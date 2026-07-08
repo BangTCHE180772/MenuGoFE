@@ -55,21 +55,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
-   * Đăng nhập
-   * @param {{ email: string, password: string }} credentials
+   * Lưu Token sau khi hoàn tất đăng nhập/2FA
    */
-  const login = async (credentials) => {
-    const res = await loginApi(credentials);
-    // TODO: Điều chỉnh tùy theo response thực tế từ BE
-    // BE trả về: { token, user: { id, name, email, role } }
-    const { token: newToken, user: userData } = res.data;
-
+  const setAuth = (newToken, userData) => {
     localStorage.setItem('access_token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
-
-    return userData;
   };
 
   /**
@@ -93,7 +85,7 @@ export const AuthProvider = ({ children }) => {
     role,
     isAuthenticated,
     isLoading,
-    login,
+    setAuth,
     logout,
     hasRole,
     ROLES,
