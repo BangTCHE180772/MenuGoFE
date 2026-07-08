@@ -9,19 +9,28 @@ import axiosInstance from './axiosInstance';
  * @returns {{ token: string, user: { id, name, email, role } }}
  */
 export const login = (credentials) =>
-  axiosInstance.post('/api/auth/login', credentials);
+  axiosInstance.post('/api/Auth/login', credentials);
+
+export const setup2FA = (accountId) =>
+  axiosInstance.post('/api/Auth/setup-2fa', { accountId });
+
+export const confirmSetup2FA = (data) =>
+  axiosInstance.post('/api/Auth/confirm-setup-2fa', data);
+
+export const verify2FA = (data) =>
+  axiosInstance.post('/api/Auth/verify-2fa', data);
 
 /**
  * Đăng xuất
  */
 export const logout = () =>
-  axiosInstance.post('/api/auth/logout');
+  axiosInstance.post('/api/Auth/logout');
 
 /**
  * Lấy thông tin user đang đăng nhập (từ token)
  */
 export const getProfile = () =>
-  axiosInstance.get('/api/auth/profile');
+  axiosInstance.get('/api/Auth/profile');
 
 /**
  * Lấy danh sách roles trong hệ thống

@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useDevice } from '../context/DeviceContext';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * Bảo vệ route: yêu cầu thiết bị đã được cấp quyền (có device_token)
@@ -9,8 +10,9 @@ import { useDevice } from '../context/DeviceContext';
  */
 const DeviceRoute = () => {
   const { isDeviceAuthorized } = useDevice();
+  const { isAuthenticated } = useAuth();
 
-  if (!isDeviceAuthorized) return <Navigate to="/login" replace />;
+  if (!isDeviceAuthorized && !isAuthenticated) return <Navigate to="/login" replace />;
 
   return <Outlet />;
 };
