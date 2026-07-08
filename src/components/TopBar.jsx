@@ -12,60 +12,65 @@ import {
   LogoutOutlined,
   UserOutlined,
   CrownOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons';
 import { useAuth, ROLES } from '../context/AuthContext';
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
-    { label: 'Tổng quan',      path: '/home',          icon: <HomeOutlined /> },
-    { label: 'Chuỗi',          path: '/chains',         icon: <ApartmentOutlined /> },
-    { label: 'Chi nhánh',      path: '/branches',       icon: <ShopOutlined /> },
-    { label: 'Nhân sự',        path: '/accounts',       icon: <TeamOutlined /> },
-    { label: 'Lịch làm việc',  path: '/work-schedule',  icon: <CalendarOutlined /> },
-    { label: 'Đơn hàng',       path: '/orders',         icon: <ShoppingCartOutlined /> },
-    { label: 'Bàn',            path: '/tables',         icon: <TableOutlined /> },
-    { label: 'Quản trị',       path: '/admin',          icon: <SettingOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Thu ngân', path: '/cashier', icon: <DesktopOutlined /> },
+    { label: 'Chuỗi', path: '/chains', icon: <ApartmentOutlined /> },
+    { label: 'Chi nhánh', path: '/branches', icon: <ShopOutlined /> },
+    { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
+    { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
+    { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
+    { label: 'Bàn', path: '/tables', icon: <TableOutlined /> },
+    { label: 'Quản trị', path: '/admin', icon: <SettingOutlined /> },
   ],
   [ROLES.OWNER]: [
-    { label: 'Tổng quan',      path: '/home',           icon: <HomeOutlined /> },
-    { label: 'Chuỗi',          path: '/chains',         icon: <ApartmentOutlined /> },
-    { label: 'Chi nhánh',      path: '/branches',       icon: <ShopOutlined /> },
-    { label: 'Nhân sự',        path: '/accounts',       icon: <TeamOutlined /> },
-    { label: 'Lịch làm việc',  path: '/work-schedule',  icon: <CalendarOutlined /> },
-    { label: 'Đơn hàng',       path: '/orders',         icon: <ShoppingCartOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Thu ngân', path: '/cashier', icon: <DesktopOutlined /> },
+    { label: 'Chuỗi', path: '/chains', icon: <ApartmentOutlined /> },
+    { label: 'Chi nhánh', path: '/branches', icon: <ShopOutlined /> },
+    { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
+    { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
+    { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
   ],
   [ROLES.MANAGER]: [
-    { label: 'Tổng quan',      path: '/home',           icon: <HomeOutlined /> },
-    { label: 'Nhân sự',        path: '/accounts',       icon: <TeamOutlined /> },
-    { label: 'Lịch làm việc',  path: '/work-schedule',  icon: <CalendarOutlined /> },
-    { label: 'Đơn hàng',       path: '/orders',         icon: <ShoppingCartOutlined /> },
-    { label: 'Bàn',            path: '/tables',         icon: <TableOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Thu ngân', path: '/cashier', icon: <DesktopOutlined /> },
+    { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
+    { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
+    { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
+    { label: 'Bàn', path: '/tables', icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [
-    { label: 'Tổng quan',      path: '/home',           icon: <HomeOutlined /> },
-    { label: 'Đơn hàng',       path: '/orders',         icon: <ShoppingCartOutlined /> },
-    { label: 'Bàn',            path: '/tables',         icon: <TableOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Thu ngân', path: '/cashier', icon: <DesktopOutlined /> },
+    { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
+    { label: 'Bàn', path: '/tables', icon: <TableOutlined /> },
   ],
   [ROLES.CHEF]: [
-    { label: 'Tổng quan',      path: '/home',           icon: <HomeOutlined /> },
-    { label: 'Lịch làm việc',  path: '/work-schedule',  icon: <CalendarOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
   ],
   [ROLES.WAITER]: [
-    { label: 'Tổng quan',      path: '/home',           icon: <HomeOutlined /> },
-    { label: 'Bàn',            path: '/tables',         icon: <TableOutlined /> },
-    { label: 'Đơn hàng',       path: '/orders',         icon: <ShoppingCartOutlined /> },
+    { label: 'Tổng quan', path: '/home', icon: <HomeOutlined /> },
+    { label: 'Bàn', path: '/tables', icon: <TableOutlined /> },
+    { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
   ],
 };
 
 // ─── Hiển thị role bằng tiếng Việt ───────────────────────────────────────
 const ROLE_LABELS = {
-  [ROLES.ADMIN]:   'Quản trị viên',
-  [ROLES.OWNER]:   'Chủ sở hữu',
+  [ROLES.ADMIN]: 'Quản trị viên',
+  [ROLES.OWNER]: 'Chủ sở hữu',
   [ROLES.MANAGER]: 'Quản lý',
   [ROLES.CASHIER]: 'Thu ngân',
-  [ROLES.CHEF]:    'Bếp trưởng',
-  [ROLES.WAITER]:  'Phục vụ',
+  [ROLES.CHEF]: 'Bếp trưởng',
+  [ROLES.WAITER]: 'Phục vụ',
 };
 
 const TopBar = () => {
