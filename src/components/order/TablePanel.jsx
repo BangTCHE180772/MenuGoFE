@@ -2,11 +2,35 @@
  * TablePanel — Panel danh sách bàn (cột trái)
  * Hiển thị grid bàn với 4 trạng thái màu sắc rõ ràng:
  *   🟢 Trống | 🔵 Đặt bàn | 🟠 Có khách | 🔴 Dọn dẹp
+ *
+ * Tính năng lọc theo Khu vực (Area):
+ *  - Tab "Tất cả" hiển thị toàn bộ bàn
+ *  - Tab theo tên khu vực: chỉ hiển thị bàn thuộc khu vực đó
  */
+import { useMemo, useState } from 'react';
 import { Spin } from 'antd';
 import { getStatusConfig, TABLE_STATUS_CONFIG } from '../../data/tableConstants';
 
 const TablePanel = ({ tables, selectedTable, onSelectTable, loading }) => {
+  const [selectedArea, setSelectedArea] = useState('all');
+
+  // Trích xuất danh sách các khu vực duy nhất từ danh sách bàn
+  const areas = useMemo(() => {
+    const areaMap = new Map();
+    tables.forEach((t) => {
+      if (t.areaId && t.areaName && !areaMap.has(t.areaId)) {
+        areaMap.set(t.areaId, { id: t.areaId, name: t.areaName });
+      }
+    });
+    return Array.from(areaMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [tables]);
+
+  // Lọc bàn theo khu vực đang chọn
+  const filteredTables = useMemo(() => {
+    if (selectedArea === 'all') return tables;
+    return tables.filter((t) => t.areaId === selectedArea);
+  }, [tables, selectedArea]);
+
   return (
     <aside className="pos-table-panel">
       {/* Header */}
@@ -15,8 +39,29 @@ const TablePanel = ({ tables, selectedTable, onSelectTable, loading }) => {
           <span className="pos-table-panel-icon"></span>
           <span>Sơ đồ bàn</span>
         </div>
-        <span className="pos-table-count">{tables.length} bàn</span>
+        <span className="pos-table-count">{filteredTables.length}/{tables.length} bàn</span>
       </div>
+
+      {/* Area Filter Tabs */}
+      {areas.length > 0 && (
+        <div className="pos-area-tabs">
+          <button
+            className={`pos-area-tab ${selectedArea === 'all' ? 'pos-area-tab--active' : ''}`}
+            onClick={() => setSelectedArea('all')}
+          >
+            Tất cả
+          </button>
+          {areas.map((area) => (
+            <button
+              key={area.id}
+              className={`pos-area-tab ${selectedArea === area.id ? 'pos-area-tab--active' : ''}`}
+              onClick={() => setSelectedArea(area.id)}
+            >
+              {area.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Legend */}
       <div className="pos-table-legend">
@@ -36,7 +81,7 @@ const TablePanel = ({ tables, selectedTable, onSelectTable, loading }) => {
         </div>
       ) : (
         <div className="pos-table-grid">
-          {tables.map((table) => {
+          {filteredTables.map((table) => {
             const cfg = getStatusConfig(table.status);
             const isSelected = selectedTable?.id === table.id;
             return (
@@ -50,9 +95,12 @@ const TablePanel = ({ tables, selectedTable, onSelectTable, loading }) => {
                   '--t-dot': cfg.dotColor,
                 }}
                 onClick={() => onSelectTable(table)}
-                title={`${table.name} — ${cfg.label}`}
+                title={`${table.name} — ${cfg.label}${table.areaName ? ` (${table.areaName})` : ''}`}
               >
                 <div className="pos-table-card-name">{table.name}</div>
+                {table.areaName && (
+                  <div className="pos-table-card-area">{table.areaName}</div>
+                )}
                 <div
                   className="pos-table-card-badge"
                   style={{ color: cfg.textColor, background: cfg.bg, borderColor: cfg.border }}
@@ -64,10 +112,10 @@ const TablePanel = ({ tables, selectedTable, onSelectTable, loading }) => {
             );
           })}
 
-          {tables.length === 0 && (
+          {filteredTables.length === 0 && (
             <div className="pos-table-empty">
               <span></span>
-              <p>Chưa có bàn nào</p>
+              <p>{selectedArea === 'all' ? 'Chưa có bàn nào' : 'Không có bàn trong khu vực này'}</p>
             </div>
           )}
         </div>
