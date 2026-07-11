@@ -741,6 +741,39 @@ img {
   font-weight: 600;
 }
 
+/* Area Filter Tabs */
+.pos-area-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0fdf4;
+  background: #f8fffe;
+}
+
+.pos-area-tab {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  background: #fff;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-area-tab:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.pos-area-tab--active {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+}
+
 /* Legend */
 .pos-table-legend {
   display: flex;
@@ -819,6 +852,16 @@ img {
   font-size: 12.5px;
   font-weight: 700;
   color: #111827;
+}
+
+.pos-table-card-area {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 400;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pos-table-card-badge {
@@ -1573,4 +1616,166 @@ img {
 }
 .pos-action-btn--confirm:active:not(:disabled) {
   transform: translateY(0);
+}
+.pos-action-btn--confirm:active:not(:disabled) { transform: translateY(0); }
+
+/* Pay button */
+.pos-action-btn--pay {
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  color: white;
+  box-shadow: 0 4px 14px rgba(29,78,216,0.35);
+}
+.pos-action-btn--pay:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(29,78,216,0.45);
+}
+.pos-action-btn--pay:active:not(:disabled) { transform: translateY(0); }
+
+/* Transfer button */
+.pos-action-btn--transfer {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: white;
+  box-shadow: 0 4px 14px rgba(124,58,237,0.3);
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.18s;
+}
+.pos-action-btn--transfer:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(124,58,237,0.4);
+}
+.pos-action-btn--cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+.pos-action-btn--cancel:hover { background: #e5e7eb; }
+
+/* ─── Order ID Bar ─────────────────────────────────────────────────────────── */
+.pos-order-id-bar {
+  margin: 0 14px 4px;
+  padding: 6px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── Menu Loading / Error ─────────────────────────────────────────────────── */
+.pos-menu-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--color-text-secondary);
+}
+
+.pos-menu-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: #dc2626;
+  font-size: 14px;
+}
+.pos-menu-error span { font-size: 40px; }
+
+/* ─── Menu Item Tag (Group Name) ───────────────────────────────────────────── */
+.pos-menu-item-tag {
+  font-size: 10.5px;
+  color: var(--color-primary);
+  background: #fff0ed;
+  border-radius: 4px;
+  padding: 1px 6px;
+  display: inline-block;
+  margin-top: 3px;
+  font-weight: 600;
+}
+
+/* ─── Payment Modal ────────────────────────────────────────────────────────── */
+.pos-payment-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.pos-payment-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.pos-payment-cash-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.pos-payment-change {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.pos-payment-change--ok {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.pos-payment-change--short {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+/* ─── Quick Cash Buttons ───────────────────────────────────────────────────── */
+.pos-quick-cash-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.pos-quick-cash-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #fff0ed;
+}
+.pos-quick-cash-btn--active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
 }

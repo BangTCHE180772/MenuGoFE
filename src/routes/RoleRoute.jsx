@@ -13,11 +13,12 @@ import Spinner from '../components/Spinner';
  * </Route>
  */
 const RoleRoute = ({ allowedRoles }) => {
-  const { isAuthenticated, role, isLoading } = useAuth();
+  const { isAuthenticated, roles, isLoading } = useAuth();
 
   if (isLoading) return <Spinner fullScreen />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!allowedRoles.includes(role)) return <Navigate to="/unauthorized" replace />;
+  // Kiểm tra user có ít nhất 1 role trong danh sách cho phép
+  if (!roles.some(r => allowedRoles.includes(r))) return <Navigate to="/unauthorized" replace />;
 
   return <Outlet />;
 };
