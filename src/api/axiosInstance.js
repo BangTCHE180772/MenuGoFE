@@ -29,9 +29,14 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const token = localStorage.getItem('access_token');
+      // Chỉ redirect về login nếu user đang có token (tức là token hết hạn/không hợp lệ)
+      // Tránh redirect vòng lặp khi user không đăng nhập gọi API public
+      if (token) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
