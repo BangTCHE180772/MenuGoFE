@@ -14,7 +14,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import { getAllTables, updateTable } from '../api/tableApi';
+import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
+import { useAuth } from '../context/AuthContext';
 import { createOrder, createOrderDetail } from '../api/orderApi';
 import { TABLE_STATUS } from '../data/tableConstants';
 import TablePanel from '../components/order/TablePanel';
@@ -28,11 +29,16 @@ const CashierPage = () => {
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
 
+  const { user } = useAuth();
+
   /* ── Load tables ─────────────────────────────────────────────────────── */
   const loadTables = useCallback(async () => {
     setTableLoading(true);
     try {
-      const res = await getAllTables();
+      const branchIds = user?.branchIds || [];
+      const res = branchIds.length > 0 
+        ? await getTablesByBranch(branchIds)
+        : await getAllTables();
       const data = res?.data;
       setTables(Array.isArray(data) ? data : []);
     } catch {
@@ -41,7 +47,7 @@ const CashierPage = () => {
     } finally {
       setTableLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 
