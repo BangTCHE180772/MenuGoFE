@@ -23,14 +23,16 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!token;
-  const role = user?.role ?? null;
+  // BE trả về user.roles (mảng), lấy phần tử đầu làm role chính
+  const roles = user?.roles ?? [];
+  const role = roles.length > 0 ? roles[0] : null;
 
   /**
    * Kiểm tra user có role được phép không
-   * @param {...string} roles - Danh sách roles cho phép
-   * @example hasRole(ROLES.MANAGER, ROLES.OWNER) // true nếu user là manager hoặc owner
+   * @param {...string} allowedRoles - Danh sách roles cho phép
    */
-  const hasRole = useCallback((...roles) => roles.includes(role), [role]);
+  const hasRole = useCallback((...allowedRoles) =>
+    roles.some(r => allowedRoles.includes(r)), [roles]);
 
   // Khi app khởi động: kiểm tra token còn hợp lệ không
   useEffect(() => {
@@ -83,6 +85,7 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     role,
+    roles,
     isAuthenticated,
     isLoading,
     setAuth,

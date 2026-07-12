@@ -12,6 +12,7 @@ import DeviceRoute from './DeviceRoute';
 import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
+import OrderPage from '../pages/OrderPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 
@@ -39,19 +40,19 @@ const AppRouter = () => {
 
             {/* Mọi role đã đăng nhập đều xem được */}
             <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
+            <Route path="/orders" element={<OrderPage />} />
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
               <Route path="/menu-management" element={<MenuManagementPage />} />
-              <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
-              <Route path="/tables"   element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
+              <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
             </Route>
 
             {/* Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
               <Route path="/branches" element={<div className="page-placeholder">🏪 Chi nhánh — Coming Soon</div>} />
-              <Route path="/chains"   element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
+              <Route path="/chains" element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
             </Route>
 
             {/* Admin only */}
