@@ -13,6 +13,7 @@ import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
+import MenuManagementPage from '../pages/MenuManagementPage';
 
 const AppRouter = () => {
   return (
@@ -41,6 +42,7 @@ const AppRouter = () => {
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+              <Route path="/menu-management" element={<MenuManagementPage />} />
               <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables"   element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
