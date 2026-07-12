@@ -1,0 +1,188 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { message, Spin } from 'antd';
+import { getAllTables, getTablesByBranch } from '../api/tableApi';
+import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
+import { useAuth } from '../context/AuthContext';
+import { getStatusConfig } from '../data/tableConstants';
+import TableDetailPanel from '../components/tablemap/TableDetailPanel';
+import '../styles/tablemap.css';
+
+const TableMapPage = () => {
+  const [tables, setTables] = useState([]);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [selectedArea, setSelectedArea] = useState('all');
+  
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [orderSummary, setOrderSummary] = useState(null);
+
+  const { user } = useAuth();
+
+  const loadTables = useCallback(async () => {
+    setLoadingTables(true);
+    try {
+      const branchIds = user?.branchIds || [];
+      const res = branchIds.length > 0 
+        ? await getTablesByBranch(branchIds)
+        : await getAllTables();
+      const data = res?.data;
+      setTables(Array.isArray(data) ? data : []);
+    } catch {
+      message.error('Không thể tải danh sách bàn. Kiểm tra kết nối server.');
+      setTables([]);
+    } finally {
+      setLoadingTables(false);
+    }
+  }, [user]);
+
+  useEffect(() => { loadTables(); }, [loadTables]);
+
+  const loadOrderSummary = useCallback(async (tableId) => {
+    setLoadingSummary(true);
+    try {
+      const res = await getTableOrderSummary(tableId);
+      setOrderSummary(res.data);
+      
+      setTables(prev => prev.map(t => {
+        if (t.id === tableId) {
+          return { 
+            ...t, 
+            pendingCount: res.data.pendingConfirmCount,
+            readyCount: res.data.readyToServeCount
+          };
+        }
+        return t;
+      }));
+    } catch (err) {
+      console.error(err);
+      setOrderSummary(null);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, []);
+
+  const handleSelectTable = (table) => {
+    setSelectedTable(table);
+    loadOrderSummary(table.id);
+  };
+
+  const handleConfirmItem = async (orderDetailId) => {
+    try {
+      await confirmOrderItem(orderDetailId);
+      message.success('Đã xác nhận món!');
+      if (selectedTable) loadOrderSummary(selectedTable.id);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    }
+  };
+
+  const handleServeItem = async (orderDetailId) => {
+    try {
+      await updateCookingStatus(orderDetailId, 'Served');
+      message.success('Đã phục vụ!');
+      if (selectedTable) loadOrderSummary(selectedTable.id);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Cập nhật thất bại');
+    }
+  };
+
+  const areas = useMemo(() => {
+    const areaMap = new Map();
+    tables.forEach((t) => {
+      if (t.areaId && t.areaName && !areaMap.has(t.areaId)) {
+        areaMap.set(t.areaId, { id: t.areaId, name: t.areaName });
+      }
+    });
+    return Array.from(areaMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [tables]);
+
+  const filteredTables = useMemo(() => {
+    if (selectedArea === 'all') return tables;
+    return tables.filter((t) => t.areaId === selectedArea);
+  }, [tables, selectedArea]);
+
+  return (
+    <div className="tablemap-page">
+      <div className="tablemap-left-col">
+        <div className="tablemap-header">
+          <h2>Sơ đồ Bàn</h2>
+          <div className="tablemap-area-tabs">
+            <button
+              className={`tablemap-tab ${selectedArea === 'all' ? 'active' : ''}`}
+              onClick={() => setSelectedArea('all')}
+            >
+              Tất cả
+            </button>
+            {areas.map((area) => (
+              <button
+                key={area.id}
+                className={`tablemap-tab ${selectedArea === area.id ? 'active' : ''}`}
+                onClick={() => setSelectedArea(area.id)}
+              >
+                {area.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingTables ? (
+          <div className="tablemap-loading-full">
+            <Spin size="large" />
+            <p>Đang tải sơ đồ bàn...</p>
+          </div>
+        ) : (
+          <div className="tablemap-grid">
+            {filteredTables.map(table => {
+              const cfg = getStatusConfig(table.status);
+              const isSelected = selectedTable?.id === table.id;
+              
+              const badgeCount = (table.pendingCount || 0) + (table.readyCount || 0);
+              const hasAlert = badgeCount > 0;
+
+              return (
+                <div
+                  key={table.id}
+                  className={`tablemap-card ${isSelected ? 'selected' : ''} ${hasAlert ? 'has-alert' : ''}`}
+                  style={{
+                    borderColor: cfg.border,
+                    backgroundColor: cfg.bg,
+                    color: cfg.textColor
+                  }}
+                  onClick={() => handleSelectTable(table)}
+                >
+                  <div className="tablemap-card-name">{table.name}</div>
+                  <div className="tablemap-card-status">
+                    <span className="dot" style={{ backgroundColor: cfg.dotColor }}></span>
+                    {cfg.label}
+                  </div>
+                  
+                  {hasAlert && (
+                    <div className="tablemap-card-badge">
+                      {badgeCount}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {filteredTables.length === 0 && (
+              <div className="tablemap-empty">Không có bàn nào</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="tablemap-right-col">
+        <TableDetailPanel 
+          table={selectedTable} 
+          summary={orderSummary} 
+          loading={loadingSummary}
+          onConfirm={handleConfirmItem}
+          onServe={handleServeItem}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default TableMapPage;
