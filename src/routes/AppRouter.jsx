@@ -16,6 +16,8 @@ import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 
+import CustomerOrderPage from '../pages/CustomerOrderPage';
+
 const AppRouter = () => {
   return (
     <BrowserRouter>
@@ -24,6 +26,7 @@ const AppRouter = () => {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
         </Route>
+        <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
         {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
         <Route element={<DeviceRoute />}>
