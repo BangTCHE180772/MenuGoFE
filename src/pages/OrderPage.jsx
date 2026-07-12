@@ -97,6 +97,19 @@ const OrderPage = () => {
 
   const handleChangeTableStatus = async (newStatus) => {
     if (!selectedTable) return;
+
+    if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
+      try {
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        if (summaryRes.data?.activeOrderId) {
+          message.warning('Bàn đang có hoá đơn chưa thanh toán. Vui lòng thanh toán hoá đơn trước khi dọn bàn!');
+          return;
+        }
+      } catch (err) {
+        console.error('Lỗi kiểm tra hoá đơn của bàn:', err);
+      }
+    }
+
     try {
       await updateTable({
         id: selectedTable.id,
