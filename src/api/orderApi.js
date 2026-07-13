@@ -16,6 +16,9 @@ export const updateOrder = (data) =>
 export const deleteOrder = (id) =>
   axiosInstance.delete(`/api/Order/${id}`);
 
+export const payOrder = (id) =>
+  axiosInstance.post(`/api/Order/${id}/pay`);
+
 // ─── Order Details ────────────────────────────────────────────────────────
 export const getOrderDetails = (orderId) =>
   axiosInstance.get(`/api/Order/${orderId}/details`);
