@@ -17,11 +17,13 @@ import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
+import { SignalRProvider } from '../context/SignalRContext';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
-      <Routes>
+      <SignalRProvider>
+        <Routes>
         {/* ── Public: không cần đăng nhập ──────────────────────────── */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
@@ -69,7 +71,8 @@ const AppRouter = () => {
         {/* ── Misc ──────────────────────────────────────────────────── */}
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
-      </Routes>
+        </Routes>
+      </SignalRProvider>
     </BrowserRouter>
   );
 };
