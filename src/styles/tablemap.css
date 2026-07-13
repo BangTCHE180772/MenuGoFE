@@ -104,6 +104,23 @@
   }
 }
 
+.tablemap-card.blinking {
+  animation: pulse-blue 1.5s infinite;
+  border-color: #1890ff !important;
+}
+
+@keyframes pulse-blue {
+  0% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(24, 144, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0);
+  }
+}
+
 .tablemap-card-name {
   font-size: 1.1rem;
   font-weight: 600;

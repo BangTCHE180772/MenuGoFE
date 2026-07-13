@@ -1,8 +1,10 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, Tag, Empty, Spin } from 'antd';
+import { Button, Tag, Empty, Spin, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleOutlined, CodeSandboxOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
 
 const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
   const navigate = useNavigate();
@@ -47,8 +49,17 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
           <QRCodeSVG value={qrUrl} size={120} />
         </div>
         <div className="tablemap-qr-info">
-          <p>Mã QR quét đặt món</p>
-          <small>Khách quét mã này để tự order tại bàn</small>
+          <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>Mã QR quét đặt món</p>
+          <small style={{ color: '#666', display: 'block', marginBottom: '8px' }}>Khách quét mã này để tự order tại bàn</small>
+          <div style={{
+            background: '#f5f5f5',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            border: '1px solid #e0e0e0',
+            wordBreak: 'break-all'
+          }}>
+            <Text copyable style={{ fontSize: '13px' }}>{qrUrl}</Text>
+          </div>
         </div>
       </div>
 
