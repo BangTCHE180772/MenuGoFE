@@ -15,6 +15,7 @@ import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
+import ContractPage from '../pages/ContractPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -53,6 +54,7 @@ const AppRouter = () => {
               <Route path="/orders" element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
+              <Route path="/contracts" element={<ContractPage />} />
             </Route>
 
             {/* Owner, Admin */}
