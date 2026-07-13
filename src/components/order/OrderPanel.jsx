@@ -76,6 +76,7 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
 /* ── OrderPanel ───────────────────────────────────────────────────────────── */
 const OrderPanel = ({
   table,
+  summary,
   cartItems,
   canOrder,
   onUpdateQty,
@@ -83,6 +84,7 @@ const OrderPanel = ({
   onNoteChange,
   onConfirm,
   onChangeStatus,
+  onPayment,
   loading,
 }) => {
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
@@ -90,7 +92,18 @@ const OrderPanel = ({
   const total = subTotal + tax;
   const cfg = table ? getStatusConfig(table.status) : null;
   const statusKey = table?.status?.toLowerCase() || 'empty';
-  const transitions = STATUS_TRANSITIONS[statusKey] || [];
+  
+  const transitions = [...(STATUS_TRANSITIONS[statusKey] || [])];
+  if (statusKey === 'occupied' && summary?.activeOrderId) {
+    const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
+    if (cleanIndex >= 0) {
+      transitions.splice(cleanIndex, 1, {
+        isPayment: true,
+        label: 'Thanh toán',
+        cls: 'btn-red'
+      });
+    }
+  }
 
   /* ─── 1. Chưa chọn bàn ────────────────────────────────────────────────── */
   if (!table) {
@@ -122,11 +135,11 @@ const OrderPanel = ({
       {/* Status Transition Buttons */}
       {transitions.length > 0 && (
         <div className="pos-status-transitions">
-          {transitions.map((t) => (
+          {transitions.map((t, idx) => (
             <button
-              key={t.to}
+              key={t.to || idx}
               className={`pos-status-btn pos-status-btn--${t.cls}`}
-              onClick={() => onChangeStatus(t.to)}
+              onClick={() => t.isPayment ? onPayment() : onChangeStatus(t.to)}
               disabled={loading}
             >
               {t.label}

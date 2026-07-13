@@ -23,6 +23,7 @@ import { TABLE_STATUS } from '../data/tableConstants';
 import TablePanel from '../components/order/TablePanel';
 import MenuPanel from '../components/order/MenuPanel';
 import OrderPanel from '../components/order/OrderPanel';
+import PaymentModal from '../components/payment/PaymentModal';
 
 const OrderPage = () => {
   const [tables, setTables] = useState([]);
@@ -30,6 +31,7 @@ const OrderPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
 
   const [searchParams] = useSearchParams();
   const tableIdParam = searchParams.get('tableId');
@@ -63,11 +65,26 @@ const OrderPage = () => {
 
   useEffect(() => { loadTables(); }, [loadTables]);
 
+  const [orderSummary, setOrderSummary] = useState(null);
+
   const handleSelectTable = (table) => {
     if (selectedTable?.id === table.id) return;
     setSelectedTable(table);
     setCartItems([]);
   };
+
+  useEffect(() => {
+    if (!selectedTable) {
+      setOrderSummary(null);
+      return;
+    }
+    getTableOrderSummary(selectedTable.id)
+      .then(res => setOrderSummary(res.data))
+      .catch(err => {
+        console.error(err);
+        setOrderSummary(null);
+      });
+  }, [selectedTable]);
 
   const handleAddItem = useCallback((item) => {
     setCartItems((prev) => {
@@ -177,6 +194,9 @@ const OrderPage = () => {
 
       message.success(`Gọi thêm món thành công!`);
       setCartItems([]);
+      
+      const newSummaryRes = await getTableOrderSummary(selectedTable.id);
+      setOrderSummary(newSummaryRes.data);
     } catch (err) {
       const msg = err?.response?.data?.message || 'Lỗi khi tạo/gọi thêm đơn hàng';
       message.error(msg);
@@ -222,6 +242,7 @@ const OrderPage = () => {
 
         <OrderPanel
           table={selectedTable}
+          summary={orderSummary}
           cartItems={cartItems}
           canOrder={isOccupied}
           onUpdateQty={handleUpdateQty}
@@ -229,9 +250,26 @@ const OrderPage = () => {
           onNoteChange={handleNoteChange}
           onConfirm={handleConfirmOrder}
           onChangeStatus={handleChangeTableStatus}
+          onPayment={() => setIsPaymentModalVisible(true)}
           loading={orderLoading}
         />
       </div>
+
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        orderId={orderSummary?.activeOrderId}
+        items={orderSummary?.items}
+        onCancel={() => setIsPaymentModalVisible(false)}
+        onSuccess={() => {
+          setIsPaymentModalVisible(false);
+          loadTables();
+          if (selectedTable) {
+            getTableOrderSummary(selectedTable.id)
+              .then(res => setOrderSummary(res.data))
+              .catch(() => setOrderSummary(null));
+          }
+        }}
+      />
     </div>
   );
 };

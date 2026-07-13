@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Tag, Empty, Spin, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined } from '@ant-design/icons';
+import PaymentModal from '../payment/PaymentModal';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
+const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPaymentSuccess }) => {
   const navigate = useNavigate();
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
 
   if (!table) {
     return (
@@ -36,12 +38,24 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
     <div className="tablemap-detail-panel">
       <div className="tablemap-detail-header">
         <h3>{table.name} {table.areaName ? `(${table.areaName})` : ''}</h3>
-        <Button
-          type="primary"
-          onClick={() => navigate(`/orders?tableId=${table.id}`)}
-        >
-          Sang trang Order
-        </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {summary?.activeOrderId && table.status === 'Occupied' && (
+            <Button
+              danger
+              type="primary"
+              icon={<DollarOutlined />}
+              onClick={() => setIsPaymentModalVisible(true)}
+            >
+              Thanh toán
+            </Button>
+          )}
+          <Button
+            type="primary"
+            onClick={() => navigate(`/orders?tableId=${table.id}`)}
+          >
+            Sang trang Order
+          </Button>
+        </div>
       </div>
 
       <div className="tablemap-qr-section">
@@ -112,6 +126,17 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
           <Empty description="Chưa có món nào được gọi" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </div>
+
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        orderId={summary?.activeOrderId}
+        items={summary?.items}
+        onCancel={() => setIsPaymentModalVisible(false)}
+        onSuccess={() => {
+          setIsPaymentModalVisible(false);
+          if (onPaymentSuccess) onPaymentSuccess(table.id);
+        }}
+      />
     </div>
   );
 };
