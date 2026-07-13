@@ -13,16 +13,22 @@ import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
+import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
+
+import CustomerOrderPage from '../pages/CustomerOrderPage';
+import { SignalRProvider } from '../context/SignalRContext';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
-      <Routes>
+      <SignalRProvider>
+        <Routes>
         {/* ── Public: không cần đăng nhập ──────────────────────────── */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
         </Route>
+        <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
         {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
         <Route element={<DeviceRoute />}>
@@ -40,6 +46,7 @@ const AppRouter = () => {
             {/* Mọi role đã đăng nhập đều xem được */}
             <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
             <Route path="/orders" element={<OrderPage />} />
+            <Route path="/table-map" element={<TableMapPage />} />
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
@@ -64,7 +71,8 @@ const AppRouter = () => {
         {/* ── Misc ──────────────────────────────────────────────────── */}
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
-      </Routes>
+        </Routes>
+      </SignalRProvider>
     </BrowserRouter>
   );
 };

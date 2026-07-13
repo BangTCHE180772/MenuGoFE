@@ -17,7 +17,6 @@ const RoleRoute = ({ allowedRoles }) => {
 
   if (isLoading) return <Spinner fullScreen />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // Kiểm tra user có ít nhất 1 role trong danh sách cho phép
   if (!roles.some(r => allowedRoles.includes(r))) return <Navigate to="/unauthorized" replace />;
 
   return <Outlet />;
