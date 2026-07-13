@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { message, Spin, Spin as AntSpin } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { createOrder, createOrderDetail } from '../api/orderApi';
+import { callStaff, requestBill } from '../api/customerActionApi';
 import MenuPanel from '../components/order/MenuPanel';
 import '../styles/customer-order.css';
 
@@ -82,8 +83,22 @@ const CustomerOrderPage = () => {
     });
   };
 
-  const handleCallStaff = () => {
-    message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
+  const handleCallStaff = async () => {
+    try {
+      await callStaff(tableId);
+      message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
+    } catch (error) {
+      message.error('Lỗi khi gọi nhân viên');
+    }
+  };
+
+  const handleRequestBill = async () => {
+    try {
+      await requestBill(tableId);
+      message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
+    } catch (error) {
+      message.error('Lỗi khi gửi yêu cầu');
+    }
   };
 
   const handleSubmitOrder = async () => {
@@ -143,11 +158,29 @@ const CustomerOrderPage = () => {
 
   return (
     <div className="co-page">
-      <div className="co-header">
-        <div className="co-header-title">{summary.tableName}</div>
-        <div className={`co-header-status ${isOccupied ? 'occupied' : 'empty'}`}>
-          {getTableStatusText(summary.tableStatus)}
+      <div className="co-header" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div className="co-header-title">{summary.tableName}</div>
+          <div className={`co-header-status ${isOccupied ? 'occupied' : 'empty'}`}>
+            {getTableStatusText(summary.tableStatus)}
+          </div>
         </div>
+        {isOccupied && summary?.items?.length > 0 && (
+          <button 
+            onClick={handleRequestBill}
+            style={{
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Thanh toán
+          </button>
+        )}
       </div>
 
       <div className="co-tabs">

@@ -3,6 +3,7 @@ import { message, Spin } from 'antd';
 import { getAllTables, getTablesByBranch } from '../api/tableApi';
 import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
 import { useAuth } from '../context/AuthContext';
+import { useSignalR } from '../context/SignalRContext';
 import { getStatusConfig } from '../data/tableConstants';
 import TableDetailPanel from '../components/tablemap/TableDetailPanel';
 import '../styles/tablemap.css';
@@ -17,6 +18,28 @@ const TableMapPage = () => {
   const [orderSummary, setOrderSummary] = useState(null);
 
   const { user } = useAuth();
+  const connection = useSignalR();
+
+  useEffect(() => {
+    if (connection) {
+      const handleNotification = (data) => {
+        if (data.tableId) {
+          setTables(prev => prev.map(t => {
+            if (t.id === data.tableId) {
+              return { ...t, isBlinking: true };
+            }
+            return t;
+          }));
+          
+          if (selectedTable?.id === data.tableId) {
+            loadOrderSummary(data.tableId);
+          }
+        }
+      };
+      connection.on('ReceiveNotification', handleNotification);
+      return () => connection.off('ReceiveNotification', handleNotification);
+    }
+  }, [connection, selectedTable]);
 
   const loadTables = useCallback(async () => {
     setLoadingTables(true);
@@ -64,6 +87,7 @@ const TableMapPage = () => {
   const handleSelectTable = (table) => {
     setSelectedTable(table);
     loadOrderSummary(table.id);
+    setTables(prev => prev.map(t => t.id === table.id ? { ...t, isBlinking: false } : t));
   };
 
   const handleConfirmItem = async (orderDetailId) => {
@@ -142,7 +166,7 @@ const TableMapPage = () => {
               return (
                 <div
                   key={table.id}
-                  className={`tablemap-card ${isSelected ? 'selected' : ''} ${hasAlert ? 'has-alert' : ''}`}
+                  className={`tablemap-card ${isSelected ? 'selected' : ''} ${hasAlert ? 'has-alert' : ''} ${table.isBlinking ? 'blinking' : ''}`}
                   style={{
                     borderColor: cfg.border,
                     backgroundColor: cfg.bg,
