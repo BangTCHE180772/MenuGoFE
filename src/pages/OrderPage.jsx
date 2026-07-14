@@ -24,6 +24,7 @@ import TablePanel from '../components/order/TablePanel';
 import MenuPanel from '../components/order/MenuPanel';
 import OrderPanel from '../components/order/OrderPanel';
 import PaymentModal from '../components/payment/PaymentModal';
+import MergeTableModal from '../components/tablemap/MergeTableModal';
 
 const OrderPage = () => {
   const [tables, setTables] = useState([]);
@@ -32,6 +33,7 @@ const OrderPage = () => {
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
 
   const [searchParams] = useSearchParams();
   const tableIdParam = searchParams.get('tableId');
@@ -251,6 +253,7 @@ const OrderPage = () => {
           onConfirm={handleConfirmOrder}
           onChangeStatus={handleChangeTableStatus}
           onPayment={() => setIsPaymentModalVisible(true)}
+          onMerge={() => setIsMergeModalVisible(true)}
           loading={orderLoading}
         />
       </div>
@@ -270,6 +273,23 @@ const OrderPage = () => {
           }
         }}
       />
+
+      {isMergeModalVisible && (
+        <MergeTableModal
+          visible={isMergeModalVisible}
+          onClose={() => setIsMergeModalVisible(false)}
+          tables={tables}
+          currentTable={selectedTable}
+          onMerged={() => {
+            loadTables();
+            if (selectedTable) {
+              getTableOrderSummary(selectedTable.id)
+                .then(res => setOrderSummary(res.data))
+                .catch(() => setOrderSummary(null));
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Tag, Empty, Spin, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined } from '@ant-design/icons';
 import PaymentModal from '../payment/PaymentModal';
+import MergeTableModal from './MergeTableModal';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPaymentSuccess }) => {
+const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPaymentSuccess, tables }) => {
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
 
   if (!table) {
     return (
@@ -38,16 +40,25 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
     <div className="tablemap-detail-panel">
       <div className="tablemap-detail-header">
         <h3>{table.name} {table.areaName ? `(${table.areaName})` : ''}</h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {summary?.activeOrderId && table.status === 'Occupied' && (
-            <Button
-              danger
-              type="primary"
-              icon={<DollarOutlined />}
-              onClick={() => setIsPaymentModalVisible(true)}
-            >
-              Thanh toán
-            </Button>
+            <>
+              <Button
+                type="dashed"
+                icon={<BranchesOutlined />}
+                onClick={() => setIsMergeModalVisible(true)}
+              >
+                Gộp bàn
+              </Button>
+              <Button
+                danger
+                type="primary"
+                icon={<DollarOutlined />}
+                onClick={() => setIsPaymentModalVisible(true)}
+              >
+                Thanh toán
+              </Button>
+            </>
           )}
           <Button
             type="primary"
@@ -137,6 +148,16 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
           if (onPaymentSuccess) onPaymentSuccess(table.id);
         }}
       />
+
+      {isMergeModalVisible && (
+        <MergeTableModal
+          visible={isMergeModalVisible}
+          onClose={() => setIsMergeModalVisible(false)}
+          tables={tables}
+          currentTable={table}
+          onMerged={onPaymentSuccess}
+        />
+      )}
     </div>
   );
 };

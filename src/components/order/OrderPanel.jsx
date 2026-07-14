@@ -85,6 +85,7 @@ const OrderPanel = ({
   onConfirm,
   onChangeStatus,
   onPayment,
+  onMerge,
   loading,
 }) => {
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
@@ -133,7 +134,7 @@ const OrderPanel = ({
       </div>
 
       {/* Status Transition Buttons */}
-      {transitions.length > 0 && (
+      {(transitions.length > 0 || table.status === 'Occupied') && (
         <div className="pos-status-transitions">
           {transitions.map((t, idx) => (
             <button
@@ -145,6 +146,16 @@ const OrderPanel = ({
               {t.label}
             </button>
           ))}
+          {table.status === 'Occupied' && (
+            <button
+              className="pos-status-btn pos-status-btn--default"
+              style={{ background: '#eab308', color: '#fff', borderColor: '#eab308' }}
+              onClick={onMerge}
+              disabled={loading}
+            >
+              Gộp bàn
+            </button>
+          )}
         </div>
       )}
 
