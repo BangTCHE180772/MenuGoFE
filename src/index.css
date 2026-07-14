@@ -222,15 +222,15 @@ img {
 /* login-page-background */
 .login-page-background {
   position: fixed;
-  inset: 0; 
+  inset: 0;
   width: 100vw;
   height: 100vh;
 
-  background-size: cover; 
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 
-  z-index: -1; 
+  z-index: -1;
 }
 
 /* Login Card */
@@ -291,9 +291,13 @@ img {
 }
 
 /* Form inputs */
-.login-form { margin-bottom: 4px; }
+.login-form {
+  margin-bottom: 4px;
+}
 
-.login-input-icon { color: var(--color-text-secondary); }
+.login-input-icon {
+  color: var(--color-text-secondary);
+}
 
 /*  login button */
 /* div manager and working button */
@@ -304,12 +308,12 @@ img {
 }
 
 /* button manager */
-.login-mode-manager{
+.login-mode-manager {
   flex: 1;
   height: 44px;
   border-radius: 8px;
-  background: green!important;
-  color: white!important;
+  background: green !important;
+  color: white !important;
 }
 .login-mode-manager.ant-btn:hover {
   transform: translateY(-2px) !important;
@@ -317,7 +321,7 @@ img {
 }
 .login-mode-manager.ant-btn:active {
   transform: translateY(0) !important;
-} 
+}
 
 /* button working */
 .login-mode-working {
@@ -342,34 +346,26 @@ img {
 }
 .login-btn-primary.ant-btn:active {
   transform: translateY(0) !important;
-} 
+}
 
 /* forgot password and register links */
-.forgot-password-register-links{
+.forgot-password-links-div {
   margin-top: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
 }
-.forgot-password-link{
+.forgot-password-link {
   font-size: 10px;
   color: var(--color-text-secondary);
   text-decoration: none;
   transition: color 0.2s ease;
 }
-.register-link{
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-.forgot-password-link:hover,
-.register-link:hover {
+.forgot-password-link:hover {
   color: var(--color-primary);
   text-decoration: underline;
 }
-
 
 /* Cashier button */
 /* .login-btn-cashier.ant-btn {
@@ -396,7 +392,8 @@ img {
   color: var(--color-text-secondary);
   font-size: 12px;
   margin-top: 10px;
-} */ */
+} */
+*/
 
 /* ─── Cashier Layout (POS — light green theme) ───────────────────────────── */
 .cashier-layout {
@@ -420,8 +417,17 @@ img {
   font-weight: 500;
 }
 
-.badge-green { background: rgba(34,197,94,0.2); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
-.badge-blue  { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); } */
+.badge-green {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.badge-blue {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+*/
 
 /* ─── Home Page ───────────────────────────────────────────────────────────── */
 .home-page {
