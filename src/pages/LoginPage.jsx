@@ -98,8 +98,6 @@ const LoginPage = () => {
         code: pin,
       });
       const data = res.data;
-      setAuth(data.token, data.user);
-      message.success(`Xác thực thành công! Chào mừng ${data.user.name}.`);
       HandleLoginNavigate(data.user, data.token);
     } catch (err) {
       message.error(err.response?.data?.message || "Mã xác thực không đúng.");
@@ -110,20 +108,7 @@ const LoginPage = () => {
 
   // ========================================================================================================= HANDLE LOGIN NAVIGATE
   const HandleLoginNavigate = (user, token) => {
-    if (loginMode.toLocaleLowerCase() === "manager".toLocaleLowerCase()) {
-      const role = user.role.name.toLowerCase();
-
-      if (!["manager", "owner", "admin"].includes(role)) {
-        message.error(
-          "Tài khoản này không có quyền truy cập màn hình Quản lý.",
-        );
-        return;
-      }
-
-      setAuth(token, user);
-      message.success(` Chào mừng trở lại, ${user.name}! 👋`);
-      navigate("/manager");
-    } else if (loginMode.toLocaleLowerCase() === "pos".toLocaleLowerCase()) {
+    if (loginMode.toLocaleLowerCase() === "pos".toLocaleLowerCase()) {
       if (!isDeviceAuthorized) {
         message.error("Thiết bị này chưa được cấp quyền.");
         return;
@@ -212,37 +197,20 @@ const LoginPage = () => {
               />
             </Form.Item>
 
-            <div className="login-mode-manager-working">
-              <Button
-                htmlType="submit"
-                size="large"
-                loading={
-                  loading && loginMode.toLowerCase() === "manager".toLowerCase()
-                }
-                block
-                className="login-mode-manager"
-                onClick={() => setLoginMode("manager")}
-              >
-                {loading && loginMode.toLowerCase() === "manager".toLowerCase()
-                  ? "Quản lý..."
-                  : "Quản lý"}
-              </Button>
-
-              <Button
-                htmlType="submit"
-                size="large"
-                loading={
-                  loading && loginMode.toLowerCase() === "pos".toLowerCase()
-                }
-                block
-                className="login-mode-working"
-                onClick={() => setLoginMode("pos")}
-              >
-                {loading && loginMode.toLowerCase() === "pos".toLowerCase()
-                  ? "Bán hàng..."
-                  : "Bán hàng"}
-              </Button>
-            </div>
+            <Button
+              htmlType="submit"
+              size="large"
+              loading={
+                loading && loginMode.toLowerCase() === "pos".toLowerCase()
+              }
+              block
+              className="login-mode-working"
+              onClick={() => setLoginMode("pos")}
+            >
+              {loading && loginMode.toLowerCase() === "pos".toLowerCase()
+                ? "Bán hàng..."
+                : "Bán hàng"}
+            </Button>
 
             <Button
               type="primary"
@@ -256,7 +224,7 @@ const LoginPage = () => {
               onClick={() => setLoginMode("Login")}
             >
               {loading && loginMode.toLowerCase() === "Login".toLowerCase()
-                ? "Đang đăng nhập..."
+                ? "Đang đăng nhập"
                 : "Đăng nhập"}
             </Button>
 
