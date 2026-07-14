@@ -15,6 +15,7 @@ import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
+import MenuManagementPage from '../pages/MenuManagementPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -50,7 +51,8 @@ const AppRouter = () => {
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/orders" element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
+              <Route path="/menu-management" element={<MenuManagementPage />} />
+              <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
             </Route>
