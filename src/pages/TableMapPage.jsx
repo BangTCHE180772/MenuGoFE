@@ -207,6 +207,7 @@ const TableMapPage = () => {
           loading={loadingSummary}
           onConfirm={handleConfirmItem}
           onServe={handleServeItem}
+          tables={tables}
           onPaymentSuccess={(tableId) => {
             loadTables();
             loadOrderSummary(tableId);

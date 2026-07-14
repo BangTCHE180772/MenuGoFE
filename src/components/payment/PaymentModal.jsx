@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Table, Typography, Button, message, Divider } from 'antd';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col } from 'antd';
 import { payOrder } from '../../api/orderApi';
 
 const { Text, Title } = Typography;
@@ -8,6 +8,17 @@ const formatPrice = (price) => Number(price).toLocaleString('vi-VN') + 'đ';
 
 const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerDeclined, setCustomerDeclined] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setCustomerPhone('');
+      setCustomerName('');
+      setCustomerDeclined(false);
+    }
+  }, [visible]);
 
   const groupedItems = useMemo(() => {
     if (!items) return [];
@@ -48,7 +59,11 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
 
     setLoading(true);
     try {
-      await payOrder(orderId);
+      const payload = {
+        customerName: customerDeclined ? null : customerName,
+        customerPhone: customerDeclined ? null : customerPhone,
+      };
+      await payOrder(orderId, payload);
       message.success('Thanh toán thành công. Bàn đã chuyển sang trạng thái cần dọn dẹp!');
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -115,6 +130,43 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       />
 
       <Divider style={{ margin: '16px 0' }} />
+
+      {/* Customer Info Section */}
+      <div style={{ marginBottom: 16, padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text strong>Thông tin khách hàng</Text>
+          <Checkbox 
+            checked={customerDeclined} 
+            onChange={(e) => {
+              setCustomerDeclined(e.target.checked);
+              if (e.target.checked) {
+                setCustomerPhone('');
+                setCustomerName('');
+              }
+            }}
+          >
+            Khách không cung cấp
+          </Checkbox>
+        </div>
+        <Row gutter={12}>
+          <Col span={12}>
+            <Input 
+              placeholder="Tên khách hàng" 
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              disabled={customerDeclined}
+            />
+          </Col>
+          <Col span={12}>
+            <Input 
+              placeholder="Số điện thoại" 
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              disabled={customerDeclined}
+            />
+          </Col>
+        </Row>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '200px' }}>
