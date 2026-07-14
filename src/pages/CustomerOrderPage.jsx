@@ -165,22 +165,40 @@ const CustomerOrderPage = () => {
             {getTableStatusText(summary.tableStatus)}
           </div>
         </div>
-        {isOccupied && summary?.items?.length > 0 && (
-          <button 
-            onClick={handleRequestBill}
-            style={{
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            Thanh toán
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {isOccupied && (
+            <button
+              onClick={handleCallStaff}
+              style={{
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Gọi phục vụ hỗ trợ
+            </button>
+          )}
+          {isOccupied && summary?.items?.length > 0 && (
+            <button
+              onClick={handleRequestBill}
+              style={{
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Thanh toán
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="co-tabs">

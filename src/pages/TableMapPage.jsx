@@ -20,27 +20,6 @@ const TableMapPage = () => {
   const { user } = useAuth();
   const connection = useSignalR();
 
-  useEffect(() => {
-    if (connection) {
-      const handleNotification = (data) => {
-        if (data.tableId) {
-          setTables(prev => prev.map(t => {
-            if (t.id === data.tableId) {
-              return { ...t, isBlinking: true };
-            }
-            return t;
-          }));
-          
-          if (selectedTable?.id === data.tableId) {
-            loadOrderSummary(data.tableId);
-          }
-        }
-      };
-      connection.on('ReceiveNotification', handleNotification);
-      return () => connection.off('ReceiveNotification', handleNotification);
-    }
-  }, [connection, selectedTable]);
-
   const loadTables = useCallback(async () => {
     setLoadingTables(true);
     try {
@@ -57,8 +36,6 @@ const TableMapPage = () => {
       setLoadingTables(false);
     }
   }, [user]);
-
-  useEffect(() => { loadTables(); }, [loadTables]);
 
   const loadOrderSummary = useCallback(async (tableId) => {
     setLoadingSummary(true);
@@ -83,6 +60,33 @@ const TableMapPage = () => {
       setLoadingSummary(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (connection) {
+      const handleNotification = (data) => {
+        if (data.tableId) {
+          if (data.type === 'Payment') {
+            loadTables();
+          } else {
+            setTables(prev => prev.map(t => {
+              if (t.id === data.tableId) {
+                return { ...t, isBlinking: true };
+              }
+              return t;
+            }));
+          }
+          
+          if (selectedTable?.id === data.tableId) {
+            loadOrderSummary(data.tableId);
+          }
+        }
+      };
+      connection.on('ReceiveNotification', handleNotification);
+      return () => connection.off('ReceiveNotification', handleNotification);
+    }
+  }, [connection, selectedTable, loadTables, loadOrderSummary]);
+
+  useEffect(() => { loadTables(); }, [loadTables]);
 
   const handleSelectTable = (table) => {
     setSelectedTable(table);
@@ -203,6 +207,11 @@ const TableMapPage = () => {
           loading={loadingSummary}
           onConfirm={handleConfirmItem}
           onServe={handleServeItem}
+          tables={tables}
+          onPaymentSuccess={(tableId) => {
+            loadTables();
+            loadOrderSummary(tableId);
+          }}
         />
       </div>
     </div>
