@@ -25,6 +25,9 @@ export const mergeOrder = (data) =>
 export const unmergeOrder = (id) =>
   axiosInstance.delete(`/api/Order/${id}/unmerge`);
 
+export const moveOrder = (id, data) =>
+  axiosInstance.post(`/api/Order/${id}/move`, data);
+
 // ─── Order Details ────────────────────────────────────────────────────────
 export const getOrderDetails = (orderId) =>
   axiosInstance.get(`/api/Order/${orderId}/details`);

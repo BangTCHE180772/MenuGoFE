@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Tag, Empty, Spin, Typography, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined, SwapOutlined } from '@ant-design/icons';
 import PaymentModal from '../payment/PaymentModal';
 import MergeTableModal from './MergeTableModal';
+import MoveTableModal from './MoveTableModal';
 import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
@@ -13,6 +14,7 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+  const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
   const handleUnmerge = () => {
     Modal.confirm({
@@ -83,6 +85,13 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
                 onClick={() => setIsMergeModalVisible(true)}
               >
                 Gộp bàn
+              </Button>
+              <Button
+                type="default"
+                icon={<SwapOutlined />}
+                onClick={() => setIsMoveModalVisible(true)}
+              >
+                Chuyển bàn
               </Button>
               <Button
                 danger
@@ -190,6 +199,17 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
           tables={tables}
           currentTable={table}
           onMerged={onPaymentSuccess}
+        />
+      )}
+
+      {isMoveModalVisible && (
+        <MoveTableModal
+          visible={isMoveModalVisible}
+          onClose={() => setIsMoveModalVisible(false)}
+          tables={tables}
+          currentTable={table}
+          summary={summary}
+          onMoved={onPaymentSuccess}
         />
       )}
     </div>
