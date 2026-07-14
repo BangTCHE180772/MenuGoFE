@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, Tag, Empty, Spin, Typography } from 'antd';
+import { Button, Tag, Empty, Spin, Typography, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined } from '@ant-design/icons';
 import PaymentModal from '../payment/PaymentModal';
 import MergeTableModal from './MergeTableModal';
+import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
 
@@ -12,6 +13,30 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+
+  const handleUnmerge = () => {
+    Modal.confirm({
+      title: 'Xác nhận tách bàn',
+      content: `Bạn có chắc chắn muốn tách ${table.name} ra khỏi nhóm đã gộp không?`,
+      okText: 'Tách bàn',
+      okType: 'danger',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          if (!summary?.originalOrderId) {
+            message.error("Không tìm thấy thông tin đơn hàng gốc của bàn này.");
+            return;
+          }
+          await unmergeOrder(summary.originalOrderId);
+          message.success("Tách bàn thành công!");
+          if (onPaymentSuccess) onPaymentSuccess(table.id);
+        } catch (err) {
+          console.error(err);
+          message.error(err.response?.data?.message || "Lỗi khi tách bàn");
+        }
+      }
+    });
+  };
 
   if (!table) {
     return (
@@ -43,6 +68,15 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {summary?.activeOrderId && table.status === 'Occupied' && (
             <>
+              {summary?.isMerged && (
+                <Button
+                  danger
+                  icon={<DisconnectOutlined />}
+                  onClick={handleUnmerge}
+                >
+                  Tách bàn
+                </Button>
+              )}
               <Button
                 type="dashed"
                 icon={<BranchesOutlined />}
