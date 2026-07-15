@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Tag, Empty, Spin, Typography, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined, SwapOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined, SwapOutlined } from '@ant-design/icons';
 import PaymentModal from '../payment/PaymentModal';
 import MergeTableModal from './MergeTableModal';
 import MoveTableModal from './MoveTableModal';
@@ -10,7 +10,7 @@ import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPaymentSuccess, tables }) => {
+const TableDetailPanel = ({ table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables }) => {
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
@@ -153,14 +153,34 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe, onPayme
 
                 <div className="tablemap-item-actions">
                   {item.status === 'CustomerPending' && (
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CheckCircleOutlined />}
-                      onClick={() => onConfirm(item.orderDetailId)}
-                    >
-                      Xác nhận
-                    </Button>
+                    <>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<CheckCircleOutlined />}
+                        onClick={() => onConfirm(item.orderDetailId)}
+                      >
+                        Xác nhận
+                      </Button>
+                      <Button
+                        danger
+                        size="small"
+                        icon={<CloseCircleOutlined />}
+                        onClick={() => {
+                          Modal.confirm({
+                            title: 'Từ chối món',
+                            content: `Bạn có chắc chắn muốn từ chối món "${item.productName}" không?`,
+                            okText: 'Từ chối',
+                            okType: 'danger',
+                            cancelText: 'Hủy',
+                            onOk: () => onReject(item.orderDetailId)
+                          });
+                        }}
+                        style={{ marginLeft: '8px' }}
+                      >
+                        Từ chối
+                      </Button>
+                    </>
                   )}
                   {item.status === 'Confirmed' && item.cookingStatus === 'Ready' && (
                     <Button

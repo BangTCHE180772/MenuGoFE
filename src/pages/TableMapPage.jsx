@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { message, Spin } from 'antd';
 import { getAllTables, getTablesByBranch } from '../api/tableApi';
 import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
+import { cancelOrderDetail } from '../api/orderApi';
 import { useAuth } from '../context/AuthContext';
 import { useSignalR } from '../context/SignalRContext';
 import { getStatusConfig } from '../data/tableConstants';
@@ -101,6 +102,16 @@ const TableMapPage = () => {
       if (selectedTable) loadOrderSummary(selectedTable.id);
     } catch (err) {
       message.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    }
+  };
+
+  const handleRejectItem = async (orderDetailId) => {
+    try {
+      await cancelOrderDetail(orderDetailId);
+      message.success('Đã từ chối món!');
+      if (selectedTable) loadOrderSummary(selectedTable.id);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Từ chối thất bại');
     }
   };
 
@@ -206,6 +217,7 @@ const TableMapPage = () => {
           summary={orderSummary} 
           loading={loadingSummary}
           onConfirm={handleConfirmItem}
+          onReject={handleRejectItem}
           onServe={handleServeItem}
           tables={tables}
           onPaymentSuccess={(tableId) => {
