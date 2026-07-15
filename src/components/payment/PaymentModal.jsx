@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col } from 'antd';
+import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, AutoComplete } from 'antd';
 import { payOrder } from '../../api/orderApi';
+import { searchCustomersOData } from '../../api/reservationApi';
 
 const { Text, Title } = Typography;
 
@@ -11,6 +12,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerDeclined, setCustomerDeclined] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState([]);
+  let searchTimeout = null;
 
   useEffect(() => {
     if (visible) {
@@ -19,6 +22,34 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       setCustomerDeclined(false);
     }
   }, [visible]);
+
+  const handleSearchCustomer = (value) => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    setCustomerPhone(value);
+    if (!value) {
+      setCustomerOptions([]);
+      return;
+    }
+    searchTimeout = setTimeout(async () => {
+      try {
+        const res = await searchCustomersOData(value);
+        if (res && res.value) {
+          setCustomerOptions(res.value.map(c => ({
+            value: c.phone,
+            label: `${c.phone} - ${c.name}`,
+            customer: c
+          })));
+        }
+      } catch (err) {
+        console.error('Error searching customer:', err);
+      }
+    }, 500); // 500ms debounce
+  };
+
+  const handleSelectCustomer = (value, option) => {
+    setCustomerPhone(value);
+    setCustomerName(option.customer.name);
+  };
 
   const groupedItems = useMemo(() => {
     if (!items) return [];
@@ -158,11 +189,15 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
             />
           </Col>
           <Col span={12}>
-            <Input 
-              placeholder="Số điện thoại" 
+            <AutoComplete
+              options={customerOptions}
+              onSearch={handleSearchCustomer}
+              onSelect={handleSelectCustomer}
               value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
+              onChange={setCustomerPhone}
               disabled={customerDeclined}
+              style={{ width: '100%' }}
+              placeholder="Số điện thoại"
             />
           </Col>
         </Row>
