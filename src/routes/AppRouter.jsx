@@ -14,6 +14,7 @@ import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
+import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
@@ -47,6 +48,7 @@ const AppRouter = () => {
             <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
             <Route path="/orders" element={<OrderPage />} />
             <Route path="/table-map" element={<TableMapPage />} />
+            <Route path="/reservations" element={<ReservationPage />} />
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
