@@ -1,13 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, Tag, Empty, Spin, Typography } from 'antd';
+import { Button, Tag, Empty, Spin, Typography, message, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, CodeSandboxOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined, SwapOutlined } from '@ant-design/icons';
+import PaymentModal from '../payment/PaymentModal';
+import MergeTableModal from './MergeTableModal';
+import MoveTableModal from './MoveTableModal';
+import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
+const TableDetailPanel = ({ table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables }) => {
   const navigate = useNavigate();
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+  const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
+
+  const handleUnmerge = () => {
+    Modal.confirm({
+      title: 'Xác nhận tách bàn',
+      content: `Bạn có chắc chắn muốn tách ${table.name} ra khỏi nhóm đã gộp không?`,
+      okText: 'Tách bàn',
+      okType: 'danger',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          if (!summary?.originalOrderId) {
+            message.error("Không tìm thấy thông tin đơn hàng gốc của bàn này.");
+            return;
+          }
+          await unmergeOrder(summary.originalOrderId);
+          message.success("Tách bàn thành công!");
+          if (onPaymentSuccess) onPaymentSuccess(table.id);
+        } catch (err) {
+          console.error(err);
+          message.error(err.response?.data?.message || "Lỗi khi tách bàn");
+        }
+      }
+    });
+  };
 
   if (!table) {
     return (
@@ -36,12 +67,49 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
     <div className="tablemap-detail-panel">
       <div className="tablemap-detail-header">
         <h3>{table.name} {table.areaName ? `(${table.areaName})` : ''}</h3>
-        <Button
-          type="primary"
-          onClick={() => navigate(`/orders?tableId=${table.id}`)}
-        >
-          Sang trang Order
-        </Button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {summary?.activeOrderId && table.status === 'Occupied' && (
+            <>
+              {summary?.isMerged && (
+                <Button
+                  danger
+                  icon={<DisconnectOutlined />}
+                  onClick={handleUnmerge}
+                >
+                  Tách bàn
+                </Button>
+              )}
+              <Button
+                type="dashed"
+                icon={<BranchesOutlined />}
+                onClick={() => setIsMergeModalVisible(true)}
+              >
+                Gộp bàn
+              </Button>
+              <Button
+                type="default"
+                icon={<SwapOutlined />}
+                onClick={() => setIsMoveModalVisible(true)}
+              >
+                Chuyển bàn
+              </Button>
+              <Button
+                danger
+                type="primary"
+                icon={<DollarOutlined />}
+                onClick={() => setIsPaymentModalVisible(true)}
+              >
+                Thanh toán
+              </Button>
+            </>
+          )}
+          <Button
+            type="primary"
+            onClick={() => navigate(`/orders?tableId=${table.id}`)}
+          >
+            Sang trang Order
+          </Button>
+        </div>
       </div>
 
       <div className="tablemap-qr-section">
@@ -85,14 +153,34 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
 
                 <div className="tablemap-item-actions">
                   {item.status === 'CustomerPending' && (
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CheckCircleOutlined />}
-                      onClick={() => onConfirm(item.orderDetailId)}
-                    >
-                      Xác nhận
-                    </Button>
+                    <>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<CheckCircleOutlined />}
+                        onClick={() => onConfirm(item.orderDetailId)}
+                      >
+                        Xác nhận
+                      </Button>
+                      <Button
+                        danger
+                        size="small"
+                        icon={<CloseCircleOutlined />}
+                        onClick={() => {
+                          Modal.confirm({
+                            title: 'Từ chối món',
+                            content: `Bạn có chắc chắn muốn từ chối món "${item.productName}" không?`,
+                            okText: 'Từ chối',
+                            okType: 'danger',
+                            cancelText: 'Hủy',
+                            onOk: () => onReject(item.orderDetailId)
+                          });
+                        }}
+                        style={{ marginLeft: '8px' }}
+                      >
+                        Từ chối
+                      </Button>
+                    </>
                   )}
                   {item.status === 'Confirmed' && item.cookingStatus === 'Ready' && (
                     <Button
@@ -112,6 +200,38 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onServe }) => {
           <Empty description="Chưa có món nào được gọi" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </div>
+
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        orderId={summary?.activeOrderId}
+        items={summary?.items}
+        onCancel={() => setIsPaymentModalVisible(false)}
+        onSuccess={() => {
+          setIsPaymentModalVisible(false);
+          if (onPaymentSuccess) onPaymentSuccess(table.id);
+        }}
+      />
+
+      {isMergeModalVisible && (
+        <MergeTableModal
+          visible={isMergeModalVisible}
+          onClose={() => setIsMergeModalVisible(false)}
+          tables={tables}
+          currentTable={table}
+          onMerged={onPaymentSuccess}
+        />
+      )}
+
+      {isMoveModalVisible && (
+        <MoveTableModal
+          visible={isMoveModalVisible}
+          onClose={() => setIsMoveModalVisible(false)}
+          tables={tables}
+          currentTable={table}
+          summary={summary}
+          onMoved={onPaymentSuccess}
+        />
+      )}
     </div>
   );
 };

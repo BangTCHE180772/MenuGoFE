@@ -391,7 +391,6 @@ img {
   margin-top: 10px;
 } */
 
-
 /* ─── Cashier Layout (POS — light green theme) ───────────────────────────── */
 .cashier-layout {
   min-height: 100vh;
@@ -424,7 +423,6 @@ img {
   color: #a5b4fc;
   border: 1px solid rgba(99, 102, 241, 0.3);
 }
-
 
 /* ─── Home Page ───────────────────────────────────────────────────────────── */
 .home-page {
