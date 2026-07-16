@@ -14,16 +14,19 @@ import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
+import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
+import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
       <SignalRProvider>
+        <GlobalReservationListener />
         <Routes>
         {/* ── Public: không cần đăng nhập ──────────────────────────── */}
         <Route element={<AuthLayout />}>
@@ -48,6 +51,7 @@ const AppRouter = () => {
             <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
             <Route path="/orders" element={<OrderPage />} />
             <Route path="/table-map" element={<TableMapPage />} />
+            <Route path="/reservations" element={<ReservationPage />} />
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>

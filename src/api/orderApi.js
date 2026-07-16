@@ -43,3 +43,9 @@ export const updateOrderDetail = (orderId, id, data) =>
 
 export const deleteOrderDetail = (orderId, id) =>
   axiosInstance.delete(`/api/Order/${orderId}/details/${id}`);
+
+export const cancelOrder = (id) =>
+  axiosInstance.put(`/api/Order/${id}/cancel`);
+
+export const cancelOrderDetail = (id) =>
+  axiosInstance.put(`/api/Order/details/${id}/cancel`);

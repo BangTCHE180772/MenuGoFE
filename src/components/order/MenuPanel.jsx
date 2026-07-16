@@ -3,67 +3,80 @@
  * Lấy dữ liệu trực tiếp từ BE qua API /api/Menu/{menuId}/products
  * Các tab danh mục được tạo động từ trường GroupName trả về từ DB
  */
-import { useState, useEffect, useMemo } from 'react';
-import { Spin } from 'antd';
-import { getMenuProducts } from '../../api/menuApi';
-
-// ID của menu chính — khớp với seed data: Menu Id = 1 "Thực đơn chính"
-const DEFAULT_MENU_ID = 1;
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Spin, message } from 'antd';
+import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 
 const formatPrice = (price) =>
   Number(price).toLocaleString('vi-VN') + 'đ';
 
 const MenuPanel = ({ onAddItem, canOrder }) => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeGroup, setActiveGroup] = useState('all');
   const [search, setSearch] = useState('');
 
+  const searchTimeout = useRef(null);
+
   /* ── Fetch sản phẩm từ API ─────────────────────────────────────────────── */
+  /* ── Lấy danh sách danh mục lúc ban đầu ────────────────────────────────── */
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
+    const fetchCategories = async () => {
       try {
-        const res = await getMenuProducts(DEFAULT_MENU_ID);
-        setProducts(res.data || []);
+        const res = await getAllGroups();
+        if (res.data) {
+          const dynamic = res.data.map(g => ({
+            id: String(g.id),
+            name: g.name
+          }));
+          setCategories([{ id: 'all', name: 'Tất cả' }, ...dynamic]);
+        }
       } catch (err) {
-        console.error('Lỗi tải menu:', err);
-        setError('Không thể tải thực đơn. Vui lòng thử lại.');
-      } finally {
-        setLoading(false);
+        console.error('Lỗi tải danh mục:', err);
       }
     };
-    fetchProducts();
+    fetchCategories();
   }, []);
 
-  /* ── Tạo danh sách danh mục động từ DB ────────────────────────────────── */
-  const categories = useMemo(() => {
-    const groupMap = new Map();
-    products.forEach((p) => {
-      if (p.groupId && !groupMap.has(p.groupId)) {
-        groupMap.set(p.groupId, p.groupName || 'Khác');
+  const fetchProducts = async (searchText, groupId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await searchProductsOData(searchText, groupId);
+      if (res && res.value) {
+        const mappedProducts = res.value.map(p => ({
+          id: p.Id,
+          name: p.Name,
+          sellPrice: p.SellPrice,
+          description: p.Description,
+          groupId: p.GroupId,
+          groupName: p.Group ? p.Group.Name : 'Khác'
+        }));
+        setProducts(mappedProducts);
+      } else {
+        setProducts([]);
       }
-    });
-    const dynamic = Array.from(groupMap.entries()).map(([id, name]) => ({
-      id: String(id),
-      name,
-    }));
-    return [{ id: 'all', name: 'Tất cả' }, ...dynamic];
-  }, [products]);
+    } catch (err) {
+      console.error('Lỗi tải thực đơn (OData):', err);
+      setError('Không thể tải thực đơn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  /* ── Lọc sản phẩm theo danh mục + tìm kiếm ────────────────────────────── */
-  const filteredItems = useMemo(() => {
-    return products.filter((p) => {
-      const matchGroup =
-        activeGroup === 'all' || String(p.groupId) === activeGroup;
-      const matchSearch = p.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
-      return matchGroup && matchSearch;
-    });
-  }, [products, activeGroup, search]);
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    searchTimeout.current = setTimeout(() => {
+      fetchProducts(search, activeGroup);
+    }, 500);
+
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [search, activeGroup]);
 
   /* ── Loading state ─────────────────────────────────────────────────────── */
   if (loading) {
@@ -104,7 +117,7 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
             <button className="pos-menu-search-clear" onClick={() => setSearch('')}>✕</button>
           )}
         </div>
-        <span className="pos-menu-count">{filteredItems.length} món</span>
+        <span className="pos-menu-count">{products.length} món</span>
       </div>
 
       {/* Category Tabs — tạo động từ DB */}
@@ -123,7 +136,7 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
       {/* Item Grid — wrapped to allow overlay */}
       <div className="pos-menu-grid-wrap">
         <div className="pos-menu-grid">
-          {filteredItems.map((item) => (
+          {products.map((item) => (
             <button
               key={item.id}
               className={`pos-menu-item ${canOrder ? 'pos-menu-item--clickable' : ''}`}
@@ -148,7 +161,7 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
             </button>
           ))}
 
-          {filteredItems.length === 0 && (
+          {products.length === 0 && (
             <div className="pos-menu-no-result">
               <span></span>
               <p>Không tìm thấy món phù hợp</p>
