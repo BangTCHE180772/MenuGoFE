@@ -148,18 +148,9 @@ const CustomerOrderPage = () => {
       let orderId = summary?.activeOrderId;
 
       if (!orderId) {
-        const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-        const total = Math.round(subTotal * 1.08);
-        const orderRes = await createOrder({
-          tableId: Number(tableId),
-          fatherId: null,
-          method: 'DineIn',
-          status: 'Active',
-          customerId: null,
-          totalAmount: total,
-          createdBy: 0,
-        });
-        orderId = orderRes?.data?.id ?? orderRes?.data;
+        message.error("Bàn chưa được mở, vui lòng liên hệ nhân viên!");
+        setOrderLoading(false);
+        return;
       }
 
       await Promise.all(
