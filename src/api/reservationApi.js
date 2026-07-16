@@ -20,6 +20,11 @@ export const cancelReservation = async (id) => {
   return response.data;
 };
 
+export const changeTable = async (id, newTableId) => {
+  const response = await axiosInstance.put(`/api/Reservation/${id}/change-table`, { newTableId });
+  return response.data;
+};
+
 export const searchCustomersOData = async (phoneStr) => {
   const response = await axiosInstance.get(`/odata/CustomerOData?$filter=contains(Phone, '${phoneStr}')&$top=5`);
   return response.data;

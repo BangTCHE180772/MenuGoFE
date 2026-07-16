@@ -19,11 +19,13 @@ import UnauthorizedPage from '../pages/UnauthorizedPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
+import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
       <SignalRProvider>
+        <GlobalReservationListener />
         <Routes>
         {/* ── Public: không cần đăng nhập ──────────────────────────── */}
         <Route element={<AuthLayout />}>
