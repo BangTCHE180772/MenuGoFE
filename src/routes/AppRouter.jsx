@@ -17,6 +17,7 @@ import TableMapPage from '../pages/TableMapPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import AccountPage from '../pages/AccountPage';
+import WorkSchedulePage from '../pages/WorkSchedulePage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -46,9 +47,10 @@ const AppRouter = () => {
             <Route path="/home" element={<HomePage />} />
 
             {/* Mọi role đã đăng nhập đều xem được */}
-            <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
+            <Route path="/work-schedule" element={<WorkSchedulePage />} />
             <Route path="/orders" element={<OrderPage />} />
             <Route path="/table-map" element={<TableMapPage />} />
+
 
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
