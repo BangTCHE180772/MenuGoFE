@@ -13,59 +13,72 @@ import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
+import TableMapPage from '../pages/TableMapPage';
+import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
+
+import CustomerOrderPage from '../pages/CustomerOrderPage';
+import { SignalRProvider } from '../context/SignalRContext';
+import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 
 const AppRouter = () => {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* ── Public: không cần đăng nhập ──────────────────────────── */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-        </Route>
-
-        {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
-        <Route element={<DeviceRoute />}>
-          <Route element={<CashierLayout />}>
-            <Route path="/cashier" element={<CashierPage />} />
+      <SignalRProvider>
+        <GlobalReservationListener />
+        <Routes>
+          {/* ── Public: không cần đăng nhập ──────────────────────────── */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
           </Route>
-        </Route>
+          <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
-        {/* ── Private: cần đăng nhập ────────────────────────────────── */}
-        <Route element={<PrivateRoute />}>
-          <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<HomePage />} />
-
-            {/* Mọi role đã đăng nhập đều xem được */}
-            <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
-            <Route path="/orders" element={<OrderPage />} />
-
-            {/* Manager, Owner, Admin */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/menu-management" element={<MenuManagementPage />} />
-              <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
-              <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
-            </Route>
-
-            {/* Owner, Admin */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/branches" element={<div className="page-placeholder">🏪 Chi nhánh — Coming Soon</div>} />
-              <Route path="/chains" element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
-            </Route>
-
-            {/* Admin only */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
-              <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+          {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
+          <Route element={<DeviceRoute />}>
+            <Route element={<CashierLayout />}>
+              <Route path="/cashier" element={<CashierPage />} />
             </Route>
           </Route>
-        </Route>
 
-        {/* ── Misc ──────────────────────────────────────────────────── */}
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
-        <Route path="*" element={<Navigate to="/home" replace />} />
-      </Routes>
+          {/* ── Private: cần đăng nhập ────────────────────────────────── */}
+          <Route element={<PrivateRoute />}>
+            <Route element={<MainLayout />}>
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="/home" element={<HomePage />} />
+
+              {/* Mọi role đã đăng nhập đều xem được */}
+              <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
+              <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/reservations" element={<ReservationPage />} />
+
+              {/* Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/menu-management" element={<MenuManagementPage />} />
+                <Route path="/orders" element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
+                <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
+                <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
+              </Route>
+
+              {/* Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/branches" element={<div className="page-placeholder">🏪 Chi nhánh — Coming Soon</div>} />
+                <Route path="/chains" element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
+              </Route>
+
+              {/* Admin only */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+                <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+              </Route>
+            </Route>
+          </Route>
+
+          {/* ── Misc ──────────────────────────────────────────────────── */}
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
+      </SignalRProvider>
     </BrowserRouter>
   );
 };

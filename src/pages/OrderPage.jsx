@@ -13,52 +13,81 @@
  * Quy tắc: Chỉ được gọi món khi bàn status = "Occupied" (kiểm tra ở BE)
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { message } from 'antd';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { createOrder, createOrderDetail } from '../api/orderApi';
+import { getTableOrderSummary } from '../api/tableMapApi';
 import { TABLE_STATUS } from '../data/tableConstants';
 import TablePanel from '../components/order/TablePanel';
 import MenuPanel from '../components/order/MenuPanel';
 import OrderPanel from '../components/order/OrderPanel';
+import PaymentModal from '../components/payment/PaymentModal';
+import MergeTableModal from '../components/tablemap/MergeTableModal';
 
-const CashierPage = () => {
+const OrderPage = () => {
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const tableIdParam = searchParams.get('tableId');
 
   const { user } = useAuth();
 
-  /* ── Load tables ─────────────────────────────────────────────────────── */
   const loadTables = useCallback(async () => {
     setTableLoading(true);
     try {
       const branchIds = user?.branchIds || [];
-      const res = branchIds.length > 0 
+      const res = branchIds.length > 0
         ? await getTablesByBranch(branchIds)
         : await getAllTables();
       const data = res?.data;
-      setTables(Array.isArray(data) ? data : []);
+      const loadedTables = Array.isArray(data) ? data : [];
+      setTables(loadedTables);
+
+      if (tableIdParam && loadedTables.length > 0) {
+        const t = loadedTables.find(x => x.id.toString() === tableIdParam);
+        if (t) {
+          setSelectedTable(t);
+        }
+      }
     } catch {
       message.error('Không thể tải danh sách bàn. Kiểm tra kết nối server.');
       setTables([]);
     } finally {
       setTableLoading(false);
     }
-  }, [user]);
+  }, [user, tableIdParam]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 
-  /* ── Chọn bàn ─────────────────────────────────────────────────────────── */
+  const [orderSummary, setOrderSummary] = useState(null);
+
   const handleSelectTable = (table) => {
     if (selectedTable?.id === table.id) return;
     setSelectedTable(table);
-    setCartItems([]); // clear giỏ khi đổi bàn
+    setCartItems([]);
   };
 
-  /* ── Thêm / sửa / xóa món trong giỏ ─────────────────────────────────── */
+  useEffect(() => {
+    if (!selectedTable) {
+      setOrderSummary(null);
+      return;
+    }
+    getTableOrderSummary(selectedTable.id)
+      .then(res => setOrderSummary(res.data))
+      .catch(err => {
+        console.error(err);
+        setOrderSummary(null);
+      });
+  }, [selectedTable]);
+
   const handleAddItem = useCallback((item) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
@@ -85,9 +114,21 @@ const CashierPage = () => {
     setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, note } : i));
   }, []);
 
-  /* ── Cập nhật trạng thái bàn ─────────────────────────────────────────── */
   const handleChangeTableStatus = async (newStatus) => {
     if (!selectedTable) return;
+
+    if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
+      try {
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        if (summaryRes.data?.activeOrderId) {
+          message.warning('Bàn đang có hoá đơn chưa thanh toán. Vui lòng thanh toán hoá đơn trước khi dọn bàn!');
+          return;
+        }
+      } catch (err) {
+        console.error('Lỗi kiểm tra hoá đơn của bàn:', err);
+      }
+    }
+
     try {
       await updateTable({
         id: selectedTable.id,
@@ -99,7 +140,7 @@ const CashierPage = () => {
       const updated = { ...selectedTable, status: newStatus };
       setSelectedTable(updated);
       setTables((prev) => prev.map((t) => t.id === updated.id ? updated : t));
-      // Xoá giỏ nếu bàn không còn là Có khách
+
       if (newStatus !== TABLE_STATUS.OCCUPIED) setCartItems([]);
       message.success('Đã cập nhật trạng thái bàn');
     } catch (err) {
@@ -108,7 +149,7 @@ const CashierPage = () => {
     }
   };
 
-  /* ── Xác nhận gọi món → tạo Order + OrderDetails trên BE ─────────────── */
+
   const handleConfirmOrder = async () => {
     if (!selectedTable || cartItems.length === 0) return;
 
@@ -119,23 +160,26 @@ const CashierPage = () => {
     }
 
     const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-    const total = Math.round(subTotal * 1.08); // + VAT 8%
+    const total = Math.round(subTotal * 1.08);
 
     setOrderLoading(true);
     try {
-      /* 1. Tạo Order */
-      const orderRes = await createOrder({
-        tableId: selectedTable.id,
-        fatherId: null,
-        method: 'DineIn',
-        status: 'Pending',
-        customerId: null,
-        totalAmount: total,
-        createdBy: 1,
-      });
-      const orderId = orderRes?.data?.id ?? orderRes?.data;
+      const summaryRes = await getTableOrderSummary(selectedTable.id);
+      let orderId = summaryRes.data?.activeOrderId;
 
-      /* 2. Tạo từng OrderDetail */
+      if (!orderId) {
+        const orderRes = await createOrder({
+          tableId: selectedTable.id,
+          fatherId: null,
+          method: 'DineIn',
+          status: 'Active',
+          customerId: null,
+          totalAmount: total,
+          createdBy: 1,
+        });
+        orderId = orderRes?.data?.id ?? orderRes?.data;
+      }
+
       await Promise.all(
         cartItems.map((item) =>
           createOrderDetail(orderId, {
@@ -144,34 +188,35 @@ const CashierPage = () => {
             quantity: item.qty,
             price: item.price,
             note: item.note || '',
-            status: 'Pending',
+            status: 'Confirmed',
             cookingStatus: 'Waiting',
           })
         )
       );
 
-      message.success(`Gọi món thành công! Mã đơn: #${orderId}`);
-      setCartItems([]); // clear giỏ sau khi gọi thành công
+      message.success(`Gọi thêm món thành công!`);
+      setCartItems([]);
+      
+      const newSummaryRes = await getTableOrderSummary(selectedTable.id);
+      setOrderSummary(newSummaryRes.data);
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Lỗi khi tạo đơn hàng';
+      const msg = err?.response?.data?.message || 'Lỗi khi tạo/gọi thêm đơn hàng';
       message.error(msg);
     } finally {
       setOrderLoading(false);
     }
   };
 
-  /* ── Render ──────────────────────────────────────────────────────────── */
   const isOccupied = selectedTable?.status?.toLowerCase() === 'occupied';
 
   return (
     <div className="pos-page">
-      {/* Thanh info trên cùng */}
       <div className="pos-top-bar">
         <div className="pos-top-bar-left">
           <span className="pos-top-bar-icon"></span>
           <span className="pos-top-bar-title">MenuGo POS</span>
           <span className="pos-top-bar-divider">|</span>
-          <span className="pos-top-bar-sub">Thu ngân</span>
+          <span className="pos-top-bar-sub">Phục vụ</span>
         </div>
         <div className="pos-top-bar-right">
           <span className="pos-top-bar-time" suppressHydrationWarning>
@@ -199,6 +244,7 @@ const CashierPage = () => {
 
         <OrderPanel
           table={selectedTable}
+          summary={orderSummary}
           cartItems={cartItems}
           canOrder={isOccupied}
           onUpdateQty={handleUpdateQty}
@@ -206,11 +252,46 @@ const CashierPage = () => {
           onNoteChange={handleNoteChange}
           onConfirm={handleConfirmOrder}
           onChangeStatus={handleChangeTableStatus}
+          onPayment={() => setIsPaymentModalVisible(true)}
+          onMerge={() => setIsMergeModalVisible(true)}
           loading={orderLoading}
         />
       </div>
+
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        orderId={orderSummary?.activeOrderId}
+        items={orderSummary?.items}
+        onCancel={() => setIsPaymentModalVisible(false)}
+        onSuccess={() => {
+          setIsPaymentModalVisible(false);
+          loadTables();
+          if (selectedTable) {
+            getTableOrderSummary(selectedTable.id)
+              .then(res => setOrderSummary(res.data))
+              .catch(() => setOrderSummary(null));
+          }
+        }}
+      />
+
+      {isMergeModalVisible && (
+        <MergeTableModal
+          visible={isMergeModalVisible}
+          onClose={() => setIsMergeModalVisible(false)}
+          tables={tables}
+          currentTable={selectedTable}
+          onMerged={() => {
+            loadTables();
+            if (selectedTable) {
+              getTableOrderSummary(selectedTable.id)
+                .then(res => setOrderSummary(res.data))
+                .catch(() => setOrderSummary(null));
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
 
-export default CashierPage;
+export default OrderPage;
