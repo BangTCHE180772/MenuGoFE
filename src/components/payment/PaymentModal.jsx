@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, AutoComplete } from 'antd';
+import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col } from 'antd';
 import { payOrder } from '../../api/orderApi';
-import { searchCustomersOData } from '../../api/reservationApi';
+import CustomerSearchInput from '../common/CustomerSearchInput';
 
 const { Text, Title } = Typography;
 
@@ -12,8 +12,6 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerDeclined, setCustomerDeclined] = useState(false);
-  const [customerOptions, setCustomerOptions] = useState([]);
-  let searchTimeout = null;
 
   useEffect(() => {
     if (visible) {
@@ -23,32 +21,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
     }
   }, [visible]);
 
-  const handleSearchCustomer = (value) => {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    setCustomerPhone(value);
-    if (!value) {
-      setCustomerOptions([]);
-      return;
-    }
-    searchTimeout = setTimeout(async () => {
-      try {
-        const res = await searchCustomersOData(value);
-        if (res && res.value) {
-          setCustomerOptions(res.value.map(c => ({
-            value: c.phone,
-            label: `${c.phone} - ${c.name}`,
-            customer: c
-          })));
-        }
-      } catch (err) {
-        console.error('Error searching customer:', err);
-      }
-    }, 500); // 500ms debounce
-  };
-
-  const handleSelectCustomer = (value, option) => {
-    setCustomerPhone(value);
-    setCustomerName(option.customer.name);
+  const handleSelectCustomer = (customer) => {
+    setCustomerName(customer.name);
   };
 
   const groupedItems = useMemo(() => {
@@ -166,8 +140,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       <div style={{ marginBottom: 16, padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <Text strong>Thông tin khách hàng</Text>
-          <Checkbox 
-            checked={customerDeclined} 
+          <Checkbox
+            checked={customerDeclined}
             onChange={(e) => {
               setCustomerDeclined(e.target.checked);
               if (e.target.checked) {
@@ -181,23 +155,20 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
         </div>
         <Row gutter={12}>
           <Col span={12}>
-            <Input 
-              placeholder="Tên khách hàng" 
+            <Input
+              placeholder="Tên khách hàng"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               disabled={customerDeclined}
             />
           </Col>
           <Col span={12}>
-            <AutoComplete
-              options={customerOptions}
-              onSearch={handleSearchCustomer}
-              onSelect={handleSelectCustomer}
+            <CustomerSearchInput 
               value={customerPhone}
               onChange={setCustomerPhone}
+              onSelectCustomer={handleSelectCustomer}
               disabled={customerDeclined}
               style={{ width: '100%' }}
-              placeholder="Số điện thoại"
             />
           </Col>
         </Row>

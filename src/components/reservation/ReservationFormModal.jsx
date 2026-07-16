@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message, AutoComplete } from 'antd';
+import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createReservation, searchCustomersOData } from '../../api/reservationApi';
 import { getAllTables, getTablesByBranch } from '../../api/tableApi';
+import { getAllBranches } from '../../api/branchApi';
 import { getMenuProducts } from '../../api/menuApi';
 import { useAuth } from '../../context/AuthContext';
 import MenuSelectionModal from './MenuSelectionModal';
+import CustomerSearchInput from '../common/CustomerSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -19,31 +21,51 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
   const [fetchingData, setFetchingData] = useState(false);
   const [preOrderItems, setPreOrderItems] = useState([]);
   const [isMenuModalVisible, setIsMenuModalVisible] = useState(false);
-  const [customerOptions, setCustomerOptions] = useState([]);
-  let searchTimeout = null;
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState(null);
 
   useEffect(() => {
     if (visible) {
       form.resetFields();
       setPreOrderItems([]);
-      fetchFormData();
+      fetchBranchesAndData();
     }
   }, [visible, form]);
 
-  const fetchFormData = async () => {
+  const fetchBranchesAndData = async () => {
     setFetchingData(true);
     try {
-      const branchIds = user?.branchIds || [];
-      const tablesPromise = branchIds.length > 0
-        ? getTablesByBranch(branchIds)
-        : getAllTables();
+      const branchesRes = await getAllBranches();
+      const allBranches = branchesRes.data;
+      
+      let availableBranches = allBranches;
+      if (user?.branchIds && user.branchIds.length > 0) {
+        availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
+      }
+      setBranches(availableBranches);
+      
+      const defaultBranch = availableBranches.length > 0 ? availableBranches[0].id : null;
+      setSelectedBranch(defaultBranch);
+      
+      if (defaultBranch) {
+        await fetchTablesAndProducts(defaultBranch);
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải dữ liệu chi nhánh');
+    } finally {
+      setFetchingData(false);
+    }
+  };
 
+  const fetchTablesAndProducts = async (branchId) => {
+    setFetchingData(true);
+    try {
       const [tablesRes, productsRes] = await Promise.all([
-        tablesPromise,
+        getTablesByBranch([branchId]),
         getMenuProducts(1)
       ]);
 
-      const availableTables = tablesRes.data.filter(t => t.status === 'Empty');
+      const availableTables = tablesRes.data.filter(t => t.status === 'Empty' || t.status === 'Available');
       setTables(availableTables);
       setProducts(productsRes.data);
     } catch (error) {
@@ -53,30 +75,14 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     }
   };
 
-  const handleSearchCustomer = (value) => {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    if (!value) {
-      setCustomerOptions([]);
-      return;
-    }
-    searchTimeout = setTimeout(async () => {
-      try {
-        const res = await searchCustomersOData(value);
-        if (res && res.value) {
-          setCustomerOptions(res.value.map(c => ({
-            value: c.phone,
-            label: `${c.phone} - ${c.name}`,
-            customer: c
-          })));
-        }
-      } catch (err) {
-        console.error('Error searching customer:', err);
-      }
-    }, 500);
+  const handleBranchChange = (val) => {
+    setSelectedBranch(val);
+    form.setFieldsValue({ tableId: undefined });
+    fetchTablesAndProducts(val);
   };
 
-  const handleSelectCustomer = (value, option) => {
-    form.setFieldsValue({ customerName: option.customer.name });
+  const handleSelectCustomer = (customer) => {
+    form.setFieldsValue({ customerName: customer.name });
   };
 
   const handleAddPreOrderItem = (productId) => {
@@ -223,12 +229,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
               rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
               style={{ flex: 1 }}
             >
-              <AutoComplete
-                options={customerOptions}
-                onSearch={handleSearchCustomer}
-                onSelect={handleSelectCustomer}
-                placeholder="0912345678"
-              />
+              <CustomerSearchInput onSelectCustomer={handleSelectCustomer} />
             </Form.Item>
           </div>
 
@@ -259,6 +260,20 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
           <Form.Item name="note" label="Ghi Chú Đặt Bàn">
             <Input.TextArea rows={2} placeholder="Yêu cầu đặc biệt..." />
           </Form.Item>
+
+          {branches.length > 0 && (
+            <Form.Item label="Chi Nhánh">
+              <Select
+                value={selectedBranch}
+                onChange={handleBranchChange}
+                placeholder="Chọn chi nhánh"
+              >
+                {branches.map(b => (
+                  <Select.Option key={b.id} value={b.id}>{b.name}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
 
           <Form.Item name="tableIds" label="Xếp Bàn (Tùy chọn)">
             <Select
