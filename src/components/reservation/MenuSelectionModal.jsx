@@ -1,27 +1,77 @@
-import React, { useState, useMemo } from 'react';
-import { Modal, Tabs, List, Card, Button, InputNumber, Typography, Row, Col, Space, Badge } from 'antd';
-import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Modal, Tabs, List, Card, Button, InputNumber, Typography, Row, Col, Space, Badge, Input, Spin, message } from 'antd';
+import { PlusOutlined, MinusOutlined, SearchOutlined } from '@ant-design/icons';
+import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 
 const { Title, Text } = Typography;
 
-const MenuSelectionModal = ({ visible, onCancel, onConfirm, products, initialSelectedItems }) => {
+const MenuSelectionModal = ({ visible, onCancel, onConfirm, initialSelectedItems }) => {
   const [selectedItems, setSelectedItems] = useState(initialSelectedItems || []);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
+  const [products, setProducts] = useState([]);
+  const [activeGroup, setActiveGroup] = useState('all');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const searchTimeout = useRef(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
       setSelectedItems(initialSelectedItems || []);
+      fetchCategories();
     }
   }, [visible, initialSelectedItems]);
 
-  const categories = useMemo(() => {
-    const map = { 'Tất cả': products };
-    products.forEach(p => {
-      const groupName = p.group?.name || 'Chưa phân loại';
-      if (!map[groupName]) map[groupName] = [];
-      map[groupName].push(p);
-    });
-    return map;
-  }, [products]);
+  const fetchCategories = async () => {
+    try {
+      const res = await getAllGroups();
+      if (res.data) {
+        const dynamic = res.data.map(g => ({
+          id: String(g.id),
+          name: g.name
+        }));
+        setCategories([{ id: 'all', name: 'Tất cả' }, ...dynamic]);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh mục:', err);
+    }
+  };
+
+  const fetchProducts = async (searchText, groupId) => {
+    setLoading(true);
+    try {
+      const res = await searchProductsOData(searchText, groupId);
+      if (res && res.value) {
+        setProducts(res.value.map(p => ({
+          id: p.Id,
+          name: p.Name,
+          sellPrice: p.SellPrice,
+          description: p.Description,
+          imageUrl: p.ImageUrl,
+          groupId: p.GroupId,
+          groupName: p.Group ? p.Group.Name : 'Khác'
+        })));
+      } else {
+        setProducts([]);
+      }
+    } catch (err) {
+      console.error('Lỗi tải thực đơn (OData):', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    
+    searchTimeout.current = setTimeout(() => {
+      fetchProducts(search, activeGroup);
+    }, 500);
+
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [search, activeGroup, visible]);
 
   const handleUpdateQuantity = (product, delta) => {
     setSelectedItems(prev => {
@@ -64,47 +114,64 @@ const MenuSelectionModal = ({ visible, onCancel, onConfirm, products, initialSel
       style={{ top: 20 }}
       bodyStyle={{ height: '60vh', overflow: 'hidden', padding: 0 }}
     >
-      <Row style={{ height: '100%' }}>
-        <Col span={16} style={{ height: '100%', display: 'flex', flexDirection: 'column', borderRight: '1px solid #f0f0f0' }}>
+      <Row style={{ height: '600px' }}>
+        <Col span={16} style={{ borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px 16px 0 16px' }}>
+            <Input
+              prefix={<SearchOutlined />}
+              placeholder="Tìm kiếm món ăn..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              allowClear
+            />
+          </div>
           <Tabs
-            defaultActiveKey="Tất cả"
+            activeKey={activeGroup}
+            onChange={setActiveGroup}
             style={{ padding: '0 16px', flex: 1, display: 'flex', flexDirection: 'column' }}
-            items={Object.keys(categories).map(catName => ({
-              key: catName,
-              label: catName,
+            items={categories.map(cat => ({
+              key: cat.id,
+              label: cat.name,
               children: (
-                <div style={{ height: 'calc(60vh - 60px)', overflowY: 'auto', paddingBottom: 16 }}>
-                  <Row gutter={[16, 16]}>
-                    {categories[catName].map(p => {
-                      const qty = getQuantity(p.id);
-                      return (
-                        <Col span={8} key={p.id}>
-                          <Badge count={qty} offset={[-10, 10]} color="#52c41a">
-                            <Card
-                              hoverable
-                              bodyStyle={{ padding: 12, textAlign: 'center' }}
-                              style={{ height: '100%', borderColor: qty > 0 ? '#1890ff' : '#f0f0f0' }}
-                              onClick={() => handleUpdateQuantity(p, 1)}
-                            >
-                              {p.imageUrl && (
-                                <img
-                                  src={p.imageUrl}
-                                  alt={p.name}
-                                  style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 4, marginBottom: 8 }}
-                                />
-                              )}
-                              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                {p.name}
-                              </div>
-                              <Text type="success" strong>
-                                {Number(p.sellPrice).toLocaleString('vi-VN')}đ
-                              </Text>
-                            </Card>
-                          </Badge>
+                <div style={{ height: '480px', overflowY: 'auto', paddingRight: 8 }}>
+                  <Spin spinning={loading}>
+                    <Row gutter={[16, 16]}>
+                      {products.map(p => {
+                        const qty = getQuantity(p.id);
+                        return (
+                          <Col span={8} key={p.id}>
+                            <Badge count={qty} offset={[-10, 10]} color="#52c41a">
+                              <Card
+                                hoverable
+                                bodyStyle={{ padding: 12, textAlign: 'center' }}
+                                style={{ height: '100%', borderColor: qty > 0 ? '#1890ff' : '#f0f0f0' }}
+                                onClick={() => handleUpdateQuantity(p, 1)}
+                              >
+                                {p.imageUrl && (
+                                  <img
+                                    src={p.imageUrl}
+                                    alt={p.name}
+                                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 4, marginBottom: 8 }}
+                                  />
+                                )}
+                                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                  {p.name}
+                                </div>
+                                <Text type="success" strong>
+                                  {Number(p.sellPrice).toLocaleString('vi-VN')}đ
+                                </Text>
+                              </Card>
+                            </Badge>
+                          </Col>
+                        );
+                      })}
+                      {!loading && products.length === 0 && (
+                        <Col span={24} style={{ textAlign: 'center', marginTop: 40, color: '#999' }}>
+                          Không có món nào phù hợp.
                         </Col>
-                      );
-                    })}
-                  </Row>
+                      )}
+                    </Row>
+                  </Spin>
                 </div>
               )
             }))}

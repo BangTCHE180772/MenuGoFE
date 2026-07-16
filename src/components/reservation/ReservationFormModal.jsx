@@ -5,7 +5,6 @@ import dayjs from 'dayjs';
 import { createReservation, searchCustomersOData } from '../../api/reservationApi';
 import { getAllTables, getTablesByBranch } from '../../api/tableApi';
 import { getAllBranches } from '../../api/branchApi';
-import { getMenuProducts } from '../../api/menuApi';
 import { useAuth } from '../../context/AuthContext';
 import MenuSelectionModal from './MenuSelectionModal';
 import CustomerSearchInput from '../common/CustomerSearchInput';
@@ -17,7 +16,6 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [tables, setTables] = useState([]);
-  const [products, setProducts] = useState([]);
   const [fetchingData, setFetchingData] = useState(false);
   const [preOrderItems, setPreOrderItems] = useState([]);
   const [isMenuModalVisible, setIsMenuModalVisible] = useState(false);
@@ -37,16 +35,16 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     try {
       const branchesRes = await getAllBranches();
       const allBranches = branchesRes.data;
-      
+
       let availableBranches = allBranches;
       if (user?.branchIds && user.branchIds.length > 0) {
         availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
       }
       setBranches(availableBranches);
-      
+
       const defaultBranch = availableBranches.length > 0 ? availableBranches[0].id : null;
       setSelectedBranch(defaultBranch);
-      
+
       if (defaultBranch) {
         await fetchTablesAndProducts(defaultBranch);
       }
@@ -60,16 +58,12 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
   const fetchTablesAndProducts = async (branchId) => {
     setFetchingData(true);
     try {
-      const [tablesRes, productsRes] = await Promise.all([
-        getTablesByBranch([branchId]),
-        getMenuProducts(1)
-      ]);
+      const tablesRes = await getTablesByBranch([branchId]);
 
       const availableTables = tablesRes.data.filter(t => t.status === 'Empty' || t.status === 'Available');
       setTables(availableTables);
-      setProducts(productsRes.data);
     } catch (error) {
-      message.error('Lỗi khi tải dữ liệu bàn và thực đơn');
+      message.error('Lỗi khi tải dữ liệu bàn');
     } finally {
       setFetchingData(false);
     }
@@ -142,7 +136,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       message.success('Đã tạo đặt bàn thành công!');
       onSuccess();
     } catch (error) {
-      if (error.errorFields) return; // Validation error
+      if (error.errorFields) return;
       message.error(error.response?.data?.message || 'Tạo đặt bàn thất bại');
     } finally {
       setLoading(false);
@@ -316,7 +310,6 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       <MenuSelectionModal
         visible={isMenuModalVisible}
         onCancel={() => setIsMenuModalVisible(false)}
-        products={products}
         initialSelectedItems={preOrderItems}
         onConfirm={(items) => {
           setPreOrderItems(items);
