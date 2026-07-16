@@ -19,9 +19,9 @@ const CustomerSearchInput = ({ value, onChange, onSelectCustomer, placeholder = 
         const res = await searchCustomersOData(searchText);
         if (res && res.value) {
           setOptions(res.value.map(c => ({
-            value: c.phone,
-            label: `${c.phone} - ${c.name}`,
-            customer: c
+            value: c.Phone,
+            label: `${c.Phone} - ${c.Name}`,
+            customer: { ...c, id: c.Id, name: c.Name, phone: c.Phone }
           })));
         }
       } catch (err) {
