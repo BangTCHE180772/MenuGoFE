@@ -29,7 +29,9 @@ const LoginPage = () => {
   const logoUrl = "/src/assets/logo.png";
   const backgroundlogoUrl = "/src/assets/background.png";
 
-  //STEP 1: LOGIN
+  const [loginMode, setLoginMode] = useState("Login");
+
+  //================================================================================================================= HANDLE LOGIN
   const handleLogin = async (values) => {
     setLoading(true);
     try {
@@ -47,9 +49,7 @@ const LoginPage = () => {
         setAccountId(data.accountId);
         setStep(3);
       } else if (data.status === "success") {
-        setAuth(data.token, data.user);
-        message.success(`Chào mừng trở lại, ${data.user.name}! 👋`);
-        navigate("/home");
+        HandleLoginNavigate(data.user, data.token);
       }
     } catch (err) {
       const errorMsg =
@@ -61,7 +61,7 @@ const LoginPage = () => {
     }
   };
 
-  //STEP 2: SETUP 2FA CONFIRM
+  //============================================================================================================== HANDLE 2FA SETUP
   const handleConfirmSetup = async () => {
     if (!pin || pin.length !== 6) {
       message.error("Vui lòng nhập đúng 6 số.");
@@ -77,7 +77,7 @@ const LoginPage = () => {
       const data = res.data;
       setAuth(data.token, data.user);
       message.success(`Cài đặt 2FA thành công! Chào mừng ${data.user.name}.`);
-      navigate("/home");
+      HandleLoginNavigate(data.user, data.token);
     } catch (err) {
       message.error(err.response?.data?.message || "Mã xác thực không đúng.");
     } finally {
@@ -85,7 +85,7 @@ const LoginPage = () => {
     }
   };
 
-  //STEP 3: VERIFY 2FA
+  //============================================================================================================ HANDLE 2FA VERIFY
   const handleVerify2FA = async () => {
     if (!pin || pin.length !== 6) {
       message.error("Vui lòng nhập đúng 6 số.");
@@ -98,9 +98,7 @@ const LoginPage = () => {
         code: pin,
       });
       const data = res.data;
-      setAuth(data.token, data.user);
-      message.success(`Xác thực thành công! Chào mừng ${data.user.name}.`);
-      navigate("/home");
+      HandleLoginNavigate(data.user, data.token);
     } catch (err) {
       message.error(err.response?.data?.message || "Mã xác thực không đúng.");
     } finally {
@@ -108,9 +106,29 @@ const LoginPage = () => {
     }
   };
 
+  // ========================================================================================================= HANDLE LOGIN NAVIGATE
+  const HandleLoginNavigate = (user, token) => {
+    if (loginMode.toLocaleLowerCase() === "pos".toLocaleLowerCase()) {
+      if (!isDeviceAuthorized) {
+        message.error("Thiết bị này chưa được cấp quyền.");
+        return;
+      }
+
+      setAuth(token, user);
+      message.success(` Chào mừng trở lại, ${user.name}! 👋`);
+      navigate("/cashier");
+    } else if (loginMode.toLocaleLowerCase() === "Login".toLocaleLowerCase()) {
+      setAuth(token, user);
+      message.success(` Chào mừng trở lại, ${user.name}! 👋`);
+      navigate("/home");
+    } else {
+      message.error("Chế độ đăng nhập không hợp lệ.");
+    }
+  };
+
   return (
     <div className="login-page">
-{/*====================================================================== Background Image */}
+      {/*===================================================================================================== Background Image */}
       <div
         className="login-page-background"
         style={
@@ -120,7 +138,7 @@ const LoginPage = () => {
         }
       />
 
-{/*================================================================ Login card information */}
+      {/*=============================================================================================== Login card information */}
       <div className="login-card">
         <div className="login-logo">
           <div className="login-logo-icon-name">
@@ -136,14 +154,14 @@ const LoginPage = () => {
           <p className="login-logo-subtitle">Hệ thống quản lý nhà hàng</p>
         </div>
 
-{/*============================================================================ ĐĂNG NHẬP */}
+        {/*========================================================================================================== ĐĂNG NHẬP */}
         {step === 1 && (
           <Form
             form={form}
             onFinish={handleLogin}
             layout="vertical"
             className="login-form"
-            autoComplete="off"
+            autoComplete="on"
           >
             <Form.Item
               name="email"
@@ -157,6 +175,8 @@ const LoginPage = () => {
                 placeholder="Email"
                 size="large"
                 className="login-input"
+                autoComplete="username"
+                prefix={<UserOutlined />}
               />
             </Form.Item>
 
@@ -172,54 +192,52 @@ const LoginPage = () => {
                 iconRender={(visible) =>
                   visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
                 }
+                autoComplete="current-password"
+                prefix={<LockOutlined />}
               />
             </Form.Item>
 
-            <div className="login-mode-manager-working">
-              <Button
-                type="default"
-                size="large"
-                className="login-mode-manager"
-                // onClick={handleManagerLogin}
-              >
-                Quản lý
-              </Button>
-
-              <Button
-                // type="default"
-                size="large"
-                className="login-mode-working"
-                // onClick={handlePosLogin}
-              >
-                Bán hàng
-              </Button>
-            </div>
+            <Button
+              htmlType="submit"
+              size="large"
+              loading={
+                loading && loginMode.toLowerCase() === "pos".toLowerCase()
+              }
+              block
+              className="login-mode-working"
+              onClick={() => setLoginMode("pos")}
+            >
+              {loading && loginMode.toLowerCase() === "pos".toLowerCase()
+                ? "Bán hàng..."
+                : "Bán hàng"}
+            </Button>
 
             <Button
               type="primary"
               htmlType="submit"
               size="large"
-              loading={loading}
+              loading={
+                loading && loginMode.toLowerCase() === "Login".toLowerCase()
+              }
               block
               className="login-btn-primary"
+              onClick={() => setLoginMode("Login")}
             >
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              {loading && loginMode.toLowerCase() === "Login".toLowerCase()
+                ? "Đang đăng nhập"
+                : "Đăng nhập"}
             </Button>
+
+            {/*============================================================================= Forgot Password and Register Links */}
+            <div className="forgot-password-links-div">
+              <Link to="/forgot-password" className="forgot-password-link">
+                Quên mật khẩu?
+              </Link>
+            </div>
           </Form>
         )}
 
-{/*==================================================== Forgot Password and Register Links */}
-        <div className="forgot-password-register-links">
-          <Link to="/forgot-password" className="forgot-password-link">
-            Quên mật khẩu?
-          </Link>
-
-          <Link to="/register" className="register-link">
-            Tạo tài khoản
-          </Link>
-        </div>
-
-{/*=================================================================== SETUP 2FA (QR CODE) */}
+        {/*================================================================================================ SETUP 2FA (QR CODE) */}
         {step === 2 && setupData && (
           <div style={{ textAlign: "center" }}>
             <h3>Bắt buộc cài đặt 2FA</h3>
@@ -269,7 +287,7 @@ const LoginPage = () => {
           </div>
         )}
 
-{/*============================================================================ VERIFY 2FA */}
+        {/*========================================================================================================= VERIFY 2FA */}
         {step === 3 && (
           <div style={{ textAlign: "center" }}>
             <h3>Xác thực 2 bước</h3>
@@ -303,7 +321,7 @@ const LoginPage = () => {
           </div>
         )}
 
-{/*================================================================== DEVICE AUTHORIZATION */}
+        {/*=============================================================================================== DEVICE AUTHORIZATION */}
         {step === 1 && isDeviceAuthorized && (
           <>
             <Divider className="login-divider">hoặc</Divider>
