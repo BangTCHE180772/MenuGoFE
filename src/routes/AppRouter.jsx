@@ -18,6 +18,7 @@ import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
+import ChainPagae from '../pages/ChainPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -64,8 +65,8 @@ const AppRouter = () => {
 
             {/* Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/branches" element={<BranchPage />} />
-              <Route path="/chains" element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
+              <Route path="/branches" element={<BranchPage/>} />
+              <Route path="/chains" element={<ChainPagae/>} />
             </Route>
 
             {/* Admin only */}
