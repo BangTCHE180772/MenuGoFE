@@ -6,6 +6,9 @@ export const getAllBranches = () =>
 export const getBranchById = (id) =>
   axiosInstance.get(`/api/Branch/${id}`);
 
+export const searchBranches = (dto) =>
+  axiosInstance.get('/api/Branch/search', { params: dto });
+
 export const createBranch = (data) =>
   axiosInstance.post('/api/Branch', data);
 
