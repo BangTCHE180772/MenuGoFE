@@ -22,6 +22,7 @@ import ChainPagae from '../pages/ChainPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import VoucherPage from '../pages/VoucherPage';
+import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 
@@ -62,7 +63,7 @@ const AppRouter = () => {
               <Route path="/vouchers" element={<VoucherPage />} />
               <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
-              <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
+              <Route path="/tables" element={<TableManagementPage />} />
             </Route>
 
             {/* Owner, Admin */}
