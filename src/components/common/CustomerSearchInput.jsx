@@ -21,7 +21,7 @@ const CustomerSearchInput = ({ value, onChange, onSelectCustomer, placeholder = 
           setOptions(res.value.map(c => ({
             value: c.Phone,
             label: `${c.Phone} - ${c.Name}`,
-            customer: { ...c, id: c.Id, name: c.Name, phone: c.Phone }
+            customer: { ...c, id: c.Id, name: c.Name, phone: c.Phone, point: c.Point }
           })));
         }
       } catch (err) {

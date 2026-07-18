@@ -24,6 +24,7 @@ const ROLE_MENUS = {
     { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -42,6 +43,7 @@ const ROLE_MENUS = {
     { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -58,6 +60,7 @@ const ROLE_MENUS = {
     { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     {
