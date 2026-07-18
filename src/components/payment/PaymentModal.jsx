@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode } from 'antd';
 import { payOrder } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
+import { checkVoucher } from '../../api/voucherApi';
 import CustomerSearchInput from '../common/CustomerSearchInput';
 import { useSignalR } from '../../context/SignalRContext';
 
@@ -14,8 +15,12 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerDeclined, setCustomerDeclined] = useState(false);
+  const [customerData, setCustomerData] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [qrCodeData, setQrCodeData] = useState(null);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [usePoints, setUsePoints] = useState(false);
 
   const connection = useSignalR();
 
@@ -23,9 +28,13 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
     if (visible) {
       setCustomerPhone('');
       setCustomerName('');
+      setCustomerData(null);
       setCustomerDeclined(false);
       setPaymentMethod('Cash');
       setQrCodeData(null);
+      setVoucherCode('');
+      setAppliedVoucher(null);
+      setUsePoints(false);
     }
   }, [visible]);
 
@@ -44,6 +53,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
 
   const handleSelectCustomer = (customer) => {
     setCustomerName(customer.name);
+    setCustomerData(customer);
   };
 
   const groupedItems = useMemo(() => {
@@ -75,7 +85,36 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   }, [groupedItems]);
 
   const vat = Math.round(subTotal * 0.08);
-  const grandTotal = subTotal + vat;
+  const baseTotal = subTotal + vat;
+
+  const handleCheckVoucher = async () => {
+    if (!voucherCode) return;
+    try {
+      setLoading(true);
+      const res = await checkVoucher(voucherCode, 0, baseTotal);
+      setAppliedVoucher({
+          discountAmount: res.discountAmount,
+          message: res.message
+      });
+      message.success(res.message);
+    } catch (error) {
+      setAppliedVoucher(null);
+      message.error(error.response?.data?.message || 'Voucher không hợp lệ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const voucherDiscount = appliedVoucher ? appliedVoucher.discountAmount : 0;
+  const pointsAvailable = customerData?.point || 0;
+  
+  let pointsDiscount = 0;
+  if (usePoints && pointsAvailable > 0) {
+    const afterVoucher = baseTotal - voucherDiscount;
+    pointsDiscount = Math.min(pointsAvailable, afterVoucher); // 1 point = 1 VND
+  }
+
+  const grandTotal = baseTotal - voucherDiscount - pointsDiscount;
 
   const handlePay = async () => {
     if (!orderId) {
@@ -88,6 +127,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       const payload = {
         customerName: customerDeclined ? null : customerName,
         customerPhone: customerDeclined ? null : customerPhone,
+        voucherCode: appliedVoucher ? voucherCode : null,
+        pointsUsed: pointsDiscount
       };
       
       if (paymentMethod === 'Cash') {
@@ -235,6 +276,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
               if (e.target.checked) {
                 setCustomerPhone('');
                 setCustomerName('');
+                setCustomerData(null);
+                setUsePoints(false);
               }
             }}
           >
@@ -260,20 +303,64 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
             />
           </Col>
         </Row>
+        {customerData && (
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary">Điểm tích luỹ: <strong style={{ color: '#52c41a' }}>{customerData.point || 0} điểm</strong></Text>
+            {customerData.point > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <Checkbox checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)}>
+                  Sử dụng điểm trừ vào hoá đơn
+                </Checkbox>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <Row gutter={8}>
+          <Col flex="auto">
+            <Input 
+              placeholder="Nhập mã Voucher (nếu có)" 
+              value={voucherCode} 
+              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+              disabled={!!appliedVoucher}
+            />
+          </Col>
+          <Col>
+            {appliedVoucher ? (
+              <Button type="dashed" danger onClick={() => { setVoucherCode(''); setAppliedVoucher(null); }}>Huỷ mã</Button>
+            ) : (
+              <Button type="primary" onClick={handleCheckVoucher} loading={loading} disabled={!voucherCode}>Áp dụng</Button>
+            )}
+          </Col>
+        </Row>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '200px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
           <Text>Cộng tiền hàng:</Text>
           <Text>{formatPrice(subTotal)}</Text>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '200px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
           <Text>VAT (8%):</Text>
           <Text>{formatPrice(vat)}</Text>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '200px', marginTop: 8 }}>
+        {voucherDiscount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+            <Text type="success">Voucher giảm:</Text>
+            <Text type="success">-{formatPrice(voucherDiscount)}</Text>
+          </div>
+        )}
+        {pointsDiscount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+            <Text type="success">Dùng điểm:</Text>
+            <Text type="success">-{formatPrice(pointsDiscount)}</Text>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginTop: 8 }}>
           <Text strong style={{ fontSize: 16 }}>Tổng cộng:</Text>
-          <Text strong style={{ fontSize: 18, color: '#f5222d' }}>{formatPrice(grandTotal)}</Text>
+          <Text strong style={{ fontSize: 18, color: '#f5222d' }}>{formatPrice(grandTotal > 0 ? grandTotal : 0)}</Text>
         </div>
       </div>
     </Modal>
