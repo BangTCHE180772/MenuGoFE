@@ -14,6 +14,7 @@ import {
   CrownOutlined,
   DesktopOutlined,
   BookOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuth, ROLES } from '../context/AuthContext';
 
@@ -27,6 +28,7 @@ const ROLE_MENUS = {
     { label: 'Chuỗi', path: '/chains', icon: <ApartmentOutlined /> },
     { label: 'Chi nhánh', path: '/branches', icon: <ShopOutlined /> },
     { label: 'Thực đơn', path: '/menu-management', icon: <BookOutlined /> },
+    { label: 'Khuyến mãi', path: '/vouchers', icon: <GiftOutlined /> },
     { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
     { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
     { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
@@ -41,6 +43,7 @@ const ROLE_MENUS = {
     { label: 'Chuỗi', path: '/chains', icon: <ApartmentOutlined /> },
     { label: 'Chi nhánh', path: '/branches', icon: <ShopOutlined /> },
     { label: 'Thực đơn', path: '/menu-management', icon: <BookOutlined /> },
+    { label: 'Khuyến mãi', path: '/vouchers', icon: <GiftOutlined /> },
     { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
     { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
     { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },
@@ -51,6 +54,7 @@ const ROLE_MENUS = {
     { label: 'Sơ đồ bàn', path: '/table-map', icon: <TableOutlined /> },
     { label: 'Đặt bàn', path: '/reservations', icon: <BookOutlined /> },
     { label: 'Thực đơn', path: '/menu-management', icon: <BookOutlined /> },
+    { label: 'Khuyến mãi', path: '/vouchers', icon: <GiftOutlined /> },
     { label: 'Nhân sự', path: '/accounts', icon: <TeamOutlined /> },
     { label: 'Lịch làm việc', path: '/work-schedule', icon: <CalendarOutlined /> },
     { label: 'Đơn hàng', path: '/orders', icon: <ShoppingCartOutlined /> },

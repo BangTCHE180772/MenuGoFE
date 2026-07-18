@@ -19,6 +19,7 @@ import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
+import VoucherPage from '../pages/VoucherPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 
@@ -56,6 +57,7 @@ const AppRouter = () => {
             {/* Manager, Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
               <Route path="/menu-management" element={<MenuManagementPage />} />
+              <Route path="/vouchers" element={<VoucherPage />} />
               <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
