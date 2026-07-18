@@ -18,6 +18,7 @@ import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import AccountPage from '../pages/AccountPage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
+import ShiftPage from '../pages/ShiftPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -58,6 +59,7 @@ const AppRouter = () => {
               <Route path="/accounts" element={<AccountPage />} />
               <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
               <Route path="/contracts" element={<ContractPage />} />
+              <Route path="/shifts" element={<ShiftPage />} />
             </Route>
 
             {/* Owner, Admin */}
