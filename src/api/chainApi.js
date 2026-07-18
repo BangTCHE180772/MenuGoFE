@@ -1,6 +1,9 @@
 import axiosInstance from './axiosInstance';
 
 export const getAllChains = () =>
+  axiosInstance.get('/api/Chain/all');
+
+export const getMainChain = () =>
   axiosInstance.get('/api/Chain');
 
 export const getChainById = (id) =>

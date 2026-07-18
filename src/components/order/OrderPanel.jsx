@@ -14,19 +14,18 @@ const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
 
 /* ── Status transition buttons ───────────────────────────────────────────── */
 const STATUS_TRANSITIONS = {
-  empty: [
-    { to: TABLE_STATUS.RESERVED, label: 'Đặt bàn', cls: 'btn-blue' },
-    { to: TABLE_STATUS.OCCUPIED, label: 'Có khách', cls: 'btn-orange' },
+  [TABLE_STATUS.EMPTY]: [
+    { to: TABLE_STATUS.OCCUPIED, label: 'Khách vào', cls: 'btn-orange' }
   ],
-  reserved: [
+  [TABLE_STATUS.RESERVED]: [
     { to: TABLE_STATUS.OCCUPIED, label: 'Khách đến', cls: 'btn-orange' },
     { to: TABLE_STATUS.EMPTY, label: 'Huỷ đặt', cls: 'btn-gray' },
   ],
-  occupied: [
+  [TABLE_STATUS.OCCUPIED]: [
     { to: TABLE_STATUS.CLEANING, label: 'Dọn dẹp', cls: 'btn-red' },
   ],
-  cleaning: [
-    { to: TABLE_STATUS.EMPTY, label: 'Đã sạch', cls: 'btn-green' },
+  [TABLE_STATUS.CLEANING]: [
+    { to: TABLE_STATUS.EMPTY, label: 'Đã sạch', cls: 'btn-green' }
   ],
 };
 
@@ -76,6 +75,7 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
 /* ── OrderPanel ───────────────────────────────────────────────────────────── */
 const OrderPanel = ({
   table,
+  summary,
   cartItems,
   canOrder,
   onUpdateQty,
@@ -83,6 +83,8 @@ const OrderPanel = ({
   onNoteChange,
   onConfirm,
   onChangeStatus,
+  onPayment,
+  onMerge,
   loading,
 }) => {
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
@@ -90,7 +92,18 @@ const OrderPanel = ({
   const total = subTotal + tax;
   const cfg = table ? getStatusConfig(table.status) : null;
   const statusKey = table?.status?.toLowerCase() || 'empty';
-  const transitions = STATUS_TRANSITIONS[statusKey] || [];
+
+  const transitions = [...(STATUS_TRANSITIONS[statusKey] || [])];
+  if (statusKey === 'occupied' && summary?.activeOrderId) {
+    const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
+    if (cleanIndex >= 0) {
+      transitions.splice(cleanIndex, 1, {
+        isPayment: true,
+        label: 'Thanh toán',
+        cls: 'btn-red'
+      });
+    }
+  }
 
   /* ─── 1. Chưa chọn bàn ────────────────────────────────────────────────── */
   if (!table) {
@@ -120,18 +133,28 @@ const OrderPanel = ({
       </div>
 
       {/* Status Transition Buttons */}
-      {transitions.length > 0 && (
+      {(transitions.length > 0 || table.status === 'Occupied') && (
         <div className="pos-status-transitions">
-          {transitions.map((t) => (
+          {transitions.map((t, idx) => (
             <button
-              key={t.to}
+              key={t.to || idx}
               className={`pos-status-btn pos-status-btn--${t.cls}`}
-              onClick={() => onChangeStatus(t.to)}
+              onClick={() => t.isPayment ? onPayment() : onChangeStatus(t.to)}
               disabled={loading}
             >
               {t.label}
             </button>
           ))}
+          {table.status === 'Occupied' && (
+            <button
+              className="pos-status-btn pos-status-btn--default"
+              style={{ background: '#eab308', color: '#fff', borderColor: '#eab308' }}
+              onClick={onMerge}
+              disabled={loading}
+            >
+              Gộp bàn
+            </button>
+          )}
         </div>
       )}
 

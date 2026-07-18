@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { message, Spin, Spin as AntSpin } from 'antd';
+import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
-import { createOrder, createOrderDetail } from '../api/orderApi';
+import { createOrder, createOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
 import MenuPanel from '../components/order/MenuPanel';
 import '../styles/customer-order.css';
@@ -101,6 +101,45 @@ const CustomerOrderPage = () => {
     }
   };
 
+  const handleCancelItem = (detailId, itemName) => {
+    Modal.confirm({
+      title: 'Xác nhận hủy món',
+      content: `Bạn có chắc chắn muốn hủy món "${itemName}" không?`,
+      okText: 'Hủy món',
+      okType: 'danger',
+      cancelText: 'Quay lại',
+      onOk: async () => {
+        try {
+          await cancelOrderDetail(detailId);
+          message.success(`Đã hủy món ${itemName}`);
+          fetchTableSummary();
+        } catch (error) {
+          message.error(error.response?.data?.message || 'Lỗi khi hủy món');
+        }
+      }
+    });
+  };
+
+  const handleCancelOrder = () => {
+    if (!summary?.activeOrderId) return;
+    Modal.confirm({
+      title: 'Xác nhận hủy toàn bộ đơn',
+      content: 'Bạn có chắc chắn muốn hủy toàn bộ đơn hàng này không? Bàn sẽ được giải phóng.',
+      okText: 'Hủy đơn',
+      okType: 'danger',
+      cancelText: 'Quay lại',
+      onOk: async () => {
+        try {
+          await cancelOrder(summary.activeOrderId);
+          message.success('Đã hủy đơn hàng thành công');
+          fetchTableSummary();
+        } catch (error) {
+          message.error(error.response?.data?.message || 'Lỗi khi hủy đơn');
+        }
+      }
+    });
+  };
+
   const handleSubmitOrder = async () => {
     if (!isOccupied || cartItems.length === 0) return;
 
@@ -109,18 +148,9 @@ const CustomerOrderPage = () => {
       let orderId = summary?.activeOrderId;
 
       if (!orderId) {
-        const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-        const total = Math.round(subTotal * 1.08);
-        const orderRes = await createOrder({
-          tableId: Number(tableId),
-          fatherId: null,
-          method: 'DineIn',
-          status: 'Active',
-          customerId: null,
-          totalAmount: total,
-          createdBy: 0,
-        });
-        orderId = orderRes?.data?.id ?? orderRes?.data;
+        message.error("Bàn chưa được mở, vui lòng liên hệ nhân viên!");
+        setOrderLoading(false);
+        return;
       }
 
       await Promise.all(
@@ -153,6 +183,9 @@ const CustomerOrderPage = () => {
   const cartTotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.price * item.qty, 0), [cartItems]);
   const cartCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.qty, 0), [cartItems]);
 
+  const activeItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
+  const canCancelOrder = activeItems.length > 0 && activeItems.every(i => i.cookingStatus === 'Waiting');
+
   if (loading) return <div className="co-empty-state"><AntSpin size="large" /></div>;
   if (!summary) return <div className="co-empty-state">Không tìm thấy thông tin bàn</div>;
 
@@ -165,22 +198,40 @@ const CustomerOrderPage = () => {
             {getTableStatusText(summary.tableStatus)}
           </div>
         </div>
-        {isOccupied && summary?.items?.length > 0 && (
-          <button 
-            onClick={handleRequestBill}
-            style={{
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            Thanh toán
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {isOccupied && (
+            <button
+              onClick={handleCallStaff}
+              style={{
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Gọi phục vụ hỗ trợ
+            </button>
+          )}
+          {isOccupied && summary?.items?.length > 0 && (
+            <button
+              onClick={handleRequestBill}
+              style={{
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Thanh toán
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="co-tabs">
@@ -233,6 +284,15 @@ const CustomerOrderPage = () => {
                     <span className="co-ordered-time">
                       {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                    {item.status !== 'Cancelled' && item.cookingStatus === 'Waiting' && (
+                      <button 
+                        className="co-btn-cancel-item" 
+                        onClick={() => handleCancelItem(item.orderDetailId, item.productName)}
+                        style={{ marginTop: '8px', color: '#ef4444', background: 'transparent', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        Hủy món
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -240,6 +300,17 @@ const CustomerOrderPage = () => {
               <div className="co-empty-state">
                 <div className="co-empty-state-icon">🍽️</div>
                 <p>Chưa có món nào được gọi</p>
+              </div>
+            )}
+            
+            {canCancelOrder && (
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <button 
+                  onClick={handleCancelOrder}
+                  style={{ background: '#ef4444', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
+                >
+                  Hủy toàn bộ đơn hàng
+                </button>
               </div>
             )}
           </div>
