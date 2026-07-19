@@ -232,6 +232,13 @@ const AccountPage = () => {
       key: 'gender',
       width: 100,
       align: 'center',
+      render: (val) => {
+        if (!val) return '—';
+        const lower = val.toLowerCase();
+        if (lower === 'male' || lower === 'nam') return 'Nam';
+        if (lower === 'female' || lower === 'nữ' || lower === 'nu') return 'Nữ';
+        return val;
+      }
     },
     {
       title: 'Ngày sinh',

@@ -65,6 +65,9 @@ const ContractPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState(null);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -206,17 +209,23 @@ const ContractPage = () => {
 
   // Filter Table Data
   const filteredContracts = contracts.filter((c) => {
-    const accName = getAccountName(c.accountId).toLowerCase();
-    const branchName = getBranchName(c.branchId).toLowerCase();
-    const typeLabel = c.type?.toLowerCase() || '';
-    const noteText = c.note?.toLowerCase() || '';
-    const search = searchText.toLowerCase();
-    return (
-      accName.includes(search) ||
-      branchName.includes(search) ||
-      typeLabel.includes(search) ||
-      noteText.includes(search)
-    );
+    if (searchText) {
+      const accName = getAccountName(c.accountId).toLowerCase();
+      const branchName = getBranchName(c.branchId).toLowerCase();
+      const typeLabel = c.type?.toLowerCase() || '';
+      const noteText = c.note?.toLowerCase() || '';
+      const search = searchText.toLowerCase();
+      const matchText =
+        accName.includes(search) ||
+        branchName.includes(search) ||
+        typeLabel.includes(search) ||
+        noteText.includes(search);
+      if (!matchText) return false;
+    }
+    if (selectedRole && c.roleId !== selectedRole) return false;
+    if (selectedType && c.type !== selectedType) return false;
+    if (selectedStatus && c.status !== selectedStatus) return false;
+    return true;
   });
 
   // Columns definition
@@ -381,15 +390,68 @@ const ContractPage = () => {
 
       {/* Filter and Table view */}
       <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Input
-            placeholder="Tìm kiếm theo tên nhân viên, chi nhánh, loại hợp đồng, ghi chú..."
+            placeholder="Tìm kiếm theo nhân viên, chi nhánh, ghi chú..."
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             allowClear
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 450, borderRadius: '8px' }}
+            style={{ maxWidth: 320, borderRadius: '8px' }}
           />
+          <Select
+            placeholder="Lọc vai trò"
+            style={{ width: 160 }}
+            allowClear
+            value={selectedRole}
+            onChange={(val) => setSelectedRole(val)}
+          >
+            {ROLES_LIST.map((r) => (
+              <Select.Option key={r.value} value={r.value}>
+                {r.label}
+              </Select.Option>
+            ))}
+          </Select>
+          <Select
+            placeholder="Lọc loại hợp đồng"
+            style={{ width: 180 }}
+            allowClear
+            value={selectedType}
+            onChange={(val) => setSelectedType(val)}
+          >
+            {CONTRACT_TYPES.map((t) => (
+              <Select.Option key={t.value} value={t.value}>
+                {t.label}
+              </Select.Option>
+            ))}
+          </Select>
+          <Select
+            placeholder="Lọc trạng thái"
+            style={{ width: 180 }}
+            allowClear
+            value={selectedStatus}
+            onChange={(val) => setSelectedStatus(val)}
+          >
+            {STATUS_OPTIONS.map((st) => (
+              <Select.Option key={st.value} value={st.value}>
+                {st.label}
+              </Select.Option>
+            ))}
+          </Select>
+          {(searchText || selectedRole || selectedType || selectedStatus) && (
+            <Button
+              type="link"
+              danger
+              onClick={() => {
+                setSearchText('');
+                setSelectedRole(null);
+                setSelectedType(null);
+                setSelectedStatus(null);
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          )}
         </div>
 
         <Table
