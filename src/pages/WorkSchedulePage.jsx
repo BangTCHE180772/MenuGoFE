@@ -154,7 +154,7 @@ const WorkSchedulePage = () => {
       form.resetFields();
       form.setFieldsValue({
         status: 'PENDING',
-        managerApproved: false,
+        managerApproved: true,
         workDate: dayjs(),
       });
     }
@@ -310,8 +310,9 @@ const WorkSchedulePage = () => {
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && item.status !== selectedStatus) return false;
     if (searchDate) {
-      const match = dayjs(item.workDate).isSame(dayjs(searchDate), 'day');
-      if (!match) return false;
+      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
+      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
+      if (itemDate !== filterDate) return false;
     }
     return true;
   });
