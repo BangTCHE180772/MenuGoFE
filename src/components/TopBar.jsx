@@ -82,6 +82,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
@@ -96,6 +97,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],

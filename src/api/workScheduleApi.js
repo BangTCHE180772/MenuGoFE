@@ -18,3 +18,6 @@ export const deleteWorkSchedule = (id) =>
 export const assignWorkSchedules = (data) =>
   axiosInstance.post('/api/WorkSchedule/assign', data);
 
+export const getMyWorkSchedules = () =>
+  axiosInstance.get('/api/WorkSchedule/mine');
+

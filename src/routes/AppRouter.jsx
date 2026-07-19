@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ROLES } from '../context/AuthContext';
+import { ROLES, useAuth } from '../context/AuthContext';
 
 import AuthLayout from '../Layout/AuthLayout';
 import MainLayout from '../Layout/MainLayout';
@@ -20,6 +20,7 @@ import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import AccountPage from '../pages/AccountPage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
+import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import ChainPagae from '../pages/ChainPage';
@@ -33,6 +34,7 @@ import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 
 const AppRouter = () => {
+  const { user, role } = useAuth();
   return (
     <BrowserRouter>
       <SignalRProvider>
@@ -65,7 +67,10 @@ const AppRouter = () => {
             <Route path="/home" element={<HomePage />} />
 
             {/* Mọi role đã đăng nhập đều xem được */}
-            <Route path="/work-schedule" element={<WorkSchedulePage />} />
+            <Route path="/work-schedule" element={
+              user && [ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN].includes(role) ?
+                <WorkSchedulePage /> : <MyWorkSchedulePage />
+            } />
             <Route path="/orders" element={<OrderPage />} />
             <Route path="/table-map" element={<TableMapPage />} />
             <Route path="/reservations" element={<ReservationPage />} />
