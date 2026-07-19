@@ -25,6 +25,7 @@ import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
+import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 
 const AppRouter = () => {
@@ -65,6 +66,7 @@ const AppRouter = () => {
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables" element={<TableManagementPage />} />
               <Route path="/device-management" element={<DeviceManagementPage />} />
+              <Route path="/device-setup" element={<DeviceSetupPage />} />
             </Route>
 
             {/* Owner, Admin */}

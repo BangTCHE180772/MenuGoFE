@@ -14,6 +14,7 @@ import {
   CrownOutlined,
   DesktopOutlined,
   BookOutlined,
+  GiftOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 
@@ -21,10 +22,10 @@ import { useAuth, ROLES } from "../context/AuthContext";
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -40,10 +41,10 @@ const ROLE_MENUS = {
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -57,9 +58,9 @@ const ROLE_MENUS = {
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
@@ -73,7 +74,6 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DesktopOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
