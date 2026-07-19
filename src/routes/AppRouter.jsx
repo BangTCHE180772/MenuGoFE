@@ -3,7 +3,7 @@ import { ROLES } from '../context/AuthContext';
 
 import AuthLayout from '../Layout/AuthLayout';
 import MainLayout from '../Layout/MainLayout';
-import CashierLayout from '../Layout/CashierLayout';
+import DeviceLayout from '../Layout/DeviceLayout';
 
 import PrivateRoute from './PrivateRoute';
 import RoleRoute from './RoleRoute';
@@ -26,8 +26,11 @@ import ChainPagae from '../pages/ChainPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import VoucherPage from '../pages/VoucherPage';
+import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
+import DeviceSetupPage from '../pages/DeviceSetupPage';
+import DeviceManagementPage from '../pages/DeviceManagementPage';
 
 const AppRouter = () => {
   return (
@@ -61,16 +64,17 @@ const AppRouter = () => {
             <Route path="/reservations" element={<ReservationPage />} />
 
 
-            {/* Manager, Owner, Admin */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/menu-management" element={<MenuManagementPage />} />
-              <Route path="/vouchers" element={<VoucherPage />} />
-              <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
-              <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
-              <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
-              <Route path="/contracts" element={<ContractPage />} />
-              <Route path="/shifts" element={<ShiftPage />} />
-            </Route>
+              {/* Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/menu-management" element={<MenuManagementPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
+                <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
+                <Route path="/tables" element={<TableManagementPage />} />
+                <Route path="/device-management" element={<DeviceManagementPage />} />
+                <Route path="/device-setup" element={<DeviceSetupPage />} />
+                <Route path="/contracts" element={<ContractPage />} />
+                <Route path="/shifts" element={<ShiftPage />} />
+              </Route>
 
             {/* Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>

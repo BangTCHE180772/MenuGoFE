@@ -19,10 +19,7 @@ const VoucherPage = () => {
   const [editingVoucher, setEditingVoucher] = useState(null);
   const [form] = Form.useForm();
 
-  useEffect(() => {
-    fetchVouchers();
-    fetchBranches();
-  }, []);
+
 
   const fetchVouchers = async () => {
     setLoading(true);
@@ -37,12 +34,17 @@ const VoucherPage = () => {
 
   const fetchBranches = async () => {
     try {
-      const data = await getAllBranches();
-      setBranches(data);
+      const res = await getAllBranches();
+      setBranches(res.data || res);
     } catch (error) {
       console.error('Lỗi tải chi nhánh:', error);
     }
   };
+
+  useEffect(() => {
+    fetchVouchers();
+    fetchBranches();
+  }, []);
 
   const showModal = (record = null) => {
     setEditingVoucher(record);
