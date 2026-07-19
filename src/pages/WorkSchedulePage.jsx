@@ -63,6 +63,7 @@ const WorkSchedulePage = () => {
   const [loading, setLoading] = useState(false);
   
   // Filtering states
+  const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -306,6 +307,7 @@ const WorkSchedulePage = () => {
 
   // Filter schedules
   const filteredSchedules = schedules.filter((item) => {
+    if (selectedAccount && item.accountId !== selectedAccount) return false;
     if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && item.status !== selectedStatus) return false;
@@ -319,6 +321,7 @@ const WorkSchedulePage = () => {
 
   // Reset Filters
   const handleResetFilters = () => {
+    setSelectedAccount(null);
     setSelectedApprovalStatus(null);
     setSelectedShift(null);
     setSelectedStatus(null);
@@ -568,6 +571,22 @@ const WorkSchedulePage = () => {
                 {/* Advanced Search & Filtering Box */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
                   <Select
+                    placeholder="Lọc nhân viên"
+                    style={{ width: 180 }}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    value={selectedAccount}
+                    onChange={(val) => setSelectedAccount(val)}
+                  >
+                    {accounts.map((a) => (
+                      <Select.Option key={a.id} value={a.id} label={a.name}>
+                        {a.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+
+                  <Select
                     placeholder="Lọc trạng thái duyệt"
                     style={{ width: 180 }}
                     allowClear
@@ -614,7 +633,7 @@ const WorkSchedulePage = () => {
                     format="DD/MM/YYYY"
                   />
 
-                  {(selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                  {(selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
                     <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
                       Xóa lọc
                     </Button>
