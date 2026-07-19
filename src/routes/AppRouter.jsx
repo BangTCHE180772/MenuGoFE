@@ -44,12 +44,19 @@ const AppRouter = () => {
         </Route>
         <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
-        {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
-        <Route element={<DeviceRoute />}>
-          <Route element={<CashierLayout />}>
-            <Route path="/cashier" element={<CashierPage />} />
+          {/* ── Device Route: cần device_token  ─────────── */}
+          <Route element={<DeviceRoute allowedTypes={[]} />}>
+            <Route element={<DeviceLayout />}>
+              {/* POS */}
+              <Route path="/pos" element={<CashierPage />} />
+              {/* Waiter */}
+              <Route path="/station" element={<TableMapPage />} />
+              {/* Kitchen */}
+              <Route path="/kitchen" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Màn Hình Bếp</h1><p>Đang phát triển</p></div>} />
+              {/* Attendance */}
+              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
+            </Route>
           </Route>
-        </Route>
 
         {/* ── Private: cần đăng nhập ────────────────────────────────── */}
         <Route element={<PrivateRoute />}>

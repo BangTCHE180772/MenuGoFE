@@ -1,50 +1,81 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { validateDevice } from '../api/deviceApi';
+import { message } from 'antd';
 
-const DEVICE_TOKEN_KEY = 'device_token';
+const DeviceContext = createContext();
 
-const DeviceContext = createContext(null);
+export const useDevice = () => useContext(DeviceContext);
 
 export const DeviceProvider = ({ children }) => {
-  const [deviceToken, setDeviceToken] = useState(
-    () => localStorage.getItem(DEVICE_TOKEN_KEY)
-  );
+  const [deviceToken, setDeviceToken] = useState(localStorage.getItem('device_token') || null);
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [deviceEmployee, setDeviceEmployee] = useState(null);
+  const [isDeviceMode, setIsDeviceMode] = useState(!!deviceToken);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isDeviceAuthorized = !!deviceToken;
+  useEffect(() => {
+    const initDevice = async () => {
+      if (deviceToken) {
+        try {
+          const res = await validateDevice(deviceToken);
+          setDeviceInfo(res.data);
+          setIsDeviceMode(true);
+        } catch (error) {
+          console.error("Device validation failed:", error);
+          if (error.response?.status === 403) {
+            message.error(error.response?.data?.message || "Thiết bị đã bị thu hồi.");
+          } else {
+            message.error("Thiết bị không hợp lệ.");
+          }
+          setDeviceInfo({ isActive: false });
+        }
+      } else {
+        setIsDeviceMode(false);
+      }
+      setIsLoading(false);
+    };
 
-  /**
-   * Lưu device_token (Manager gọi khi cấp quyền cho thiết bị này)
-   * @param {string} token
-   */
-  const authorizeDevice = (token) => {
-    localStorage.setItem(DEVICE_TOKEN_KEY, token);
+    initDevice();
+  }, [deviceToken]);
+
+  const setupDevice = (token, info) => {
+    localStorage.setItem('device_token', token);
     setDeviceToken(token);
+    setDeviceInfo(info);
+    setIsDeviceMode(true);
   };
 
-  /**
-   * Xóa device_token (thu hồi quyền khỏi thiết bị này)
-   */
-  const revokeDevice = () => {
-    localStorage.removeItem(DEVICE_TOKEN_KEY);
+  const loginEmployee = (employee) => {
+    setDeviceEmployee(employee);
+  };
+
+  const logoutEmployee = () => {
+    setDeviceEmployee(null);
+  };
+
+  const resetDevice = () => {
+    localStorage.removeItem('device_token');
     setDeviceToken(null);
-  };
-
-  const value = {
-    deviceToken,
-    isDeviceAuthorized,
-    authorizeDevice,
-    revokeDevice,
+    setDeviceInfo(null);
+    setDeviceEmployee(null);
+    setIsDeviceMode(false);
   };
 
   return (
-    <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>
+    <DeviceContext.Provider
+      value={{
+        deviceToken,
+        deviceInfo,
+        deviceEmployee,
+        isDeviceMode,
+        isLoading,
+        setupDevice,
+        loginEmployee,
+        logoutEmployee,
+        resetDevice,
+      }}
+    >
+      {children}
+    </DeviceContext.Provider>
   );
-};
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useDevice = () => {
-  const context = useContext(DeviceContext);
-  if (!context) {
-    throw new Error('useDevice phải được dùng bên trong <DeviceProvider>');
-  }
-  return context;
 };
