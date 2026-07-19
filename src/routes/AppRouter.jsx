@@ -69,12 +69,10 @@ const AppRouter = () => {
               <Route path="/menu-management" element={<MenuManagementPage />} />
               <Route path="/vouchers" element={<VoucherPage />} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
+              <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
               <Route path="/contracts" element={<ContractPage />} />
               <Route path="/shifts" element={<ShiftPage />} />
             </Route>
-                <Route path="/tables" element={<TableManagementPage />} />
-                <Route path="/device-management" element={<DeviceManagementPage />} />
-                <Route path="/device-setup" element={<DeviceSetupPage />} />
 
             {/* Owner, Admin */}
             <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
