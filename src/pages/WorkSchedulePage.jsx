@@ -63,7 +63,7 @@ const WorkSchedulePage = () => {
   const [loading, setLoading] = useState(false);
   
   // Filtering states
-  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
@@ -306,7 +306,7 @@ const WorkSchedulePage = () => {
 
   // Filter schedules
   const filteredSchedules = schedules.filter((item) => {
-    if (selectedBranch && item.branchId !== selectedBranch) return false;
+    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && item.status !== selectedStatus) return false;
     if (searchDate) {
@@ -319,7 +319,7 @@ const WorkSchedulePage = () => {
 
   // Reset Filters
   const handleResetFilters = () => {
-    setSelectedBranch(null);
+    setSelectedApprovalStatus(null);
     setSelectedShift(null);
     setSelectedStatus(null);
     setSearchDate(null);
@@ -568,17 +568,14 @@ const WorkSchedulePage = () => {
                 {/* Advanced Search & Filtering Box */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
                   <Select
-                    placeholder="Lọc chi nhánh"
+                    placeholder="Lọc trạng thái duyệt"
                     style={{ width: 180 }}
                     allowClear
-                    value={selectedBranch}
-                    onChange={(val) => setSelectedBranch(val)}
+                    value={selectedApprovalStatus}
+                    onChange={(val) => setSelectedApprovalStatus(val)}
                   >
-                    {branches.map((b) => (
-                      <Select.Option key={b.id} value={b.id}>
-                        {b.name}
-                      </Select.Option>
-                    ))}
+                    <Select.Option value={true}>Đã duyệt</Select.Option>
+                    <Select.Option value={false}>Chưa duyệt</Select.Option>
                   </Select>
 
                   <Select
@@ -617,7 +614,7 @@ const WorkSchedulePage = () => {
                     format="DD/MM/YYYY"
                   />
 
-                  {(selectedBranch || selectedShift || selectedStatus || searchDate) && (
+                  {(selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
                     <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
                       Xóa lọc
                     </Button>
