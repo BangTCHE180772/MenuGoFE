@@ -3,7 +3,7 @@ import { ROLES } from '../context/AuthContext';
 
 import AuthLayout from '../Layout/AuthLayout';
 import MainLayout from '../Layout/MainLayout';
-import CashierLayout from '../Layout/CashierLayout';
+import DeviceLayout from '../Layout/DeviceLayout';
 
 import PrivateRoute from './PrivateRoute';
 import RoleRoute from './RoleRoute';
@@ -25,6 +25,7 @@ import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
+import DeviceManagementPage from '../pages/DeviceManagementPage';
 
 const AppRouter = () => {
   return (
@@ -61,9 +62,9 @@ const AppRouter = () => {
             <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
               <Route path="/menu-management" element={<MenuManagementPage />} />
               <Route path="/vouchers" element={<VoucherPage />} />
-              <Route path="/orders"   element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
               <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
               <Route path="/tables" element={<TableManagementPage />} />
+              <Route path="/device-management" element={<DeviceManagementPage />} />
             </Route>
 
             {/* Owner, Admin */}
