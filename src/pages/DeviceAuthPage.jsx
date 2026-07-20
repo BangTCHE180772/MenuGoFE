@@ -9,9 +9,9 @@ const DeviceAuthPage = () => {
   const { challengeId } = useParams();
   const navigate = useNavigate();
   const { user, token } = useAuth();
-  
+
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [successData, setSuccessData] = useState(null);
 
   useEffect(() => {
     if (!user || !token) {
@@ -23,11 +23,18 @@ const DeviceAuthPage = () => {
   const handleScan = async () => {
     try {
       setLoading(true);
-      await axiosInstance.post(
-        '/api/Device/auth/scan',
+      const response = await axiosInstance.post(
+        '/api/Device/personal-login',
         { challengeId }
       );
-      setSuccess(true);
+
+      const data = response.data;
+      if (!data.isPos && data.branchId) {
+        localStorage.setItem('activeShiftBranchId', data.branchId);
+        window.dispatchEvent(new Event('shiftUpdated'));
+      }
+
+      setSuccessData(data);
     } catch (e) {
       message.error(e.response?.data?.message || 'Không thể đăng nhập thiết bị. Mã QR có thể đã hết hạn.');
     } finally {
@@ -35,21 +42,38 @@ const DeviceAuthPage = () => {
     }
   };
 
-  if (success) {
-    return (
-      <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
-        <Result
-          status="success"
-          title="Đã gửi yêu cầu!"
-          subTitle="Vui lòng nhập mã 2FA trên màn hình thiết bị quán để hoàn tất đăng nhập."
-          extra={[
-            <Button type="primary" key="home" onClick={() => navigate('/')}>
-              Về Trang Chủ
-            </Button>
-          ]}
-        />
-      </div>
-    );
+  if (successData) {
+    if (successData.isPos) {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
+          <Result
+            status="success"
+            title="Đã gửi yêu cầu!"
+            subTitle="Vui lòng nhập mã PIN (2FA) trên màn hình thiết bị thu ngân để hoàn tất đăng nhập."
+            extra={[
+              <Button type="primary" key="home" onClick={() => navigate('/')}>
+                Về Trang Chủ
+              </Button>
+            ]}
+          />
+        </div>
+      );
+    } else {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
+          <Result
+            status="success"
+            title="Nhận ca thành công!"
+            subTitle="Bạn đã kết nối thành công với trạm phục vụ. Bây giờ bạn có thể bắt đầu order món cho khách."
+            extra={[
+              <Button type="primary" key="waiter" onClick={() => navigate('/waiter-shift')}>
+                Bắt đầu Phục Vụ
+              </Button>
+            ]}
+          />
+        </div>
+      );
+    }
   }
 
   return (
@@ -59,11 +83,11 @@ const DeviceAuthPage = () => {
       <p style={{ color: '#666', marginBottom: 30 }}>
         Bạn đang yêu cầu đăng nhập tài khoản <strong>{user?.email}</strong> vào thiết bị quán.
       </p>
-      <Button 
-        type="primary" 
-        size="large" 
-        block 
-        onClick={handleScan} 
+      <Button
+        type="primary"
+        size="large"
+        block
+        onClick={handleScan}
         loading={loading}
       >
         Xác Nhận Đăng Nhập

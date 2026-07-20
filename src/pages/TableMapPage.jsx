@@ -48,6 +48,19 @@ const TableMapPage = () => {
           return;
         }
 
+        const shiftBranchId = localStorage.getItem('activeShiftBranchId');
+        if (shiftBranchId) {
+          const shiftBranch = allBranches.find(b => b.id.toString() === shiftBranchId);
+          if (shiftBranch) {
+            setBranches([shiftBranch]);
+            setSelectedBranch(shiftBranch.id);
+          } else {
+            setBranches([]);
+            setSelectedBranch(null);
+          }
+          return;
+        }
+
         let availableBranches = allBranches;
         const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
         if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {

@@ -51,7 +51,8 @@ const DeviceManagementPage = () => {
       const res = await getDevicesByBranch(selectedBranch);
       setDevices(res.data);
     } catch (err) {
-      message.error('Lỗi khi tải danh sách thiết bị');
+      console.error(err);
+      message.error(`Lỗi khi tải danh sách thiết bị: ${err.response?.status || err.message}`);
     } finally {
       setLoading(false);
     }

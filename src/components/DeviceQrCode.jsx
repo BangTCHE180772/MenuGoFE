@@ -42,7 +42,7 @@ const DeviceQrCode = () => {
           <Spin />
         ) : challengeId ? (
           <QRCodeSVG 
-            value={`http://localhost:5173/device-auth/${challengeId}`} 
+            value={`${window.location.origin}/device-auth/${challengeId}`} 
             size={120} 
             level="M" 
           />
@@ -50,7 +50,16 @@ const DeviceQrCode = () => {
           <div className="device-qr-error">Lỗi QR</div>
         )}
       </div>
-      <div className="device-qr-desc">Quét bằng camera điện thoại</div>
+      <div className="device-qr-desc">
+        Quét bằng camera điện thoại
+        {challengeId && (
+          <div style={{ marginTop: '8px' }}>
+            <a href={`${window.location.origin}/device-auth/${challengeId}`} target="_blank" rel="noreferrer">
+              (Hoặc click vào đây để test)
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

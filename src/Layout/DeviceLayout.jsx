@@ -25,7 +25,7 @@ const DeviceLayout = () => {
   useEffect(() => {
     const { deviceToken } = useDevice.getState ? useDevice.getState() : { deviceToken: localStorage.getItem('device_token') };
     const tokenToUse = deviceToken || localStorage.getItem('device_token');
-    
+
     if (!tokenToUse || !deviceInfo?.isActive) return;
 
     const setupSignalR = async () => {
@@ -36,8 +36,20 @@ const DeviceLayout = () => {
         .build();
 
       conn.on('DeviceAuthScanned', (data) => {
-        setScannedEmail(data.email);
-        setLoginVisible(true);
+        const storedInfo = localStorage.getItem('device_info');
+        let dType = 'POS';
+        if (storedInfo) {
+          try {
+            dType = JSON.parse(storedInfo).deviceType;
+          } catch (e) { }
+        }
+
+        if (dType === 'POS') {
+          setScannedEmail(data.email);
+          setLoginVisible(true);
+        } else {
+          message.success(`Nhân viên ${data.email} vừa kết nối thành công!`);
+        }
       });
 
       try {

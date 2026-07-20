@@ -46,8 +46,12 @@ const OrderPage = () => {
     setTableLoading(true);
     try {
       let res;
+      const shiftBranchId = localStorage.getItem('activeShiftBranchId');
+      
       if (deviceInfo) {
         res = await getTablesByBranch(deviceInfo.branchId);
+      } else if (shiftBranchId) {
+        res = await getTablesByBranch(shiftBranchId);
       } else {
         const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
         const branchIds = user?.branchIds || [];
