@@ -454,22 +454,82 @@ const WorkSchedulePage = () => {
   const dateCellRender = (value) => {
     const dateStr = value.format('YYYY-MM-DD');
     const daySchedules = schedules.filter((item) => item.workDate === dateStr);
+
+    // Group by shiftId
+    const shiftGroups = {};
+    daySchedules.forEach((item) => {
+      const shiftId = item.shiftId;
+      if (!shiftGroups[shiftId]) {
+        shiftGroups[shiftId] = {
+          shiftId,
+          count: 0,
+          pendingCount: 0,
+          approvedCount: 0,
+        };
+      }
+      shiftGroups[shiftId].count += 1;
+      if (item.managerApproved) {
+        shiftGroups[shiftId].approvedCount += 1;
+      } else {
+        shiftGroups[shiftId].pendingCount += 1;
+      }
+    });
+
+    // Convert to array and sort by shift startTime/name
+    const sortedShifts = Object.values(shiftGroups).map((group) => {
+      const details = getShiftDetails(group.shiftId);
+      return {
+        ...group,
+        name: details.name,
+        startTime: details.startTime || '',
+      };
+    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
     return (
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, overflow: 'hidden' }}>
-        {daySchedules.slice(0, 3).map((item) => {
-          const shiftInfo = getShiftDetails(item.shiftId);
-          const name = getAccountName(item.accountId);
+        {sortedShifts.map((group) => {
+          // If any schedule in this shift is pending, badge is warning (yellow), else success (green)
+          const badgeStatus = group.pendingCount > 0 ? 'warning' : 'success';
           return (
-            <li key={item.id} style={{ margin: '1px 0', padding: '1px 3px', borderRadius: '3px', background: '#fff2e8', borderLeft: '3px solid #ff7a45', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              <Badge status={item.managerApproved ? 'success' : 'warning'} text={<strong>{shiftInfo.name}:</strong>} /> {name}
+            <li
+              key={group.shiftId}
+              style={{
+                margin: '2px 0',
+                padding: '2px 4px',
+                borderRadius: '4px',
+                background: '#fff2e8',
+                borderLeft: '3px solid #ff7a45',
+                fontSize: '11px',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                cursor: 'pointer',
+              }}
+            >
+              <Tooltip
+                title={
+                  <div>
+                    <strong>Danh sách ca trực:</strong>
+                    <ul style={{ paddingLeft: 16, margin: '4px 0 0 0' }}>
+                      {daySchedules
+                        .filter((item) => item.shiftId === group.shiftId)
+                        .map((item) => (
+                          <li key={item.id}>
+                            {getAccountName(item.accountId)} {item.managerApproved ? '(Đã duyệt)' : '(Chờ duyệt)'}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                }
+              >
+                <div>
+                  <Badge status={badgeStatus} />
+                  <strong>{group.name}:</strong> {group.count} người
+                </div>
+              </Tooltip>
             </li>
           );
         })}
-        {daySchedules.length > 3 && (
-          <li style={{ fontSize: '11px', color: '#ff7a45', fontWeight: 'bold' }}>
-            + {daySchedules.length - 3} nhân viên khác...
-          </li>
-        )}
       </ul>
     );
   };
