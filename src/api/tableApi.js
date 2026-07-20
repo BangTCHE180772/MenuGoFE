@@ -3,8 +3,13 @@ import axiosInstance from './axiosInstance';
 export const getAllTables = () =>
   axiosInstance.get('/api/Table');
 
-export const getTablesByBranch = (branchIds) =>
-  axiosInstance.get('/api/Table', { params: { branchIds: branchIds.join(',') } });
+export const getTablesByBranch = (branchIds, areaId = null) => {
+  const params = { branchIds: branchIds.join(',') };
+  if (areaId) {
+    params['$filter'] = `areaId eq ${areaId}`;
+  }
+  return axiosInstance.get('/api/Table', { params });
+};
 
 export const getTableById = (id) =>
   axiosInstance.get(`/api/Table/${id}`);

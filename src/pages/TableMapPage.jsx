@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { message, Spin, Select } from 'antd';
 import { getAllTables, getTablesByBranch } from '../api/tableApi';
 import { getAllBranches } from '../api/branchApi';
+import { getAreasByBranchId } from '../api/areaApi';
 import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
 import { cancelOrderDetail } from '../api/orderApi';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,7 @@ const TableMapPage = () => {
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [selectedArea, setSelectedArea] = useState('all');
+  const [areas, setAreas] = useState([]);
   
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(null);
@@ -50,12 +52,27 @@ const TableMapPage = () => {
     fetchBranches();
   }, [user]);
 
+  useEffect(() => {
+    if (selectedBranch) {
+      const fetchAreas = async () => {
+        try {
+          const res = await getAreasByBranchId(selectedBranch);
+          setAreas(res.data);
+        } catch (err) {
+          console.error('Lỗi khi tải danh sách khu vực', err);
+        }
+      };
+      fetchAreas();
+    }
+  }, [selectedBranch]);
+
   const loadTables = useCallback(async () => {
     if (!selectedBranch && branches.length > 0) return; // Wait until branch is selected
     setLoadingTables(true);
     try {
+      const areaIdToFetch = selectedArea === 'all' ? null : selectedArea;
       const res = selectedBranch 
-        ? await getTablesByBranch([selectedBranch])
+        ? await getTablesByBranch([selectedBranch], areaIdToFetch)
         : await getAllTables();
       const data = res?.data;
       setTables(Array.isArray(data) ? data : []);
@@ -65,7 +82,7 @@ const TableMapPage = () => {
     } finally {
       setLoadingTables(false);
     }
-  }, [selectedBranch, branches.length]);
+  }, [selectedBranch, branches.length, selectedArea]);
 
   const loadOrderSummary = useCallback(async (tableId) => {
     setLoadingSummary(true);
@@ -154,21 +171,6 @@ const TableMapPage = () => {
     }
   };
 
-  const areas = useMemo(() => {
-    const areaMap = new Map();
-    tables.forEach((t) => {
-      if (t.areaId && t.areaName && !areaMap.has(t.areaId)) {
-        areaMap.set(t.areaId, { id: t.areaId, name: t.areaName });
-      }
-    });
-    return Array.from(areaMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [tables]);
-
-  const filteredTables = useMemo(() => {
-    if (selectedArea === 'all') return tables;
-    return tables.filter((t) => t.areaId === selectedArea);
-  }, [tables, selectedArea]);
-
   return (
     <div className="tablemap-page">
       <div className="tablemap-left-col">
@@ -214,7 +216,7 @@ const TableMapPage = () => {
           </div>
         ) : (
           <div className="tablemap-grid">
-            {filteredTables.map(table => {
+            {tables.map(table => {
               const cfg = getStatusConfig(table.status);
               const isSelected = selectedTable?.id === table.id;
               
@@ -247,8 +249,10 @@ const TableMapPage = () => {
               );
             })}
             
-            {filteredTables.length === 0 && (
-              <div className="tablemap-empty">Không có bàn nào</div>
+            {tables.length === 0 && (
+              <div className="tablemap-empty">
+                Không có bàn nào trong khu vực này.
+              </div>
             )}
           </div>
         )}
