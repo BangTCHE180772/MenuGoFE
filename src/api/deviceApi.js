@@ -1,25 +1,15 @@
 import axiosInstance from './axiosInstance';
 
-// ─── TODO: BE chưa có các endpoint này ────────────────────────────────────
-// Cần thêm vào BE khi implement tính năng cấp quyền thiết bị
+export const setupDevice = (data) => axiosInstance.post('/api/Device/setup', data);
 
-/**
- * Manager cấp quyền cho thiết bị hiện tại
- * @returns {{ deviceToken: string }}
- */
-export const authorizeDevice = () =>
-  axiosInstance.post('/api/device/authorize');
+export const validateDevice = (token) => axiosInstance.post('/api/Device/validate', { token });
 
-/**
- * Kiểm tra device_token có còn hợp lệ không
- * @param {string} token
- */
-export const validateDevice = (token) =>
-  axiosInstance.post('/api/device/validate', { token });
+export const getDevicesByBranch = (branchId) => axiosInstance.get(`/api/Device/branch/${branchId}`);
 
-/**
- * Thu hồi quyền của thiết bị
- * @param {string} token
- */
-export const revokeDevice = (token) =>
-  axiosInstance.post('/api/device/revoke', { token });
+export const updateDevice = (data) => axiosInstance.put('/api/Device', data);
+
+export const deleteDevice = (id) => axiosInstance.delete(`/api/Device/${id}`);
+
+export const revokeDevice = (id) => axiosInstance.post(`/api/Device/${id}/revoke`);
+
+export const employeeLogin = (data) => axiosInstance.post('/api/Device/employee-login', data);

@@ -8,6 +8,8 @@ import {
   Dropdown,
   Tooltip,
   message,
+  Popconfirm,
+  Modal,
 } from "antd";
 import {
   SearchOutlined,
@@ -19,6 +21,8 @@ import dayjs from "dayjs";
 import { searchBranches } from "../api/branchApi";
 import "../styles/Branch/BranchPage.css";
 import CreateUpdateBranchFormPopup from "../Popup/CreateUpdateBranchFormPopup";
+import { getMainChain } from "../api/chainApi";
+import { deleteBranch } from "../api/branchApi";
 
 const { RangePicker } = DatePicker;
 
@@ -57,7 +61,6 @@ const getMockFinancials = (range, customDates, branchCount) => {
 };
 
 const BranchPage = () => {
-  // ─── States ────────────────────────────────────────────────────────────────
   const [branches, setBranches] = useState([]);
 
   const [loading, setLoading] = useState(false);
@@ -77,6 +80,8 @@ const BranchPage = () => {
 
   const [openModal, setOpenModal] = useState(false);
   const [editingBranchObject, setEditingBranchObject] = useState(null);
+
+  const [mainChainId, setMainChainId] = useState(null);
   //====================================================================================================================Fetch Data
   const loadBranches = useCallback(async () => {
     setLoading(true);
@@ -119,6 +124,19 @@ const BranchPage = () => {
     loadBranches();
   }, [loadBranches]);
 
+  useEffect(() => {
+    const loadMainChain = async () => {
+      try {
+        const res = await getMainChain();
+        setMainChainId(res.data.id);
+      } catch (err) {
+        console.error(err);
+        message.error("Không tải được thông tin chi nhánh chính");
+      }
+    };
+
+    loadMainChain();
+  }, []);
   //======================================================================================================================Dashboard
   const stats = useMemo(() => {
     return getMockFinancials(dateRange, customDates, branches.length);
@@ -212,6 +230,18 @@ const BranchPage = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await deleteBranch(id);
+
+      message.success("Xóa chi nhánh thành công");
+
+      loadBranches();
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message ?? "Xóa thất bại");
+    }
+  };
   //====================================================================================================================data fomat
   const columns = [
     {
@@ -243,14 +273,18 @@ const BranchPage = () => {
       dataIndex: "openTime",
       key: "openTime",
       sorter: true,
-      render: (text) => <span className="branch-time-tag">{text}</span>,
+      render: (text) => (
+        <span className="branch-time-tag">{text?.slice(0, 5)}</span>
+      ),
     },
     {
       title: "Giờ đóng cửa",
       dataIndex: "closeTime",
       key: "closeTime",
       sorter: true,
-      render: (text) => <span className="branch-time-tag">{text}</span>,
+      render: (text) => (
+        <span className="branch-time-tag">{text?.slice(0, 5)}</span>
+      ),
     },
     {
       title: "Ngày tạo",
@@ -285,6 +319,46 @@ const BranchPage = () => {
               >
                 Sửa
               </Button>
+            </div>
+
+            <div className="ant-dropdown-menu-item">
+              <Popconfirm
+                title="Bạn có chắc muốn xóa?"
+                okText="Tiếp tục"
+                cancelText="Hủy"
+                onConfirm={() => {
+                  Modal.confirm({
+                    title: "Xác nhận lần cuối",
+                    content: (
+                      <div>
+                        <div>
+                          Bạn sắp xóa chi nhánh <strong>"{record.name}"</strong>
+                          .
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 8,
+                            color: "#ff4d4f",
+                            fontWeight: 700,
+                          }}
+                        >
+                          ⚠️ Hành động này không thể hoàn tác ⚠️
+                        </div>
+                      </div>
+                    ),
+                    okText: "Xóa",
+                    cancelText: "Hủy",
+                    okType: "danger",
+
+                    onOk: () => handleDelete(record.id),
+                  });
+                }}
+              >
+                <Button danger type="text">
+                  Xóa
+                </Button>
+              </Popconfirm>
             </div>
           </div>
         );
@@ -487,6 +561,7 @@ const BranchPage = () => {
             open={openModal}
             onClose={() => setOpenModal(false)}
             branchObject={editingBranchObject}
+            mainChainId={mainChainId}
             onSuccess={loadBranches}
           />
         </div>

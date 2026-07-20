@@ -14,19 +14,18 @@ const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
 
 /* ── Status transition buttons ───────────────────────────────────────────── */
 const STATUS_TRANSITIONS = {
-  empty: [
-    { to: TABLE_STATUS.RESERVED, label: 'Đặt bàn', cls: 'btn-blue' },
-    { to: TABLE_STATUS.OCCUPIED, label: 'Có khách', cls: 'btn-orange' },
+  [TABLE_STATUS.EMPTY]: [
+    { to: TABLE_STATUS.OCCUPIED, label: 'Khách vào', cls: 'btn-orange' }
   ],
-  reserved: [
+  [TABLE_STATUS.RESERVED]: [
     { to: TABLE_STATUS.OCCUPIED, label: 'Khách đến', cls: 'btn-orange' },
     { to: TABLE_STATUS.EMPTY, label: 'Huỷ đặt', cls: 'btn-gray' },
   ],
-  occupied: [
+  [TABLE_STATUS.OCCUPIED]: [
     { to: TABLE_STATUS.CLEANING, label: 'Dọn dẹp', cls: 'btn-red' },
   ],
-  cleaning: [
-    { to: TABLE_STATUS.EMPTY, label: 'Đã sạch', cls: 'btn-green' },
+  [TABLE_STATUS.CLEANING]: [
+    { to: TABLE_STATUS.EMPTY, label: 'Đã sạch', cls: 'btn-green' }
   ],
 };
 
@@ -92,10 +91,9 @@ const OrderPanel = ({
   const tax = Math.round(subTotal * 0.08);
   const total = subTotal + tax;
   const cfg = table ? getStatusConfig(table.status) : null;
-  const statusKey = table?.status?.toLowerCase() || 'empty';
-  
+  const statusKey = table?.status || TABLE_STATUS.EMPTY;
   const transitions = [...(STATUS_TRANSITIONS[statusKey] || [])];
-  if (statusKey === 'occupied' && summary?.activeOrderId) {
+  if (statusKey === TABLE_STATUS.OCCUPIED && summary?.activeOrderId) {
     const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
     if (cleanIndex >= 0) {
       transitions.splice(cleanIndex, 1, {
@@ -134,7 +132,7 @@ const OrderPanel = ({
       </div>
 
       {/* Status Transition Buttons */}
-      {(transitions.length > 0 || table.status === 'Occupied') && (
+      {(transitions.length > 0 || table.status === TABLE_STATUS.OCCUPIED) && (
         <div className="pos-status-transitions">
           {transitions.map((t, idx) => (
             <button
@@ -146,7 +144,7 @@ const OrderPanel = ({
               {t.label}
             </button>
           ))}
-          {table.status === 'Occupied' && (
+          {table.status === TABLE_STATUS.OCCUPIED && (
             <button
               className="pos-status-btn pos-status-btn--default"
               style={{ background: '#eab308', color: '#fff', borderColor: '#eab308' }}

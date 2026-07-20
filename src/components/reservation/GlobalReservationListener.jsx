@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { notification, Button } from 'antd';
+import { notification, Button, message } from 'antd';
 import { useSignalR } from '../../context/SignalRContext';
 import ChangeTableModal from './ChangeTableModal';
+import axiosInstance from '../../api/axiosInstance';
 
 const GlobalReservationListener = () => {
   const connection = useSignalR();
@@ -42,10 +43,53 @@ const GlobalReservationListener = () => {
       });
     };
 
+    const handleLateWarning = (data) => {
+      const audio = new Audio('/sounds/alert.mp3');
+      audio.play().catch(e => console.log('Audio play failed', e));
+
+      const key = `late-${data.ReservationId}`;
+      notification.warning({
+        key,
+        message: 'Cảnh Báo Đơn Quá Hạn',
+        description: data.Message,
+        duration: 0,
+        placement: 'topRight',
+        btn: (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button
+              type="primary"
+              size="small"
+              onClick={async () => {
+                try {
+                  await axiosInstance.put(`/api/Reservation/${data.ReservationId}/extend?minutes=30`);
+                  message.success('Đã gia hạn thêm 30 phút thành công!');
+                  notification.destroy(key);
+                } catch (error) {
+                  message.error('Lỗi khi gia hạn!');
+                }
+              }}
+            >
+              Gia hạn 30 phút
+            </Button>
+            <Button
+              size="small"
+              onClick={() => {
+                notification.destroy(key);
+              }}
+            >
+              Bỏ qua
+            </Button>
+          </div>
+        ),
+      });
+    };
+
     connection.on('TableConflictWarning', handleConflict);
+    connection.on('ReservationLateWarning', handleLateWarning);
 
     return () => {
       connection.off('TableConflictWarning', handleConflict);
+      connection.off('ReservationLateWarning', handleLateWarning);
     };
   }, [connection]);
 

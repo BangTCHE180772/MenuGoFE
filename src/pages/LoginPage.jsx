@@ -22,14 +22,12 @@ const LoginPage = () => {
   const [pin, setPin] = useState("");
 
   const { setAuth } = useAuth();
-  const { isDeviceAuthorized } = useDevice();
+  const { isDeviceMode, deviceInfo } = useDevice();
   const navigate = useNavigate();
   const [form] = Form.useForm();
 
   const logoUrl = "/src/assets/logo.png";
   const backgroundlogoUrl = "/src/assets/background.png";
-
-  const [loginMode, setLoginMode] = useState("Login");
 
   //================================================================================================================= HANDLE LOGIN
   const handleLogin = async (values) => {
@@ -108,22 +106,9 @@ const LoginPage = () => {
 
   // ========================================================================================================= HANDLE LOGIN NAVIGATE
   const HandleLoginNavigate = (user, token) => {
-    if (loginMode.toLocaleLowerCase() === "pos".toLocaleLowerCase()) {
-      if (!isDeviceAuthorized) {
-        message.error("Thiết bị này chưa được cấp quyền.");
-        return;
-      }
-
-      setAuth(token, user);
-      message.success(` Chào mừng trở lại, ${user.name}! 👋`);
-      navigate("/cashier");
-    } else if (loginMode.toLocaleLowerCase() === "Login".toLocaleLowerCase()) {
-      setAuth(token, user);
-      message.success(` Chào mừng trở lại, ${user.name}! 👋`);
-      navigate("/home");
-    } else {
-      message.error("Chế độ đăng nhập không hợp lệ.");
-    }
+    setAuth(token, user);
+    message.success(` Chào mừng trở lại, ${user.name}! 👋`);
+    navigate("/home");
   };
 
   return (
@@ -176,7 +161,6 @@ const LoginPage = () => {
                 size="large"
                 className="login-input"
                 autoComplete="username"
-                prefix={<UserOutlined />}
               />
             </Form.Item>
 
@@ -193,39 +177,18 @@ const LoginPage = () => {
                   visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
                 }
                 autoComplete="current-password"
-                prefix={<LockOutlined />}
               />
             </Form.Item>
-
-            <Button
-              htmlType="submit"
-              size="large"
-              loading={
-                loading && loginMode.toLowerCase() === "pos".toLowerCase()
-              }
-              block
-              className="login-mode-working"
-              onClick={() => setLoginMode("pos")}
-            >
-              {loading && loginMode.toLowerCase() === "pos".toLowerCase()
-                ? "Bán hàng..."
-                : "Bán hàng"}
-            </Button>
 
             <Button
               type="primary"
               htmlType="submit"
               size="large"
-              loading={
-                loading && loginMode.toLowerCase() === "Login".toLowerCase()
-              }
+              loading={loading}
               block
               className="login-btn-primary"
-              onClick={() => setLoginMode("Login")}
             >
-              {loading && loginMode.toLowerCase() === "Login".toLowerCase()
-                ? "Đang đăng nhập"
-                : "Đăng nhập"}
+              {loading ? "Đang đăng nhập" : "Đăng nhập"}
             </Button>
 
             {/*============================================================================= Forgot Password and Register Links */}
@@ -322,7 +285,7 @@ const LoginPage = () => {
         )}
 
         {/*=============================================================================================== DEVICE AUTHORIZATION */}
-        {step === 1 && isDeviceAuthorized && (
+        {step === 1 && isDeviceMode && deviceInfo?.isActive && (
           <>
             <Divider className="login-divider">hoặc</Divider>
             <Button
@@ -330,12 +293,20 @@ const LoginPage = () => {
               block
               icon={<DesktopOutlined />}
               className="login-btn-cashier"
-              onClick={() => navigate("/cashier")}
+              onClick={() => {
+                switch (deviceInfo.deviceType) {
+                  case 'POS': navigate('/pos'); break;
+                  case 'Waiter': navigate('/station'); break;
+                  case 'Kitchen': navigate('/kitchen'); break;
+                  case 'Attendance': navigate('/attendance'); break;
+                  default: navigate('/login');
+                }
+              }}
             >
-              Mở Thu Ngân / Điểm Danh
+              Vào chế độ {deviceInfo.deviceType === 'POS' ? 'Thu Ngân' : deviceInfo.deviceType === 'Waiter' ? 'Phục Vụ' : deviceInfo.deviceType === 'Kitchen' ? 'Bếp' : 'Điểm Danh'}
             </Button>
             <p className="login-device-note">
-              Thiết bị này đã được cấp quyền mở màn thu ngân
+              Thiết bị này đã được xác lập: {deviceInfo.name}
             </p>
           </>
         )}

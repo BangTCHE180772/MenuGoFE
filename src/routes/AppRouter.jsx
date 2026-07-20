@@ -3,7 +3,7 @@ import { ROLES } from '../context/AuthContext';
 
 import AuthLayout from '../Layout/AuthLayout';
 import MainLayout from '../Layout/MainLayout';
-import CashierLayout from '../Layout/CashierLayout';
+import DeviceLayout from '../Layout/DeviceLayout';
 
 import PrivateRoute from './PrivateRoute';
 import RoleRoute from './RoleRoute';
@@ -17,12 +17,21 @@ import TableMapPage from '../pages/TableMapPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
+import ContractPage from '../pages/ContractPage';
+import AccountPage from '../pages/AccountPage';
+import WorkSchedulePage from '../pages/WorkSchedulePage';
+import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
+import ChainPagae from '../pages/ChainPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
+import VoucherPage from '../pages/VoucherPage';
+import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
+import DeviceSetupPage from '../pages/DeviceSetupPage';
+import DeviceManagementPage from '../pages/DeviceManagementPage';
 
 const AppRouter = () => {
   return (
@@ -36,10 +45,17 @@ const AppRouter = () => {
           </Route>
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
-          {/* ── Device Route: cần device_token (màn thu ngân) ─────────── */}
-          <Route element={<DeviceRoute />}>
-            <Route element={<CashierLayout />}>
-              <Route path="/cashier" element={<CashierPage />} />
+          {/* ── Device Route: cần device_token ─────────── */}
+          <Route element={<DeviceRoute allowedTypes={[]} />}>
+            <Route element={<DeviceLayout />}>
+              {/* POS */}
+              <Route path="/pos" element={<CashierPage />} />
+              {/* Waiter */}
+              <Route path="/station" element={<TableMapPage />} />
+              {/* Kitchen */}
+              <Route path="/kitchen" element={<KDSPage />} />
+              {/* Attendance */}
+              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
             </Route>
           </Route>
 
@@ -50,7 +66,7 @@ const AppRouter = () => {
               <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
-              <Route path="/work-schedule" element={<div className="page-placeholder">📅 Lịch làm việc — Coming Soon</div>} />
+              <Route path="/work-schedule" element={<WorkSchedulePage />} />
               <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/reservations" element={<ReservationPage />} />
@@ -63,15 +79,19 @@ const AppRouter = () => {
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/menu-management" element={<MenuManagementPage />} />
-                <Route path="/orders" element={<div className="page-placeholder">🛒 Đơn hàng — Coming Soon</div>} />
-                <Route path="/accounts" element={<div className="page-placeholder">👥 Nhân sự — Coming Soon</div>} />
-                <Route path="/tables" element={<div className="page-placeholder">🪑 Bàn — Coming Soon</div>} />
+                <Route path="/vouchers" element={<VoucherPage />} />
+                <Route path="/accounts" element={<AccountPage />} />
+                <Route path="/tables" element={<TableManagementPage />} />
+                <Route path="/device-management" element={<DeviceManagementPage />} />
+                <Route path="/device-setup" element={<DeviceSetupPage />} />
+                <Route path="/contracts" element={<ContractPage />} />
+                <Route path="/shifts" element={<ShiftPage />} />
               </Route>
 
               {/* Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/branches" element={<BranchPage />} />
-                <Route path="/chains" element={<div className="page-placeholder">🔗 Chuỗi — Coming Soon</div>} />
+                <Route path="/chains" element={<ChainPagae />} />
               </Route>
 
               {/* Admin only */}
@@ -91,4 +111,3 @@ const AppRouter = () => {
 };
 
 export default AppRouter;
-
