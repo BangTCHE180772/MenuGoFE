@@ -26,7 +26,7 @@ const TableMapPage = () => {
   const [orderSummary, setOrderSummary] = useState(null);
 
   const { user } = useAuth();
-  const { deviceEmployee } = useDevice();
+  const { deviceEmployee, deviceInfo } = useDevice();
   const connection = useSignalR();
 
   useEffect(() => {
@@ -35,6 +35,19 @@ const TableMapPage = () => {
         const res = await getAllBranches();
         const allBranches = res.data;
         
+        if (deviceInfo) {
+          // Locked to the device's assigned branch
+          const deviceBranch = allBranches.find(b => b.id === deviceInfo.branchId);
+          if (deviceBranch) {
+            setBranches([deviceBranch]);
+            setSelectedBranch(deviceBranch.id);
+          } else {
+            setBranches([]);
+            setSelectedBranch(null);
+          }
+          return;
+        }
+
         let availableBranches = allBranches;
         const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
         if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
@@ -50,7 +63,7 @@ const TableMapPage = () => {
       }
     };
     fetchBranches();
-  }, [user]);
+  }, [user, deviceInfo]);
 
   useEffect(() => {
     if (selectedBranch) {
