@@ -5,3 +5,13 @@ export const getAllImages = () =>
 
 export const createImage = (data) =>
   axiosInstance.post('/api/Image', data);
+
+export const uploadImage = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axiosInstance.post('/api/Image/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
