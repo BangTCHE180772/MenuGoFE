@@ -31,6 +31,7 @@ import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
+import DeviceAuthPage from '../pages/DeviceAuthPage';
 
 const AppRouter = () => {
   return (
@@ -58,9 +59,11 @@ const AppRouter = () => {
             </Route>
           </Route>
 
-        {/* ── Private: cần đăng nhập ────────────────────────────────── */}
-        <Route element={<PrivateRoute />}>
-          <Route element={<MainLayout />}>
+          {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
+          <Route element={<PrivateRoute />}>
+            <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
+            
+            <Route element={<MainLayout />}>
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<HomePage />} />
 
