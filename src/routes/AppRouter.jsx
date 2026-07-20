@@ -23,6 +23,7 @@ import WorkSchedulePage from '../pages/WorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import ChainPagae from '../pages/ChainPage';
+import AttendancePage from '../pages/AttendancePage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import VoucherPage from '../pages/VoucherPage';
@@ -55,7 +56,7 @@ const AppRouter = () => {
               {/* Kitchen */}
               <Route path="/kitchen" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Màn Hình Bếp</h1><p>Đang phát triển</p></div>} />
               {/* Attendance */}
-              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
+              <Route path="/attendance" element={<AttendancePage />} />
             </Route>
           </Route>
 
