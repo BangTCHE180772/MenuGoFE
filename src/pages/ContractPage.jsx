@@ -109,6 +109,7 @@ const ContractPage = () => {
     if (type === 'edit' && record) {
       form.setFieldsValue({
         accountId: record.accountId,
+        accountName: record.accountName || getAccountName(record.accountId),
         roleId: record.roleId,
         branchId: record.branchId,
         type: record.type,
@@ -210,7 +211,7 @@ const ContractPage = () => {
   // Filter Table Data
   const filteredContracts = contracts.filter((c) => {
     if (searchText) {
-      const accName = getAccountName(c.accountId).toLowerCase();
+      const accName = (c.accountName || getAccountName(c.accountId)).toLowerCase();
       const branchName = getBranchName(c.branchId).toLowerCase();
       const typeLabel = c.type?.toLowerCase() || '';
       const noteText = c.note?.toLowerCase() || '';
@@ -241,9 +242,9 @@ const ContractPage = () => {
       title: 'Nhân viên',
       dataIndex: 'accountId',
       key: 'accountId',
-      render: (id) => (
+      render: (id, record) => (
         <div>
-          <strong style={{ color: '#e8442a' }}>{getAccountName(id)}</strong>
+          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
           <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {id}</div>
         </div>
       ),
@@ -459,7 +460,7 @@ const ContractPage = () => {
           dataSource={filteredContracts}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 1000 }}
           bordered
         />
@@ -500,26 +501,40 @@ const ContractPage = () => {
         >
           {/* Row 1: Account Selection & Role Selection */}
           <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="accountId"
-              label="Nhân viên hợp đồng"
-              rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
-              style={{ width: 330 }}
-            >
-              <Select
-                placeholder="Chọn nhân viên..."
-                showSearch
-                optionFilterProp="label"
-                onChange={handleAccountChange}
-                disabled={modalType === 'edit'}
+            {modalType === 'edit' ? (
+              <>
+                <Form.Item
+                  name="accountName"
+                  label="Nhân viên hợp đồng"
+                  style={{ width: 330 }}
+                >
+                  <Input disabled style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                </Form.Item>
+                <Form.Item name="accountId" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+              </>
+            ) : (
+              <Form.Item
+                name="accountId"
+                label="Nhân viên hợp đồng"
+                rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
+                style={{ width: 330 }}
               >
-                {accounts.map((a) => (
-                  <Select.Option key={a.id} value={a.id} label={a.name}>
-                    {a.name} (Code: {a.id})
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+                <Select
+                  placeholder="Chọn nhân viên..."
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={handleAccountChange}
+                >
+                  {accounts.map((a) => (
+                    <Select.Option key={a.id} value={a.id} label={a.name}>
+                      {a.name} (Code: {a.id})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            )}
 
             <Form.Item
               name="roleId"
