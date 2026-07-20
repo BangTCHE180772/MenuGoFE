@@ -91,7 +91,6 @@ const ROLE_MENUS = {
       icon: <CalendarOutlined />,
     },
   ],
-  ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
