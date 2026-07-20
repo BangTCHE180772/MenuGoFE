@@ -706,7 +706,7 @@ const WorkSchedulePage = () => {
                   dataSource={filteredSchedules}
                   rowKey="id"
                   loading={loading}
-                  pagination={{ pageSize: 12 }}
+                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
                   scroll={{ x: 1100 }}
                   bordered
                 />
