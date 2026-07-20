@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Space, message, Tag, Select, Popconfirm, Spin } from 'antd';
-import { getDevicesByBranch, deleteDevice, revokeDevice } from '../api/deviceApi';
+import { getDevicesByBranch, deleteDevice, revokeDevice, updateDevice } from '../api/deviceApi';
 import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import dayjs from 'dayjs';
@@ -63,6 +63,21 @@ const DeviceManagementPage = () => {
     }
   };
 
+  const handleActivate = async (record) => {
+    try {
+      await updateDevice({
+        id: record.id,
+        name: record.name,
+        deviceType: record.deviceType,
+        isActive: true
+      });
+      message.success('Đã cấp lại quyền cho thiết bị thành công');
+      loadDevices();
+    } catch (err) {
+      message.error('Lỗi khi cấp quyền thiết bị');
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await deleteDevice(id);
@@ -107,9 +122,13 @@ const DeviceManagementPage = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          {record.isActive && (
+          {record.isActive ? (
             <Popconfirm title="Thu hồi quyền của thiết bị này?" onConfirm={() => handleRevoke(record.id)}>
               <Button size="small" type="primary" danger>Thu hồi</Button>
+            </Popconfirm>
+          ) : (
+            <Popconfirm title="Cấp lại quyền cho thiết bị này?" onConfirm={() => handleActivate(record)}>
+              <Button size="small" type="primary" style={{ backgroundColor: '#52c41a' }}>Cấp quyền</Button>
             </Popconfirm>
           )}
           <Popconfirm title="Xóa thiết bị này khỏi hệ thống?" onConfirm={() => handleDelete(record.id)}>
