@@ -1,3 +1,5 @@
+import { useDevice } from '../context/DeviceContext';
+
 /**
  * Màn hình Thu Ngân / Điểm Danh
  *
@@ -7,6 +9,8 @@
  * TODO: Team sẽ thêm nội dung thực tế vào đây
  */
 const CashierPage = () => {
+  const { deviceEmployee } = useDevice();
+
   return (
     <div className="cashier-page">
       <div className="cashier-placeholder">

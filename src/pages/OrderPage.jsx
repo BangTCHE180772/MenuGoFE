@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 import { message } from 'antd';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
+import { useDevice } from '../context/DeviceContext';
 import { createOrder, createOrderDetail } from '../api/orderApi';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { TABLE_STATUS } from '../data/tableConstants';
@@ -39,15 +40,21 @@ const OrderPage = () => {
   const tableIdParam = searchParams.get('tableId');
 
   const { user } = useAuth();
+  const { deviceInfo } = useDevice();
 
   const loadTables = useCallback(async () => {
     setTableLoading(true);
     try {
-      const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
-      const branchIds = user?.branchIds || [];
-      const res = (!isAdminOrOwner && branchIds.length > 0)
-        ? await getTablesByBranch(branchIds)
-        : await getAllTables();
+      let res;
+      if (deviceInfo) {
+        res = await getTablesByBranch(deviceInfo.branchId);
+      } else {
+        const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
+        const branchIds = user?.branchIds || [];
+        res = (!isAdminOrOwner && branchIds.length > 0)
+          ? await getTablesByBranch(branchIds)
+          : await getAllTables();
+      }
       const data = res?.data;
       const loadedTables = Array.isArray(data) ? data : [];
       setTables(loadedTables);
