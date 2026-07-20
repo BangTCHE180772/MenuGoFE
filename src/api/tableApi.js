@@ -4,7 +4,8 @@ export const getAllTables = () =>
   axiosInstance.get('/api/Table');
 
 export const getTablesByBranch = (branchIds, areaId = null) => {
-  const params = { branchIds: branchIds.join(',') };
+  const ids = Array.isArray(branchIds) ? branchIds : [branchIds];
+  const params = { branchIds: ids.join(',') };
   if (areaId) {
     params['$filter'] = `areaId eq ${areaId}`;
   }
