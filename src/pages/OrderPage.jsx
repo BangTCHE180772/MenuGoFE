@@ -43,8 +43,9 @@ const OrderPage = () => {
   const loadTables = useCallback(async () => {
     setTableLoading(true);
     try {
+      const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
       const branchIds = user?.branchIds || [];
-      const res = branchIds.length > 0
+      const res = (!isAdminOrOwner && branchIds.length > 0)
         ? await getTablesByBranch(branchIds)
         : await getAllTables();
       const data = res?.data;
