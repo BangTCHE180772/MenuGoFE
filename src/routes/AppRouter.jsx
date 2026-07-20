@@ -18,6 +18,7 @@ import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
+import KDSPage from '../pages/KDSPage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -53,6 +54,11 @@ const AppRouter = () => {
               <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/reservations" element={<ReservationPage />} />
+
+              {/* Chef, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/kds" element={<KDSPage />} />
+              </Route>
 
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
