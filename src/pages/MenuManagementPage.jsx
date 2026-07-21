@@ -873,17 +873,14 @@ const MenuManagementPage = () => {
                           <Select
                             placeholder="Chọn nguyên liệu chế biến"
                             showSearch
-                            optionFilterProp="children"
                             filterOption={(input, option) =>
-                              (option?.children || '').toLowerCase().includes(input.toLowerCase())
+                              (option?.label || '').toLowerCase().includes((input || '').toLowerCase())
                             }
-                          >
-                            {ingredientsPool.map(p => (
-                              <Option key={p.id} value={p.id}>
-                                {p.name} ({p.displayType}) - SKU: {p.skuCode || 'N/A'}
-                              </Option>
-                            ))}
-                          </Select>
+                            options={ingredientsPool.map(p => ({
+                              value: p.id,
+                              label: `${p.name} (${p.displayType}) - SKU: ${p.skuCode || 'N/A'}`
+                            }))}
+                          />
                         </Form.Item>
                       </Col>
                       <Col span={7}>
