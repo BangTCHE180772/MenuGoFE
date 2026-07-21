@@ -16,8 +16,11 @@ import {
   BookOutlined,
   FireOutlined,
   GiftOutlined,
+  LeftOutlined,
+  RightOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
+import { useRef, useState, useEffect } from "react";
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
@@ -121,6 +124,85 @@ const TopBar = () => {
     navigate("/login");
   };
 
+  // ─── Scroll & Drag-to-scroll logic ──────────────────────────────────────────
+  const navRef = useRef(null);
+  const [showLeftBtn, setShowLeftBtn] = useState(false);
+  const [showRightBtn, setShowRightBtn] = useState(false);
+
+  // Drag-to-scroll mouse states
+  const [isDown, setIsDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+
+  const updateScrollButtons = () => {
+    if (navRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
+      setShowLeftBtn(scrollLeft > 5);
+      setShowRightBtn(scrollLeft + clientWidth < scrollWidth - 5);
+    }
+  };
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (el) {
+      updateScrollButtons();
+      el.addEventListener("scroll", updateScrollButtons);
+      window.addEventListener("resize", updateScrollButtons);
+    }
+    return () => {
+      if (el) {
+        el.removeEventListener("scroll", updateScrollButtons);
+      }
+      window.removeEventListener("resize", updateScrollButtons);
+    };
+  }, [menuItems]);
+
+  const scrollNav = (direction) => {
+    if (navRef.current) {
+      const scrollAmount = 200;
+      navRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Mouse Drag Events
+  const handleMouseDown = (e) => {
+    if (!navRef.current) return;
+    setIsDown(true);
+    setStartX(e.pageX - navRef.current.offsetLeft);
+    setScrollLeftState(navRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDown(false);
+    if (navRef.current) {
+      navRef.current.classList.remove("dragging");
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDown(false);
+    if (navRef.current) {
+      navRef.current.classList.remove("dragging");
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDown || !navRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - navRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Tốc độ cuộn chuột
+
+    // Chỉ kích hoạt chế độ dragging khi kéo chuột di chuyển nhiều hơn 5px
+    if (Math.abs(x - startX) > 5) {
+      navRef.current.classList.add("dragging");
+    }
+
+    navRef.current.scrollLeft = scrollLeftState - walk;
+  };
+
   // Dropdown menu khi click vào avatar/tên user
   const userDropdownItems = [
     {
@@ -155,19 +237,40 @@ const TopBar = () => {
         <span className="topbar-logo-text">MenuGo</span>
       </Link>
 
-      {/* Navigation */}
-      <nav className="topbar-nav">
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      {/* Navigation với thanh trượt / kéo chuột */}
+      <div className="topbar-nav-wrapper">
+        {showLeftBtn && (
+          <button className="topbar-scroll-btn scroll-left" onClick={() => scrollNav("left")}>
+            <LeftOutlined />
+          </button>
+        )}
+
+        <nav
+          ref={navRef}
+          className="topbar-nav"
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+        >
+          {menuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        {showRightBtn && (
+          <button className="topbar-scroll-btn scroll-right" onClick={() => scrollNav("right")}>
+            <RightOutlined />
+          </button>
+        )}
+      </div>
 
       {/* User info */}
       <div className="topbar-right">

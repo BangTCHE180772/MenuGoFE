@@ -1197,6 +1197,7 @@
 .branch-swiper-container {
   position: relative;
   width: 100%;
+  user-select: none;
 }
 
 .edge-nav-btn {

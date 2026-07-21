@@ -21,7 +21,6 @@ const CustomerMenuCard = ({ product, onViewDetail }) => {
 
   return (
     <div className="customer-menu-card">
-      {/* Thumbnail */}
       <div className="card-image-wrapper">
         <img src={image} alt={name} className="card-img" loading="lazy" />
         <div className="card-overlay">
@@ -42,7 +41,6 @@ const CustomerMenuCard = ({ product, onViewDetail }) => {
         )}
       </div>
 
-      {/* Info */}
       <div className="card-info">
         {groupName && (
           <Tag className="card-category-tag">

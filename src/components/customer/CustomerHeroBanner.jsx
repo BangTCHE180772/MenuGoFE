@@ -23,7 +23,6 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
     >
       <div className="hero-container">
         <div className="hero-content">
-          {/* Logo */}
           <div className="hero-logo-wrapper">
             {chainInfo?.logoImage ? (
               <img
@@ -38,7 +37,6 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
             )}
           </div>
 
-          {/* Name & Badge */}
           <div className="hero-title-group">
             <Tag color="gold" className="hero-welcome-badge">
               Welcome to our Chain
@@ -48,9 +46,7 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
             </h1>
           </div>
 
-          {/* Details Pill Group */}
           <div className="hero-meta-grid">
-            {/* Opening Hours */}
             <div className="meta-card">
               <div className="meta-icon">
                 <ClockCircleOutlined />
@@ -63,7 +59,6 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
               </div>
             </div>
 
-            {/* Address */}
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                 (chainInfo?.newAddressName || "")
@@ -84,7 +79,6 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
             </a>
           </div>
 
-          {/* CTA Buttons */}
           <div className="hero-actions">
             <Button
               type="primary"

@@ -9,7 +9,11 @@ import {
 } from "@ant-design/icons";
 import { getMainChain } from "../api/chainApi";
 import { getAllBranches } from "../api/branchApi";
-import { getAllMenus, getMenuProducts, getProductsODataPaged } from "../api/menuApi";
+import {
+  getAllMenus,
+  getMenuProducts,
+  getProductsODataPaged,
+} from "../api/menuApi";
 
 import CustomerHeader from "../components/customer/CustomerHeader";
 import CustomerHeroBanner from "../components/customer/CustomerHeroBanner";
@@ -24,7 +28,7 @@ import ToTop from "../components/ToTop";
 
 import "../styles/CustomerHomePage.css";
 
-// ─── Mock Fallback Data ──────────────────────────────────────────────────────
+//=======================================================================================================================Fake Data
 const MOCK_CHAIN = {
   id: 1,
   name: "Chuỗi Nhà Hàng MenuGo Premium",
@@ -171,7 +175,7 @@ const MOCK_BRANCHES = [
   },
 ];
 
-// ─── Helper Functions ────────────────────────────────────────────────────────
+//==========================================================================================================new menu item in month
 const isCreatedInCurrentMonth = (dateStr) => {
   if (!dateStr) return false;
   try {
@@ -186,32 +190,28 @@ const isCreatedInCurrentMonth = (dateStr) => {
 };
 
 const CustomerHomePage = () => {
-  // State variables
   const [chainInfo, setChainInfo] = useState(MOCK_CHAIN);
   const [branches, setBranches] = useState(MOCK_BRANCHES);
   const [products, setProducts] = useState(MOCK_PRODUCTS);
   const [menus, setMenus] = useState([]);
 
-  const [loadingChain, setLoadingChain] = useState(false);
+  const [, setLoadingChain] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Filter & Search & Sort states
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortOption, setSortOption] = useState("default");
 
-  // Nav highlight & Modal states
   const [activeSection, setActiveSection] = useState("hero");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  // ─── Fetch Chain Data ─────────────────────────────────────────────────────
+  //=================================================================================================================== Fetch Data
   const fetchChain = useCallback(async () => {
     setLoadingChain(true);
     try {
@@ -233,7 +233,6 @@ const CustomerHomePage = () => {
     }
   }, []);
 
-  // ─── Fetch Branches Data ──────────────────────────────────────────────────
   const fetchBranches = useCallback(async () => {
     setLoadingBranches(true);
     try {
@@ -248,57 +247,75 @@ const CustomerHomePage = () => {
     }
   }, []);
 
-  // ─── Fetch Products via OData with Pagination ──────────────────────────────
-  const fetchProducts = useCallback(async (searchText = "", catId = "all", currentMenus = [], pageIdx = 1, size = 8) => {
-    setLoadingMenu(true);
-    try {
-      // Gọi OData phân trang động
-      const data = await getProductsODataPaged({
-        searchText,
-        menuId: catId,
-        pageSize: size,
-        pageIndex: pageIdx,
-      });
+  const fetchProducts = useCallback(
+    async (
+      searchText = "",
+      catId = "all",
+      currentMenus = [],
+      pageIdx = 1,
+      size = 8,
+    ) => {
+      setLoadingMenu(true);
+      try {
+        const data = await getProductsODataPaged({
+          searchText,
+          menuId: catId,
+          pageSize: size,
+          pageIndex: pageIdx,
+        });
 
-      const items = data.value || [];
-      const total = data["@odata.count"] ?? items.length;
+        const items = data.value || [];
+        const total = data["@odata.count"] ?? items.length;
 
-      setTotalCount(total);
+        setTotalCount(total);
 
-      if (items.length > 0) {
-        const formatted = items.map((p) => ({
-          ...p,
-          id: p.id || p.Id,
-          name: p.name || p.Name,
-          price: p.sellPrice ?? p.SellPrice ?? p.price ?? p.Price ?? 0,
-          imageLink: p.imageLink || p.ImageLink || (p.Image && p.Image.ImageLink) || p.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
-          groupName: p.groupName || p.GroupName || p.Group?.Name || p.category || "Món ăn",
-          isNew:
-            p.isNew ??
-            isCreatedInCurrentMonth(
-              p.createdAt || p.CreatedAt || p.createdDate || p.CreatedDate
-            ),
-        }));
-        setProducts(formatted);
-      } else {
-        // Fallback sang dữ liệu mẫu ở trang 1 nếu DB trống trơn để trải nghiệm người dùng luôn tốt
-        if (pageIdx === 1 && searchText === "" && catId === "all") {
-          setProducts(MOCK_PRODUCTS);
-          setTotalCount(MOCK_PRODUCTS.length);
+        if (items.length > 0) {
+          const formatted = items.map((p) => ({
+            ...p,
+            id: p.id || p.Id,
+            name: p.name || p.Name,
+            price: p.sellPrice ?? p.SellPrice ?? p.price ?? p.Price ?? 0,
+            imageLink:
+              p.imageLink ||
+              p.ImageLink ||
+              (p.Image && p.Image.ImageLink) ||
+              p.image ||
+              "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+            groupName:
+              p.groupName ||
+              p.GroupName ||
+              p.Group?.Name ||
+              p.category ||
+              "Món ăn",
+            isNew:
+              p.isNew ??
+              isCreatedInCurrentMonth(
+                p.createdAt || p.CreatedAt || p.createdDate || p.CreatedDate,
+              ),
+          }));
+          setProducts(formatted);
         } else {
-          setProducts([]);
+          if (pageIdx === 1 && searchText === "" && catId === "all") {
+            setProducts(MOCK_PRODUCTS);
+            setTotalCount(MOCK_PRODUCTS.length);
+          } else {
+            setProducts([]);
+          }
         }
+      } catch (err) {
+        console.warn(
+          "Gọi API OData paged lỗi, sử dụng dữ liệu món ăn mẫu:",
+          err.message,
+        );
+        setProducts(MOCK_PRODUCTS);
+        setTotalCount(MOCK_PRODUCTS.length);
+      } finally {
+        setLoadingMenu(false);
       }
-    } catch (err) {
-      console.warn("Gọi API OData paged lỗi, sử dụng dữ liệu món ăn mẫu:", err.message);
-      setProducts(MOCK_PRODUCTS);
-      setTotalCount(MOCK_PRODUCTS.length);
-    } finally {
-      setLoadingMenu(false);
-    }
-  }, [menus]);
+    },
+    [menus],
+  );
 
-  // ─── Fetch Menus ───────────────────────────────────────────────────────────
   const fetchMenus = useCallback(async () => {
     try {
       const res = await getAllMenus();
@@ -312,20 +329,18 @@ const CustomerHomePage = () => {
     return [];
   }, []);
 
-  // Load initial data
   useEffect(() => {
     const initData = async () => {
       fetchChain();
       fetchBranches();
       const currentMenus = await fetchMenus();
-      // Load products với trang 1 và kích thước mặc định ban đầu là 8
       fetchProducts(searchKeyword, selectedCategory, currentMenus, 1, 8);
     };
 
     initData();
   }, [fetchChain, fetchBranches]);
 
-  // Handle Search Input Change
+  //=================================================================================================================== filter data
   const handleSearchChange = (val) => {
     setSearchKeyword(val);
     setCurrentPage(1);
@@ -338,14 +353,12 @@ const CustomerHomePage = () => {
     fetchProducts("", selectedCategory, menus, 1, pageSize);
   };
 
-  // Handle Category Filter Change
   const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
     setCurrentPage(1);
     fetchProducts(searchKeyword, catId, menus, 1, pageSize);
   };
 
-  // Handle Pagination changes
   const handlePageChange = (page, size) => {
     setCurrentPage(page);
     setPageSize(size);
@@ -365,19 +378,46 @@ const CustomerHomePage = () => {
     const totalPages = Math.ceil(totalCount / pageSize);
 
     if (diff > 60) {
-      // Swiped left -> Go to Next Page
       if (currentPage < totalPages) {
         handlePageChange(currentPage + 1, pageSize);
       }
     } else if (diff < -60) {
-      // Swiped right -> Go to Prev Page
       if (currentPage > 1) {
         handlePageChange(currentPage - 1, pageSize);
       }
     }
   };
 
-  // ─── Tạo danh sách Category Filter động từ Menus ───────────────────────────
+  const [mouseDownX, setMouseDownX] = useState(0);
+  const [isMouseDownState, setIsMouseDownState] = useState(false);
+
+  const handleMouseDown = (e) => {
+    if (e.target.closest("button") || e.target.closest("a")) return;
+    setIsMouseDownState(true);
+    setMouseDownX(e.clientX);
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isMouseDownState) return;
+    setIsMouseDownState(false);
+    const diff = mouseDownX - e.clientX;
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    if (diff > 80) {
+      if (currentPage < totalPages) {
+        handlePageChange(currentPage + 1, pageSize);
+      }
+    } else if (diff < -80) {
+      if (currentPage > 1) {
+        handlePageChange(currentPage - 1, pageSize);
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDownState(false);
+  };
+
   const filterCategories = useMemo(() => {
     const list = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
 
@@ -389,34 +429,35 @@ const CustomerHomePage = () => {
       });
     });
 
-    list.push({ id: "new", name: "Món mới", icon: <CalendarOutlined />, isNew: true });
+    list.push({
+      id: "new",
+      name: "Món mới",
+      icon: <CalendarOutlined />,
+      isNew: true,
+    });
     return list;
   }, [menus]);
 
-  // ─── Client-Side Filter & Sort Processing ──────────────────────────────────
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
 
-    // 1. Text Search Filter (realtime client side backup)
     if (searchKeyword.trim()) {
       const q = searchKeyword.toLowerCase().trim();
       result = result.filter(
         (item) =>
           (item.name || "").toLowerCase().includes(q) ||
-          (item.groupName || "").toLowerCase().includes(q)
+          (item.groupName || "").toLowerCase().includes(q),
       );
     }
 
-    // 2. Category Filter (Chỉ lọc phía client cho "Món mới", các Menu ID cụ thể đã được lọc qua API)
     if (selectedCategory === "new") {
       result = result.filter(
         (item) =>
           item.isNew === true ||
-          isCreatedInCurrentMonth(item.createdAt || item.CreatedAt)
+          isCreatedInCurrentMonth(item.createdAt || item.CreatedAt),
       );
     }
 
-    // 3. Sorting
     switch (sortOption) {
       case "price-asc":
         result.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
@@ -437,19 +478,17 @@ const CustomerHomePage = () => {
     return result;
   }, [products, searchKeyword, selectedCategory, sortOption]);
 
-  // ─── Smooth Navigation Handlers ──────────────────────────────────────────
   const scrollToSection = (sectionId) => {
     setActiveSection(sectionId);
     const element = document.getElementById(sectionId);
     if (element) {
-      const yOffset = -70; // Header offset
+      const yOffset = -70; 
       const y =
         element.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
   };
 
-  // View detail modal handlers
   const handleOpenDetailModal = (product) => {
     setSelectedProduct(product);
     setIsDetailModalOpen(true);
@@ -462,60 +501,54 @@ const CustomerHomePage = () => {
 
   return (
     <div className="customer-home-layout">
-      {/* Fixed Sticky Header */}
       <CustomerHeader
         chainInfo={chainInfo}
         activeSection={activeSection}
         onNavigate={scrollToSection}
       />
 
-      {/* Hero Banner Section */}
       <CustomerHeroBanner
         chainInfo={chainInfo}
         onExploreMenu={() => scrollToSection("menu")}
         onExploreBranches={() => scrollToSection("branches")}
       />
 
-      {/* Main Menu Section */}
       <main id="menu" className="customer-menu-section">
         <div className="menu-container">
-          {/* Section Header Title */}
           <div className="menu-header-group">
             <span className="section-subtitle">Delicious Menu</span>
             <h2 className="section-title">Thực Đơn Đặc Sắc</h2>
             <div className="title-underline"></div>
           </div>
 
-          {/* Controls Bar: Search, Category Filter, Sort Dropdown */}
           <div className="menu-controls-bar">
-            {/* Realtime Search Bar */}
             <CustomerSearchBar
               value={searchKeyword}
               onChange={handleSearchChange}
               onClear={handleSearchClear}
             />
 
-            {/* Category Filter Pills */}
             <CustomerMenuFilter
               categories={filterCategories}
               activeCategory={selectedCategory}
               onSelectCategory={handleCategorySelect}
             />
 
-            {/* Sort Dropdown */}
             <CustomerMenuSort
               value={sortOption}
               onChange={(val) => setSortOption(val)}
             />
           </div>
 
-          {/* Menu Food Grid Display với Vuốt/Bấm mép để sang trang */}
           <div
             className="menu-swiper-container"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            style={{ cursor: "grab" }}
           >
-            {/* Nút mép trái để sang trang trước */}
             {currentPage > 1 && (
               <button
                 className="edge-nav-btn edge-left"
@@ -526,7 +559,6 @@ const CustomerHomePage = () => {
               </button>
             )}
 
-            {/* Nút mép phải để sang trang sau */}
             {currentPage < Math.ceil(totalCount / pageSize) && (
               <button
                 className="edge-nav-btn edge-right"
@@ -544,7 +576,6 @@ const CustomerHomePage = () => {
             />
           </div>
 
-          {/* Điều khiển phân trang (Pagination) */}
           {totalCount > 0 && (
             <div className="menu-pagination-wrapper">
               <Pagination
@@ -560,24 +591,20 @@ const CustomerHomePage = () => {
         </div>
       </main>
 
-      {/* Branch Section */}
       <CustomerBranchSection
         branches={branches}
         loading={loadingBranches}
         chainInfo={chainInfo}
       />
 
-      {/* Extensible Footer */}
       <CustomerFooter chainInfo={chainInfo} />
 
-      {/* Product Detail Modal Popup */}
       <ProductDetailModal
         product={selectedProduct}
         open={isDetailModalOpen}
         onClose={handleCloseDetailModal}
       />
 
-      {/* Button cuộn lên đầu trang */}
       <ToTop />
     </div>
   );

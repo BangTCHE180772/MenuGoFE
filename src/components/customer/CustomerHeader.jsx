@@ -34,7 +34,6 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
   return (
     <header className={`customer-header ${scrolled ? "scrolled" : ""}`}>
       <div className="header-container">
-        {/* Brand Logo & Name */}
         <div className="header-brand" onClick={() => handleNavClick("hero")}>
           {chainInfo?.logoImage ? (
             <img
@@ -55,7 +54,6 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
           </div>
         </div>
 
-        {/* Desktop Navigation */}
         <nav className="desktop-nav">
           {navItems.map((item) => (
             <button
@@ -69,7 +67,6 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
           ))}
         </nav>
 
-        {/* Mobile Toggle Button */}
         <Button
           type="text"
           className="mobile-menu-btn"
@@ -77,7 +74,6 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
           onClick={() => setMobileMenuOpen(true)}
         />
 
-        {/* Mobile Drawer */}
         <Drawer
           title={
             <div className="drawer-brand">

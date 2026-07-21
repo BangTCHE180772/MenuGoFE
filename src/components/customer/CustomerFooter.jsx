@@ -23,7 +23,6 @@ const CustomerFooter = ({ chainInfo }) => {
     <footer className="customer-footer">
       <div className="footer-container">
         <Row gutter={[40, 32]}>
-          {/* Col 1: Brand & Info */}
           <Col xs={24} sm={12} lg={8}>
             <div className="footer-brand">
               {chainInfo?.logoImage ? (
@@ -52,7 +51,6 @@ const CustomerFooter = ({ chainInfo }) => {
             </div>
           </Col>
 
-          {/* Col 2: Contact Info */}
           <Col xs={24} sm={12} lg={8}>
             <Title level={5} className="footer-heading">
               Thông Tin Liên Hệ
@@ -86,7 +84,6 @@ const CustomerFooter = ({ chainInfo }) => {
             </ul>
           </Col>
 
-          {/* Col 3: Links & Future extensions */}
           <Col xs={24} sm={12} lg={8}>
             <Title level={5} className="footer-heading">
               Khám Phá & Mở Rộng

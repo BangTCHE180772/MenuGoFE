@@ -31,7 +31,6 @@ const ProductDetailModal = ({ product, open, onClose }) => {
       className="product-detail-modal"
     >
       <div className="modal-product-container">
-        {/* Left / Top Image */}
         <div className="modal-image-wrapper">
           <img src={image} alt={product.name || product.Name} className="modal-product-img" />
           {product.isNew && (
@@ -41,7 +40,6 @@ const ProductDetailModal = ({ product, open, onClose }) => {
           )}
         </div>
 
-        {/* Right / Content */}
         <div className="modal-product-content">
           <div className="modal-header-info">
             <Tag color="volcano" className="modal-category-tag">

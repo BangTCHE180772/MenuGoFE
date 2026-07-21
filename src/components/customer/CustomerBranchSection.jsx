@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Row, Col, Typography, Spin, Pagination } from "antd";
 import { ShopOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
 import CustomerBranchCard from "./CustomerBranchCard";
@@ -12,7 +12,7 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
   const activeBranches = branches || [];
   const paginatedBranches = activeBranches.slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    currentPage * pageSize,
   );
 
   const [touchStartX, setTouchStartX] = useState(0);
@@ -36,6 +36,37 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
         setCurrentPage(currentPage - 1);
       }
     }
+  };
+
+  // Mouse drag handlers for page swiping
+  const [mouseDownX, setMouseDownX] = useState(0);
+  const [isMouseDownState, setIsMouseDownState] = useState(false);
+
+  const handleMouseDown = (e) => {
+    if (e.target.closest("button") || e.target.closest("a")) return;
+    setIsMouseDownState(true);
+    setMouseDownX(e.clientX);
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isMouseDownState) return;
+    setIsMouseDownState(false);
+    const diff = mouseDownX - e.clientX;
+    const totalPages = Math.ceil(activeBranches.length / pageSize);
+
+    if (diff > 80) {
+      if (currentPage < totalPages) {
+        setCurrentPage(currentPage + 1);
+      }
+    } else if (diff < -80) {
+      if (currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDownState(false);
   };
 
   return (
@@ -67,6 +98,10 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
               className="branch-swiper-container"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              style={{ cursor: "grab" }}
             >
               {/* Nút mép trái để sang trang trước */}
               {currentPage > 1 && (

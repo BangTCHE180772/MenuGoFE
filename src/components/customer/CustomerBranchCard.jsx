@@ -20,14 +20,12 @@ const CustomerBranchCard = ({ branch, isMain }) => {
   const closeTime = branch.closeTime || "22:00";
   const phone = branch.phone || branch.phoneNumber || "1900 6868";
 
-  // Google Maps directions search link
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     address,
   )}`;
 
   return (
     <div className={`customer-branch-card ${isMain ? "main-branch" : ""}`}>
-      {/* Header Tag */}
       <div className="branch-card-header">
         <div className="branch-badge-group">
           {isMain ? (
@@ -42,12 +40,9 @@ const CustomerBranchCard = ({ branch, isMain }) => {
         </div>
       </div>
 
-      {/* Title */}
       <h3 className="branch-title">{branchName}</h3>
 
-      {/* Info List */}
       <div className="branch-info-list">
-        {/* Address */}
         <div className="info-row">
           <EnvironmentOutlined className="info-icon icon-location" />
           <div className="info-content">
@@ -56,7 +51,6 @@ const CustomerBranchCard = ({ branch, isMain }) => {
           </div>
         </div>
 
-        {/* Operating Hours */}
         <div className="info-row">
           <ClockCircleOutlined className="info-icon icon-clock" />
           <div className="info-content">
@@ -67,7 +61,6 @@ const CustomerBranchCard = ({ branch, isMain }) => {
           </div>
         </div>
 
-        {/* Contact Phone */}
         <div className="info-row">
           <PhoneOutlined className="info-icon icon-phone" />
           <div className="info-content">

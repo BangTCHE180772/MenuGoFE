@@ -92,7 +92,6 @@ const ChainPage = () => {
       setBannerFile(null);
       setLogoFile(null);
 
-      // Populate Address State (wardId khởi tạo là null, chỉ có giá trị khi người dùng chọn trong Modal)
       setNewAddressState({
         wardId: null,
         name: data.newAddressName || "Chưa thiết lập",
@@ -200,7 +199,6 @@ const ChainPage = () => {
       let finalLogo = chain.logoImage || "";
       let finalBanner = chain.backgroundImage || "";
 
-      // Tải Logo lên Cloudinary nếu người dùng chọn file logo mới
       if (logoFile) {
         message.loading({ content: "Đang tải Logo lên Cloudinary...", key: "uploadLogo" });
         const logoRes = await uploadImage(logoFile);
@@ -210,7 +208,6 @@ const ChainPage = () => {
         }
       }
 
-      // Tải Ảnh bìa lên Cloudinary nếu người dùng chọn file ảnh bìa mới
       if (bannerFile) {
         message.loading({ content: "Đang tải ảnh bìa lên Cloudinary...", key: "uploadBanner" });
         const bannerRes = await uploadImage(bannerFile);
@@ -220,7 +217,6 @@ const ChainPage = () => {
         }
       }
 
-      // Chuẩn bị DTO theo đúng ChainUpdateDto
       const dto = {
         id: chain.id,
         name: values.name,
