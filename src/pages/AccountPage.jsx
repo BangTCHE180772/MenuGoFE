@@ -143,7 +143,26 @@ const AccountPage = () => {
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin nhân viên!';
-      message.error(errorMsg);
+
+      // Map backend validation errors to specific form fields
+      const errorFieldMap = [
+        { keyword: 'Email', field: 'email' },
+        { keyword: 'điện thoại', field: 'phone' },
+        { keyword: 'CCCD', field: 'citizenIdCode' },
+      ];
+
+      let fieldErrorSet = false;
+      for (const { keyword, field } of errorFieldMap) {
+        if (errorMsg.includes(keyword)) {
+          form.setFields([{ name: field, errors: [errorMsg] }]);
+          fieldErrorSet = true;
+          break;
+        }
+      }
+
+      if (!fieldErrorSet) {
+        message.error(errorMsg);
+      }
     }
   };
 
