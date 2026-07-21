@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, message } from 'antd';
 import { employeeLogin } from '../api/deviceApi';
 import { useDevice } from '../context/DeviceContext';
+import DeviceQrCode from './DeviceQrCode';
 
-const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess }) => {
+const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess, prefillEmail }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const { deviceToken, loginEmployee } = useDevice();
+
+  useEffect(() => {
+    if (prefillEmail) {
+      form.setFieldsValue({ email: prefillEmail });
+    }
+  }, [prefillEmail, form]);
 
   const handleFinish = async (values) => {
     setLoading(true);
@@ -16,11 +23,13 @@ const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess }) => {
         email: values.email,
         code: values.code
       });
-      
+
       message.success(`Đăng nhập thành công: ${res.data.employee.name}`);
       loginEmployee(res.data.employee);
-      
-      form.resetFields();
+
+      form.resetFields(['code']);
+      if (!prefillEmail) form.resetFields(['email']);
+
       if (onSuccess) onSuccess(res.data.employee);
     } catch (error) {
       message.error(error.response?.data?.message || 'Đăng nhập thất bại');
@@ -39,36 +48,52 @@ const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess }) => {
       }}
       footer={null}
       destroyOnClose
+      width={600}
     >
-      <div style={{ marginBottom: 20, color: '#666' }}>
-        <p>Vui lòng nhập Email và mã 2FA từ ứng dụng Authenticator để bắt đầu phiên làm việc.</p>
-        <p><em>Lưu ý: Bạn phải thuộc chi nhánh của thiết bị này.</em></p>
+      <div style={{ display: 'flex', gap: '20px' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ marginBottom: 20, color: '#666' }}>
+            {prefillEmail ? (
+              <p>Mã QR đã được quét! Vui lòng nhập mã 2FA để hoàn tất đăng nhập cho <strong>{prefillEmail}</strong>.</p>
+            ) : (
+              <p>Vui lòng nhập Email và mã 2FA từ ứng dụng Authenticator để bắt đầu phiên làm việc.</p>
+            )}
+            <p><em>Lưu ý: Bạn phải thuộc chi nhánh của thiết bị này.</em></p>
+          </div>
+
+          <Form form={form} layout="vertical" onFinish={handleFinish}>
+            <Form.Item
+              name="email"
+              label="Email Nhân Viên"
+              initialValue={prefillEmail}
+              rules={[
+                { required: true, message: 'Vui lòng nhập email' },
+                { type: 'email', message: 'Email không hợp lệ' }
+              ]}
+            >
+              <Input placeholder="nv1@menugo.com" disabled={!!prefillEmail} />
+            </Form.Item>
+
+            <Form.Item
+              name="code"
+              label="Mã 2FA (Authenticator)"
+              rules={[{ required: true, message: 'Vui lòng nhập mã 2FA' }]}
+            >
+              <Input.OTP length={6} />
+            </Form.Item>
+
+            <Button type="primary" htmlType="submit" block loading={loading} style={{ marginTop: 10 }}>
+              Xác nhận
+            </Button>
+          </Form>
+        </div>
+
+        {!prefillEmail && (
+          <div style={{ width: '180px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderLeft: '1px solid #f0f0f0', paddingLeft: '20px', position: 'relative' }}>
+            <DeviceQrCode />
+          </div>
+        )}
       </div>
-
-      <Form form={form} layout="vertical" onFinish={handleFinish}>
-        <Form.Item 
-          name="email" 
-          label="Email Nhân Viên"
-          rules={[
-            { required: true, message: 'Vui lòng nhập email' },
-            { type: 'email', message: 'Email không hợp lệ' }
-          ]}
-        >
-          <Input placeholder="nv1@menugo.com" />
-        </Form.Item>
-
-        <Form.Item 
-          name="code" 
-          label="Mã 2FA (Authenticator)"
-          rules={[{ required: true, message: 'Vui lòng nhập mã 2FA' }]}
-        >
-          <Input.OTP length={6} />
-        </Form.Item>
-
-        <Button type="primary" htmlType="submit" block loading={loading} style={{ marginTop: 10 }}>
-          Xác nhận
-        </Button>
-      </Form>
     </Modal>
   );
 };

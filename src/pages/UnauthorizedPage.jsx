@@ -1,27 +1,19 @@
-import { Button, Result } from 'antd';
+import React from 'react';
+import { Result, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeftOutlined } from '@ant-design/icons';
 
-/**
- * Trang 403 - Không có quyền truy cập
- */
 const UnauthorizedPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="unauthorized-page">
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f0f2f5' }}>
       <Result
         status="403"
-        title="403"
-        subTitle="Bạn không có quyền truy cập trang này."
+        title="403 Forbidden"
+        subTitle="Xin lỗi, bạn không có quyền truy cập vào trang này."
         extra={
-          <Button
-            type="primary"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/home')}
-            className="unauthorized-btn"
-          >
-            Về trang chủ
+          <Button type="primary" onClick={() => navigate('/')}>
+            Quay Về Trang Chủ
           </Button>
         }
       />

@@ -24,6 +24,7 @@ import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
 import ChainPagae from '../pages/ChainPage';
+import AttendancePage from '../pages/AttendancePage';
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import VoucherPage from '../pages/VoucherPage';
@@ -32,6 +33,7 @@ import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
+import DeviceAuthPage from '../pages/DeviceAuthPage';
 
 const AppRouter = () => {
   return (
@@ -55,15 +57,17 @@ const AppRouter = () => {
               {/* Kitchen */}
               <Route path="/kitchen" element={<KDSPage />} />
               {/* Attendance */}
-              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
+              <Route path="/attendance" element={<AttendancePage />} />
             </Route>
           </Route>
 
-          {/* ── Private: cần đăng nhập ────────────────────────────────── */}
+          {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
           <Route element={<PrivateRoute />}>
+            <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
+            
             <Route element={<MainLayout />}>
-              <Route index element={<Navigate to="/home" replace />} />
-              <Route path="/home" element={<HomePage />} />
+            <Route index element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route path="/work-schedule" element={<WorkSchedulePage />} />
