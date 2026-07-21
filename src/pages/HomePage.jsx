@@ -310,34 +310,38 @@ const HomePage = () => {
                 style={{ borderRadius: 12, height: '100%' }}
               >
                 <Row gutter={[12, 12]}>
-                  <Col span={12}>
-                    <Card
-                      hoverable
-                      onClick={() => navigate('/kds')}
-                      style={{ background: '#fff1f0', borderColor: '#ffa39e', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
-                    >
-                      <FireOutlined style={{ fontSize: 28, color: '#ff4d4f', marginBottom: 8 }} />
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>Bếp KDS (UC-097)</div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Điều phối chế biến</Text>
-                    </Card>
-                  </Col>
+                  {hasRole(ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN) && (
+                    <Col span={12}>
+                      <Card
+                        hoverable
+                        onClick={() => navigate('/cashier')}
+                        style={{ background: '#f6ffed', borderColor: '#b7eb8f', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
+                      >
+                        <DollarOutlined style={{ fontSize: 28, color: '#52c41a', marginBottom: 8 }} />
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>Quầy Thu Ngân</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Thanh toán hóa đơn</Text>
+                      </Card>
+                    </Col>
+                  )}
+
+                  {hasRole(ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN) && (
+                    <Col span={12}>
+                      <Card
+                        hoverable
+                        onClick={() => navigate('/kds')}
+                        style={{ background: '#fff1f0', borderColor: '#ffa39e', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
+                      >
+                        <FireOutlined style={{ fontSize: 28, color: '#ff4d4f', marginBottom: 8 }} />
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>Bếp KDS (UC-097)</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Điều phối chế biến</Text>
+                      </Card>
+                    </Col>
+                  )}
 
                   <Col span={12}>
                     <Card
                       hoverable
-                      onClick={() => navigate('/menu-management')}
-                      style={{ background: '#e6f7ff', borderColor: '#91d5ff', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
-                    >
-                      <BookOutlined style={{ fontSize: 28, color: '#1890ff', marginBottom: 8 }} />
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>Thực Đơn (UC-058)</div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Món & Công thức</Text>
-                    </Card>
-                  </Col>
-
-                  <Col span={12}>
-                    <Card
-                      hoverable
-                      onClick={() => navigate('/tables')}
+                      onClick={() => navigate('/table-map')}
                       style={{ background: '#fffbe6', borderColor: '#ffe58f', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
                     >
                       <TableOutlined style={{ fontSize: 28, color: '#faad14', marginBottom: 8 }} />
@@ -346,17 +350,33 @@ const HomePage = () => {
                     </Card>
                   </Col>
 
-                  <Col span={12}>
-                    <Card
-                      hoverable
-                      onClick={() => navigate('/reservations')}
-                      style={{ background: '#f6ffed', borderColor: '#b7eb8f', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
-                    >
-                      <CalendarOutlined style={{ fontSize: 28, color: '#52c41a', marginBottom: 8 }} />
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>Đặt Bàn Trước</div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Lịch hẹn khách</Text>
-                    </Card>
-                  </Col>
+                  {hasRole(ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN) && (
+                    <Col span={12}>
+                      <Card
+                        hoverable
+                        onClick={() => navigate('/menu-management')}
+                        style={{ background: '#e6f7ff', borderColor: '#91d5ff', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
+                      >
+                        <BookOutlined style={{ fontSize: 28, color: '#1890ff', marginBottom: 8 }} />
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>Thực Đơn (UC-058)</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Món & Công thức</Text>
+                      </Card>
+                    </Col>
+                  )}
+
+                  {hasRole(ROLES.CASHIER, ROLES.WAITER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN) && (
+                    <Col span={12}>
+                      <Card
+                        hoverable
+                        onClick={() => navigate('/reservations')}
+                        style={{ background: '#f9f0ff', borderColor: '#d3ade8', borderRadius: 8, textAlign: 'center', cursor: 'pointer' }}
+                      >
+                        <CalendarOutlined style={{ fontSize: 28, color: '#722ed1', marginBottom: 8 }} />
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>Đặt Bàn Trước</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Lịch hẹn khách</Text>
+                      </Card>
+                    </Col>
+                  )}
                 </Row>
               </Card>
             </Col>

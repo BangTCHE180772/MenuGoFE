@@ -77,8 +77,8 @@ const AppRouter = () => {
                 <Route path="/vouchers" element={<VoucherPage />} />
               </Route>
 
-              {/* Chef, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+              {/* Chef, Cashier, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
 
