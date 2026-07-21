@@ -79,6 +79,7 @@ const MenuManagementPage = () => {
   const [viewDishModalVisible, setViewDishModalVisible] = useState(false);
   const [viewingDishDetails, setViewingDishDetails] = useState(null);
 
+  const [categoryForm] = Form.useForm();
   const [dishForm] = Form.useForm();
 
   // Image Upload State & Handler
