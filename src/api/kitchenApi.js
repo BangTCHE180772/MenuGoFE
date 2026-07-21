@@ -1,0 +1,19 @@
+import axiosInstance from './axiosInstance';
+
+/**
+ * Lấy tất cả món ăn cần chế biến cho KDS (Kitchen Display System)
+ */
+export const getKitchenItems = () =>
+  axiosInstance.get('/api/Order/kitchen-items');
+
+/**
+ * Cập nhật trạng thái chế biến (Waiting -> Accepted -> Cooking -> Ready/Done)
+ */
+export const updateCookingStatus = (detailId, cookingStatus) =>
+  axiosInstance.put(`/api/Order/details/${detailId}/cooking-status`, { cookingStatus });
+
+/**
+ * Cập nhật trạng thái cho nhiều món cùng lúc (hỗ trợ Batch Processing - AF1)
+ */
+export const batchUpdateCookingStatus = (detailIds, cookingStatus) =>
+  Promise.all(detailIds.map(id => updateCookingStatus(id, cookingStatus)));

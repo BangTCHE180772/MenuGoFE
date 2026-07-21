@@ -37,6 +37,8 @@ axiosInstance.interceptors.response.use(
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+    } else if (error.response?.status === 403) {
+      window.location.href = '/unauthorized';
     }
     return Promise.reject(error);
   }

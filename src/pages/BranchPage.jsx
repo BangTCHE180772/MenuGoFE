@@ -19,7 +19,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { searchBranches } from "../api/branchApi";
-import "../styles/Branch/BranchPage.css";
+import "../styles/BranchPage.css";
 import CreateUpdateBranchFormPopup from "../Popup/CreateUpdateBranchFormPopup";
 import { getMainChain } from "../api/chainApi";
 import { deleteBranch } from "../api/branchApi";
@@ -216,7 +216,7 @@ const BranchPage = () => {
         createdAt: "CreatedAt",
         openTime: "OpenTime",
         closeTime: "CloseTime",
-        addressName: "AddressName",
+        addressName: "NewAddressName",
         managerName: "ManagerName",
       };
 
@@ -253,10 +253,10 @@ const BranchPage = () => {
     },
     {
       title: "Địa chỉ",
-      dataIndex: "addressName",
-      key: "addressName",
+      dataIndex: "newAddressName",
+      key: "newAddressName",
       sorter: true,
-      render: (text) => <span>{text}</span>,
+      render: (text) => <span>{text || "Chưa có địa chỉ"}</span>,
     },
     // {
     //   title: "Loại hình",

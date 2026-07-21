@@ -3,6 +3,7 @@ import { useDevice } from '../context/DeviceContext';
 import { Button, Tooltip } from 'antd';
 import { LogoutOutlined, LockOutlined, DesktopOutlined, LoginOutlined } from '@ant-design/icons';
 import { useState, useEffect, useRef } from 'react';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import DeviceEmployeeLoginModal from '../components/DeviceEmployeeLoginModal';
 import '../styles/devicelayout.css';
 
@@ -11,13 +12,67 @@ const DeviceLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loginVisible, setLoginVisible] = useState(false);
+  const [scannedEmail, setScannedEmail] = useState('');
   const pressTimerRef = useRef(null);
+  const connectionRef = useRef(null);
 
   useEffect(() => {
-    if (!deviceEmployee && deviceInfo && (deviceInfo.deviceType === 'POS' || deviceInfo.deviceType === 'Attendance')) {
-      setLoginVisible(true);
+    if (!deviceEmployee && deviceInfo && deviceInfo.deviceType === 'POS') {
+      if (!loginVisible) setLoginVisible(true);
     }
-  }, [deviceEmployee, deviceInfo]);
+  }, [deviceEmployee, deviceInfo, loginVisible]);
+
+  useEffect(() => {
+    const { deviceToken } = useDevice.getState ? useDevice.getState() : { deviceToken: localStorage.getItem('device_token') };
+    const tokenToUse = deviceToken || localStorage.getItem('device_token');
+
+    if (!tokenToUse || !deviceInfo?.isActive) return;
+
+    const setupSignalR = async () => {
+      const conn = new HubConnectionBuilder()
+        .withUrl('http://localhost:5067/notificationHub')
+        .configureLogging(LogLevel.Information)
+        .withAutomaticReconnect()
+        .build();
+
+      conn.on('DeviceAuthScanned', (data) => {
+        const storedInfo = localStorage.getItem('device_info');
+        let dType = 'POS';
+        if (storedInfo) {
+          try {
+            dType = JSON.parse(storedInfo).deviceType;
+          } catch (e) { }
+        }
+
+        if (dType === 'POS') {
+          setScannedEmail(data.email);
+          setLoginVisible(true);
+        } else {
+          message.success(`Nhân viên ${data.email} vừa kết nối thành công!`);
+        }
+      });
+
+      conn.on('AttendanceSuccess', (data) => {
+        window.dispatchEvent(new CustomEvent('AttendanceSuccessEvent', { detail: data }));
+      });
+
+      try {
+        await conn.start();
+        await conn.invoke('JoinDeviceGroup', tokenToUse);
+        connectionRef.current = conn;
+      } catch (e) {
+        console.error('SignalR Connection Error: ', e);
+      }
+    };
+
+    setupSignalR();
+
+    return () => {
+      if (connectionRef.current) {
+        connectionRef.current.stop();
+      }
+    };
+  }, [deviceInfo?.isActive]);
 
   const handleLoginSuccess = (employee) => {
     setLoginVisible(false);
@@ -100,13 +155,19 @@ const DeviceLayout = () => {
 
       <DeviceEmployeeLoginModal
         open={loginVisible}
+        prefillEmail={scannedEmail}
         onCancel={() => {
-          // Ngăn không cho tắt modal nếu là POS/Attendance
-          if (deviceInfo?.deviceType !== 'POS' && deviceInfo?.deviceType !== 'Attendance') {
-            setLoginVisible(false);
+          // Ngăn không cho tắt modal nếu là POS
+          if (deviceInfo?.deviceType === 'POS') {
+            return;
           }
+          setLoginVisible(false);
+          setScannedEmail('');
         }}
-        onSuccess={handleLoginSuccess}
+        onSuccess={(emp) => {
+          handleLoginSuccess(emp);
+          setScannedEmail('');
+        }}
       />
     </div>
   );

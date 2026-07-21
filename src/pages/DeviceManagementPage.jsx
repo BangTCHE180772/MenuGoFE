@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Space, message, Tag, Select, Popconfirm, Spin } from 'antd';
-import { getDevicesByBranch, deleteDevice, revokeDevice } from '../api/deviceApi';
+import { Table, Button, Space, message, Tag, Select, Popconfirm, Spin, Modal, Form, Input } from 'antd';
+import { getDevicesByBranch, deleteDevice, revokeDevice, updateDevice } from '../api/deviceApi';
 import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import dayjs from 'dayjs';
@@ -11,6 +11,10 @@ const DeviceManagementPage = () => {
   const [devices, setDevices] = useState([]);
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(null);
+
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingDevice, setEditingDevice] = useState(null);
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
@@ -20,7 +24,8 @@ const DeviceManagementPage = () => {
         const res = await getAllBranches();
         const allBranches = res.data;
         let availableBranches = allBranches;
-        if (user?.branchIds && user.branchIds.length > 0) {
+        const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
+        if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
           availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
         }
         setBranches(availableBranches);
@@ -46,7 +51,8 @@ const DeviceManagementPage = () => {
       const res = await getDevicesByBranch(selectedBranch);
       setDevices(res.data);
     } catch (err) {
-      message.error('Lỗi khi tải danh sách thiết bị');
+      console.error(err);
+      message.error(`Lỗi khi tải danh sách thiết bị: ${err.response?.status || err.message}`);
     } finally {
       setLoading(false);
     }
@@ -62,6 +68,21 @@ const DeviceManagementPage = () => {
     }
   };
 
+  const handleActivate = async (record) => {
+    try {
+      await updateDevice({
+        id: record.id,
+        name: record.name,
+        deviceType: record.deviceType,
+        isActive: true
+      });
+      message.success('Đã cấp lại quyền cho thiết bị thành công');
+      loadDevices();
+    } catch (err) {
+      message.error('Lỗi khi cấp quyền thiết bị');
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await deleteDevice(id);
@@ -69,6 +90,31 @@ const DeviceManagementPage = () => {
       loadDevices();
     } catch (err) {
       message.error('Lỗi khi xóa thiết bị');
+    }
+  };
+
+  const openEditModal = (record) => {
+    setEditingDevice(record);
+    form.setFieldsValue({
+      name: record.name,
+      deviceType: record.deviceType
+    });
+    setIsEditModalVisible(true);
+  };
+
+  const handleUpdate = async (values) => {
+    try {
+      await updateDevice({
+        id: editingDevice.id,
+        name: values.name,
+        deviceType: values.deviceType,
+        isActive: editingDevice.isActive
+      });
+      message.success('Cập nhật thiết bị thành công');
+      setIsEditModalVisible(false);
+      loadDevices();
+    } catch (err) {
+      message.error('Lỗi khi cập nhật thiết bị');
     }
   };
 
@@ -106,9 +152,14 @@ const DeviceManagementPage = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          {record.isActive && (
+          <Button size="small" onClick={() => openEditModal(record)}>Sửa</Button>
+          {record.isActive ? (
             <Popconfirm title="Thu hồi quyền của thiết bị này?" onConfirm={() => handleRevoke(record.id)}>
               <Button size="small" type="primary" danger>Thu hồi</Button>
+            </Popconfirm>
+          ) : (
+            <Popconfirm title="Cấp lại quyền cho thiết bị này?" onConfirm={() => handleActivate(record)}>
+              <Button size="small" type="primary" style={{ backgroundColor: '#52c41a' }}>Cấp quyền</Button>
             </Popconfirm>
           )}
           <Popconfirm title="Xóa thiết bị này khỏi hệ thống?" onConfirm={() => handleDelete(record.id)}>
@@ -147,6 +198,37 @@ const DeviceManagementPage = () => {
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
+
+      <Modal
+        title="Chỉnh sửa thiết bị"
+        open={isEditModalVisible}
+        onCancel={() => setIsEditModalVisible(false)}
+        onOk={() => form.submit()}
+        okText="Lưu"
+        cancelText="Hủy"
+      >
+        <Form form={form} layout="vertical" onFinish={handleUpdate}>
+          <Form.Item 
+            name="name" 
+            label="Tên thiết bị" 
+            rules={[{ required: true, message: 'Vui lòng nhập tên thiết bị' }]}
+          >
+            <Input placeholder="Ví dụ: Máy Waiter 01" />
+          </Form.Item>
+          <Form.Item 
+            name="deviceType" 
+            label="Loại thiết bị"
+            rules={[{ required: true, message: 'Vui lòng chọn loại thiết bị' }]}
+          >
+            <Select>
+              <Select.Option value="POS">Thu ngân (POS)</Select.Option>
+              <Select.Option value="Waiter">Phục vụ (Waiter)</Select.Option>
+              <Select.Option value="Kitchen">Bếp (Kitchen)</Select.Option>
+              <Select.Option value="Attendance">Điểm danh (Attendance)</Select.Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

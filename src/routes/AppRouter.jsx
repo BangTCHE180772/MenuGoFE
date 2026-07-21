@@ -14,6 +14,7 @@ import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
+import WaiterStationPage from '../pages/WaiterStationPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
@@ -23,7 +24,10 @@ import WorkSchedulePage from '../pages/WorkSchedulePage';
 import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
+import KDSPage from '../pages/KDSPage';
 import ChainPagae from '../pages/ChainPage';
+import AttendancePage from '../pages/AttendancePage';
+
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
 import VoucherPage from '../pages/VoucherPage';
@@ -32,6 +36,7 @@ import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
+import DeviceAuthPage from '../pages/DeviceAuthPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -40,41 +45,44 @@ const AppRouter = () => {
       <SignalRProvider>
         <GlobalReservationListener />
         <Routes>
-        {/* ── Public: không cần đăng nhập ──────────────────────────── */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-        </Route>
-        <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
+          {/* ── Public: không cần đăng nhập ──────────────────────────── */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+          </Route>
+          <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
-          {/* ── Device Route: cần device_token  ─────────── */}
+          {/* ── Device Route: cần device_token ─────────── */}
           <Route element={<DeviceRoute allowedTypes={[]} />}>
             <Route element={<DeviceLayout />}>
               {/* POS */}
               <Route path="/pos" element={<CashierPage />} />
               {/* Waiter */}
-              <Route path="/station" element={<TableMapPage />} />
+              <Route path="/station" element={<WaiterStationPage />} />
               {/* Kitchen */}
-              <Route path="/kitchen" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Màn Hình Bếp</h1><p>Đang phát triển</p></div>} />
+              <Route path="/kitchen" element={<KDSPage />} />
               {/* Attendance */}
-              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
+              <Route path="/attendance" element={<AttendancePage />} />
             </Route>
           </Route>
 
-        {/* ── Private: cần đăng nhập ────────────────────────────────── */}
-        <Route element={<PrivateRoute />}>
-          <Route element={<MainLayout />}>
+          {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
+          <Route element={<PrivateRoute />}>
+            <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
+            
+            <Route element={<MainLayout />}>
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<HomePage />} />
 
-            {/* Mọi role đã đăng nhập đều xem được */}
-            <Route path="/work-schedule" element={
-              user && [ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN].includes(role) ?
-                <WorkSchedulePage /> : <MyWorkSchedulePage />
-            } />
-            <Route path="/orders" element={<OrderPage />} />
-            <Route path="/table-map" element={<TableMapPage />} />
-            <Route path="/reservations" element={<ReservationPage />} />
+              {/* Mọi role đã đăng nhập đều xem được */}
+              <Route path="/work-schedule" element={<WorkSchedulePage />} />
+              <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/reservations" element={<ReservationPage />} />
 
+              {/* Chef, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/kds" element={<KDSPage />} />
+              </Route>
 
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
@@ -88,22 +96,22 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
               </Route>
 
-            {/* Owner, Admin */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
-              <Route path="/branches" element={<BranchPage/>} />
-              <Route path="/chains" element={<ChainPagae/>} />
-            </Route>
+              {/* Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/branches" element={<BranchPage />} />
+                <Route path="/chains" element={<ChainPagae />} />
+              </Route>
 
-            {/* Admin only */}
-            <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
-              <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+              {/* Admin only */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+                <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+              </Route>
             </Route>
           </Route>
-        </Route>
 
-        {/* ── Misc ──────────────────────────────────────────────────── */}
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
-        <Route path="*" element={<Navigate to="/home" replace />} />
+          {/* ── Misc ──────────────────────────────────────────────────── */}
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </SignalRProvider>
     </BrowserRouter>
