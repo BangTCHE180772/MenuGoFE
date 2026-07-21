@@ -43,7 +43,22 @@ const DeviceAuthPage = () => {
   };
 
   if (successData) {
-    if (successData.isPos) {
+    if (!successData.success) {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
+          <Result
+            status="error"
+            title="Điểm danh thất bại!"
+            subTitle={successData.message || "Bạn không có ca làm việc hôm nay tại chi nhánh này."}
+            extra={[
+              <Button type="primary" key="home" onClick={() => navigate('/')}>
+                Về Trang Chủ
+              </Button>
+            ]}
+          />
+        </div>
+      );
+    } else if (successData.isPos) {
       return (
         <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
           <Result
@@ -58,15 +73,30 @@ const DeviceAuthPage = () => {
           />
         </div>
       );
+    } else if (successData.isAttendance) {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
+          <Result
+            status="success"
+            title="Điểm danh thành công!"
+            subTitle={successData.message}
+            extra={[
+              <Button type="primary" key="home" onClick={() => navigate('/')}>
+                Về Trang Chủ
+              </Button>
+            ]}
+          />
+        </div>
+      );
     } else {
       return (
         <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
           <Result
             status="success"
             title="Nhận ca thành công!"
-            subTitle="Bạn đã kết nối thành công với trạm phục vụ. Bây giờ bạn có thể bắt đầu order món cho khách."
+            subTitle={successData.message || "Bạn đã kết nối thành công với trạm phục vụ."}
             extra={[
-              <Button type="primary" key="waiter" onClick={() => navigate('/waiter-shift')}>
+              <Button type="primary" key="waiter" onClick={() => navigate('/table-map')}>
                 Bắt đầu Phục Vụ
               </Button>
             ]}
