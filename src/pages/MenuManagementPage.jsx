@@ -18,6 +18,8 @@ import {
   Empty,
   Badge,
   Descriptions,
+  Upload,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -30,6 +32,7 @@ import {
   CheckCircleOutlined,
   MinusCircleOutlined,
   BookOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import {
   getAllGroups,
@@ -45,7 +48,7 @@ import {
 } from '../api/processedProductApi';
 import { getAllUnits } from '../api/unitApi';
 import { getAllChains } from '../api/chainApi';
-import { createImage } from '../api/imageApi';
+import { createImage, uploadImage } from '../api/imageApi';
 import { getAllIngredients, getAllRegularProducts } from '../api/ingredientApi';
 
 const { TextArea } = Input;
@@ -76,8 +79,33 @@ const MenuManagementPage = () => {
   const [viewDishModalVisible, setViewDishModalVisible] = useState(false);
   const [viewingDishDetails, setViewingDishDetails] = useState(null);
 
-  const [categoryForm] = Form.useForm();
   const [dishForm] = Form.useForm();
+
+  // Image Upload State & Handler
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState(null);
+
+  const handleCustomImageUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingImage(true);
+    try {
+      const res = await uploadImage(file);
+      if (res.data) {
+        const imgObj = res.data;
+        setSelectedImageId(imgObj.id);
+        dishForm.setFieldsValue({
+          imageLink: imgObj.imageLink,
+        });
+        message.success('Tải ảnh lên Cloudinary thành công!');
+        if (onSuccess) onSuccess(imgObj);
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      message.error('Không thể tải ảnh lên Cloudinary.');
+      if (onError) onError(err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   // ─── DATA FETCHING ─────────────────────────────────────────────────────────
   const fetchCategories = async () => {
@@ -195,6 +223,7 @@ const MenuManagementPage = () => {
   // ─── DISH HANDLERS ────────────────────────────────────────────────────────
   const handleOpenDishModal = (dish = null) => {
     setCurrentDish(dish);
+    setSelectedImageId(dish?.imageId || null);
     if (dish) {
       // Find base unit from unitConversions
       const baseConversion = dish.unitConversions?.find(uc => !uc.baseId || uc.isBase);
@@ -288,17 +317,22 @@ const MenuManagementPage = () => {
         recipe,
       };
 
-      // Handle ImageId creation if imageLink provided
-      if (values.imageLink) {
+      // Handle ImageId creation if imageLink provided or file uploaded
+      let imageIdToUse = selectedImageId || currentDish?.imageId;
+
+      if (values.imageLink && !imageIdToUse) {
         try {
           const imgRes = await createImage({ imageLink: values.imageLink });
           if (imgRes.data && imgRes.data.id) {
-            payload.imageId = imgRes.data.id;
+            imageIdToUse = imgRes.data.id;
           }
         } catch {
-          // If we fail to create image or find imageApi, we can fallback
-          // Let's implement dynamic image association if possible, otherwise skip or handle
+          // Fallback
         }
+      }
+
+      if (imageIdToUse) {
+        payload.imageId = imageIdToUse;
       }
 
       if (currentDish) {
@@ -804,8 +838,41 @@ const MenuManagementPage = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="imageLink" label="Link hình ảnh món ăn">
-                <Input placeholder="Dán URL hình ảnh món ăn" />
+              <Form.Item label="Hình ảnh món ăn">
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Upload
+                    name="file"
+                    listType="picture-card"
+                    showUploadList={false}
+                    customRequest={handleCustomImageUpload}
+                    accept="image/*"
+                    style={{ width: 110, height: 110 }}
+                  >
+                    {dishForm.getFieldValue('imageLink') ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8 }}>
+                        <img
+                          src={dishForm.getFieldValue('imageLink')}
+                          alt="dish"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center' }}>
+                        {uploadingImage ? <Spin /> : <UploadOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
+                        <div style={{ marginTop: 8, fontSize: 12 }}>{uploadingImage ? 'Đang tải...' : 'Upload ảnh'}</div>
+                      </div>
+                    )}
+                  </Upload>
+                  <Form.Item name="imageLink" noStyle>
+                    <Input
+                      placeholder="Hoặc dán URL ảnh trực tiếp..."
+                      allowClear
+                      onChange={(e) => {
+                        if (!e.target.value) setSelectedImageId(null);
+                      }}
+                    />
+                  </Form.Item>
+                </Space>
               </Form.Item>
             </Col>
             <Col span={12}>
