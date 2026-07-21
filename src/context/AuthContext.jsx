@@ -77,6 +77,7 @@ export const AuthProvider = ({ children }) => {
     }
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('activeShiftBranchId');
     setToken(null);
     setUser(null);
   };

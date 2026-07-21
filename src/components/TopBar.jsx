@@ -14,6 +14,7 @@ import {
   CrownOutlined,
   DesktopOutlined,
   BookOutlined,
+  FireOutlined,
   GiftOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
@@ -22,6 +23,7 @@ import { useAuth, ROLES } from "../context/AuthContext";
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
@@ -41,6 +43,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
@@ -58,6 +61,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
@@ -80,6 +84,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",

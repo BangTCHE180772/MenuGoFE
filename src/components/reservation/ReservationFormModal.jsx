@@ -37,7 +37,8 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       const allBranches = branchesRes.data;
 
       let availableBranches = allBranches;
-      if (user?.branchIds && user.branchIds.length > 0) {
+      const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
+      if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
         availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
       }
       setBranches(availableBranches);
