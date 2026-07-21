@@ -96,7 +96,7 @@ const DeviceAuthPage = () => {
             title="Nhận ca thành công!"
             subTitle={successData.message || "Bạn đã kết nối thành công với trạm phục vụ."}
             extra={[
-              <Button type="primary" key="waiter" onClick={() => navigate('/waiter-shift')}>
+              <Button type="primary" key="waiter" onClick={() => navigate('/table-map')}>
                 Bắt đầu Phục Vụ
               </Button>
             ]}

@@ -14,6 +14,7 @@ import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
+import WaiterStationPage from '../pages/WaiterStationPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
@@ -53,7 +54,7 @@ const AppRouter = () => {
               {/* POS */}
               <Route path="/pos" element={<CashierPage />} />
               {/* Waiter */}
-              <Route path="/station" element={<TableMapPage />} />
+              <Route path="/station" element={<WaiterStationPage />} />
               {/* Kitchen */}
               <Route path="/kitchen" element={<KDSPage />} />
               {/* Attendance */}
