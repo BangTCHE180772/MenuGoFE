@@ -34,3 +34,31 @@ export const searchProductsOData = async (searchText = '', groupId = null) => {
   const response = await axiosInstance.get(`/odata/ProductOData${query}`);
   return response.data;
 };
+
+export const getProductsODataPaged = async ({
+  searchText = "",
+  menuId = null,
+  pageSize = 20,
+  pageIndex = 1,
+}) => {
+  let filterClauses = ["IsSellable eq true", "IsActive eq true"];
+
+  if (searchText) {
+    const escapedSearch = searchText.replace(/'/g, "''");
+    filterClauses.push(`contains(tolower(Name), '${escapedSearch.toLowerCase()}')`);
+  }
+
+  if (menuId && menuId !== "all" && menuId !== "new") {
+    filterClauses.push(`MenuProducts/any(mp: mp/MenuId eq ${menuId})`);
+  }
+
+  const skip = (pageIndex - 1) * pageSize;
+  const filterQuery = filterClauses.length > 0 ? `$filter=${filterClauses.join(" and ")}` : "";
+  const expandQuery = "$expand=Image,Group";
+  const countQuery = "$count=true";
+  const pagingQuery = `$top=${pageSize}&$skip=${skip}`;
+
+  const queryParams = [filterQuery, expandQuery, countQuery, pagingQuery].filter(Boolean).join("&");
+  const response = await axiosInstance.get(`/odata/ProductOData?${queryParams}`);
+  return response.data;
+};
