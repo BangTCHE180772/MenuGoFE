@@ -52,6 +52,10 @@ const DeviceLayout = () => {
         }
       });
 
+      conn.on('AttendanceSuccess', (data) => {
+        window.dispatchEvent(new CustomEvent('AttendanceSuccessEvent', { detail: data }));
+      });
+
       try {
         await conn.start();
         await conn.invoke('JoinDeviceGroup', tokenToUse);

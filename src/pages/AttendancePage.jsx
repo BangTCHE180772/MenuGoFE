@@ -16,12 +16,10 @@ const AttendancePage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Listen for SignalR AttendanceSuccess event
+  // Listen for CustomEvent AttendanceSuccessEvent dispatched by DeviceLayout
   useEffect(() => {
-    if (!hubConnection) return;
-
-    const handleAttendanceSuccess = (data) => {
-      // data format expected: { name, action, message }
+    const handleAttendanceSuccess = (e) => {
+      const data = e.detail;
       setAttendanceEvent({
         ...data,
         timestamp: dayjs()
@@ -37,12 +35,12 @@ const AttendancePage = () => {
       setTimeout(() => setAttendanceEvent(null), 5000);
     };
 
-    hubConnection.on('AttendanceSuccess', handleAttendanceSuccess);
+    window.addEventListener('AttendanceSuccessEvent', handleAttendanceSuccess);
 
     return () => {
-      hubConnection.off('AttendanceSuccess', handleAttendanceSuccess);
+      window.removeEventListener('AttendanceSuccessEvent', handleAttendanceSuccess);
     };
-  }, [hubConnection]);
+  }, []);
 
   return (
     <div style={{
