@@ -840,40 +840,34 @@ const MenuManagementPage = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="Hình ảnh món ăn">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Upload
-                    name="file"
-                    listType="picture-card"
-                    showUploadList={false}
-                    customRequest={handleCustomImageUpload}
-                    accept="image/*"
-                    style={{ width: 110, height: 110 }}
-                  >
-                    {dishForm.getFieldValue('imageLink') ? (
-                      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8 }}>
-                        <img
-                          src={dishForm.getFieldValue('imageLink')}
-                          alt="dish"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                <Form.Item name="imageLink" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+                <Upload
+                  name="file"
+                  listType="picture-card"
+                  showUploadList={false}
+                  customRequest={handleCustomImageUpload}
+                  accept="image/*"
+                  style={{ width: 120, height: 120 }}
+                >
+                  {dishForm.getFieldValue('imageLink') ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 8 }}>
+                      <img
+                        src={dishForm.getFieldValue('imageLink')}
+                        alt="dish"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      {uploadingImage ? <Spin /> : <UploadOutlined style={{ fontSize: 26, color: '#1890ff' }} />}
+                      <div style={{ marginTop: 8, fontSize: 13, fontWeight: 500 }}>
+                        {uploadingImage ? 'Đang tải...' : 'Tải ảnh lên'}
                       </div>
-                    ) : (
-                      <div style={{ textAlign: 'center' }}>
-                        {uploadingImage ? <Spin /> : <UploadOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
-                        <div style={{ marginTop: 8, fontSize: 12 }}>{uploadingImage ? 'Đang tải...' : 'Upload ảnh'}</div>
-                      </div>
-                    )}
-                  </Upload>
-                  <Form.Item name="imageLink" noStyle>
-                    <Input
-                      placeholder="Hoặc dán URL ảnh trực tiếp..."
-                      allowClear
-                      onChange={(e) => {
-                        if (!e.target.value) setSelectedImageId(null);
-                      }}
-                    />
-                  </Form.Item>
-                </Space>
+                    </div>
+                  )}
+                </Upload>
               </Form.Item>
             </Col>
             <Col span={12}>
