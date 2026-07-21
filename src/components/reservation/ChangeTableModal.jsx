@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Select, Button, message, Spin } from 'antd';
 import { getTablesByBranch } from '../../api/tableApi';
-import { changeTable } from '../../api/reservationApi';
+import { changeTable, getAvailableTablesForReservation } from '../../api/reservationApi';
 
 const { Option } = Select;
 
@@ -13,18 +13,23 @@ const ChangeTableModal = ({ visible, onClose, conflictData, onSuccess }) => {
 
   useEffect(() => {
     if (visible && conflictData?.BranchId) {
-      fetchTables(conflictData.BranchId);
+      fetchTables(conflictData.BranchId, conflictData.ReservationTime);
     } else {
       setTables([]);
       setSelectedTableId(null);
     }
   }, [visible, conflictData]);
 
-  const fetchTables = async (branchId) => {
+  const fetchTables = async (branchId, reservationTime) => {
     setLoading(true);
     try {
-      const response = await getTablesByBranch(branchId);
-      // Chỉ lấy bàn trống (Empty hoặc Available)
+      let response;
+      if (reservationTime) {
+        response = { data: await getAvailableTablesForReservation(branchId, reservationTime) };
+      } else {
+        response = await getTablesByBranch([branchId]);
+      }
+
       const availableTables = response.data.filter(
         t => t.status === 'Empty' || t.status === 'Available'
       );
@@ -64,11 +69,11 @@ const ChangeTableModal = ({ visible, onClose, conflictData, onSuccess }) => {
         <Button key="cancel" onClick={onClose}>
           Hủy
         </Button>,
-        <Button 
-          key="submit" 
-          type="primary" 
-          danger 
-          loading={submitting} 
+        <Button
+          key="submit"
+          type="primary"
+          danger
+          loading={submitting}
           onClick={handleOk}
           disabled={!selectedTableId}
         >
