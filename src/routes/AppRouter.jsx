@@ -71,6 +71,12 @@ const AppRouter = () => {
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/reservations" element={<ReservationPage />} />
 
+              {/* Cashier, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
+              </Route>
+
               {/* Chef, Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
@@ -79,7 +85,6 @@ const AppRouter = () => {
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/menu-management" element={<MenuManagementPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
