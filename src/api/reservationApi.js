@@ -5,6 +5,13 @@ export const getReservations = async () => {
   return response.data;
 };
 
+export const getAvailableTablesForReservation = async (branchId, reservationTime) => {
+  const response = await axiosInstance.get('/api/Reservation/available-tables', {
+    params: { branchId, reservationTime }
+  });
+  return response.data;
+};
+
 export const createReservation = async (data) => {
   const response = await axiosInstance.post('/api/Reservation', data);
   return response.data;
