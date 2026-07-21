@@ -49,14 +49,14 @@ const HomePage = () => {
       setLoading(true);
       try {
         const [kRes, oRes, tRes] = await Promise.allSettled([
-          getKitchenItems(),
-          getAllOrders(),
-          getAllTables(),
+          getKitchenItems().catch(() => ({ data: [] })),
+          getAllOrders().catch(() => ({ data: [] })),
+          getAllTables().catch(() => ({ data: [] })),
         ]);
 
-        if (kRes.status === 'fulfilled') setKitchenItems(kRes.value.data || []);
-        if (oRes.status === 'fulfilled') setOrders(oRes.value.data || []);
-        if (tRes.status === 'fulfilled') setTables(tRes.value.data || []);
+        if (kRes.status === 'fulfilled' && kRes.value?.data) setKitchenItems(kRes.value.data);
+        if (oRes.status === 'fulfilled' && oRes.value?.data) setOrders(oRes.value.data);
+        if (tRes.status === 'fulfilled' && tRes.value?.data) setTables(tRes.value.data);
       } catch (err) {
         console.error('Lỗi khi tải dữ liệu dashboard:', err);
       } finally {
@@ -155,7 +155,8 @@ const HomePage = () => {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <Spin size="large" tip="Đang tải dữ liệu tổng quan..." />
+          <Spin size="large" />
+          <div style={{ marginTop: 12, color: '#8c8c8c' }}>Đang tải dữ liệu tổng quan...</div>
         </div>
       ) : (
         <>
