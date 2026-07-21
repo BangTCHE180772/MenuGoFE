@@ -74,7 +74,16 @@ const AppRouter = () => {
             <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
-              <Route path="/work-schedule" element={<WorkSchedulePage />} />
+              <Route
+                path="/work-schedule"
+                element={
+                  ['Cashier', 'Chef', 'Waiter'].includes(role) ? (
+                    <MyWorkSchedulePage />
+                  ) : (
+                    <WorkSchedulePage />
+                  )
+                }
+              />
               <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/reservations" element={<ReservationPage />} />
