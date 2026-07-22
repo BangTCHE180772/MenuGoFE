@@ -177,7 +177,6 @@ const CustomerOrderPage = () => {
       let orderId = summary?.activeOrderId;
 
       if (!orderId) {
-        // Create new order if table is empty
         const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
         const orderRes = await createOrder({
           tableId: parseInt(tableId),
@@ -186,7 +185,7 @@ const CustomerOrderPage = () => {
           status: 'Active',
           customerId: null,
           totalAmount: totalAmount,
-          createdBy: 1, // System/Customer fallback ID
+          createdBy: null,
         });
         orderId = orderRes?.data?.id ?? orderRes?.data;
       }
@@ -324,8 +323,8 @@ const CustomerOrderPage = () => {
                       {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {item.status !== 'Cancelled' && item.cookingStatus === 'Waiting' && (
-                      <button 
-                        className="co-btn-cancel-item" 
+                      <button
+                        className="co-btn-cancel-item"
                         onClick={() => handleCancelItem(item.orderDetailId, item.productName)}
                         style={{ marginTop: '8px', color: '#ef4444', background: 'transparent', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                       >
@@ -341,10 +340,10 @@ const CustomerOrderPage = () => {
                 <p>Chưa có món nào được gọi</p>
               </div>
             )}
-            
+
             {canCancelOrder && (
               <div style={{ padding: '16px', textAlign: 'center' }}>
-                <button 
+                <button
                   onClick={handleCancelOrder}
                   style={{ background: '#ef4444', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
                 >
