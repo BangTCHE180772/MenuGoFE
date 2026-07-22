@@ -12,7 +12,7 @@
  *
  * Quy tắc: Chỉ được gọi món khi bàn status = "Occupied" (kiểm tra ở BE)
  */
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { message } from 'antd';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
@@ -126,8 +126,12 @@ const OrderPage = () => {
     setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, note } : i));
   }, []);
 
+  const actionRef = useRef(false);
+
   const handleChangeTableStatus = async (newStatus) => {
     if (!selectedTable) return;
+    if (actionRef.current) return;
+    actionRef.current = true;
 
     if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
       try {
@@ -158,12 +162,17 @@ const OrderPage = () => {
     } catch (err) {
       const msg = err?.response?.data?.message || 'Lỗi khi cập nhật trạng thái bàn';
       message.error(msg);
+    } finally {
+      actionRef.current = false;
     }
   };
 
 
+  const isConfirmingRef = useRef(false);
+
   const handleConfirmOrder = async () => {
     if (!selectedTable || cartItems.length === 0) return;
+    if (isConfirmingRef.current) return;
 
     const isOccupied = selectedTable.status?.toLowerCase() === 'occupied';
     if (!isOccupied) {
@@ -174,6 +183,7 @@ const OrderPage = () => {
     const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
     const total = Math.round(subTotal * 1.08);
 
+    isConfirmingRef.current = true;
     setOrderLoading(true);
     try {
       const summaryRes = await getTableOrderSummary(selectedTable.id);
@@ -216,6 +226,7 @@ const OrderPage = () => {
       message.error(msg);
     } finally {
       setOrderLoading(false);
+      isConfirmingRef.current = false;
     }
   };
 
