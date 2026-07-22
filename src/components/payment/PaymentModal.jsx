@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode } from 'antd';
+import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode, Select } from 'antd';
 import { payOrder } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
-import { checkVoucher } from '../../api/voucherApi';
+import { checkVoucher, getAllVouchers } from '../../api/voucherApi';
 import CustomerSearchInput from '../common/CustomerSearchInput';
 import { useSignalR } from '../../context/SignalRContext';
 
@@ -10,7 +10,7 @@ const { Text, Title } = Typography;
 
 const formatPrice = (price) => Number(price).toLocaleString('vi-VN') + 'đ';
 
-const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
+const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -21,6 +21,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [usePoints, setUsePoints] = useState(false);
+  const [allVouchers, setAllVouchers] = useState([]);
 
   const connection = useSignalR();
 
@@ -35,6 +36,16 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       setVoucherCode('');
       setAppliedVoucher(null);
       setUsePoints(false);
+
+      const fetchVouchers = async () => {
+        try {
+          const data = await getAllVouchers();
+          setAllVouchers(data || []);
+        } catch (error) {
+          console.error('Lỗi khi tải voucher:', error);
+        }
+      };
+      fetchVouchers();
     }
   }, [visible]);
 
@@ -87,14 +98,26 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
   const vat = Math.round(subTotal * 0.08);
   const baseTotal = subTotal + vat;
 
+  const applicableVouchers = useMemo(() => {
+    const now = new Date();
+    return allVouchers.filter(v => {
+      if (!v.isActive) return false;
+      if (v.usedCount >= v.quantity) return false;
+      if (new Date(v.startDate) > now || new Date(v.endDate) < now) return false;
+      if (v.branchId && v.branchId !== branchId) return false;
+      if (baseTotal < v.minOrderValue) return false;
+      return true;
+    });
+  }, [allVouchers, baseTotal, branchId]);
+
   const handleCheckVoucher = async () => {
     if (!voucherCode) return;
     try {
       setLoading(true);
-      const res = await checkVoucher(voucherCode, 0, baseTotal);
+      const res = await checkVoucher(voucherCode, branchId || 0, baseTotal);
       setAppliedVoucher({
-          discountAmount: res.discountAmount,
-          message: res.message
+        discountAmount: res.discountAmount,
+        message: res.message
       });
       message.success(res.message);
     } catch (error) {
@@ -107,7 +130,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
 
   const voucherDiscount = appliedVoucher ? appliedVoucher.discountAmount : 0;
   const pointsAvailable = customerData?.point || 0;
-  
+
   let pointsDiscount = 0;
   if (usePoints && pointsAvailable > 0) {
     const afterVoucher = baseTotal - voucherDiscount;
@@ -134,7 +157,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
         voucherCode: appliedVoucher ? voucherCode : null,
         pointsUsed: pointsDiscount
       };
-      
+
       if (paymentMethod === 'Cash') {
         await payOrder(orderId, payload, 'Cash');
         message.success('Thanh toán tiền mặt thành công. Bàn đã chuyển sang trạng thái cần dọn dẹp!');
@@ -195,11 +218,11 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
         <Button key="back" onClick={onCancel} disabled={loading}>
           Huỷ
         </Button>,
-        <Button 
-          key="submit" 
-          type="primary" 
-          danger 
-          onClick={handlePay} 
+        <Button
+          key="submit"
+          type="primary"
+          danger
+          onClick={handlePay}
           loading={loading}
           disabled={qrCodeData && paymentMethod === 'PayOS'}
         >
@@ -224,8 +247,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
 
       <div style={{ marginBottom: 16 }}>
         <Text strong>Phương thức thanh toán:</Text>
-        <Radio.Group 
-          value={paymentMethod} 
+        <Radio.Group
+          value={paymentMethod}
           onChange={(e) => {
             setPaymentMethod(e.target.value);
             setQrCodeData(null);
@@ -244,8 +267,8 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
           <div style={{ marginTop: 8 }}>
             <Text type="secondary">Vui lòng đợi hệ thống xác nhận thanh toán tự động (SignalR)...</Text>
           </div>
-          <Button 
-            type="dashed" 
+          <Button
+            type="dashed"
             onClick={async () => {
               setLoading(true);
               try {
@@ -261,7 +284,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
               } finally {
                 setLoading(false);
               }
-            }} 
+            }}
             style={{ marginTop: 8 }}
             loading={loading}
           >
@@ -299,7 +322,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
             />
           </Col>
           <Col span={12}>
-            <CustomerSearchInput 
+            <CustomerSearchInput
               value={customerPhone}
               onChange={setCustomerPhone}
               onSelectCustomer={handleSelectCustomer}
@@ -325,12 +348,21 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       <div style={{ marginBottom: 16 }}>
         <Row gutter={8}>
           <Col flex="auto">
-            <Input 
-              placeholder="Nhập mã Voucher (nếu có)" 
-              value={voucherCode} 
-              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+            <Select 
+              placeholder="Chọn mã Voucher (nếu có)" 
+              value={voucherCode || null} 
+              onChange={(val) => setVoucherCode(val || '')}
               disabled={!!appliedVoucher}
-            />
+              style={{ width: '100%' }}
+              allowClear
+              notFoundContent="Không có mã giảm giá phù hợp"
+            >
+              {applicableVouchers.map(v => (
+                <Select.Option key={v.code} value={v.code}>
+                  {v.name} ({v.code}) - {v.discountType === 'Fixed' ? formatPrice(v.discountValue) : `${v.discountValue}%`}
+                </Select.Option>
+              ))}
+            </Select>
           </Col>
           <Col>
             {appliedVoucher ? (
