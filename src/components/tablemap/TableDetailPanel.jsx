@@ -10,7 +10,7 @@ import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables }) => {
+const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables }) => {
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
@@ -203,6 +203,7 @@ const TableDetailPanel = ({ table, summary, loading, onConfirm, onReject, onServ
 
       <PaymentModal
         visible={isPaymentModalVisible}
+        branchId={branchId}
         orderId={summary?.activeOrderId}
         items={summary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}

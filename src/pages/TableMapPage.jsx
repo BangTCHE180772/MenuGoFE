@@ -311,6 +311,7 @@ const TableMapPage = () => {
       <div className="tablemap-right-col">
         {selectedTable ? (
           <TableDetailPanel
+            branchId={selectedBranch}
             table={selectedTable}
             summary={orderSummary}
             loading={loadingSummary}
