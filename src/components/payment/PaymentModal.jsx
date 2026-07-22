@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode } from 'antd';
 import { payOrder } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
@@ -116,12 +116,16 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
 
   const grandTotal = baseTotal - voucherDiscount - pointsDiscount;
 
+  const isPayingRef = useRef(false);
+
   const handlePay = async () => {
     if (!orderId) {
       message.error('Không tìm thấy mã hoá đơn hợp lệ!');
       return;
     }
+    if (isPayingRef.current) return;
 
+    isPayingRef.current = true;
     setLoading(true);
     try {
       const payload = {
@@ -149,6 +153,7 @@ const PaymentModal = ({ visible, orderId, items, onCancel, onSuccess }) => {
       message.error(error?.response?.data?.message || 'Có lỗi xảy ra khi thanh toán!');
     } finally {
       setLoading(false);
+      isPayingRef.current = false;
     }
   };
 

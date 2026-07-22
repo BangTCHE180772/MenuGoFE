@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
@@ -83,25 +83,36 @@ const CustomerOrderPage = () => {
     });
   };
 
+  const actionRef = useRef(false);
+
   const handleCallStaff = async () => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await callStaff(tableId);
       message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
       message.error('Lỗi khi gọi nhân viên');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleRequestBill = async () => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await requestBill(tableId);
       message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
       message.error('Lỗi khi gửi yêu cầu');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleCancelItem = (detailId, itemName) => {
+    if (actionRef.current) return;
     Modal.confirm({
       title: 'Xác nhận hủy món',
       content: `Bạn có chắc chắn muốn hủy món "${itemName}" không?`,
@@ -109,12 +120,15 @@ const CustomerOrderPage = () => {
       okType: 'danger',
       cancelText: 'Quay lại',
       onOk: async () => {
+        actionRef.current = true;
         try {
           await cancelOrderDetail(detailId);
           message.success(`Đã hủy món ${itemName}`);
           fetchTableSummary();
         } catch (error) {
           message.error(error.response?.data?.message || 'Lỗi khi hủy món');
+        } finally {
+          actionRef.current = false;
         }
       }
     });
@@ -122,6 +136,7 @@ const CustomerOrderPage = () => {
 
   const handleCancelOrder = () => {
     if (!summary?.activeOrderId) return;
+    if (actionRef.current) return;
     Modal.confirm({
       title: 'Xác nhận hủy toàn bộ đơn',
       content: 'Bạn có chắc chắn muốn hủy toàn bộ đơn hàng này không? Bàn sẽ được giải phóng.',
@@ -129,20 +144,27 @@ const CustomerOrderPage = () => {
       okType: 'danger',
       cancelText: 'Quay lại',
       onOk: async () => {
+        actionRef.current = true;
         try {
           await cancelOrder(summary.activeOrderId);
           message.success('Đã hủy đơn hàng thành công');
           fetchTableSummary();
         } catch (error) {
           message.error(error.response?.data?.message || 'Lỗi khi hủy đơn');
+        } finally {
+          actionRef.current = false;
         }
       }
     });
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmitOrder = async () => {
     if (!isOccupied || cartItems.length === 0) return;
+    if (isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     setOrderLoading(true);
     try {
       let orderId = summary?.activeOrderId;
@@ -177,6 +199,7 @@ const CustomerOrderPage = () => {
       message.error('Có lỗi xảy ra khi đặt món');
     } finally {
       setOrderLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
