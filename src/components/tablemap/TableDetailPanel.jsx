@@ -63,6 +63,21 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
     }
   };
 
+  const activeItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
+  const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
+
+  const handlePaymentClick = () => {
+    if (hasUnservedItems) {
+      Modal.warning({
+        title: 'Cảnh báo: Bàn chưa lên hết món',
+        content: 'Vẫn còn món chưa được phục vụ (đang chờ hoặc đang nấu). Vui lòng phục vụ hoặc huỷ món trước khi thanh toán.',
+        okText: 'Đã hiểu',
+      });
+    } else {
+      setIsPaymentModalVisible(true);
+    }
+  };
+
   return (
     <div className="tablemap-detail-panel">
       <div className="tablemap-detail-header">
@@ -97,7 +112,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
                 danger
                 type="primary"
                 icon={<DollarOutlined />}
-                onClick={() => setIsPaymentModalVisible(true)}
+                onClick={handlePaymentClick}
               >
                 Thanh toán
               </Button>
