@@ -21,6 +21,7 @@ const TableMapPage = () => {
 
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(null);
+  const [isBranchesLoaded, setIsBranchesLoaded] = useState(false);
 
   const [loadingTables, setLoadingTables] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -46,6 +47,7 @@ const TableMapPage = () => {
             setBranches([]);
             setSelectedBranch(null);
           }
+          setIsBranchesLoaded(true);
           return;
         }
 
@@ -59,6 +61,7 @@ const TableMapPage = () => {
             setBranches([]);
             setSelectedBranch(null);
           }
+          setIsBranchesLoaded(true);
           return;
         }
 
@@ -74,6 +77,8 @@ const TableMapPage = () => {
         }
       } catch (err) {
         message.error('Lỗi khi tải danh sách chi nhánh');
+      } finally {
+        setIsBranchesLoaded(true);
       }
     };
     fetchBranches();
@@ -94,13 +99,18 @@ const TableMapPage = () => {
   }, [selectedBranch]);
 
   const loadTables = useCallback(async () => {
-    if (!selectedBranch && branches.length > 0) return; // Wait until branch is selected
+    if (!isBranchesLoaded) return;
+    if (!selectedBranch && branches.length > 0) return;
+
+    if (!selectedBranch && branches.length === 0) {
+      setTables([]);
+      return;
+    }
+
     setLoadingTables(true);
     try {
       const areaIdToFetch = selectedArea === 'all' ? null : selectedArea;
-      const res = selectedBranch
-        ? await getTablesByBranch([selectedBranch], areaIdToFetch)
-        : await getAllTables();
+      const res = await getTablesByBranch([selectedBranch], areaIdToFetch);
       const data = res?.data;
       setTables(Array.isArray(data) ? data : []);
     } catch {
@@ -109,7 +119,7 @@ const TableMapPage = () => {
     } finally {
       setLoadingTables(false);
     }
-  }, [selectedBranch, branches.length, selectedArea]);
+  }, [isBranchesLoaded, selectedBranch, branches.length, selectedArea]);
 
   const loadOrderSummary = useCallback(async (tableId) => {
     setLoadingSummary(true);

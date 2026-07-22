@@ -5,7 +5,7 @@ import { useSignalR } from '../../context/SignalRContext';
 import '../../styles/waiter-feed.css';
 
 const WaiterActionFeed = ({ tables, onSelectTable }) => {
-  const { connection } = useSignalR();
+  const connection = useSignalR();
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {

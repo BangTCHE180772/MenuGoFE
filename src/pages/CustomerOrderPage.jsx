@@ -61,6 +61,7 @@ const CustomerOrderPage = () => {
   const tableStatus = summary?.tableStatus?.toLowerCase();
   const isReserved = tableStatus === 'reserved';
   const isCleaning = tableStatus === 'cleaning';
+  const isOccupied = tableStatus === 'occupied';
   const isAvailableForOrder = tableStatus === 'empty' || tableStatus === 'occupied';
 
   const handleAddItem = useCallback((item) => {
@@ -288,18 +289,6 @@ const CustomerOrderPage = () => {
       </div>
 
       <div className="co-content">
-        {!isOccupied && (
-          <div className="co-locked-overlay">
-            <div className="co-locked-icon">👋</div>
-            <div className="co-locked-title">Chào mừng quý khách</div>
-            <div className="co-locked-desc">
-              Vui lòng gọi nhân viên để mở bàn trước khi bắt đầu gọi món nhé!
-            </div>
-            <button className="co-btn-call" onClick={handleCallStaff}>
-              Gọi nhân viên
-            </button>
-          </div>
-        )}
 
         {activeTab === 'menu' ? (
           <div className="co-menu-wrap">
