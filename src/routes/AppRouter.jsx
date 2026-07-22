@@ -30,6 +30,7 @@ import AttendancePage from '../pages/AttendancePage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
+import CustomerHomePage from '../pages/CustomerHomePage';
 import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -49,6 +50,8 @@ const AppRouter = () => {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
+          <Route path="/customer-home" element={<CustomerHomePage />} />
+          <Route path="/customer" element={<CustomerHomePage />} />
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}

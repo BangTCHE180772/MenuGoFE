@@ -27,6 +27,7 @@ import {
 import dayjs from "dayjs";
 
 import { getMainChain, updateChain } from "../api/chainApi";
+import { uploadImage } from "../api/imageApi";
 import AddressSelectModal from "../PopUp/AddressSelectModal";
 import "../styles/ChainPage.css";
 
@@ -49,10 +50,8 @@ const ChainPage = () => {
 
   const [bannerPreview, setBannerPreview] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
-  // const [bannerFile, setBannerFile] = useState(null);
-  // const [logoFile, setLogoFile] = useState(null);
-  const [setBannerFile] = useState(null);
-  const [setLogoFile] = useState(null);
+  const [bannerFile, setBannerFile] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
 
   const bannerInputRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -93,7 +92,6 @@ const ChainPage = () => {
       setBannerFile(null);
       setLogoFile(null);
 
-      // Populate Address State (wardId khởi tạo là null, chỉ có giá trị khi người dùng chọn trong Modal)
       setNewAddressState({
         wardId: null,
         name: data.newAddressName || "Chưa thiết lập",
@@ -198,18 +196,27 @@ const ChainPage = () => {
     try {
       setSubmitting(true);
 
-      // Đảm bảo logoImage và backgroundImage không vượt quá 255 ký tự nếu là Base64/Blob tạm
-      let finalLogo = logoPreview || chain.logoImage || "";
-      let finalBanner = bannerPreview || chain.backgroundImage || "";
+      let finalLogo = chain.logoImage || "";
+      let finalBanner = chain.backgroundImage || "";
 
-      if (finalLogo.length > 255) {
-        finalLogo = chain.logoImage || "";
-      }
-      if (finalBanner.length > 255) {
-        finalBanner = chain.backgroundImage || "";
+      if (logoFile) {
+        message.loading({ content: "Đang tải Logo lên Cloudinary...", key: "uploadLogo" });
+        const logoRes = await uploadImage(logoFile);
+        if (logoRes.data?.imageLink) {
+          finalLogo = logoRes.data.imageLink;
+          message.success({ content: "Tải Logo lên Cloudinary thành công!", key: "uploadLogo" });
+        }
       }
 
-      // Chuẩn bị DTO theo đúng ChainUpdateDto
+      if (bannerFile) {
+        message.loading({ content: "Đang tải ảnh bìa lên Cloudinary...", key: "uploadBanner" });
+        const bannerRes = await uploadImage(bannerFile);
+        if (bannerRes.data?.imageLink) {
+          finalBanner = bannerRes.data.imageLink;
+          message.success({ content: "Tải ảnh bìa lên Cloudinary thành công!", key: "uploadBanner" });
+        }
+      }
+
       const dto = {
         id: chain.id,
         name: values.name,
