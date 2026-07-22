@@ -85,6 +85,33 @@ img {
   margin-right: auto;
 }
 
+.main-content.fluid {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-top: var(--topbar-height) !important;
+  padding: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* ─── KiotViet High-Density Table Typography ─────────────────────────────── */
+.kiotviet-table .ant-table-thead > tr > th {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+  background: #f8fafc !important;
+  padding: 6px 12px !important;
+}
+
+.kiotviet-table .ant-table-tbody > tr > td {
+  font-size: 12px !important;
+  padding: 6px 12px !important;
+}
+
+.kiotviet-table .ant-pagination {
+  font-size: 12px !important;
+}
+
 /* ─── TopBar ─────────────────────────────────────────────────────────────── */
 .topbar {
   position: fixed;

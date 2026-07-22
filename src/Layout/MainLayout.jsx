@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { notification } from 'antd';
 import { useSignalR } from '../context/SignalRContext';
 import TopBar from '../components/TopBar';
@@ -11,6 +11,8 @@ import ToTop from '../components/ToTop';
  */
 const MainLayout = () => {
   const connection = useSignalR();
+  const location = useLocation();
+  const isFluid = location.pathname.startsWith('/product-catalog');
 
   useEffect(() => {
     if (connection) {
@@ -34,7 +36,7 @@ const MainLayout = () => {
   return (
     <div className="main-layout">
       <TopBar />
-      <main className="main-content">
+      <main className={`main-content ${isFluid ? 'fluid' : ''}`}>
         <Outlet />
       </main>
       <ToTop />

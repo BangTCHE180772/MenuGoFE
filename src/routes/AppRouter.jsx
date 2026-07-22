@@ -38,6 +38,7 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ProductCatalogPage from '../pages/ProductCatalogPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -116,6 +117,7 @@ const AppRouter = () => {
 
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+                <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
               </Route>
             </Route>
