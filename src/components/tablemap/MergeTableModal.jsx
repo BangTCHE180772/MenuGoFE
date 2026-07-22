@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal, Select, message } from 'antd';
 import { mergeOrder } from '../../api/orderApi';
 import { getTableOrderSummary } from '../../api/tableMapApi';
@@ -9,12 +9,16 @@ const MergeTableModal = ({ visible, onClose, tables, currentTable, onMerged }) =
 
   const availableTables = tables.filter(t => t.status === 'Occupied' && t.id !== currentTable?.id);
 
+  const isMergingRef = useRef(false);
+
   const handleMerge = async () => {
     if (!selectedTableId) {
       message.error("Vui lòng chọn bàn để gộp");
       return;
     }
+    if (isMergingRef.current) return;
 
+    isMergingRef.current = true;
     setLoading(true);
     try {
       const fatherSummary = await getTableOrderSummary(currentTable.id);
@@ -43,6 +47,7 @@ const MergeTableModal = ({ visible, onClose, tables, currentTable, onMerged }) =
       message.error(err.response?.data?.message || "Lỗi khi gộp bàn");
     } finally {
       setLoading(false);
+      isMergingRef.current = false;
     }
   };
 

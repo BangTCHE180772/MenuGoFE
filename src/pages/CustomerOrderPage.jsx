@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
@@ -58,9 +58,17 @@ const CustomerOrderPage = () => {
     return () => clearInterval(interval);
   }, [fetchTableSummary]);
 
-  const isOccupied = summary?.tableStatus?.toLowerCase() === 'occupied';
+  const tableStatus = summary?.tableStatus?.toLowerCase();
+  const isReserved = tableStatus === 'reserved';
+  const isCleaning = tableStatus === 'cleaning';
+  const isOccupied = tableStatus === 'occupied';
+  const isAvailableForOrder = tableStatus === 'empty' || tableStatus === 'occupied';
 
   const handleAddItem = useCallback((item) => {
+    if (isReserved || isCleaning) {
+      message.error("Bàn đang được đặt trước hoặc đang dọn dẹp. Vui lòng liên hệ nhân viên!");
+      return;
+    }
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
@@ -83,25 +91,36 @@ const CustomerOrderPage = () => {
     });
   };
 
+  const actionRef = useRef(false);
+
   const handleCallStaff = async () => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await callStaff(tableId);
       message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
       message.error('Lỗi khi gọi nhân viên');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleRequestBill = async () => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await requestBill(tableId);
       message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
       message.error('Lỗi khi gửi yêu cầu');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleCancelItem = (detailId, itemName) => {
+    if (actionRef.current) return;
     Modal.confirm({
       title: 'Xác nhận hủy món',
       content: `Bạn có chắc chắn muốn hủy món "${itemName}" không?`,
@@ -109,12 +128,15 @@ const CustomerOrderPage = () => {
       okType: 'danger',
       cancelText: 'Quay lại',
       onOk: async () => {
+        actionRef.current = true;
         try {
           await cancelOrderDetail(detailId);
           message.success(`Đã hủy món ${itemName}`);
           fetchTableSummary();
         } catch (error) {
           message.error(error.response?.data?.message || 'Lỗi khi hủy món');
+        } finally {
+          actionRef.current = false;
         }
       }
     });
@@ -122,6 +144,7 @@ const CustomerOrderPage = () => {
 
   const handleCancelOrder = () => {
     if (!summary?.activeOrderId) return;
+    if (actionRef.current) return;
     Modal.confirm({
       title: 'Xác nhận hủy toàn bộ đơn',
       content: 'Bạn có chắc chắn muốn hủy toàn bộ đơn hàng này không? Bàn sẽ được giải phóng.',
@@ -129,28 +152,43 @@ const CustomerOrderPage = () => {
       okType: 'danger',
       cancelText: 'Quay lại',
       onOk: async () => {
+        actionRef.current = true;
         try {
           await cancelOrder(summary.activeOrderId);
           message.success('Đã hủy đơn hàng thành công');
           fetchTableSummary();
         } catch (error) {
           message.error(error.response?.data?.message || 'Lỗi khi hủy đơn');
+        } finally {
+          actionRef.current = false;
         }
       }
     });
   };
 
-  const handleSubmitOrder = async () => {
-    if (!isOccupied || cartItems.length === 0) return;
+  const isSubmittingRef = useRef(false);
 
+  const handleSubmitOrder = async () => {
+    if (!isAvailableForOrder || cartItems.length === 0) return;
+    if (isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
     setOrderLoading(true);
     try {
       let orderId = summary?.activeOrderId;
 
       if (!orderId) {
-        message.error("Bàn chưa được mở, vui lòng liên hệ nhân viên!");
-        setOrderLoading(false);
-        return;
+        const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+        const orderRes = await createOrder({
+          tableId: parseInt(tableId),
+          fatherId: null,
+          method: 'DineIn',
+          status: 'Active',
+          customerId: null,
+          totalAmount: totalAmount,
+          createdBy: null,
+        });
+        orderId = orderRes?.data?.id ?? orderRes?.data;
       }
 
       await Promise.all(
@@ -177,6 +215,7 @@ const CustomerOrderPage = () => {
       message.error('Có lỗi xảy ra khi đặt món');
     } finally {
       setOrderLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -250,22 +289,10 @@ const CustomerOrderPage = () => {
       </div>
 
       <div className="co-content">
-        {!isOccupied && (
-          <div className="co-locked-overlay">
-            <div className="co-locked-icon">👋</div>
-            <div className="co-locked-title">Chào mừng quý khách</div>
-            <div className="co-locked-desc">
-              Vui lòng gọi nhân viên để mở bàn trước khi bắt đầu gọi món nhé!
-            </div>
-            <button className="co-btn-call" onClick={handleCallStaff}>
-              Gọi nhân viên
-            </button>
-          </div>
-        )}
 
         {activeTab === 'menu' ? (
           <div className="co-menu-wrap">
-            <MenuPanel canOrder={isOccupied} onAddItem={handleAddItem} />
+            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} />
           </div>
         ) : (
           <div className="co-ordered-list">
@@ -285,8 +312,8 @@ const CustomerOrderPage = () => {
                       {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {item.status !== 'Cancelled' && item.cookingStatus === 'Waiting' && (
-                      <button 
-                        className="co-btn-cancel-item" 
+                      <button
+                        className="co-btn-cancel-item"
                         onClick={() => handleCancelItem(item.orderDetailId, item.productName)}
                         style={{ marginTop: '8px', color: '#ef4444', background: 'transparent', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                       >
@@ -302,10 +329,10 @@ const CustomerOrderPage = () => {
                 <p>Chưa có món nào được gọi</p>
               </div>
             )}
-            
+
             {canCancelOrder && (
               <div style={{ padding: '16px', textAlign: 'center' }}>
-                <button 
+                <button
                   onClick={handleCancelOrder}
                   style={{ background: '#ef4444', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}
                 >
@@ -317,7 +344,7 @@ const CustomerOrderPage = () => {
         )}
       </div>
 
-      {isOccupied && cartCount > 0 && (
+      {isAvailableForOrder && cartCount > 0 && (
         <button className="co-floating-cart" onClick={() => setIsCartOpen(true)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '20px' }}>🛒</span>
@@ -360,9 +387,9 @@ const CustomerOrderPage = () => {
             <button
               className="co-btn-submit"
               onClick={handleSubmitOrder}
-              disabled={cartItems.length === 0 || orderLoading}
+              disabled={!isAvailableForOrder || cartCount === 0 || orderLoading}
             >
-              {orderLoading ? 'Đang gửi...' : 'GỬI ĐƠN XUỐNG BẾP'}
+              {orderLoading ? 'Đang gửi...' : 'Gọi món'}
             </button>
           </div>
         </div>

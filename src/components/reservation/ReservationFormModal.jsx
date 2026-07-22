@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -127,7 +127,10 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     setPreOrderItems(prev => prev.filter(item => item.productId !== productId));
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
     try {
       const values = await form.validateFields();
 
@@ -145,6 +148,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         }))
       };
 
+      isSubmittingRef.current = true;
       setLoading(true);
       await createReservation(payload);
       message.success('Đã tạo đặt bàn thành công!');
@@ -154,6 +158,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       message.error(error.response?.data?.message || 'Tạo đặt bàn thất bại');
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, Form, Input, Select, Button, message } from 'antd';
 import { setupDevice } from '../api/deviceApi';
 import { getAllBranches } from '../api/branchApi';
@@ -30,7 +30,12 @@ const DeviceSetupPage = () => {
     }
   }, [isAdminOrOwner]);
 
+  const isSubmittingRef = useRef(false);
+
   const handleFinish = async (values) => {
+    if (isSubmittingRef.current) return;
+    
+    isSubmittingRef.current = true;
     setLoading(true);
     try {
       const payload = {
@@ -61,7 +66,9 @@ const DeviceSetupPage = () => {
 
     } catch (error) {
       message.error(error.response?.data?.message || 'Xác lập thiết bị thất bại');
+    } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
