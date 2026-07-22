@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { message, Spin, Select } from 'antd';
-import { getAllTables, getTablesByBranch } from '../api/tableApi';
+import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAreasByBranchId } from '../api/areaApi';
 import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
@@ -17,7 +17,7 @@ const TableMapPage = () => {
   const [selectedTable, setSelectedTable] = useState(null);
   const [selectedArea, setSelectedArea] = useState('all');
   const [areas, setAreas] = useState([]);
-  
+
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(null);
 
@@ -34,7 +34,7 @@ const TableMapPage = () => {
       try {
         const res = await getAllBranches();
         const allBranches = res.data;
-        
+
         if (deviceInfo) {
           // Locked to the device's assigned branch
           const deviceBranch = allBranches.find(b => b.id === deviceInfo.branchId);
@@ -66,7 +66,7 @@ const TableMapPage = () => {
         if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
           availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
         }
-        
+
         setBranches(availableBranches);
         if (availableBranches.length > 0) {
           setSelectedBranch(availableBranches[0].id);
@@ -97,7 +97,7 @@ const TableMapPage = () => {
     setLoadingTables(true);
     try {
       const areaIdToFetch = selectedArea === 'all' ? null : selectedArea;
-      const res = selectedBranch 
+      const res = selectedBranch
         ? await getTablesByBranch([selectedBranch], areaIdToFetch)
         : await getAllTables();
       const data = res?.data;
@@ -115,11 +115,11 @@ const TableMapPage = () => {
     try {
       const res = await getTableOrderSummary(tableId);
       setOrderSummary(res.data);
-      
+
       setTables(prev => prev.map(t => {
         if (t.id === tableId) {
-          return { 
-            ...t, 
+          return {
+            ...t,
             pendingCount: res.data.pendingConfirmCount,
             readyCount: res.data.readyToServeCount
           };
@@ -148,7 +148,7 @@ const TableMapPage = () => {
               return t;
             }));
           }
-          
+
           if (selectedTable?.id === data.tableId) {
             loadOrderSummary(data.tableId);
           }
@@ -171,7 +171,20 @@ const TableMapPage = () => {
     try {
       await confirmOrderItem(orderDetailId);
       message.success('Đã xác nhận món!');
-      if (selectedTable) loadOrderSummary(selectedTable.id);
+
+      if (selectedTable) {
+        if (selectedTable.status?.toLowerCase() === 'empty') {
+          await updateTable({
+            id: selectedTable.id,
+            areaId: selectedTable.areaId,
+            name: selectedTable.name,
+            status: 'Occupied',
+            isActive: selectedTable.isActive ?? true,
+          });
+          loadTables();
+        }
+        loadOrderSummary(selectedTable.id);
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Xác nhận thất bại');
     }
@@ -245,7 +258,7 @@ const TableMapPage = () => {
             {tables.map(table => {
               const cfg = getStatusConfig(table.status);
               const isSelected = selectedTable?.id === table.id;
-              
+
               const badgeCount = (table.pendingCount || 0) + (table.readyCount || 0);
               const hasAlert = badgeCount > 0;
 
@@ -265,7 +278,7 @@ const TableMapPage = () => {
                     <span className="dot" style={{ backgroundColor: cfg.dotColor }}></span>
                     {cfg.label}
                   </div>
-                  
+
                   {hasAlert && (
                     <div className="tablemap-card-badge">
                       {badgeCount}
@@ -274,7 +287,7 @@ const TableMapPage = () => {
                 </div>
               );
             })}
-            
+
             {tables.length === 0 && (
               <div className="tablemap-empty">
                 Không có bàn nào trong khu vực này.
@@ -285,9 +298,9 @@ const TableMapPage = () => {
       </div>
 
       <div className="tablemap-right-col">
-        <TableDetailPanel 
-          table={selectedTable} 
-          summary={orderSummary} 
+        <TableDetailPanel
+          table={selectedTable}
+          summary={orderSummary}
           loading={loadingSummary}
           onConfirm={handleConfirmItem}
           onReject={handleRejectItem}

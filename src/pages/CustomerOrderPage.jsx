@@ -58,9 +58,16 @@ const CustomerOrderPage = () => {
     return () => clearInterval(interval);
   }, [fetchTableSummary]);
 
-  const isOccupied = summary?.tableStatus?.toLowerCase() === 'occupied';
+  const tableStatus = summary?.tableStatus?.toLowerCase();
+  const isReserved = tableStatus === 'reserved';
+  const isCleaning = tableStatus === 'cleaning';
+  const isAvailableForOrder = tableStatus === 'empty' || tableStatus === 'occupied';
 
   const handleAddItem = useCallback((item) => {
+    if (isReserved || isCleaning) {
+      message.error("Bàn đang được đặt trước hoặc đang dọn dẹp. Vui lòng liên hệ nhân viên!");
+      return;
+    }
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
@@ -161,7 +168,7 @@ const CustomerOrderPage = () => {
   const isSubmittingRef = useRef(false);
 
   const handleSubmitOrder = async () => {
-    if (!isOccupied || cartItems.length === 0) return;
+    if (!isAvailableForOrder || cartItems.length === 0) return;
     if (isSubmittingRef.current) return;
 
     isSubmittingRef.current = true;
@@ -170,9 +177,18 @@ const CustomerOrderPage = () => {
       let orderId = summary?.activeOrderId;
 
       if (!orderId) {
-        message.error("Bàn chưa được mở, vui lòng liên hệ nhân viên!");
-        setOrderLoading(false);
-        return;
+        // Create new order if table is empty
+        const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+        const orderRes = await createOrder({
+          tableId: parseInt(tableId),
+          fatherId: null,
+          method: 'DineIn',
+          status: 'Active',
+          customerId: null,
+          totalAmount: totalAmount,
+          createdBy: 1, // System/Customer fallback ID
+        });
+        orderId = orderRes?.data?.id ?? orderRes?.data;
       }
 
       await Promise.all(
@@ -288,7 +304,7 @@ const CustomerOrderPage = () => {
 
         {activeTab === 'menu' ? (
           <div className="co-menu-wrap">
-            <MenuPanel canOrder={isOccupied} onAddItem={handleAddItem} />
+            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} />
           </div>
         ) : (
           <div className="co-ordered-list">
@@ -340,7 +356,7 @@ const CustomerOrderPage = () => {
         )}
       </div>
 
-      {isOccupied && cartCount > 0 && (
+      {isAvailableForOrder && cartCount > 0 && (
         <button className="co-floating-cart" onClick={() => setIsCartOpen(true)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '20px' }}>🛒</span>
@@ -383,7 +399,7 @@ const CustomerOrderPage = () => {
             <button
               className="co-btn-submit"
               onClick={handleSubmitOrder}
-              disabled={cartItems.length === 0 || orderLoading}
+              disabled={!isAvailableForOrder || cartCount === 0 || orderLoading}
             >
               {orderLoading ? 'Đang gửi...' : 'GỬI ĐƠN XUỐNG BẾP'}
             </button>
