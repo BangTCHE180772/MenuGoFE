@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSignalR } from '../context/SignalRContext';
 import { getStatusConfig } from '../data/tableConstants';
 import TableDetailPanel from '../components/tablemap/TableDetailPanel';
+import WaiterActionFeed from '../components/tablemap/WaiterActionFeed';
 import { useDevice } from '../context/DeviceContext';
 import '../styles/tablemap.css';
 
@@ -298,19 +299,23 @@ const TableMapPage = () => {
       </div>
 
       <div className="tablemap-right-col">
-        <TableDetailPanel
-          table={selectedTable}
-          summary={orderSummary}
-          loading={loadingSummary}
-          onConfirm={handleConfirmItem}
-          onReject={handleRejectItem}
-          onServe={handleServeItem}
-          tables={tables}
-          onPaymentSuccess={(tableId) => {
-            loadTables();
-            loadOrderSummary(tableId);
-          }}
-        />
+        {selectedTable ? (
+          <TableDetailPanel
+            table={selectedTable}
+            summary={orderSummary}
+            loading={loadingSummary}
+            onConfirm={handleConfirmItem}
+            onReject={handleRejectItem}
+            onServe={handleServeItem}
+            tables={tables}
+            onPaymentSuccess={(tableId) => {
+              loadTables();
+              loadOrderSummary(tableId);
+            }}
+          />
+        ) : (
+          <WaiterActionFeed tables={tables} onSelectTable={handleSelectTable} />
+        )}
       </div>
     </div>
   );

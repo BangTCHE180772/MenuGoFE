@@ -400,7 +400,7 @@ const CustomerOrderPage = () => {
               onClick={handleSubmitOrder}
               disabled={!isAvailableForOrder || cartCount === 0 || orderLoading}
             >
-              {orderLoading ? 'Đang gửi...' : 'GỬI ĐƠN XUỐNG BẾP'}
+              {orderLoading ? 'Đang gửi...' : 'Gọi món'}
             </button>
           </div>
         </div>
