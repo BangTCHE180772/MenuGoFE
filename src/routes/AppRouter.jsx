@@ -25,7 +25,7 @@ import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
-import ChainPagae from '../pages/ChainPage';
+import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 
 
@@ -111,7 +111,7 @@ const AppRouter = () => {
               {/* Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/branches" element={<BranchPage />} />
-                <Route path="/chains" element={<ChainPagae />} />
+                <Route path="/chains" element={<ChainPage />} />
               </Route>
 
               {/* Admin only */}

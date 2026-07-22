@@ -18,6 +18,8 @@ import {
   GiftOutlined,
   LeftOutlined,
   RightOutlined,
+  FileProtectOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useRef, useState, useEffect } from "react";
