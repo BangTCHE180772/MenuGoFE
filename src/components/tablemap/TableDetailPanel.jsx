@@ -10,7 +10,7 @@ import { unmergeOrder } from '../../api/orderApi';
 
 const { Text } = Typography;
 
-const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables }) => {
+const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReject, onServe, onPaymentSuccess, tables, isPosHub, isWaiterMode }) => {
   const navigate = useNavigate();
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
@@ -101,29 +101,27 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
               >
                 Gộp bàn
               </Button>
-              <Button
-                type="default"
-                icon={<SwapOutlined />}
-                onClick={() => setIsMoveModalVisible(true)}
-              >
-                Chuyển bàn
-              </Button>
-              <Button
-                danger
-                type="primary"
-                icon={<DollarOutlined />}
-                onClick={handlePaymentClick}
-              >
-                Thanh toán
-              </Button>
+              {!isPosHub && (
+                <Button
+                  type="default"
+                  icon={<SwapOutlined />}
+                  onClick={() => setIsMoveModalVisible(true)}
+                >
+                  Chuyển bàn
+                </Button>
+              )}
+              {!isWaiterMode && (
+                <Button
+                  danger
+                  type="primary"
+                  icon={<DollarOutlined />}
+                  onClick={handlePaymentClick}
+                >
+                  Thanh toán
+                </Button>
+              )}
             </>
           )}
-          <Button
-            type="primary"
-            onClick={() => navigate(`/orders?tableId=${table.id}`)}
-          >
-            Sang trang Order
-          </Button>
         </div>
       </div>
 
@@ -166,48 +164,50 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
                   </div>
                 </div>
 
-                <div className="tablemap-item-actions">
-                  {item.status === 'CustomerPending' && (
-                    <>
+                {!isPosHub && (
+                  <div className="tablemap-item-actions">
+                    {item.status === 'CustomerPending' && (
+                      <>
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<CheckCircleOutlined />}
+                          onClick={() => onConfirm(item.orderDetailId)}
+                        >
+                          Xác nhận
+                        </Button>
+                        <Button
+                          danger
+                          size="small"
+                          icon={<CloseCircleOutlined />}
+                          onClick={() => {
+                            Modal.confirm({
+                              title: 'Từ chối món',
+                              content: `Bạn có chắc chắn muốn từ chối món "${item.productName}" không?`,
+                              okText: 'Từ chối',
+                              okType: 'danger',
+                              cancelText: 'Hủy',
+                              onOk: () => onReject(item.orderDetailId)
+                            });
+                          }}
+                          style={{ marginLeft: '8px' }}
+                        >
+                          Từ chối
+                        </Button>
+                      </>
+                    )}
+                    {item.status === 'Confirmed' && item.cookingStatus === 'Ready' && (
                       <Button
-                        type="primary"
+                        type="default"
                         size="small"
-                        icon={<CheckCircleOutlined />}
-                        onClick={() => onConfirm(item.orderDetailId)}
+                        icon={<CodeSandboxOutlined />}
+                        onClick={() => onServe(item.orderDetailId)}
                       >
-                        Xác nhận
+                        Đã phục vụ
                       </Button>
-                      <Button
-                        danger
-                        size="small"
-                        icon={<CloseCircleOutlined />}
-                        onClick={() => {
-                          Modal.confirm({
-                            title: 'Từ chối món',
-                            content: `Bạn có chắc chắn muốn từ chối món "${item.productName}" không?`,
-                            okText: 'Từ chối',
-                            okType: 'danger',
-                            cancelText: 'Hủy',
-                            onOk: () => onReject(item.orderDetailId)
-                          });
-                        }}
-                        style={{ marginLeft: '8px' }}
-                      >
-                        Từ chối
-                      </Button>
-                    </>
-                  )}
-                  {item.status === 'Confirmed' && item.cookingStatus === 'Ready' && (
-                    <Button
-                      type="default"
-                      size="small"
-                      icon={<CodeSandboxOutlined />}
-                      onClick={() => onServe(item.orderDetailId)}
-                    >
-                      Đã phục vụ
-                    </Button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

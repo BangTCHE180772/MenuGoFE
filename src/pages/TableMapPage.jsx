@@ -13,7 +13,7 @@ import WaiterActionFeed from '../components/tablemap/WaiterActionFeed';
 import { useDevice } from '../context/DeviceContext';
 import '../styles/tablemap.css';
 
-const TableMapPage = () => {
+const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [selectedArea, setSelectedArea] = useState('all');
@@ -319,6 +319,8 @@ const TableMapPage = () => {
             onReject={handleRejectItem}
             onServe={handleServeItem}
             tables={tables}
+            isPosHub={isPosHub}
+            isWaiterMode={isWaiterMode}
             onPaymentSuccess={(tableId) => {
               loadTables();
               loadOrderSummary(tableId);

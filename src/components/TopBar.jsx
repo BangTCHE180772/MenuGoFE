@@ -18,6 +18,7 @@ import {
   GiftOutlined,
   LeftOutlined,
   RightOutlined,
+  RocketOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useRef, useState, useEffect } from "react";
@@ -61,7 +62,7 @@ const ROLE_MENUS = {
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
-    { label: "Trạm Phục vụ", path: "/waiter-station", icon: <RocketOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -78,7 +79,6 @@ const ROLE_MENUS = {
   [ROLES.CASHIER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -90,6 +90,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
   ],
 };

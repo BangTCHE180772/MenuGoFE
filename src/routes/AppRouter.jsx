@@ -15,6 +15,7 @@ import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import WaiterStationPage from '../pages/WaiterStationPage';
+import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
@@ -91,6 +92,7 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
+              <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/menu-management" element={<MenuManagementPage />} />
