@@ -26,9 +26,6 @@ import { useRef, useState, useEffect } from "react";
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -42,15 +39,11 @@ const ROLE_MENUS = {
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
     { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -64,13 +57,11 @@ const ROLE_MENUS = {
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Trạm Phục vụ", path: "/waiter-station", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -82,19 +73,15 @@ const ROLE_MENUS = {
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
@@ -104,8 +91,6 @@ const ROLE_MENUS = {
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],
 };
 

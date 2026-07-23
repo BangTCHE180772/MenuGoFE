@@ -87,15 +87,10 @@ const AppRouter = () => {
                   )
                 }
               />
-              <Route path="/orders" element={<OrderPage />} />
-              <Route path="/table-map" element={<TableMapPage />} />
-              <Route path="/reservations" element={<ReservationPage />} />
-
               {/* Chef, Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
-
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/menu-management" element={<MenuManagementPage />} />
