@@ -99,6 +99,7 @@ const AppRouter = () => {
 
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
@@ -117,7 +118,6 @@ const AppRouter = () => {
 
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
-                <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
               </Route>
             </Route>
