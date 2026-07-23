@@ -30,6 +30,7 @@ const ROLE_MENUS = {
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
