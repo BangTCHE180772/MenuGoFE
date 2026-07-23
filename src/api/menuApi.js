@@ -50,7 +50,7 @@ export const getProductsODataPaged = async ({
   pageSize = 20,
   pageIndex = 1,
 }) => {
-  let filterClauses = ["IsSellable eq true", "IsActive eq true"];
+  let filterClauses = ["IsSellable eq true"];
 
   if (searchText) {
     const escapedSearch = searchText.replace(/'/g, "''");

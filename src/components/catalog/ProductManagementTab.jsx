@@ -18,10 +18,12 @@ import {
   Tooltip,
   Radio,
   Card,
+  Alert,
   Dropdown,
   Avatar,
   Typography,
   Tabs,
+  Pagination,
 } from 'antd';
 import {
   PlusOutlined,
@@ -48,6 +50,7 @@ import {
   deleteProduct,
 } from '../../api/productApi';
 import { getAllGroups, createGroup } from '../../api/groupApi';
+import { getAllMenus, createMenu } from '../../api/menuApi';
 import { getAllUnits, createUnit } from '../../api/unitApi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -66,14 +69,20 @@ const ProductManagementTab = () => {
   const [products, setProducts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [units, setUnits] = useState([]);
+  const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // KiotViet Left Filter Panel States
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  // KiotViet Left Filter Panel Multi-Select States
+  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [selectedMenuIds, setSelectedMenuIds] = useState([]);
+  const [selectedSellableFilter, setSelectedSellableFilter] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Form Modal State
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -85,14 +94,21 @@ const ProductManagementTab = () => {
   const [derivedUnits, setDerivedUnits] = useState([]);
   const [recipeItems, setRecipeItems] = useState([]);
   const [imageUrlWatch, setImageUrlWatch] = useState('');
+  const [isManageQuantityWatch, setIsManageQuantityWatch] = useState(false);
+  const [activeModalTabKey, setActiveModalTabKey] = useState('info');
 
-  // KiotViet Unit Picker Modal States
+  // KiotViet Unit & Recipe Paper Modal States
   const [isUnitPickerModalOpen, setIsUnitPickerModalOpen] = useState(false);
+  const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
 
   // Inline Quick Group & Unit Creation States
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [quickGroupLoading, setQuickGroupLoading] = useState(false);
+
+  const [isAddMenuModalOpen, setIsAddMenuModalOpen] = useState(false);
+  const [newMenuName, setNewMenuName] = useState('');
+  const [quickMenuLoading, setQuickMenuLoading] = useState(false);
 
   const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -103,6 +119,7 @@ const ProductManagementTab = () => {
   // Custom Styled TopRight Notification Helpers (Soft Red for Errors, Soft Green for Success)
   const notifySuccess = (msg, desc = '') => {
     notifyApi.success({
+      title: msg,
       message: msg,
       description: desc,
       placement: 'topRight',
@@ -119,6 +136,7 @@ const ProductManagementTab = () => {
 
   const notifyError = (msg, desc = '') => {
     notifyApi.error({
+      title: msg,
       message: msg,
       description: desc,
       placement: 'topRight',
@@ -135,6 +153,7 @@ const ProductManagementTab = () => {
 
   const notifyWarning = (msg, desc = '') => {
     notifyApi.warning({
+      title: msg,
       message: msg,
       description: desc,
       placement: 'topRight',
@@ -175,7 +194,51 @@ const ProductManagementTab = () => {
     }
   };
 
+  const fetchMenus = async () => {
+    try {
+      const resMenu = await getAllMenus();
+      const menuList = Array.isArray(resMenu.data) ? resMenu.data : resMenu.data?.$values || resMenu.data?.items || [];
+      setMenus(menuList);
+    } catch (err) {
+      console.error('Error fetching menus:', err);
+    }
+  };
+
+  const handleQuickCreateMenu = async () => {
+    if (!newMenuName.trim()) {
+      notifyWarning('Vui lòng nhập tên thực đơn mới!');
+      return;
+    }
+    setQuickMenuLoading(true);
+    try {
+      const res = await createMenu({
+        name: newMenuName.trim(),
+      });
+      const created = res.data;
+      setMenus((prev) => [...prev, created]);
+      const currentMenuIds = form.getFieldValue('menuIds') || [];
+      form.setFieldsValue({ menuIds: [...currentMenuIds, created.id] });
+      notifySuccess('Tạo thực đơn mới thành công!');
+      setIsAddMenuModalOpen(false);
+      setNewMenuName('');
+    } catch (err) {
+      console.error(err);
+      const errMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Không thể tạo thực đơn mới.';
+      notifyError('Tạo thực đơn thất bại', errMsg);
+    } finally {
+      setQuickMenuLoading(false);
+    }
+  };
+
   const handleToggleUnitSelection = (unit) => {
+    if (['Processed', 'Manufactured'].includes(productTypeWatch)) {
+      setBaseUnitId(unit.id);
+      setDerivedUnits([]);
+      form.setFieldsValue({ baseUnitId: unit.id });
+      notifySuccess(`Đã chọn đơn vị cơ bản: ${unit.name}`);
+      return;
+    }
+
     if (!baseUnitId) {
       setBaseUnitId(unit.id);
       form.setFieldsValue({ baseUnitId: unit.id });
@@ -290,14 +353,16 @@ const ProductManagementTab = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resProd, resGroup, resUnit] = await Promise.all([
+      const [resProd, resGroup, resUnit, resMenu] = await Promise.all([
         getAllProducts(),
         getAllGroups(),
         getAllUnits(),
+        getAllMenus(),
       ]);
       const prodList = Array.isArray(resProd.data) ? resProd.data : resProd.data?.$values || [];
       const groupList = Array.isArray(resGroup.data) ? resGroup.data : resGroup.data?.$values || resGroup.data?.items || [];
-      
+      const menuList = Array.isArray(resMenu.data) ? resMenu.data : resMenu.data?.$values || resMenu.data?.items || [];
+
       let unitList = [];
       if (Array.isArray(resUnit.data)) {
         unitList = resUnit.data;
@@ -312,6 +377,7 @@ const ProductManagementTab = () => {
       setProducts(prodList);
       setGroups(groupList);
       setUnits(unitList);
+      setMenus(menuList);
     } catch (err) {
       console.error('Fetch Data Error:', err);
       const errMsg = err?.response?.data?.detail || err?.response?.data?.message || 'Không thể kết nối đến máy chủ.';
@@ -331,21 +397,89 @@ const ProductManagementTab = () => {
     }
   }, [isUnitPickerModalOpen]);
 
+  const handleGroupFilterChange = (vals) => {
+    if (vals.includes('ALL')) {
+      if (vals[vals.length - 1] === 'ALL') {
+        setSelectedGroupIds([]);
+      } else {
+        setSelectedGroupIds(vals.filter((v) => v !== 'ALL'));
+      }
+    } else {
+      setSelectedGroupIds(vals);
+    }
+  };
+
+  const handleTypeFilterChange = (vals) => {
+    if (vals.includes('ALL')) {
+      if (vals[vals.length - 1] === 'ALL') {
+        setSelectedTypes([]);
+      } else {
+        setSelectedTypes(vals.filter((v) => v !== 'ALL'));
+      }
+    } else {
+      setSelectedTypes(vals);
+    }
+  };
+
+  const handleMenuFilterChange = (vals) => {
+    if (vals.includes('ALL')) {
+      if (vals[vals.length - 1] === 'ALL') {
+        setSelectedMenuIds([]);
+      } else {
+        setSelectedMenuIds(vals.filter((v) => v !== 'ALL'));
+      }
+    } else {
+      setSelectedMenuIds(vals);
+    }
+  };
+
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      if (selectedType && p.type !== selectedType) return false;
-      if (selectedGroup && p.groupId !== selectedGroup) return false;
-      if (selectedStatus === 'active' && !p.isActive) return false;
-      if (selectedStatus === 'inactive' && p.isActive) return false;
+      // Filter by Types (Multi-select)
+      if (selectedTypes.length > 0 && !selectedTypes.includes(p.type)) {
+        return false;
+      }
+
+      // Filter by Groups (Multi-select)
+      if (selectedGroupIds.length > 0 && !selectedGroupIds.includes(p.groupId)) {
+        return false;
+      }
+
+      // Filter by Menus (Multi-select)
+      if (selectedMenuIds.length > 0) {
+        const productMenuIds = p.menuProducts?.map((mp) => mp.menuId) || [];
+        const isInSelectedMenu = selectedMenuIds.some((mId) => productMenuIds.includes(mId));
+        if (!isInSelectedMenu) return false;
+      }
+
+      // Filter by Sellable Status
+      if (selectedSellableFilter === 'sellable' && !p.isSellable) {
+        return false;
+      }
+      if (selectedSellableFilter === 'not_sellable' && p.isSellable) {
+        return false;
+      }
+
+      // Search Text
       if (searchText) {
         const text = searchText.toLowerCase();
         const matchName = p.name?.toLowerCase().includes(text);
         const matchSKU = p.skuCode?.toLowerCase().includes(text);
         if (!matchName && !matchSKU) return false;
       }
+
       return true;
     });
-  }, [products, selectedType, selectedGroup, selectedStatus, searchText]);
+  }, [products, selectedTypes, selectedGroupIds, selectedMenuIds, selectedSellableFilter, searchText]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTypes, selectedGroupIds, selectedMenuIds, selectedSellableFilter, searchText]);
+
+  const pagedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(startIndex, startIndex + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
 
   // Handle "+ Thêm mới" Dropdown Item Selection
   const handleSelectProductTypeFromDropdown = (type) => {
@@ -372,18 +506,23 @@ const ProductManagementTab = () => {
     setProductTypeWatch(type);
     setImageUrlWatch('');
 
-    const initialBaseUnitId = units.length > 0 ? units[0].id : null;
+    const initialBaseUnitId = null;
     setBaseUnitId(initialBaseUnitId);
     setDerivedUnits([]);
     setRecipeItems([]);
 
+    setIsManageQuantityWatch(false);
+    setActiveModalTabKey('info');
     form.setFieldsValue({
       type,
-      isActive: true,
       isSellable: true,
+      isManageQuantity: false,
+      minStorage: 0,
+      maxStorage: 1000000000,
       sellPrice: 0,
       chainId: user?.chainId || 1,
-      baseUnitId: initialBaseUnitId,
+      baseUnitId: null,
+      menuIds: [],
     });
 
     setIsFormModalOpen(true);
@@ -395,6 +534,8 @@ const ProductManagementTab = () => {
 
     setProductTypeWatch(prod.type);
     setImageUrlWatch(prod.imageUrl || '');
+    setIsManageQuantityWatch(prod.isManageQuantity || false);
+    setActiveModalTabKey('info');
 
     form.setFieldsValue({
       id: prod.id,
@@ -405,9 +546,12 @@ const ProductManagementTab = () => {
       description: prod.description,
       skuCode: prod.skuCode,
       imageUrl: prod.imageUrl,
-      isActive: prod.isActive,
       isSellable: prod.isSellable,
+      isManageQuantity: prod.isManageQuantity || false,
+      minStorage: prod.minStorage ?? 0,
+      maxStorage: prod.maxStorage ?? 1000000000,
       sellPrice: prod.sellPrice,
+      menuIds: prod.menuProducts?.map((mp) => mp.menuId) || [],
     });
 
     const baseUnitObj = prod.unitConversions?.find((uc) => !uc.baseId);
@@ -456,24 +600,20 @@ const ProductManagementTab = () => {
     try {
       const values = await form.validateFields();
 
-      if (!baseUnitId) {
-        notifyWarning('Vui lòng chọn Đơn vị tính cơ sở!');
-        return;
-      }
+      const unitConversionsPayload = baseUnitId
+        ? [{ unitId: baseUnitId, conversionPoint: 1, isBase: true }]
+        : [];
 
-      const unitConversionsPayload = [
-        { unitId: baseUnitId, conversionPoint: 1, isBase: true },
-      ];
-
-      if (!['Processed', 'Manufactured'].includes(productTypeWatch)) {
+      if (baseUnitId && !['Processed', 'Manufactured'].includes(productTypeWatch)) {
         for (const du of derivedUnits) {
-          if (!du.conversionPoint || du.conversionPoint <= 1) {
-            notifyWarning('Tỷ lệ quy đổi ra đơn vị gốc phải là số dương lớn hơn 1 (đơn vị quy đổi phải lớn hơn đơn vị gốc)!');
+          const pointInt = Math.round(Number(du.conversionPoint) || 0);
+          if (pointInt < 2 || pointInt > 1000000) {
+            notifyWarning('Giá trị quy đổi của đơn vị phụ phải là số nguyên từ 2 đến 1.000.000 (1 triệu)!');
             return;
           }
           unitConversionsPayload.push({
             unitId: du.unitId,
-            conversionPoint: du.conversionPoint,
+            conversionPoint: pointInt,
             isBase: false,
           });
         }
@@ -486,8 +626,8 @@ const ProductManagementTab = () => {
         }
 
         for (const item of recipeItems) {
-          if (!item.quantity || item.quantity <= 0) {
-            notifyWarning('Số lượng nguyên liệu phải lớn hơn 0!');
+          if (!item.quantity || item.quantity < 0.001 || item.quantity > 1000000) {
+            notifyWarning('Số lượng nguyên liệu trong công thức phải từ 0,001 đến 1.000.000 (1 triệu)!');
             return;
           }
         }
@@ -495,11 +635,23 @@ const ProductManagementTab = () => {
 
       const payload = {
         ...values,
+        type: productTypeWatch,
+        chainId: user?.chainId || 1,
+        baseUnitId: baseUnitId,
         unitConversions: unitConversionsPayload,
-        recipe: ['Processed', 'Manufactured'].includes(productTypeWatch)
-          ? { details: recipeItems }
-          : null,
       };
+
+      if (!payload.skuCode || !payload.skuCode.trim()) {
+        delete payload.skuCode;
+      } else {
+        payload.skuCode = payload.skuCode.trim();
+      }
+
+      if (['Processed', 'Manufactured'].includes(productTypeWatch)) {
+        payload.recipe = { details: recipeItems };
+      } else {
+        delete payload.recipe;
+      }
 
       if (editingProduct) {
         payload.id = editingProduct.id;
@@ -513,9 +665,21 @@ const ProductManagementTab = () => {
       setIsFormModalOpen(false);
       fetchData();
     } catch (err) {
-      console.error(err);
-      const errMessage = err?.response?.data?.detail || err?.response?.data?.message || 'Vui lòng kiểm tra lại thông tin.';
-      notifyError(errMessage);
+      console.error('Error saving product:', err);
+      const resData = err?.response?.data;
+      let errMessage = 'Vui lòng kiểm tra lại thông tin sản phẩm.';
+      if (typeof resData === 'string' && resData.trim()) {
+        errMessage = resData;
+      } else if (resData?.message) {
+        errMessage = resData.message;
+      } else if (resData?.detail) {
+        errMessage = resData.detail;
+      } else if (resData?.title) {
+        errMessage = resData.title;
+      } else if (resData?.errors) {
+        errMessage = Object.values(resData.errors).flat().join(', ');
+      }
+      notifyError('Lưu sản phẩm thất bại (400)', errMessage);
     }
   };
 
@@ -539,6 +703,7 @@ const ProductManagementTab = () => {
   const availableIngredientsForType = useMemo(() => {
     return products.filter((p) => {
       if (p.id === editingProduct?.id) return false;
+      if (!p.isActive) return false;
       if (productTypeWatch === 'Processed') return ['Processed', 'Manufactured', 'Ingredient', 'Regular'].includes(p.type);
       if (productTypeWatch === 'Manufactured') return ['Manufactured', 'Ingredient', 'Regular'].includes(p.type);
       return false;
@@ -614,21 +779,43 @@ const ProductManagementTab = () => {
   ];
 
   // KiotViet Table Columns Definition
+  // Helper: truncated text cell with tooltip on hover
+  const TruncatedCell = ({ text, style = {} }) => (
+    <Tooltip title={text} placement="topLeft">
+      <span
+        title={text}
+        style={{
+          display: 'inline-block',
+          width: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          verticalAlign: 'middle',
+          ...style,
+        }}
+      >
+        {text}
+      </span>
+    </Tooltip>
+  );
+
   const columns = [
     {
       title: 'Mã hàng',
       key: 'imageSku',
-      width: 130,
+      width: '14%',
+      ellipsis: true,
       render: (_, record) => (
-        <Space size="small">
+        <Space size="small" style={{ flexWrap: 'nowrap', width: '100%', overflow: 'hidden' }}>
           {record.imageUrl ? (
-            <Avatar src={record.imageUrl} shape="square" size={26} />
+            <Avatar src={record.imageUrl} shape="square" size={26} style={{ flexShrink: 0 }} />
           ) : (
-            <Avatar icon={<PictureOutlined />} shape="square" size={26} style={{ background: '#f3f4f6', color: '#9ca3af' }} />
+            <Avatar icon={<PictureOutlined />} shape="square" size={26} style={{ background: '#f3f4f6', color: '#9ca3af', flexShrink: 0 }} />
           )}
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', fontFamily: 'monospace' }}>
-            {record.skuCode || 'N/A'}
-          </span>
+          <TruncatedCell
+            text={record.skuCode || 'N/A'}
+            style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', fontFamily: 'monospace' }}
+          />
         </Space>
       ),
     },
@@ -636,14 +823,19 @@ const ProductManagementTab = () => {
       title: 'Tên hàng hóa',
       dataIndex: 'name',
       key: 'name',
+      width: '32%',
+      ellipsis: true,
       render: (text, record) => {
         const baseUnitObj = record.unitConversions?.find((uc) => !uc.baseId);
         const baseUnitName = units.find((u) => u.id === baseUnitObj?.unitId)?.name;
         return (
-          <Space size="small">
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{text}</span>
+          <Space size="small" style={{ flexWrap: 'nowrap', width: '100%', overflow: 'hidden' }}>
+            <TruncatedCell
+              text={text}
+              style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}
+            />
             {baseUnitName && (
-              <Tag style={{ margin: 0, fontSize: 10, background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '0 4px' }}>
+              <Tag title={baseUnitName} style={{ margin: 0, fontSize: 10, background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '0 4px', flexShrink: 0 }}>
                 {baseUnitName}
               </Tag>
             )}
@@ -655,13 +847,29 @@ const ProductManagementTab = () => {
       title: 'Nhóm quản lý',
       dataIndex: 'groupId',
       key: 'groupId',
-      width: 130,
+      width: '18%',
+      ellipsis: true,
       render: (groupId) => {
         const gName = groups.find((g) => g.id === groupId)?.name || 'Chưa phân nhóm';
         return (
-          <Tag style={{ borderRadius: 10, padding: '0 6px', fontSize: 10, border: '1px solid #e5e7eb' }}>
-            {gName}
-          </Tag>
+          <Tooltip title={gName} placement="topLeft">
+            <Tag
+              title={gName}
+              style={{
+                borderRadius: 10,
+                padding: '0 6px',
+                fontSize: 10,
+                border: '1px solid #e5e7eb',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                display: 'inline-block',
+              }}
+            >
+              {gName}
+            </Tag>
+          </Tooltip>
         );
       },
     },
@@ -669,13 +877,29 @@ const ProductManagementTab = () => {
       title: 'Loại món',
       dataIndex: 'type',
       key: 'type',
-      width: 110,
+      width: '12%',
+      ellipsis: true,
       render: (type) => {
         const typeObj = PRODUCT_TYPES.find((t) => t.value === type) || { label: type, color: 'default' };
         return (
-          <Tag color={typeObj.color} style={{ borderRadius: 8, fontSize: 10, padding: '0 6px' }}>
-            {typeObj.label}
-          </Tag>
+          <Tooltip title={typeObj.label} placement="topLeft">
+            <Tag
+              title={typeObj.label}
+              color={typeObj.color}
+              style={{
+                borderRadius: 8,
+                fontSize: 10,
+                padding: '0 6px',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                display: 'inline-block',
+              }}
+            >
+              {typeObj.label}
+            </Tag>
+          </Tooltip>
         );
       },
     },
@@ -684,29 +908,69 @@ const ProductManagementTab = () => {
       dataIndex: 'sellPrice',
       key: 'sellPrice',
       align: 'right',
-      width: 130,
-      render: (val) => (
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
-          {val ? `${val.toLocaleString('vi-VN')}` : '0'}
-        </span>
-      ),
+      width: '12%',
+      ellipsis: true,
+      render: (val) => {
+        const display = val ? val.toLocaleString('vi-VN') : '0';
+        return (
+          <Tooltip title={display} placement="topRight">
+            <span
+              title={display}
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#0f172a',
+                display: 'inline-block',
+                width: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {display}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
-      title: 'Trạng thái',
-      dataIndex: 'isActive',
-      key: 'isActive',
-      width: 130,
-      render: (active) => (
-        <span style={{ fontSize: 11, color: active ? '#15803d' : '#b91c1c', fontWeight: 500 }}>
-          {active ? '● Đang kinh doanh' : '● Ngừng kinh doanh'}
-        </span>
-      ),
+      title: 'Cho phép bán',
+      dataIndex: 'isSellable',
+      key: 'isSellable',
+      align: 'center',
+      width: '12%',
+      ellipsis: true,
+      render: (isSellable) => {
+        const text = isSellable ? 'Cho phép bán' : 'Ngừng bán';
+        return (
+          <Tooltip title={text} placement="top">
+            <Tag
+              title={text}
+              color={isSellable ? 'success' : 'error'}
+              style={{
+                borderRadius: 10,
+                fontSize: 10.5,
+                padding: '0 8px',
+                fontWeight: 600,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                display: 'inline-block',
+              }}
+            >
+              {text}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Thao tác',
       key: 'actions',
       align: 'center',
       width: 90,
+      fixed: 'right',
       render: (_, record) => (
         <Space size={2}>
           <Tooltip title="Sửa">
@@ -791,7 +1055,7 @@ const ProductManagementTab = () => {
         {/* KiotViet Left Filter Panel with Scroll */}
         <Col xs={24} sm={24} md={6} lg={5} style={{ height: '100%' }}>
           <Card
-            bodyStyle={{ padding: '14px', flex: 1, overflowY: 'auto' }}
+            styles={{ body: { padding: '14px', flex: 1, overflowY: 'auto' } }}
             style={{
               borderRadius: 10,
               border: '1px solid #e5e7eb',
@@ -803,69 +1067,126 @@ const ProductManagementTab = () => {
               overflow: 'hidden',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 12 }}>
-              Bộ lọc sản phẩm
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
+                Bộ lọc sản phẩm
+              </span>
+              {(selectedGroupIds.length > 0 || selectedTypes.length > 0 || selectedMenuIds.length > 0 || selectedSellableFilter !== 'all') && (
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: 0, fontSize: 11, color: '#ef4444' }}
+                  onClick={() => {
+                    setSelectedGroupIds([]);
+                    setSelectedTypes([]);
+                    setSelectedMenuIds([]);
+                    setSelectedSellableFilter('all');
+                  }}
+                >
+                  Xóa lọc
+                </Button>
+              )}
             </div>
 
-            {/* Group Filter */}
+            {/* 1. Nhóm quản lý (Multi-select + Scroll Y + ALL option) */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 6 }}>
                 Nhóm quản lý
               </div>
-              <Select
-                placeholder="Tất cả nhóm món"
-                value={selectedGroup}
-                onChange={setSelectedGroup}
-                onFocus={fetchGroups}
-                style={{ width: '100%', fontSize: 12 }}
-                size="small"
-                allowClear
-              >
-                {groups.map((g) => (
-                  <Select.Option key={g.id} value={g.id}>
-                    {g.name}
+              <div style={{ maxHeight: 76, overflowY: 'auto', borderRadius: 6 }}>
+                <Select
+                  mode="multiple"
+                  placeholder="Tất cả nhóm món"
+                  value={selectedGroupIds.length === 0 ? ['ALL'] : selectedGroupIds}
+                  onChange={handleGroupFilterChange}
+                  onFocus={fetchGroups}
+                  style={{ width: '100%', fontSize: 12 }}
+                  size="small"
+                  allowClear
+                >
+                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>
+                    Tất cả nhóm món
                   </Select.Option>
-                ))}
-              </Select>
+                  {groups.map((g) => (
+                    <Select.Option key={g.id} value={g.id}>
+                      {g.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
             </div>
 
-            {/* Type Filter */}
+            {/* 2. Loại món (Multi-select + Scroll Y + ALL option) */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 6 }}>
                 Loại món
               </div>
-              <Select
-                placeholder="Tất cả loại món"
-                value={selectedType}
-                onChange={setSelectedType}
-                style={{ width: '100%', fontSize: 12 }}
-                size="small"
-                allowClear
-              >
-                {PRODUCT_TYPES.map((t) => (
-                  <Select.Option key={t.value} value={t.value}>
-                    <Space size={4}>
-                      {t.icon}
-                      {t.label}
-                    </Space>
+              <div style={{ maxHeight: 76, overflowY: 'auto', borderRadius: 6 }}>
+                <Select
+                  mode="multiple"
+                  placeholder="Tất cả loại món"
+                  value={selectedTypes.length === 0 ? ['ALL'] : selectedTypes}
+                  onChange={handleTypeFilterChange}
+                  style={{ width: '100%', fontSize: 12 }}
+                  size="small"
+                  allowClear
+                >
+                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>
+                    Tất cả loại món
                   </Select.Option>
-                ))}
-              </Select>
+                  {PRODUCT_TYPES.map((t) => (
+                    <Select.Option key={t.value} value={t.value}>
+                      <Space size={4}>
+                        {t.icon}
+                        {t.label}
+                      </Space>
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
             </div>
 
-            {/* Status Radio Filter */}
+            {/* 3. Thực đơn (Multi-select + Scroll Y + ALL option) */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 6 }}>
+                Thực đơn
+              </div>
+              <div style={{ maxHeight: 76, overflowY: 'auto', borderRadius: 6 }}>
+                <Select
+                  mode="multiple"
+                  placeholder="Tất cả thực đơn"
+                  value={selectedMenuIds.length === 0 ? ['ALL'] : selectedMenuIds}
+                  onChange={handleMenuFilterChange}
+                  onFocus={fetchMenus}
+                  style={{ width: '100%', fontSize: 12 }}
+                  size="small"
+                  allowClear
+                >
+                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>
+                    Tất cả thực đơn
+                  </Select.Option>
+                  {menus.map((m) => (
+                    <Select.Option key={m.id} value={m.id}>
+                      {m.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            {/* 4. Cho phép bán (Sellable Status Filter) */}
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 6 }}>
-                Trạng thái
+                Cho phép bán
               </div>
               <Radio.Group
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                value={selectedSellableFilter}
+                onChange={(e) => setSelectedSellableFilter(e.target.value)}
                 style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}
               >
-                <Radio value="all" style={{ fontSize: 12 }}>Tất cả</Radio>
-                <Radio value="active" style={{ fontSize: 12 }}>Đang kinh doanh</Radio>
-                <Radio value="inactive" style={{ fontSize: 12 }}>Ngừng kinh doanh</Radio>
+                <Radio value="all" style={{ fontSize: 12 }}>Tất cả (Bán & Không bán)</Radio>
+                <Radio value="sellable" style={{ fontSize: 12 }}>Cho phép bán</Radio>
+                <Radio value="not_sellable" style={{ fontSize: 12 }}>Không cho phép bán</Radio>
               </Radio.Group>
             </div>
           </Card>
@@ -874,7 +1195,7 @@ const ProductManagementTab = () => {
         {/* KiotViet Main Data Table Area with Internal Scroll */}
         <Col xs={24} sm={24} md={18} lg={19} style={{ height: '100%' }}>
           <Card
-            bodyStyle={{ padding: 0 }}
+            styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
             style={{
               borderRadius: 10,
               border: '1px solid #e5e7eb',
@@ -886,26 +1207,54 @@ const ProductManagementTab = () => {
               height: 'calc(100vh - 135px)',
             }}
           >
-            {/* KiotViet Data Table with Internal Scroll */}
-            <Table
-              className="kiotviet-table"
-              rowSelection={{
-                selectedRowKeys,
-                onChange: setSelectedRowKeys,
+            {/* Table Container with Internal Scroll */}
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <Table
+                className="kiotviet-table"
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: setSelectedRowKeys,
+                }}
+                columns={columns}
+                dataSource={pagedProducts}
+                rowKey="id"
+                loading={loading}
+                size="small"
+                scroll={{ y: 'calc(100vh - 235px)' }}
+                pagination={false}
+              />
+            </div>
+
+            {/* Fixed Sticky Footer Pagination Bar at Content Bottom */}
+            <div
+              style={{
+                padding: '10px 18px',
+                background: '#ffffff',
+                borderTop: '1px solid #e5e7eb',
+                display: 'flex',
+                justify: 'space-between',
+                alignItems: 'center',
+                zIndex: 10,
+                boxShadow: '0 -2px 6px rgba(0,0,0,0.02)',
               }}
-              columns={columns}
-              dataSource={filteredProducts}
-              rowKey="id"
-              loading={loading}
-              size="small"
-              scroll={{ y: 'calc(100vh - 200px)' }}
-              pagination={{
-                pageSize: 20,
-                showSizeChanger: true,
-                pageSizeOptions: ['20', '50', '100'],
-                showTotal: (total) => `Tổng số: ${total} sản phẩm`,
-              }}
-            />
+            >
+              <div style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>
+                Tổng số: <strong style={{ color: '#0284c7', fontWeight: 700 }}>{filteredProducts.length}</strong> sản phẩm
+              </div>
+
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredProducts.length}
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+                showSizeChanger
+                pageSizeOptions={['10', '20', '50', '100']}
+                size="small"
+              />
+            </div>
           </Card>
         </Col>
       </Row>
@@ -920,26 +1269,25 @@ const ProductManagementTab = () => {
           </div>
         }
         open={isFormModalOpen}
-        onOk={handleSaveProduct}
         onCancel={() => setIsFormModalOpen(false)}
         width={760}
-        okText="Lưu"
-        cancelText="Hủy"
-        destroyOnClose
+        footer={null}
+        destroyOnHidden
         style={{ top: 20 }}
       >
-        <Form form={form} layout="vertical" size="small">
+        <Form form={form} layout="vertical" size="small" requiredMark={false}>
           <Tabs
-            defaultActiveKey="info"
+            activeKey={activeModalTabKey}
+            onChange={(key) => setActiveModalTabKey(key)}
             items={[
               {
                 key: 'info',
                 label: <span style={{ fontWeight: 600 }}>Thông tin</span>,
                 children: (
                   <div style={{ paddingTop: 8 }}>
-                    {/* Top Row: Left Inputs (15) + Right Single Image Box (9) */}
+                    {/* Top Row: Left Inputs (14) + Right Single Image Box (10) */}
                     <Row gutter={16}>
-                      <Col span={15}>
+                      <Col span={14}>
                         <Form.Item name="skuCode" label={<span style={{ fontSize: 12, fontWeight: 600 }}>Mã hàng</span>}>
                           <Input placeholder="Tự động" style={{ borderRadius: 6 }} />
                         </Form.Item>
@@ -952,39 +1300,76 @@ const ProductManagementTab = () => {
                           <Input placeholder="Nhập tên hàng hóa / món ăn..." style={{ borderRadius: 6 }} />
                         </Form.Item>
 
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                              Nhóm hàng <span style={{ color: '#ef4444' }}>*</span>
-                            </span>
-                            <Button
-                              type="link"
-                              size="small"
-                              style={{ padding: 0, fontSize: 12, fontWeight: 600, color: '#2563eb' }}
-                              onClick={() => setIsAddGroupModalOpen(true)}
-                            >
-                              + Tạo mới
-                            </Button>
-                          </div>
+                        {/* Row: Nhóm hàng (12) + Thuộc thực đơn (12) */}
+                        <Row gutter={12} style={{ marginBottom: 16 }}>
+                          <Col span={12}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                                Nhóm hàng <span style={{ color: '#ef4444' }}>*</span>
+                              </span>
+                              <Button
+                                type="link"
+                                size="small"
+                                style={{ padding: 0, fontSize: 12, fontWeight: 600, color: '#2563eb' }}
+                                onClick={() => setIsAddGroupModalOpen(true)}
+                              >
+                                + Tạo mới
+                              </Button>
+                            </div>
 
-                          <Form.Item
-                            name="groupId"
-                            noStyle
-                            rules={[{ required: true, message: 'Vui lòng chọn 1 nhóm món!' }]}
-                          >
-                            <Select placeholder="Chọn nhóm món" style={{ width: '100%' }} onFocus={fetchGroups}>
-                              {groups.map((g) => (
-                                <Select.Option key={g.id} value={g.id}>
-                                  {g.name}
-                                </Select.Option>
-                              ))}
-                            </Select>
-                          </Form.Item>
-                        </div>
+                            <Form.Item
+                              name="groupId"
+                              noStyle
+                              rules={[{ required: true, message: 'Vui lòng chọn 1 nhóm món!' }]}
+                            >
+                              <Select placeholder="Chọn nhóm món" style={{ width: '100%' }} onFocus={fetchGroups}>
+                                {groups.map((g) => (
+                                  <Select.Option key={g.id} value={g.id}>
+                                    {g.name}
+                                  </Select.Option>
+                                ))}
+                              </Select>
+                            </Form.Item>
+                          </Col>
+
+                          <Col span={12}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Thuộc thực đơn
+                              </span>
+                              <Button
+                                type="link"
+                                size="small"
+                                style={{ padding: 0, fontSize: 12, fontWeight: 600, color: '#2563eb', flexShrink: 0, marginLeft: 4 }}
+                                onClick={() => setIsAddMenuModalOpen(true)}
+                              >
+                                + Tạo mới
+                              </Button>
+                            </div>
+
+                            <Form.Item name="menuIds" noStyle>
+                              <div style={{ maxHeight: 76, overflowY: 'auto', borderRadius: 6 }}>
+                                <Select
+                                  mode="multiple"
+                                  placeholder="Chọn thực đơn"
+                                  style={{ width: '100%' }}
+                                  onFocus={fetchMenus}
+                                  allowClear
+                                >
+                                  {menus.map((m) => (
+                                    <Select.Option key={m.id} value={m.id}>
+                                      {m.name}
+                                    </Select.Option>
+                                  ))}
+                                </Select>
+                              </div>
+                            </Form.Item>
+                          </Col>
+                        </Row>
                       </Col>
 
                       {/* Right Single Image Upload / URL Preview Frame */}
-                      <Col span={9}>
+                      <Col span={10}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                           Ảnh sản phẩm (Tối đa 1 ảnh)
                         </div>
@@ -992,24 +1377,31 @@ const ProductManagementTab = () => {
                           style={{
                             border: '2px dashed #e5e7eb',
                             borderRadius: 8,
-                            padding: 12,
+                            padding: 8,
                             textAlign: 'center',
                             background: '#fafafa',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            minHeight: 140,
+                            aspectRatio: '1 / 1',
+                            width: '100%',
+                            maxHeight: 185,
                           }}
                         >
                           {imageUrlWatch ? (
-                            <div style={{ position: 'relative' }}>
-                              <Avatar src={imageUrlWatch} shape="square" size={80} style={{ borderRadius: 8, marginBottom: 8 }} />
+                            <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                              <img
+                                src={imageUrlWatch}
+                                alt="Preview"
+                                style={{ width: 110, height: 110, objectFit: 'cover', borderRadius: 8, marginBottom: 4 }}
+                              />
                               <div>
                                 <Button
                                   type="link"
                                   danger
                                   size="small"
+                                  style={{ padding: 0, fontSize: 11 }}
                                   onClick={() => {
                                     setImageUrlWatch('');
                                     form.setFieldsValue({ imageUrl: '' });
@@ -1021,8 +1413,8 @@ const ProductManagementTab = () => {
                             </div>
                           ) : (
                             <div>
-                              <PictureOutlined style={{ fontSize: 32, color: '#9ca3af', marginBottom: 6 }} />
-                              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>
+                              <PictureOutlined style={{ fontSize: 40, color: '#9ca3af', marginBottom: 4 }} />
+                              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>
                                 Cung cấp liên kết ảnh sản phẩm
                               </div>
                             </div>
@@ -1044,43 +1436,96 @@ const ProductManagementTab = () => {
                     {/* Card 1: Giá & Thuế */}
                     <Card
                       type="inner"
-                      title={<span style={{ fontSize: 13, fontWeight: 700 }}>Giá & Thuế</span>}
+                      title={<span style={{ fontSize: 12, fontWeight: 700 }}>Giá & Thuế</span>}
                       size="small"
                       style={{ marginBottom: 12, borderRadius: 8 }}
                     >
-                      <Row gutter={12}>
-                        <Col span={12}>
-                          <Form.Item
-                            name="sellPrice"
-                            label="Giá bán (VNĐ)"
-                            rules={[{ required: true, message: 'Nhập giá bán' }]}
-                            style={{ marginBottom: 0 }}
-                          >
-                            <InputNumber
-                              style={{ width: '100%' }}
-                              formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                              parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
-                              min={0}
+                      <Form.Item
+                        name="sellPrice"
+                        label={<span style={{ fontSize: 11.5, fontWeight: 600 }}>Giá bán (VNĐ) <span style={{ color: '#ef4444' }}>*</span></span>}
+                        rules={[{ required: true, message: 'Nhập giá bán' }]}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <InputNumber
+                          style={{ width: '100%' }}
+                          formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                          min={0}
+                        />
+                      </Form.Item>
+                    </Card>
+
+                    {/* Card: Quản lý tồn kho (Chỉ hiển thị với Tool, Regular, Ingredient, Manufactured) */}
+                    {productTypeWatch !== 'Processed' && (
+                      <Card
+                        type="inner"
+                        size="small"
+                        style={{
+                          marginBottom: 12,
+                          borderRadius: 8,
+                          border: '1px solid #e5e7eb',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                          background: '#ffffff',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 2px' }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
+                              Quản lý tồn kho
+                            </div>
+                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                              {isManageQuantityWatch
+                                ? 'Đang bật theo dõi hạn mức số lượng tồn kho cho sản phẩm này.'
+                                : 'Bật nếu muốn thiết lập định mức cảnh báo tồn tối thiểu & tối đa.'}
+                            </div>
+                          </div>
+
+                          <Form.Item name="isManageQuantity" valuePropName="checked" noStyle>
+                            <Switch
+                              size="small"
+                              onChange={(checked) => setIsManageQuantityWatch(checked)}
                             />
                           </Form.Item>
-                        </Col>
+                        </div>
 
-                        <Col span={12}>
-                          <Row gutter={12} style={{ marginTop: 22 }}>
+                        {isManageQuantityWatch && (
+                          <Row gutter={12} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
                             <Col span={12}>
-                              <Form.Item name="isSellable" label="Cho phép bán" valuePropName="checked" style={{ marginBottom: 0 }}>
-                                <Switch size="small" />
+                              <Form.Item
+                                name="minStorage"
+                                label={<span style={{ fontSize: 11.5, fontWeight: 600 }}>Tồn tối thiểu <span style={{ color: '#ef4444' }}>*</span></span>}
+                                rules={[{ required: true, message: 'Nhập định mức tồn tối thiểu' }]}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <InputNumber
+                                  style={{ width: '100%' }}
+                                  min={0}
+                                  max={1000000000}
+                                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                                />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
-                              <Form.Item name="isActive" label="Đang kinh doanh" valuePropName="checked" style={{ marginBottom: 0 }}>
-                                <Switch size="small" />
+                              <Form.Item
+                                name="maxStorage"
+                                label={<span style={{ fontSize: 11.5, fontWeight: 600 }}>Tồn tối đa <span style={{ color: '#ef4444' }}>*</span></span>}
+                                rules={[{ required: true, message: 'Nhập định mức tồn tối đa' }]}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <InputNumber
+                                  style={{ width: '100%' }}
+                                  min={0}
+                                  max={1000000000}
+                                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                                />
                               </Form.Item>
                             </Col>
                           </Row>
-                        </Col>
-                      </Row>
-                    </Card>
+                        )}
+                      </Card>
+                    )}
 
                     {/* Card 2: KiotViet Exact Collapsed Unit Summary Card */}
                     {(() => {
@@ -1120,7 +1565,7 @@ const ProductManagementTab = () => {
                                   </span>
                                 ) : (
                                   <span>
-                                    Tạo các biến thể món theo đơn vị (cốc, set, thùng). Mỗi biến thể có một quy tắc quy đổi riêng.
+                                    Chưa thiết lập đơn vị tính. Nhấp vào đây nếu muốn chọn đơn vị tính cho sản phẩm.
                                   </span>
                                 )}
                               </div>
@@ -1149,64 +1594,63 @@ const ProductManagementTab = () => {
                       );
                     })()}
 
-                    {/* Card 3: Searchable Recipe Builder for Processed & Manufactured */}
+                    {/* Card 3: Exact Paper Summary Card for Recipe Builder (Processed & Manufactured) */}
                     {['Processed', 'Manufactured'].includes(productTypeWatch) && (
                       <Card
                         type="inner"
-                        title={<span style={{ fontSize: 13, fontWeight: 700 }}>Định lượng Công thức Nguyên liệu (Bắt buộc)</span>}
                         size="small"
-                        style={{ borderRadius: 8 }}
-                        extra={
-                          <Button type="dashed" icon={<PlusOutlined />} onClick={addRecipeItem} size="small">
-                            + Thêm thành phần nguyên liệu
-                          </Button>
-                        }
+                        style={{
+                          marginBottom: 12,
+                          borderRadius: 12,
+                          cursor: 'pointer',
+                          border: '1px solid #e5e7eb',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                          background: '#ffffff',
+                        }}
+                        onClick={() => setIsRecipeModalOpen(true)}
                       >
-                        {recipeItems.map((item, idx) => (
-                          <Row key={idx} gutter={8} align="middle" style={{ marginBottom: 6 }}>
-                            <Col span={13}>
-                              <Select
-                                showSearch
-                                optionFilterProp="children"
-                                placeholder="Gõ tìm tên hoặc mã SKU..."
-                                value={item.productId}
-                                onChange={(val) => {
-                                  const updated = [...recipeItems];
-                                  updated[idx].productId = val;
-                                  setRecipeItems(updated);
-                                }}
-                                style={{ width: '100%' }}
-                                size="small"
-                              >
-                                {availableIngredientsForType.map((p) => (
-                                  <Select.Option key={p.id} value={p.id}>
-                                    {p.name} [{p.skuCode || `ID:${p.id}`}] - ({p.type})
-                                  </Select.Option>
-                                ))}
-                              </Select>
-                            </Col>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px' }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
+                              Định lượng Công thức Nguyên liệu <span style={{ color: '#ef4444' }}>*</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                              {recipeItems.length > 0 ? (
+                                <span>
+                                  Món được chế biến từ <strong>{recipeItems.length} thành phần</strong> (
+                                  {recipeItems
+                                    .map((ri) => products.find((p) => p.id === ri.productId)?.name)
+                                    .filter(Boolean)
+                                    .join(', ')}
+                                  )
+                                </span>
+                              ) : (
+                                <span style={{ color: '#ef4444', fontWeight: 500 }}>
+                                  Chưa có công thức. Món chế biến & thành phẩm bắt buộc phải có ít nhất 1 thành phần!
+                                </span>
+                              )}
+                            </div>
+                          </div>
 
-                            <Col span={7}>
-                              <InputNumber
-                                min={0.001}
-                                step={0.1}
-                                size="small"
-                                value={item.quantity}
-                                onChange={(val) => {
-                                  const updated = [...recipeItems];
-                                  updated[idx].quantity = val;
-                                  setRecipeItems(updated);
-                                }}
-                                addonBefore="Số lượng"
-                                style={{ width: '100%' }}
-                              />
-                            </Col>
-
-                            <Col span={4}>
-                              <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeRecipeItem(idx)} />
-                            </Col>
-                          </Row>
-                        ))}
+                          <Button
+                            type="text"
+                            style={{
+                              color: '#1f2937',
+                              fontWeight: 600,
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsRecipeModalOpen(true);
+                            }}
+                          >
+                            {recipeItems.length > 0 ? `${recipeItems.length} thành phần` : 'Thiết lập'}
+                            <RightOutlined style={{ fontSize: 12, color: '#6b7280' }} />
+                          </Button>
+                        </div>
                       </Card>
                     )}
                   </div>
@@ -1217,7 +1661,7 @@ const ProductManagementTab = () => {
                 label: <span style={{ fontWeight: 600 }}>Mô tả chi tiết</span>,
                 children: (
                   <div style={{ paddingTop: 12 }}>
-                    <Form.Item name="description" label="Ghi chú & Mô tả chi tiết món ăn/sản phẩm">
+                    <Form.Item name="description" label={<span style={{ fontSize: 12, fontWeight: 600 }}>Ghi chú & Mô tả chi tiết</span>}>
                       <Input.TextArea rows={6} placeholder="Nhập mô tả chi tiết, hướng dẫn chế biến hoặc ghi chú..." />
                     </Form.Item>
                   </div>
@@ -1225,11 +1669,43 @@ const ProductManagementTab = () => {
               },
               {
                 key: 'branch',
-                label: <span style={{ color: '#9ca3af' }}>Chi nhánh sử dụng (Tạm để đó)</span>,
+                label: <span style={{ color: '#9ca3af' }}>Chi nhánh sử dụng</span>,
                 disabled: true,
               },
             ]}
           />
+
+          {/* Sticky Modal Bottom Footer Bar */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: 14,
+              marginTop: 14,
+              borderTop: '1px solid #f3f4f6',
+            }}
+          >
+            {activeModalTabKey !== 'desc' ? (
+              <Form.Item name="isSellable" valuePropName="checked" noStyle>
+                <Space size="small" style={{ cursor: 'pointer' }}>
+                  <Switch size="small" />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Cho phép bán</span>
+                </Space>
+              </Form.Item>
+            ) : (
+              <div />
+            )}
+
+            <Space>
+              <Button onClick={() => setIsFormModalOpen(false)} style={{ borderRadius: 6, fontSize: 12 }}>
+                Hủy
+              </Button>
+              <Button type="primary" danger onClick={handleSaveProduct} style={{ borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                Lưu
+              </Button>
+            </Space>
+          </div>
         </Form>
       </Modal>
 
@@ -1256,6 +1732,33 @@ const ProductManagementTab = () => {
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
             onPressEnter={handleQuickCreateGroup}
+          />
+        </div>
+      </Modal>
+
+      {/* Quick Add New Menu Inline Modal with higher zIndex */}
+      <Modal
+        title="Tạo mới Thực đơn"
+        open={isAddMenuModalOpen}
+        onOk={handleQuickCreateMenu}
+        onCancel={() => setIsAddMenuModalOpen(false)}
+        confirmLoading={quickMenuLoading}
+        okText="Tạo thực đơn"
+        cancelText="Hủy"
+        size="small"
+        width={400}
+        zIndex={1100}
+        destroyOnClose
+      >
+        <div style={{ paddingTop: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+            Tên thực đơn mới <span style={{ color: '#ef4444' }}>*</span>
+          </div>
+          <Input
+            placeholder="Ví dụ: Thực đơn sáng, Thực đơn chính, Thực đơn khuyến mãi..."
+            value={newMenuName}
+            onChange={(e) => setNewMenuName(e.target.value)}
+            onPressEnter={handleQuickCreateMenu}
           />
         </div>
       </Modal>
@@ -1300,6 +1803,15 @@ const ProductManagementTab = () => {
         destroyOnClose
       >
         <div style={{ paddingTop: 4 }}>
+          {['Processed', 'Manufactured'].includes(productTypeWatch) && (
+            <Alert
+              type="info"
+              showIcon
+              message="Sản phẩm loại Chế biến & Thành phẩm chỉ được chọn 1 Đơn vị cơ sở duy nhất (Không sử dụng đơn vị quy đổi phụ)."
+              style={{ marginBottom: 14, borderRadius: 8, fontSize: 12 }}
+            />
+          )}
+
           {/* Section 1: Dynamic Unit Tags List */}
           <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 8 }}>
             Chọn đơn vị tính cho sản phẩm:
@@ -1360,7 +1872,7 @@ const ProductManagementTab = () => {
           </div>
 
           {/* Section 2: QUY ĐỔI ĐƠN VỊ CHO HÀNG HOÁ NÀY (KiotViet Exact Table Layout) */}
-          {(baseUnitId || derivedUnits.length > 0) && (
+          {!['Processed', 'Manufactured'].includes(productTypeWatch) && (baseUnitId || derivedUnits.length > 0) && (
             <div style={{ background: '#f9fafb', padding: 16, borderRadius: 10, border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
                 QUY ĐỔI ĐƠN VỊ CHO HÀNG HOÁ NÀY
@@ -1428,7 +1940,8 @@ const ProductManagementTab = () => {
                         {/* Column 2: Conversion Ratio Input + Base Unit Suffix */}
                         <div style={{ width: '50%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
                           <InputNumber
-                            min={1}
+                            min={2}
+                            max={1000000}
                             step={1}
                             size="small"
                             value={du.conversionPoint}
@@ -1437,7 +1950,7 @@ const ProductManagementTab = () => {
                               updated[idx].conversionPoint = val;
                               setDerivedUnits(updated);
                             }}
-                            style={{ width: 90 }}
+                            style={{ width: 100 }}
                           />
                           <span style={{ fontSize: 12, color: '#4b5563', fontWeight: 500 }}>
                             {baseUnitObj?.name || 'Đơn vị cơ bản'}
@@ -1461,6 +1974,185 @@ const ProductManagementTab = () => {
               )}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Recipe Paper Modal for Processed & Manufactured Products (Exact KiotViet Design) */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ExperimentOutlined style={{ color: '#0284c7', fontSize: 18 }} />
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
+              Thiết lập công thức chế biến
+            </span>
+          </div>
+        }
+        open={isRecipeModalOpen}
+        onOk={() => setIsRecipeModalOpen(false)}
+        onCancel={() => setIsRecipeModalOpen(false)}
+        okText="Xong"
+        cancelText="Hủy"
+        width={780}
+        zIndex={1100}
+        destroyOnClose
+      >
+        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
+          {/* Header Title & Subtitle */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+              Thành phần nguyên liệu
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+              Thêm công thức để tự động trừ tồn và tính giá vốn dựa trên nguyên liệu
+            </div>
+          </div>
+
+          {/* Top Control Bar with Search Input */}
+          <div style={{ marginBottom: 16 }}>
+            <Select
+              showSearch
+              allowClear
+              size="middle"
+              placeholder="🔍 Thêm hàng thành phần"
+              filterOption={(input, option) =>
+                (option?.searchValue || '').toLowerCase().includes(input.toLowerCase())
+              }
+              onSelect={(val) => {
+                if (recipeItems.some((ri) => ri.productId === val)) {
+                  notifyWarning('Nguyên liệu này đã có trong công thức!');
+                  return;
+                }
+                setRecipeItems([...recipeItems, { productId: val, quantity: 1 }]);
+                notifySuccess('Đã thêm thành phần vào công thức!');
+              }}
+              value={null}
+              style={{ width: 320 }}
+            >
+              {products
+                .filter((p) => {
+                  if (p.isActive === false) return false;
+                  if (editingProduct && p.id === editingProduct.id) return false;
+                  return ['Ingredient', 'Regular', 'Manufactured', 'Processed'].includes(p.type);
+                })
+                .map((p) => {
+                  const baseUnitName =
+                    units.find((u) => {
+                      const baseUc = p.unitConversions?.find((uc) => !uc.baseId);
+                      return u.id === (baseUc ? baseUc.unitId : p.baseUnitId);
+                    })?.name || 'đơn vị';
+
+                  const searchLabel = `${p.skuCode || ''} ${p.name}`.trim();
+
+                  return (
+                    <Select.Option key={p.id} value={p.id} searchValue={searchLabel}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>
+                          <strong style={{ color: '#0284c7' }}>{p.skuCode || 'SP'}</strong> - {p.name}
+                        </span>
+                        <Tag color="blue" style={{ fontSize: 11 }}>Đơn vị: {baseUnitName}</Tag>
+                      </div>
+                    </Select.Option>
+                  );
+                })}
+            </Select>
+          </div>
+
+          {/* Table Container */}
+          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            {/* Table Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '10px 16px',
+                background: '#f3f4f6',
+                borderBottom: '1px solid #e5e7eb',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#374151',
+              }}
+            >
+              <div style={{ width: '20%' }}>Mã hàng</div>
+              <div style={{ width: '40%' }}>Tên món thành phần</div>
+              <div style={{ width: '15%' }}>Đơn vị tính</div>
+              <div style={{ width: '20%', textAlign: 'right' }}>Số lượng</div>
+              <div style={{ width: '5%', textAlign: 'right' }}></div>
+            </div>
+
+            {/* Table Body / Empty State */}
+            {recipeItems.length === 0 ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 500 }}>
+                Chưa có hàng thành phần
+              </div>
+            ) : (
+              recipeItems.map((item, idx) => {
+                const ingredientObj = products.find((p) => p.id === item.productId);
+                const baseUnitName =
+                  units.find((u) => {
+                    const baseUc = ingredientObj?.unitConversions?.find((uc) => !uc.baseId);
+                    return u.id === (baseUc ? baseUc.unitId : ingredientObj?.baseUnitId);
+                  })?.name || 'Đơn vị';
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 16px',
+                      borderBottom: idx === recipeItems.length - 1 ? 'none' : '1px solid #f3f4f6',
+                      fontSize: 13,
+                    }}
+                  >
+                    {/* Column 1: Mã hàng */}
+                    <div style={{ width: '20%', fontWeight: 600, color: '#0284c7' }}>
+                      {ingredientObj?.skuCode || `SP${item.productId}`}
+                    </div>
+
+                    {/* Column 2: Tên món thành phần */}
+                    <div style={{ width: '40%', fontWeight: 500, color: '#1f2937' }}>
+                      {ingredientObj?.name || `Sản phẩm #${item.productId}`}
+                    </div>
+
+                    {/* Column 3: Đơn vị tính */}
+                    <div style={{ width: '15%', color: '#4b5563', fontSize: 12 }}>
+                      <Tag color="cyan">{baseUnitName}</Tag>
+                    </div>
+
+                    {/* Column 4: Số lượng InputNumber [0.001 - 1,000,000] */}
+                    <div style={{ width: '20%', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
+                      <InputNumber
+                        min={0.001}
+                        max={1000000}
+                        step={0.1}
+                        precision={3}
+                        size="small"
+                        value={item.quantity}
+                        onChange={(val) => {
+                          const updated = [...recipeItems];
+                          updated[idx].quantity = val;
+                          setRecipeItems(updated);
+                        }}
+                        style={{ width: 110 }}
+                      />
+                      <span style={{ fontSize: 12, color: '#6b7280' }}>{baseUnitName}</span>
+                    </div>
+
+                    {/* Column 5: Trash Action */}
+                    <div style={{ width: '5%', textAlign: 'right' }}>
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={() => removeRecipeItem(idx)}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </Modal>
     </div>
