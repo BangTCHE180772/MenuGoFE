@@ -106,6 +106,7 @@ const AppRouter = () => {
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
+                <Route path="/payroll" element={<PayrollPage />} />
               </Route>
 
               {/* Owner, Admin */}
