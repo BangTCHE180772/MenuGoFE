@@ -250,7 +250,17 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             <Form.Item
               name="reservationTime"
               label="Thời Gian Đến"
-              rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}
+              rules={[
+                { required: true, message: 'Vui lòng chọn thời gian' },
+                {
+                  validator: (_, value) => {
+                    if (value && value.isBefore(dayjs().add(10, 'minute'))) {
+                      return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                    }
+                    return Promise.resolve();
+                  }
+                }
+              ]}
               style={{ flex: 1 }}
             >
               <DatePicker

@@ -175,12 +175,12 @@ const WorkSchedulePage = () => {
       // Combine date and time
       let checkInAt = null;
       if (values.checkInTime) {
-        checkInAt = dayjs(`${workDateStr} ${values.checkInTime.format('HH:mm:ss')}`).format('YYYY-MM-DDTHH:mm:ss');
+        checkInAt = dayjs(`${workDateStr} ${values.checkInTime.format('HH:mm:ss')}`).toISOString();
       }
 
       let checkOutAt = null;
       if (values.checkOutTime) {
-        checkOutAt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`).format('YYYY-MM-DDTHH:mm:ss');
+        checkOutAt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`).toISOString();
       }
 
       // Validations
@@ -756,7 +756,22 @@ const WorkSchedulePage = () => {
         }}
         cancelButtonProps={{ style: { borderRadius: '6px' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: 16 }}>
+        <Form 
+          form={form} 
+          layout="vertical" 
+          onFinish={handleSubmit} 
+          style={{ marginTop: 16 }}
+          onValuesChange={(changedValues, allValues) => {
+            if (changedValues.checkInTime || changedValues.checkOutTime) {
+              if (allValues.checkInTime && allValues.checkOutTime) {
+                const diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
+                if (diff > 0) {
+                  form.setFieldsValue({ actualHours: parseFloat(diff.toFixed(2)) });
+                }
+              }
+            }
+          }}
+        >
           {/* Row 1: Employee & Branch */}
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item
