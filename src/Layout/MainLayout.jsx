@@ -12,7 +12,7 @@ import ToTop from '../components/ToTop';
 const MainLayout = () => {
   const connection = useSignalR();
   const location = useLocation();
-  const isFluid = location.pathname.startsWith('/product-catalog');
+  const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
 
   useEffect(() => {
     if (connection) {

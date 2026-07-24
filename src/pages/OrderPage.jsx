@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
 import { createOrder, createOrderDetail } from '../api/orderApi';
 import { getTableOrderSummary } from '../api/tableMapApi';
+import { checkInReservation } from '../api/reservationApi';
 import { TABLE_STATUS } from '../data/tableConstants';
 import TablePanel from '../components/order/TablePanel';
 import MenuPanel from '../components/order/MenuPanel';
@@ -133,7 +134,30 @@ const OrderPage = () => {
     if (actionRef.current) return;
     actionRef.current = true;
 
-    if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
+      if (newStatus === 'CHECK_IN') {
+        if (!orderSummary?.reservationId) {
+          message.error("Không tìm thấy thông tin đặt bàn!");
+          actionRef.current = false;
+          return;
+        }
+        try {
+          await checkInReservation(orderSummary.reservationId);
+          message.success("Đã xác nhận khách đến!");
+          const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
+          setSelectedTable(updated);
+          setTables((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+          const summaryRes = await getTableOrderSummary(selectedTable.id);
+          setOrderSummary(summaryRes.data);
+        } catch (err) {
+          console.error(err);
+          message.error("Xác nhận khách đến thất bại!");
+        } finally {
+          actionRef.current = false;
+        }
+        return;
+      }
+
+      if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
       try {
         const summaryRes = await getTableOrderSummary(selectedTable.id);
         if (summaryRes.data?.activeOrderId) {

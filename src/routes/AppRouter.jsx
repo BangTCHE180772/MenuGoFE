@@ -40,6 +40,7 @@ import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
+import InventoryManagementPage from '../pages/InventoryManagementPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -56,16 +57,24 @@ const AppRouter = () => {
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}
-          <Route element={<DeviceRoute allowedTypes={[]} />}>
+          <Route element={<DeviceRoute />}>
             <Route element={<DeviceLayout />}>
               {/* POS */}
-              <Route path="/pos" element={<CashierPage />} />
+              <Route element={<DeviceRoute allowedTypes={['POS']} />}>
+                <Route path="/pos" element={<CashierPage />} />
+              </Route>
               {/* Waiter */}
-              <Route path="/station" element={<WaiterStationPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Waiter']} />}>
+                <Route path="/station" element={<WaiterStationPage />} />
+              </Route>
               {/* Kitchen */}
-              <Route path="/kitchen" element={<KDSPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Kitchen']} />}>
+                <Route path="/kitchen" element={<KDSPage />} />
+              </Route>
               {/* Attendance */}
-              <Route path="/attendance" element={<AttendancePage />} />
+              <Route element={<DeviceRoute allowedTypes={['Attendance']} />}>
+                <Route path="/attendance" element={<AttendancePage />} />
+              </Route>
             </Route>
           </Route>
 
@@ -96,6 +105,7 @@ const AppRouter = () => {
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
+                <Route path="/inventory-management" element={<InventoryManagementPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />

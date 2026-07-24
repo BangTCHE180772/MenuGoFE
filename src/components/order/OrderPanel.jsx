@@ -18,8 +18,7 @@ const STATUS_TRANSITIONS = {
     { to: TABLE_STATUS.OCCUPIED, label: 'Khách vào', cls: 'btn-orange' }
   ],
   [TABLE_STATUS.RESERVED]: [
-    { to: TABLE_STATUS.OCCUPIED, label: 'Khách đến', cls: 'btn-orange' },
-    { to: TABLE_STATUS.EMPTY, label: 'Huỷ đặt', cls: 'btn-gray' },
+    { to: 'CHECK_IN', label: 'Khách đến', cls: 'btn-orange' },
   ],
   [TABLE_STATUS.OCCUPIED]: [
     { to: TABLE_STATUS.CLEANING, label: 'Dọn dẹp', cls: 'btn-red' },
@@ -130,6 +129,13 @@ const OrderPanel = ({
           {cfg.label}
         </div>
       </div>
+
+      {table.status === TABLE_STATUS.RESERVED && summary?.reservationId && (
+        <div style={{ padding: '0 16px 16px 16px', borderBottom: '1px solid #e5e7eb', marginBottom: '16px', fontSize: '14px', color: '#4b5563' }}>
+          <div style={{ marginBottom: '4px' }}><strong>Khách hàng:</strong> {summary.customerName} - {summary.customerPhone}</div>
+          <div><strong>Giờ đặt:</strong> {summary.reservationTime ? new Date(summary.reservationTime).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : ''}</div>
+        </div>
+      )}
 
       {/* Status Transition Buttons */}
       {(transitions.length > 0 || table.status === TABLE_STATUS.OCCUPIED) && (
