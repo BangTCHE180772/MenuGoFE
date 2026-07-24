@@ -57,16 +57,24 @@ const AppRouter = () => {
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}
-          <Route element={<DeviceRoute allowedTypes={[]} />}>
+          <Route element={<DeviceRoute />}>
             <Route element={<DeviceLayout />}>
               {/* POS */}
-              <Route path="/pos" element={<CashierPage />} />
+              <Route element={<DeviceRoute allowedTypes={['POS']} />}>
+                <Route path="/pos" element={<CashierPage />} />
+              </Route>
               {/* Waiter */}
-              <Route path="/station" element={<WaiterStationPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Waiter']} />}>
+                <Route path="/station" element={<WaiterStationPage />} />
+              </Route>
               {/* Kitchen */}
-              <Route path="/kitchen" element={<KDSPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Kitchen']} />}>
+                <Route path="/kitchen" element={<KDSPage />} />
+              </Route>
               {/* Attendance */}
-              <Route path="/attendance" element={<AttendancePage />} />
+              <Route element={<DeviceRoute allowedTypes={['Attendance']} />}>
+                <Route path="/attendance" element={<AttendancePage />} />
+              </Route>
             </Route>
           </Route>
 
