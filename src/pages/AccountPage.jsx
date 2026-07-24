@@ -35,6 +35,7 @@ import {
   deleteAccount,
 } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 
 const GENDER_OPTIONS = [
   { value: 'Nam', label: 'Nam' },
@@ -51,6 +52,7 @@ const ROLES_MAP = {
 
 const AccountPage = () => {
   const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -67,7 +69,7 @@ const AccountPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRoleRange();
+      const res = await getRoleRange(currentBranchId);
       setAccounts(res.data || []);
     } catch (err) {
       console.error(err);
@@ -75,7 +77,7 @@ const AccountPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     loadData();

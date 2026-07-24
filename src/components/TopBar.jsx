@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Dropdown, Avatar, message } from "antd";
+import { Dropdown, Avatar, message, Select } from "antd";
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -25,6 +25,7 @@ import {
   InboxOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
+import { useBranch } from "../context/BranchContext";
 import { useRef, useState, useEffect } from "react";
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
@@ -118,6 +119,7 @@ const ROLE_LABELS = {
 
 const TopBar = () => {
   const { user, role, logout } = useAuth();
+  const { currentBranchId, selectBranch, branches } = useBranch();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -278,7 +280,26 @@ const TopBar = () => {
       </div>
 
       {/* User info */}
-      <div className="topbar-right">
+      <div className="topbar-right" style={{ display: 'flex', alignItems: 'center' }}>
+        {['Admin', 'Owner'].includes(role) && (
+          <Select
+            value={currentBranchId}
+            onChange={selectBranch}
+            style={{ width: 180, marginRight: 16 }}
+            placeholder="Tất cả chi nhánh"
+            allowClear
+            dropdownStyle={{ minWidth: 200 }}
+            className="topbar-branch-select"
+          >
+            <Select.Option value={null}>Tất cả chi nhánh</Select.Option>
+            {branches.map((b) => (
+              <Select.Option key={b.id} value={b.id}>
+                {b.name}
+              </Select.Option>
+            ))}
+          </Select>
+        )}
+
         <Dropdown
           menu={{ items: userDropdownItems }}
           placement="bottomRight"
