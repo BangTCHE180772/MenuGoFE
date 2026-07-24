@@ -52,8 +52,7 @@ const AppRouter = () => {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
-          <Route path="/customer-home" element={<CustomerHomePage />} />
-          <Route path="/customer" element={<CustomerHomePage />} />
+          <Route path="/welcome" element={<CustomerHomePage />} />
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}
