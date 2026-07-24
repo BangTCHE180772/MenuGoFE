@@ -26,7 +26,7 @@ import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
-import ChainPagae from '../pages/ChainPage';
+import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 
 
@@ -39,6 +39,7 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ProductCatalogPage from '../pages/ProductCatalogPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -95,6 +96,7 @@ const AppRouter = () => {
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
@@ -108,7 +110,7 @@ const AppRouter = () => {
               {/* Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/branches" element={<BranchPage />} />
-                <Route path="/chains" element={<ChainPagae />} />
+                <Route path="/chains" element={<ChainPage />} />
               </Route>
 
               {/* Admin only */}
