@@ -23,6 +23,42 @@ const DeviceLayout = () => {
   }, [deviceEmployee, deviceInfo, loginVisible]);
 
   useEffect(() => {
+    if (!deviceEmployee || !deviceEmployee.disconnectTime) return;
+
+    const warnTime = deviceEmployee.shiftEndTime ? new Date(deviceEmployee.shiftEndTime).getTime() : null;
+    const disconnectTime = new Date(deviceEmployee.disconnectTime).getTime();
+
+    let warnTimer = null;
+    let disconnectTimer = null;
+
+    const now = Date.now();
+
+    if (warnTime && warnTime > now) {
+      warnTimer = setTimeout(() => {
+        message.warning({
+          content: 'Ca làm việc của bạn đã hết giờ chuẩn. Bạn có 30 phút gia hạn trước khi hệ thống ngắt kết nối.',
+          duration: 10,
+        });
+      }, warnTime - now);
+    }
+
+    if (disconnectTime > now) {
+      disconnectTimer = setTimeout(() => {
+        message.error('Ca làm việc đã quá 30 phút gia hạn. Đã tự động ngắt kết nối.');
+        logoutEmployee();
+      }, disconnectTime - now);
+    } else {
+      message.error('Ca làm việc đã quá 30 phút gia hạn. Đã tự động ngắt kết nối.');
+      logoutEmployee();
+    }
+
+    return () => {
+      if (warnTimer) clearTimeout(warnTimer);
+      if (disconnectTimer) clearTimeout(disconnectTimer);
+    };
+  }, [deviceEmployee, logoutEmployee]);
+
+  useEffect(() => {
     const { deviceToken } = useDevice.getState ? useDevice.getState() : { deviceToken: localStorage.getItem('device_token') };
     const tokenToUse = deviceToken || localStorage.getItem('device_token');
 
@@ -117,7 +153,7 @@ const DeviceLayout = () => {
           {deviceEmployee ? (
             <div className="device-employee">
               <span className="employee-name">👤 {deviceEmployee.name}</span>
-              {deviceInfo?.deviceType === 'Waiter' ? (
+              {deviceInfo?.deviceType === 'Waiter' || deviceInfo?.deviceType === 'Station' ? (
                 <Tooltip title="Khóa màn hình (Quay về sơ đồ bàn)">
                   <Button type="text" icon={<LockOutlined />} onClick={logoutEmployee} danger>
                     Khóa
@@ -129,12 +165,16 @@ const DeviceLayout = () => {
                 </Button>
               )}
             </div>
-          ) : (
+          ) : deviceInfo?.deviceType === 'POS' ? (
             <div className="device-status-container" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <span className="device-status">Trạng thái: Sẵn sàng</span>
               <Button type="primary" icon={<LoginOutlined />} onClick={() => setLoginVisible(true)}>
                 Đăng nhập
               </Button>
+            </div>
+          ) : (
+            <div className="device-status-container">
+              <span className="device-status" style={{ color: '#52c41a', fontWeight: 'bold' }}>● Đang vận hành</span>
             </div>
           )}
         </div>
@@ -154,7 +194,7 @@ const DeviceLayout = () => {
       </main>
 
       <DeviceEmployeeLoginModal
-        open={loginVisible}
+        open={loginVisible && deviceInfo?.deviceType === 'POS'}
         prefillEmail={scannedEmail}
         onCancel={() => {
           // Ngăn không cho tắt modal nếu là POS
