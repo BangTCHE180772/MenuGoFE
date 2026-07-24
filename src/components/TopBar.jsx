@@ -21,6 +21,7 @@ import {
   FileProtectOutlined,
   ClockCircleOutlined,
   AppstoreOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useRef, useState, useEffect } from "react";
@@ -37,6 +38,7 @@ const ROLE_MENUS = {
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
@@ -60,6 +62,7 @@ const ROLE_MENUS = {
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
@@ -79,6 +82,7 @@ const ROLE_MENUS = {
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },

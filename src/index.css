@@ -101,15 +101,40 @@ img {
   color: #374151 !important;
   background: #f8fafc !important;
   padding: 6px 12px !important;
+  border-bottom: 1.5px solid #e5e7eb !important;
 }
 
 .kiotviet-table .ant-table-tbody > tr > td {
   font-size: 12px !important;
   padding: 6px 12px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+
+.kiotviet-table .ant-table-tbody > tr:hover > td {
+  background: #f0f7ff !important;
+}
+
+.kiotviet-table .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: #eff6ff !important;
 }
 
 .kiotviet-table .ant-pagination {
   font-size: 12px !important;
+}
+
+/* ─── Inventory Filter Panel Scrollbar ───────────────────────────────────── */
+.inv-filter-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.inv-filter-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.inv-filter-scroll::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+.inv-filter-scroll::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
 }
 
 /* ─── TopBar ─────────────────────────────────────────────────────────────── */
