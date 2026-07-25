@@ -27,6 +27,7 @@ import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
 import ChainPagae from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
+import PayrollPage from '../pages/PayrollPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
