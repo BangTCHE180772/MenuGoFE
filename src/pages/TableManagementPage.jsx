@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Row, Col, Card, Button, List, Typography, Space, Modal,
   Form, Input, Switch, Select, message, Spin, Popconfirm, Empty
@@ -113,7 +113,11 @@ const TableManagementPage = () => {
     setIsAreaModalVisible(true);
   };
 
+  const actionRef = useRef(false);
+
   const handleSaveArea = async (values) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       if (editingArea) {
         await updateArea({ ...editingArea, ...values });
@@ -126,10 +130,14 @@ const TableManagementPage = () => {
       fetchAreas(selectedBranch);
     } catch (err) {
       message.error('Lỗi khi lưu khu vực');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleDeleteArea = async (id) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await deleteArea(id);
       message.success('Xoá khu vực thành công');
@@ -140,6 +148,8 @@ const TableManagementPage = () => {
       fetchAreas(selectedBranch);
     } catch (err) {
       message.error(err.response?.data?.message || 'Không thể xoá khu vực này. Có thể khu vực đang chứa bàn.');
+    } finally {
+      actionRef.current = false;
     }
   };
 
@@ -159,6 +169,8 @@ const TableManagementPage = () => {
   };
 
   const handleSaveTable = async (values) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       if (editingTable) {
         await updateTable({ ...editingTable, ...values });
@@ -171,16 +183,22 @@ const TableManagementPage = () => {
       fetchTables(selectedArea.id);
     } catch (err) {
       message.error('Lỗi khi lưu bàn');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleDeleteTable = async (id) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await deleteTable(id);
       message.success('Xoá bàn thành công');
       fetchTables(selectedArea.id);
     } catch (err) {
       message.error(err.response?.data?.message || 'Không thể xoá bàn này. Có thể bàn đang có đơn hàng.');
+    } finally {
+      actionRef.current = false;
     }
   };
 

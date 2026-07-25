@@ -17,3 +17,12 @@ export const updateBranch = (data) =>
 
 export const deleteBranch = (id) =>
   axiosInstance.delete(`/api/Branch/${id}`);
+
+export const getBranchDashboardStats = (range, startDateStr, endDateStr) =>
+  axiosInstance.get('/api/Branch/dashboard-stats', {
+    params: {
+      range,
+      startDateStr,
+      endDateStr,
+    },
+  });

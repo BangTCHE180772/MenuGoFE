@@ -15,6 +15,7 @@ import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import WaiterStationPage from '../pages/WaiterStationPage';
+import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
@@ -25,7 +26,7 @@ import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
-import ChainPagae from '../pages/ChainPage';
+import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 import PayrollPage from '../pages/PayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
@@ -40,6 +41,8 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ProductCatalogPage from '../pages/ProductCatalogPage';
+import InventoryManagementPage from '../pages/InventoryManagementPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -52,21 +55,28 @@ const AppRouter = () => {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
-          <Route path="/customer-home" element={<CustomerHomePage />} />
-          <Route path="/customer" element={<CustomerHomePage />} />
+          <Route path="/welcome" element={<CustomerHomePage />} />
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}
-          <Route element={<DeviceRoute allowedTypes={[]} />}>
+          <Route element={<DeviceRoute />}>
             <Route element={<DeviceLayout />}>
               {/* POS */}
-              <Route path="/pos" element={<CashierPage />} />
+              <Route element={<DeviceRoute allowedTypes={['POS']} />}>
+                <Route path="/pos" element={<CashierPage />} />
+              </Route>
               {/* Waiter */}
-              <Route path="/station" element={<WaiterStationPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Waiter']} />}>
+                <Route path="/station" element={<WaiterStationPage />} />
+              </Route>
               {/* Kitchen */}
-              <Route path="/kitchen" element={<KDSPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Kitchen']} />}>
+                <Route path="/kitchen" element={<KDSPage />} />
+              </Route>
               {/* Attendance */}
-              <Route path="/attendance" element={<AttendancePage />} />
+              <Route element={<DeviceRoute allowedTypes={['Attendance']} />}>
+                <Route path="/attendance" element={<AttendancePage />} />
+              </Route>
             </Route>
           </Route>
 
@@ -89,17 +99,15 @@ const AppRouter = () => {
                   )
                 }
               />
-              <Route path="/orders" element={<OrderPage />} />
-              <Route path="/table-map" element={<TableMapPage />} />
-              <Route path="/reservations" element={<ReservationPage />} />
-
               {/* Chef, Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
-
+              <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/product-catalog" element={<ProductCatalogPage />} />
+                <Route path="/inventory-management" element={<InventoryManagementPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
@@ -115,7 +123,7 @@ const AppRouter = () => {
               {/* Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/branches" element={<BranchPage />} />
-                <Route path="/chains" element={<ChainPagae />} />
+                <Route path="/chains" element={<ChainPage />} />
               </Route>
 
               {/* Admin only */}

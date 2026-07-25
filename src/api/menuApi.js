@@ -7,6 +7,15 @@ export const getAllMenus = () =>
 export const getMenuById = (id) =>
   axiosInstance.get(`/api/Menu/${id}`);
 
+export const createMenu = (data) =>
+  axiosInstance.post('/api/Menu', data);
+
+export const updateMenu = (data) =>
+  axiosInstance.put('/api/Menu', data);
+
+export const deleteMenu = (id) =>
+  axiosInstance.delete(`/api/Menu/${id}`);
+
 export const getMenuProducts = (menuId) =>
   axiosInstance.get(`/api/Menu/${menuId}/products`);
 
@@ -41,7 +50,7 @@ export const getProductsODataPaged = async ({
   pageSize = 20,
   pageIndex = 1,
 }) => {
-  let filterClauses = ["IsSellable eq true", "IsActive eq true"];
+  let filterClauses = ["IsSellable eq true"];
 
   if (searchText) {
     const escapedSearch = searchText.replace(/'/g, "''");

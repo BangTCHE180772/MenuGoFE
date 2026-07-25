@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Table, Button, Space, message, Tag, Select, Popconfirm, Spin, Modal, Form, Input } from 'antd';
 import { getDevicesByBranch, deleteDevice, revokeDevice, updateDevice } from '../api/deviceApi';
 import { getAllBranches } from '../api/branchApi';
@@ -58,17 +58,25 @@ const DeviceManagementPage = () => {
     }
   };
 
+  const actionRef = useRef(false);
+
   const handleRevoke = async (id) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await revokeDevice(id);
       message.success('Đã thu hồi quyền thiết bị thành công');
       loadDevices();
     } catch (err) {
       message.error('Lỗi khi thu hồi thiết bị');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleActivate = async (record) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await updateDevice({
         id: record.id,
@@ -80,16 +88,22 @@ const DeviceManagementPage = () => {
       loadDevices();
     } catch (err) {
       message.error('Lỗi khi cấp quyền thiết bị');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleDelete = async (id) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await deleteDevice(id);
       message.success('Đã xóa thiết bị thành công');
       loadDevices();
     } catch (err) {
       message.error('Lỗi khi xóa thiết bị');
+    } finally {
+      actionRef.current = false;
     }
   };
 
@@ -103,6 +117,8 @@ const DeviceManagementPage = () => {
   };
 
   const handleUpdate = async (values) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await updateDevice({
         id: editingDevice.id,
@@ -115,6 +131,8 @@ const DeviceManagementPage = () => {
       loadDevices();
     } catch (err) {
       message.error('Lỗi khi cập nhật thiết bị');
+    } finally {
+      actionRef.current = false;
     }
   };
 

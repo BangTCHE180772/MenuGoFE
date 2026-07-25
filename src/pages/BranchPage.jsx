@@ -18,11 +18,14 @@ import {
   MoreOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { searchBranches } from "../api/branchApi";
+import {
+  searchBranches,
+  deleteBranch,
+  getBranchDashboardStats,
+} from "../api/branchApi";
 import "../styles/BranchPage.css";
 import CreateUpdateBranchFormPopup from "../Popup/CreateUpdateBranchFormPopup";
 import { getMainChain } from "../api/chainApi";
-import { deleteBranch } from "../api/branchApi";
 
 const { RangePicker } = DatePicker;
 
@@ -31,33 +34,6 @@ const formatCurrency = (value) => {
     style: "currency",
     currency: "VND",
   }).format(value);
-};
-
-const getMockFinancials = (range, customDates, branchCount) => {
-  let days = 30;
-  if (range === "7days") days = 7;
-  else if (range === "thisMonth") days = dayjs().date();
-  else if (range === "lastMonth") days = 30;
-  else if (range === "thisYear") {
-    const start = dayjs().startOf("year");
-    days = dayjs().diff(start, "day") + 1;
-  } else if (range === "lastYear") days = 365;
-  else if (
-    range === "custom" &&
-    customDates &&
-    customDates[0] &&
-    customDates[1]
-  ) {
-    const diff = customDates[1].diff(customDates[0], "day");
-    days = diff > 0 ? diff : 1;
-  }
-
-  const factor = branchCount > 0 ? branchCount : 3;
-  const revenue = factor * days * 5500000;
-  const expenses = Math.round(revenue * 0.64);
-  const profit = revenue - expenses;
-
-  return { revenue, expenses, profit };
 };
 
 const BranchPage = () => {
@@ -82,6 +58,12 @@ const BranchPage = () => {
   const [editingBranchObject, setEditingBranchObject] = useState(null);
 
   const [mainChainId, setMainChainId] = useState(null);
+
+  // Financial Stats state from Backend
+  const [stats, setStats] = useState({ revenue: 0, expenses: 0, profit: 0 });
+  // const [loadingStats, setLoadingStats] = useState(false);
+  const [, setLoadingStats] = useState(false);
+
   //====================================================================================================================Fetch Data
   const loadBranches = useCallback(async () => {
     setLoading(true);
@@ -137,10 +119,37 @@ const BranchPage = () => {
 
     loadMainChain();
   }, []);
-  //======================================================================================================================Dashboard
-  const stats = useMemo(() => {
-    return getMockFinancials(dateRange, customDates, branches.length);
-  }, [dateRange, customDates, branches.length]);
+
+  // Fetch financial stats from Backend dynamically
+  const loadStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      let startStr = null;
+      let endStr = null;
+      if (
+        dateRange === "custom" &&
+        customDates &&
+        customDates[0] &&
+        customDates[1]
+      ) {
+        startStr = customDates[0].toISOString();
+        endStr = customDates[1].toISOString();
+      }
+      const res = await getBranchDashboardStats(dateRange, startStr, endStr);
+      if (res.data) {
+        setStats(res.data);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải số liệu thống kê:", err);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [dateRange, customDates]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadStats();
+  }, [loadStats]);
 
   const chartData = useMemo(() => {
     const total = stats.revenue + stats.expenses + stats.profit;
@@ -173,7 +182,8 @@ const BranchPage = () => {
 
     return items.map((item) => {
       const percent = total > 0 ? (item.value / total) * 100 : 0;
-      const strokeDasharray = `${(percent * circumference) / 100} ${circumference}`;
+      const sliceLength = (percent * circumference) / 100;
+      const strokeDasharray = `${sliceLength} ${circumference - sliceLength}`;
       const strokeDashoffset = `${circumference - (accumulatedPercent * circumference) / 100}`;
       accumulatedPercent += percent;
       return {
@@ -387,14 +397,14 @@ const BranchPage = () => {
             <Select
               value={dateRange}
               onChange={(value) => setDateRange(value)}
-              style={{ width: 140 }}
+              style={{ width: 160 }}
             >
-              <Select.Option value="7days">7 ngày qua</Select.Option>
+              <Select.Option value="7days">7 ngày gần đây</Select.Option>
               <Select.Option value="thisMonth">Tháng này</Select.Option>
               <Select.Option value="lastMonth">Tháng trước</Select.Option>
-              <Select.Option value="thisYear">Năm này</Select.Option>
-              <Select.Option value="lastYear">Năm trước</Select.Option>
-              <Select.Option value="custom">Tuỳ chỉnh</Select.Option>
+              <Select.Option value="thisYear">Năm nay</Select.Option>
+              <Select.Option value="lastYear">Năm ngoái</Select.Option>
+              <Select.Option value="custom">Thời gian khác</Select.Option>
             </Select>
 
             {dateRange === "custom" && (
@@ -420,80 +430,108 @@ const BranchPage = () => {
                 stroke="#f0f0f0"
                 strokeWidth="32"
               />
-              {chartData.map((slice) => (
-                <circle
-                  key={slice.key}
-                  cx="110"
-                  cy="110"
-                  r="50"
-                  className={`branch-svg-slice ${slice.className}`}
-                  stroke={slice.color}
-                  strokeDasharray={slice.strokeDasharray}
-                  strokeDashoffset={slice.strokeDashoffset}
-                  onMouseEnter={() => setHoveredSlice(slice)}
-                  onMouseLeave={() => setHoveredSlice(null)}
-                />
-              ))}
+              {chartData.map((slice) => {
+                const isHighlighted = hoveredSlice?.key === slice.key;
+                const isDimmed = hoveredSlice && hoveredSlice.key !== slice.key;
+                return (
+                  <circle
+                    key={slice.key}
+                    cx="110"
+                    cy="110"
+                    r="50"
+                    className={`branch-svg-slice ${slice.className} ${isHighlighted ? "active" : ""} ${isDimmed ? "dimmed" : ""}`}
+                    stroke={slice.color}
+                    strokeDasharray={slice.strokeDasharray}
+                    strokeDashoffset={slice.strokeDashoffset}
+                    onMouseEnter={() => setHoveredSlice(slice)}
+                    onMouseLeave={() => setHoveredSlice(null)}
+                  />
+                );
+              })}
             </svg>
+
+            {/* Tổng số chi nhánh hiển thị dưới biểu đồ tròn */}
+            <div className="branch-total-summary">
+              Tổng số chi nhánh:{" "}
+              <span className="branch-total-badge">{branches.length}</span>
+            </div>
 
             {/* Legend */}
             <div className="branch-chart-legend">
-              {chartData.map((slice) => (
-                <div
-                  key={slice.key}
-                  className="branch-legend-item"
-                  onMouseEnter={() => setHoveredSlice(slice)}
-                  onMouseLeave={() => setHoveredSlice(null)}
-                >
-                  <span className={`branch-legend-dot ${slice.className}`} />
-                  <span>
-                    {slice.label} ({Math.round(slice.percent)}%)
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Overlay hiển thị thông số khi hover Legend*/}
-            <div className="branch-chart-overlay">
-              <div className="branch-chart-overlay-value">
-                {hoveredSlice
-                  ? `${Math.round(hoveredSlice.percent)}%`
-                  : `${branches.length}`}
-              </div>
-              <div className="branch-chart-overlay-label">
-                {hoveredSlice ? hoveredSlice.label : "Chi nhánh"}
-              </div>
+              {chartData.map((slice) => {
+                const isHighlighted = hoveredSlice?.key === slice.key;
+                const isDimmed = hoveredSlice && hoveredSlice.key !== slice.key;
+                return (
+                  <div
+                    key={slice.key}
+                    className={`branch-legend-item ${isHighlighted ? "active" : ""} ${isDimmed ? "dimmed" : ""}`}
+                    onMouseEnter={() => setHoveredSlice(slice)}
+                    onMouseLeave={() => setHoveredSlice(null)}
+                  >
+                    <span className={`branch-legend-dot ${slice.className}`} />
+                    <span>
+                      {slice.label} ({Math.round(slice.percent)}%)
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* report div */}
+          {/* report div (Dạng dọc: label trái, value phải để chống tràn) */}
           <div className="branch-stats-grid">
-            <div className="branch-stat-card revenue">
-              <span className="branch-stat-label">Tổng Doanh Thu</span>
+            <div
+              className={`branch-stat-card revenue ${hoveredSlice?.key === "revenue" ? "active" : ""} ${hoveredSlice && hoveredSlice.key !== "revenue" ? "dimmed" : ""}`}
+              onMouseEnter={() =>
+                setHoveredSlice(chartData.find((s) => s.key === "revenue"))
+              }
+              onMouseLeave={() => setHoveredSlice(null)}
+            >
+              <div className="branch-stat-info">
+                <span className="branch-stat-label">Tổng Doanh Thu</span>
+                <span className="branch-stat-sub">
+                  Ước tính từ hóa đơn thanh toán
+                </span>
+              </div>
               <span className="branch-stat-value">
                 {formatCurrency(stats.revenue)}
               </span>
-              <span className="branch-stat-sub">
-                Ước tính từ hóa đơn thanh toán
-              </span>
             </div>
 
-            <div className="branch-stat-card expenses">
-              <span className="branch-stat-label">Tổng Chi Phí</span>
+            <div
+              className={`branch-stat-card expenses ${hoveredSlice?.key === "expenses" ? "active" : ""} ${hoveredSlice && hoveredSlice.key !== "expenses" ? "dimmed" : ""}`}
+              onMouseEnter={() =>
+                setHoveredSlice(chartData.find((s) => s.key === "expenses"))
+              }
+              onMouseLeave={() => setHoveredSlice(null)}
+            >
+              <div className="branch-stat-info">
+                <span className="branch-stat-label">Tổng Chi Phí</span>
+                <span className="branch-stat-sub">
+                  Nguyên vật liệu & vận hành
+                </span>
+              </div>
               <span className="branch-stat-value">
                 {formatCurrency(stats.expenses)}
               </span>
-              <span className="branch-stat-sub">
-                Nguyên vật liệu & vận hành
-              </span>
             </div>
 
-            <div className="branch-stat-card profit">
-              <span className="branch-stat-label">Tổng Lợi Nhuận</span>
+            <div
+              className={`branch-stat-card profit ${hoveredSlice?.key === "profit" ? "active" : ""} ${hoveredSlice && hoveredSlice.key !== "profit" ? "dimmed" : ""}`}
+              onMouseEnter={() =>
+                setHoveredSlice(chartData.find((s) => s.key === "profit"))
+              }
+              onMouseLeave={() => setHoveredSlice(null)}
+            >
+              <div className="branch-stat-info">
+                <span className="branch-stat-label">Tổng Lợi Nhuận</span>
+                <span className="branch-stat-sub">
+                  Doanh thu trừ đi chi phí
+                </span>
+              </div>
               <span className="branch-stat-value" style={{ color: "#52c41a" }}>
                 {formatCurrency(stats.profit)}
               </span>
-              <span className="branch-stat-sub">Doanh thu trừ đi chi phí</span>
             </div>
           </div>
         </div>

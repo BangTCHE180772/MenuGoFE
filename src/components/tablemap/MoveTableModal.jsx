@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal, Select, message } from 'antd';
 import { moveOrder } from '../../api/orderApi';
 import { getTableOrderSummary } from '../../api/tableMapApi';
@@ -9,12 +9,16 @@ const MoveTableModal = ({ visible, onClose, tables, currentTable, summary, onMov
 
   const availableTables = tables.filter(t => t.status === 'Empty' && t.id !== currentTable?.id);
 
+  const isMovingRef = useRef(false);
+
   const handleMove = async () => {
     if (!selectedTableId) {
       message.error("Vui lòng chọn bàn mới để chuyển tới");
       return;
     }
+    if (isMovingRef.current) return;
 
+    isMovingRef.current = true;
     setLoading(true);
     try {
       const activeOrderId = summary?.originalOrderId;
@@ -38,6 +42,7 @@ const MoveTableModal = ({ visible, onClose, tables, currentTable, summary, onMov
       message.error(err.response?.data?.message || "Lỗi khi chuyển bàn");
     } finally {
       setLoading(false);
+      isMovingRef.current = false;
     }
   };
 
