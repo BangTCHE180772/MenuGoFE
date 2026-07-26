@@ -23,6 +23,8 @@ import {
   ClockCircleOutlined,
   AppstoreOutlined,
   InboxOutlined,
+  DollarOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
