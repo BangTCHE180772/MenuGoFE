@@ -26,6 +26,7 @@ import {
   MailOutlined,
   PhoneOutlined,
   LockOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -43,7 +44,7 @@ const GENDER_OPTIONS = [
 ];
 
 const ROLES_MAP = {
-  3: { label: 'Quản lý', color: 'purple' },
+  
   4: { label: 'Thu ngân', color: 'blue' },
   5: { label: 'Bếp trưởng', color: 'orange' },
   6: { label: 'Phục vụ', color: 'green' },
@@ -55,6 +56,8 @@ const AccountPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedGender, setSelectedGender] = useState(null);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,7 +74,8 @@ const AccountPage = () => {
       setAccounts(res.data || []);
     } catch (err) {
       console.error(err);
-      message.error('Không thể tải danh sách nhân viên!');
+      const errMsg = err.response?.data?.message || 'Không thể tải danh sách nhân viên!';
+      message.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -189,6 +193,14 @@ const AccountPage = () => {
       (a.citizenIdCode || '').toLowerCase().includes(search);
     if (!matchText) return false;
     if (selectedRole && !(a.roleIds || []).includes(selectedRole)) return false;
+    if (selectedStatus !== null && selectedStatus !== undefined && a.isActive !== selectedStatus) return false;
+    if (selectedGender) {
+      if (!a.gender) return false;
+      const gLower = a.gender.toLowerCase();
+      if (selectedGender === 'Nam' && gLower !== 'nam' && gLower !== 'male') return false;
+      if (selectedGender === 'Nữ' && gLower !== 'nữ' && gLower !== 'nu' && gLower !== 'female') return false;
+      if (selectedGender === 'Khác' && (gLower === 'nam' || gLower === 'male' || gLower === 'nữ' || gLower === 'nu' || gLower === 'female')) return false;
+    }
     return true;
   });
 
@@ -394,11 +406,37 @@ const AccountPage = () => {
             allowClear
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 400, borderRadius: '8px' }}
+            style={{ maxWidth: 320, borderRadius: '8px' }}
           />
+
+          <Select
+            placeholder="Lọc theo giới tính"
+            style={{ width: 160 }}
+            allowClear
+            value={selectedGender}
+            onChange={(val) => setSelectedGender(val)}
+          >
+            {GENDER_OPTIONS.map((g) => (
+              <Select.Option key={g.value} value={g.value}>
+                {g.label}
+              </Select.Option>
+            ))}
+          </Select>
+
+          <Select
+            placeholder="Lọc theo trạng thái"
+            style={{ width: 160 }}
+            allowClear
+            value={selectedStatus}
+            onChange={(val) => setSelectedStatus(val)}
+          >
+            <Select.Option value={true}>Hoạt động</Select.Option>
+            <Select.Option value={false}>Vô hiệu</Select.Option>
+          </Select>
+
           <Select
             placeholder="Lọc theo vai trò"
-            style={{ width: 180 }}
+            style={{ width: 160 }}
             allowClear
             value={selectedRole}
             onChange={(val) => setSelectedRole(val)}
@@ -409,6 +447,21 @@ const AccountPage = () => {
               </Select.Option>
             ))}
           </Select>
+
+          {(searchText || selectedRole || selectedStatus !== null || selectedGender) && (
+            <Button
+              type="link"
+              danger
+              onClick={() => {
+                setSearchText('');
+                setSelectedRole(null);
+                setSelectedStatus(null);
+                setSelectedGender(null);
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          )}
         </div>
 
         <Table
