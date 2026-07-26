@@ -16,3 +16,6 @@ export const getRoleRange = (branchId) =>
   axiosInstance.get('/api/Account/exclude-roles', {
     params: branchId ? { branchId } : {},
   });
+
+export const getManagerAccounts = () =>
+  axiosInstance.get('/api/Account/managers');

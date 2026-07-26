@@ -35,6 +35,7 @@ import {
   updateAccount,
   deleteAccount,
 } from '../api/accountApi';
+import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 
 const GENDER_OPTIONS = [
@@ -44,7 +45,13 @@ const GENDER_OPTIONS = [
 ];
 
 const ROLES_MAP = {
-  
+  3: { label: 'Quản lý', color: 'purple' },
+  4: { label: 'Thu ngân', color: 'blue' },
+  5: { label: 'Bếp trưởng', color: 'orange' },
+  6: { label: 'Phục vụ', color: 'green' },
+};
+
+const STAFF_ROLES_MAP = {
   4: { label: 'Thu ngân', color: 'blue' },
   5: { label: 'Bếp trưởng', color: 'orange' },
   6: { label: 'Phục vụ', color: 'green' },
@@ -53,11 +60,23 @@ const ROLES_MAP = {
 const AccountPage = () => {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [selectedGender, setSelectedGender] = useState(null);
+  const [selectedBranch, setSelectedBranch] = useState(null);
+
+  const isOwnerOrAdmin =
+    user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
+    user?.roleIds?.some((id) => id === 1 || id === 2);
+
+  const titleText = isOwnerOrAdmin ? 'Quản Lý Tài Khoản Quản Lý' : 'Quản Lý Nhân Viên Chi Nhánh';
+  const subtitleText = isOwnerOrAdmin
+    ? 'Quản lý danh sách tài khoản Quản lý các chi nhánh'
+    : 'Quản lý thông tin tài khoản, trạng thái và vai trò của nhân viên';
+  const buttonText = isOwnerOrAdmin ? 'Thêm quản lý mới' : 'Thêm nhân viên mới';
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,16 +89,20 @@ const AccountPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRoleRange();
-      setAccounts(res.data || []);
+      const [accRes, branchRes] = await Promise.all([
+        getRoleRange(selectedBranch || undefined),
+        isOwnerOrAdmin ? getAllBranches().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+      ]);
+      setAccounts(accRes.data || []);
+      if (isOwnerOrAdmin) setBranches(branchRes.data || []);
     } catch (err) {
       console.error(err);
-      const errMsg = err.response?.data?.message || 'Không thể tải danh sách nhân viên!';
+      const errMsg = err.response?.data?.message || 'Không thể tải danh sách tài khoản!';
       message.error(errMsg);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedBranch, isOwnerOrAdmin]);
 
   useEffect(() => {
     loadData();
@@ -372,10 +395,10 @@ const AccountPage = () => {
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: '#e8442a', fontWeight: 700 }}>
-                Quản Lý Nhân Sự
+                {titleText}
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                Quản lý thông tin tài khoản, trạng thái và vai trò của nhân viên
+                {subtitleText}
               </p>
             </div>
           </div>
@@ -392,7 +415,7 @@ const AccountPage = () => {
             }}
             onClick={() => handleOpenModal('create')}
           >
-            Thêm nhân viên mới
+            {buttonText}
           </Button>
         </div>
       </Card>
@@ -434,21 +457,37 @@ const AccountPage = () => {
             <Select.Option value={false}>Vô hiệu</Select.Option>
           </Select>
 
-          <Select
-            placeholder="Lọc theo vai trò"
-            style={{ width: 160 }}
-            allowClear
-            value={selectedRole}
-            onChange={(val) => setSelectedRole(val)}
-          >
-            {Object.entries(ROLES_MAP).map(([id, info]) => (
-              <Select.Option key={id} value={Number(id)}>
-                {info.label}
-              </Select.Option>
-            ))}
-          </Select>
+          {isOwnerOrAdmin ? (
+            <Select
+              placeholder="Lọc theo chi nhánh"
+              style={{ width: 180 }}
+              allowClear
+              value={selectedBranch}
+              onChange={(val) => setSelectedBranch(val)}
+            >
+              {branches.map((b) => (
+                <Select.Option key={b.id} value={b.id}>
+                  {b.name}
+                </Select.Option>
+              ))}
+            </Select>
+          ) : (
+            <Select
+              placeholder="Lọc theo vai trò"
+              style={{ width: 160 }}
+              allowClear
+              value={selectedRole}
+              onChange={(val) => setSelectedRole(val)}
+            >
+              {Object.entries(STAFF_ROLES_MAP).map(([id, info]) => (
+                <Select.Option key={id} value={Number(id)}>
+                  {info.label}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
-          {(searchText || selectedRole || selectedStatus !== null || selectedGender) && (
+          {(searchText || selectedRole || selectedStatus !== null || selectedGender || selectedBranch) && (
             <Button
               type="link"
               danger
@@ -457,6 +496,7 @@ const AccountPage = () => {
                 setSelectedRole(null);
                 setSelectedStatus(null);
                 setSelectedGender(null);
+                setSelectedBranch(null);
               }}
             >
               Xóa bộ lọc
