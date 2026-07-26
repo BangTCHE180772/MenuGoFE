@@ -42,6 +42,8 @@ const ROLE_MENUS = {
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",
@@ -62,6 +64,8 @@ const ROLE_MENUS = {
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",
@@ -80,6 +84,8 @@ const ROLE_MENUS = {
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",

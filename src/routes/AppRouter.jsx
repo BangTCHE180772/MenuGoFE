@@ -28,6 +28,8 @@ import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
 import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
+import PayrollPage from '../pages/PayrollPage';
+import SalaryDetailPage from '../pages/SalaryDetailPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
@@ -114,6 +116,8 @@ const AppRouter = () => {
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
+                <Route path="/payroll" element={<PayrollPage />} />
+                <Route path="/salary-details" element={<SalaryDetailPage />} />
               </Route>
 
               {/* Owner, Admin */}
