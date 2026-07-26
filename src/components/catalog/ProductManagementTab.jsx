@@ -1686,16 +1686,14 @@ const ProductManagementTab = () => {
               borderTop: '1px solid #f3f4f6',
             }}
           >
-            {activeModalTabKey !== 'desc' ? (
+            <div style={{ display: activeModalTabKey !== 'desc' ? 'block' : 'none' }}>
               <Form.Item name="isSellable" valuePropName="checked" noStyle>
                 <Space size="small" style={{ cursor: 'pointer' }}>
                   <Switch size="small" />
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Cho phép bán</span>
                 </Space>
               </Form.Item>
-            ) : (
-              <div />
-            )}
+            </div>
 
             <Space>
               <Button onClick={() => setIsFormModalOpen(false)} style={{ borderRadius: 6, fontSize: 12 }}>
