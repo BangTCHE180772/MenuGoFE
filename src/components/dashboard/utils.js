@@ -19,6 +19,12 @@ export const formatVNDFull = (value) => {
   return value.toLocaleString('vi-VN') + 'đ';
 };
 
+// Format plain number (count) — no currency suffix
+export const formatNumber = (value) => {
+  if (value === null || value === undefined) return '—';
+  return Math.round(value).toLocaleString('vi-VN');
+};
+
 export const formatPercent = (value) => {
   return (value * 100).toFixed(1) + '%';
 };

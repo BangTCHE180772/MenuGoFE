@@ -1,135 +1,158 @@
-import React, { useState, useCallback } from 'react';
-import { Row, Col } from 'antd';
-import { RiseOutlined, FallOutlined, DollarOutlined } from '@ant-design/icons';
-import KPICard from './KPICard';
-import TrendLineChart from './TrendLineChart';
-import RevenueExpenseBar from './RevenueExpenseBar';
-import ProfitAreaChart from './ProfitAreaChart';
-import ProfitMarginCombo from './ProfitMarginCombo';
-import TimeRangeFilter from './TimeRangeFilter';
+import { Row, Col, Tooltip } from "antd";
 import {
-  MOCK_KPI_OVERVIEW,
-  MOCK_TREND_DATA,
-  MOCK_MONTHLY_DATA,
-} from './constants';
+  RiseOutlined,
+  FallOutlined,
+  DollarOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 
-/**
- * OverviewSection — Phần dưới: KPI tổng hợp + bộ lọc thời gian + các charts.
- */
-const OverviewSection = ({ loading = false }) => {
-  const [range, setRange] = useState('thisMonth');
-  const [customDates, setCustomDates] = useState(null);
-  const kpi = MOCK_KPI_OVERVIEW;
+import ProfitAreaChart from "./OverviewSection/ProfitAreaChart";
+import ProfitMarginCombo from "./OverviewSection/ProfitMarginCombo";
+import RevenueExpenseBar from "./OverviewSection/RevenueExpenseBar";
+import TimeRangeFilter from "./OverviewSection/TimeRangeFilter";
+import TrendLineChart from "./OverviewSection/TrendLineChart";
+import KPICard from "./KPICard";
 
-  const handleRefresh = useCallback(() => {
-    // TODO: gọi API refresh
-  }, []);
+const OverviewSection = ({
+  loading = false,
+  overviewStats = null,
+  range = "thisMonth",
+  customDates = null,
+  onRangeChange,
+  onCustomDatesChange,
+  onRefresh,
+}) => {
+  const revenue = overviewStats?.revenue ?? 0;
+  const expenses = overviewStats?.expenses ?? 0;
+  const profit = overviewStats?.profit ?? 0;
 
   return (
     <div>
-      {/* Section header */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           gap: 12,
           marginBottom: 20,
-          padding: '16px 20px',
-          background: 'linear-gradient(135deg, #1a3a5c 0%, #1e4976 100%)',
+          padding: "16px 20px",
+          background: "linear-gradient(135deg, #1a3a5c 0%, #1e4976 100%)",
           borderRadius: 12,
-          color: 'white',
+          color: "white",
+          flexWrap: "wrap",
         }}
       >
-        <div style={{ fontSize: 24 }}>📊</div>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.3px' }}>
-            Overview
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-            Phân tích hiệu suất kinh doanh theo thời gian
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 24 }}>📊</div>
+          <div>
+            <div
+              style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.3px" }}
+            >
+              <Tooltip title="Overview">Tổng quan điều hành</Tooltip>
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+              Phân tích hiệu suất kinh doanh theo thời gian — dữ liệu thật từ hệ
+              thống
+            </div>
           </div>
         </div>
+        {onRefresh && (
+          <Tooltip title="Làm mới dữ liệu">
+            <ReloadOutlined
+              style={{
+                color: "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+              onClick={onRefresh}
+            />
+          </Tooltip>
+        )}
       </div>
 
-      {/* Time range filter */}
       <div
         style={{
-          padding: '12px 16px',
-          background: 'var(--color-surface)',
+          padding: "12px 16px",
+          background: "var(--color-surface)",
           borderRadius: 10,
-          border: '1px solid var(--color-border)',
+          border: "1px solid var(--color-border)",
           marginBottom: 20,
         }}
       >
         <TimeRangeFilter
           value={range}
-          onChange={setRange}
+          onChange={onRangeChange}
           customDates={customDates}
-          onCustomDatesChange={setCustomDates}
+          onCustomDatesChange={onCustomDatesChange}
         />
       </div>
 
-      {/* Overview KPI Row */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={8}>
           <KPICard
             title="Tổng doanh thu"
-            value={kpi.revenue.value}
-            prevValue={kpi.revenue.prevValue}
+            value={revenue}
+            prevValue={null}
             icon={<RiseOutlined />}
             color="#3b82f6"
             compareLabel="So với kỳ trước"
             loading={loading}
-            onRefresh={handleRefresh}
           />
         </Col>
         <Col xs={24} sm={8}>
           <KPICard
             title="Tổng chi phí"
-            value={kpi.expense.value}
-            prevValue={kpi.expense.prevValue}
+            value={expenses}
+            prevValue={null}
             icon={<FallOutlined />}
             color="#ef4444"
             compareLabel="So với kỳ trước"
             loading={loading}
-            onRefresh={handleRefresh}
           />
         </Col>
         <Col xs={24} sm={8}>
           <KPICard
             title="Tổng lợi nhuận"
-            value={kpi.profit.value}
-            prevValue={kpi.profit.prevValue}
+            value={profit}
+            prevValue={null}
             icon={<DollarOutlined />}
             color="#22c55e"
             compareLabel="So với kỳ trước"
             loading={loading}
-            onRefresh={handleRefresh}
           />
         </Col>
       </Row>
 
-      {/* Trend line chart (full width) */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24}>
-          <TrendLineChart data={MOCK_TREND_DATA} loading={loading} onRefresh={handleRefresh} />
+          <TrendLineChart
+            data={overviewStats?.dailyStats || []}
+            loading={loading}
+          />
         </Col>
       </Row>
 
-      {/* Revenue vs Expense + Profit Area (2 col) */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={12}>
-          <RevenueExpenseBar data={MOCK_MONTHLY_DATA} loading={loading} onRefresh={handleRefresh} />
+          <RevenueExpenseBar
+            data={overviewStats?.monthlyStats || []}
+            loading={loading}
+          />
         </Col>
         <Col xs={24} lg={12}>
-          <ProfitAreaChart data={MOCK_MONTHLY_DATA} loading={loading} onRefresh={handleRefresh} />
+          <ProfitAreaChart
+            data={overviewStats?.monthlyStats || []}
+            loading={loading}
+          />
         </Col>
       </Row>
 
-      {/* Profit Margin Combo (full width) */}
       <Row gutter={[16, 16]}>
         <Col xs={24}>
-          <ProfitMarginCombo data={MOCK_MONTHLY_DATA} loading={loading} onRefresh={handleRefresh} />
+          <ProfitMarginCombo
+            data={overviewStats?.monthlyStats || []}
+            loading={loading}
+          />
         </Col>
       </Row>
     </div>
