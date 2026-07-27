@@ -85,6 +85,7 @@ const OrderPanel = ({
   onPayment,
   onMerge,
   loading,
+  isWaiterMode,
 }) => {
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = Math.round(subTotal * 0.08);
@@ -94,7 +95,7 @@ const OrderPanel = ({
   const transitions = [...(STATUS_TRANSITIONS[statusKey] || [])];
   if (statusKey === TABLE_STATUS.OCCUPIED && summary?.activeOrderId) {
     const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
-    if (cleanIndex >= 0) {
+    if (cleanIndex >= 0 && !isWaiterMode) {
       transitions.splice(cleanIndex, 1, {
         isPayment: true,
         label: 'Thanh toán',

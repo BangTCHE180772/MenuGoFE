@@ -28,7 +28,7 @@ import OrderPanel from '../components/order/OrderPanel';
 import PaymentModal from '../components/payment/PaymentModal';
 import MergeTableModal from '../components/tablemap/MergeTableModal';
 
-const OrderPage = () => {
+const OrderPage = ({ isWaiterMode }) => {
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [cartItems, setCartItems] = useState([]);
@@ -145,7 +145,7 @@ const OrderPage = () => {
           message.success("Đã xác nhận khách đến!");
           const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
           setSelectedTable(updated);
-          setTables((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+          setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
           const summaryRes = await getTableOrderSummary(selectedTable.id);
           setOrderSummary(summaryRes.data);
         } catch (err) {
@@ -157,7 +157,7 @@ const OrderPage = () => {
         return;
       }
 
-      if (newStatus === TABLE_STATUS.CLEANING || newStatus === TABLE_STATUS.EMPTY) {
+      if (newStatus === TABLE_STATUS.CLEANING) {
       try {
         const summaryRes = await getTableOrderSummary(selectedTable.id);
         if (summaryRes.data?.activeOrderId) {
@@ -179,7 +179,7 @@ const OrderPage = () => {
       });
       const updated = { ...selectedTable, status: newStatus };
       setSelectedTable(updated);
-      setTables((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+      setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
 
       if (newStatus !== TABLE_STATUS.OCCUPIED) setCartItems([]);
       message.success('Đã cập nhật trạng thái bàn');
@@ -211,7 +211,7 @@ const OrderPage = () => {
     setOrderLoading(true);
     try {
       const summaryRes = await getTableOrderSummary(selectedTable.id);
-      let orderId = summaryRes.data?.activeOrderId;
+      let orderId = summaryRes.data?.originalOrderId || summaryRes.data?.activeOrderId;
 
       if (!orderId) {
         const orderRes = await createOrder({
@@ -302,6 +302,7 @@ const OrderPage = () => {
           onPayment={() => setIsPaymentModalVisible(true)}
           onMerge={() => setIsMergeModalVisible(true)}
           loading={orderLoading}
+          isWaiterMode={isWaiterMode}
         />
       </div>
 
