@@ -1,5 +1,8 @@
 import axiosInstance from './axiosInstance';
 
+export const getAllAccounts = () =>
+  axiosInstance.get('/api/Account/role-range');
+
 export const getAccountById = (id) =>
   axiosInstance.get(`/api/Account/${id}`);
 

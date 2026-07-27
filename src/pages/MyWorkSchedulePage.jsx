@@ -8,6 +8,9 @@ import {
   message,
   Badge,
   Spin,
+  Select,
+  Form,
+  Input,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -17,12 +20,14 @@ import {
   ReloadOutlined,
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { getMyWorkSchedules } from '../api/workScheduleApi';
+import { getMyWorkSchedules, updateWorkSchedule } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
+import { getRoleRange } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 
 const MyWorkSchedulePage = () => {
@@ -31,6 +36,7 @@ const MyWorkSchedulePage = () => {
   const [schedules, setSchedules] = useState([]);
   const [branches, setBranches] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(dayjs());
   
@@ -38,17 +44,24 @@ const MyWorkSchedulePage = () => {
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
+  // Transfer modal states
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferForm] = Form.useForm();
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schedulesRes, branchesRes, shiftsRes] = await Promise.all([
+      const [schedulesRes, branchesRes, shiftsRes, accountsRes] = await Promise.all([
         getMyWorkSchedules(),
         getAllBranches(),
         getAllShifts(),
+        getRoleRange(),
       ]);
       setSchedules(schedulesRes.data || []);
       setBranches(branchesRes.data || []);
       setShifts(shiftsRes.data || []);
+      setAccounts(accountsRes.data || []);
     } catch (err) {
       console.error(err);
       message.error('Không thể tải lịch làm việc của bạn hoặc thông tin ca trực!');
@@ -56,6 +69,51 @@ const MyWorkSchedulePage = () => {
       setLoading(false);
     }
   }, []);
+
+  const getAccountName = (id) => {
+    const acc = accounts.find((a) => a.id === id);
+    return acc ? acc.name : `Nhân viên #${id}`;
+  };
+
+  const handleOpenTransfer = () => {
+    setDetailModalOpen(false);
+    transferForm.resetFields();
+    setTransferModalOpen(true);
+  };
+
+  const handleTransferSubmit = async (values) => {
+    if (!selectedSchedule) return;
+    setTransferLoading(true);
+    try {
+      const targetAccount = accounts.find((a) => a.id === values.targetAccountId);
+      const workDateStr = dayjs(selectedSchedule.workDate).format('YYYY-MM-DD');
+      
+      const payload = {
+        id: selectedSchedule.id,
+        accountId: values.targetAccountId,
+        branchId: selectedSchedule.branchId,
+        shiftId: selectedSchedule.shiftId,
+        code: selectedSchedule.code || `WS-${selectedSchedule.branchId}-${selectedSchedule.shiftId}-${values.targetAccountId}-${dayjs(selectedSchedule.workDate).format('YYYYMMDD')}`,
+        workDate: workDateStr,
+        checkInAt: selectedSchedule.checkInAt,
+        checkOutAt: selectedSchedule.checkOutAt,
+        actualHours: selectedSchedule.actualHours,
+        status: selectedSchedule.status,
+        managerApproved: false,
+      };
+
+      await updateWorkSchedule(payload);
+      message.success(`Đã chuyển ca ngày ${dayjs(selectedSchedule.workDate).format('DD/MM/YYYY')} cho nhân viên ${targetAccount ? targetAccount.name : values.targetAccountId} thành công!`);
+      setTransferModalOpen(false);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi chuyển ca!';
+      message.error(errorMsg);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -324,6 +382,15 @@ const MyWorkSchedulePage = () => {
         open={detailModalOpen}
         onCancel={() => setDetailModalOpen(false)}
         footer={[
+          <Button
+            key="transfer"
+            type="primary"
+            icon={<SwapOutlined />}
+            onClick={handleOpenTransfer}
+            style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }}
+          >
+            Chuyển ca
+          </Button>,
           <Button key="close" type="primary" onClick={() => setDetailModalOpen(false)} style={{ background: '#1890ff', borderColor: '#1890ff' }}>
             Đóng
           </Button>
@@ -340,6 +407,9 @@ const MyWorkSchedulePage = () => {
             </div>
             <div>
               <strong>Ngày làm việc:</strong> {dayjs(selectedSchedule.workDate).format('DD/MM/YYYY dddd')}
+            </div>
+            <div>
+              <strong>Nhân viên trực:</strong> {getAccountName(selectedSchedule.accountId)}
             </div>
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
               <strong>Thời gian ghi nhận thực tế:</strong>
@@ -361,6 +431,102 @@ const MyWorkSchedulePage = () => {
                 <Tag icon={<CloseCircleOutlined />} color="warning">Chờ duyệt công</Tag>
               )}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Transfer Shift Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '18px', color: '#fa8c16' }}>
+            <SwapOutlined />
+            <span>CHUYỂN CA LÀM VIỆC</span>
+          </div>
+        }
+        open={transferModalOpen}
+        onCancel={() => setTransferModalOpen(false)}
+        footer={null}
+        width={450}
+        destroyOnClose
+      >
+        {selectedSchedule && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{
+              background: '#fffbe6',
+              border: '1px solid #ffe58f',
+              borderRadius: '6px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              fontSize: '14px',
+              color: '#595959'
+            }}>
+              <div style={{ fontWeight: 'bold', color: '#d46b08', marginBottom: '6px', fontSize: '15px' }}>
+                Thông tin ca cần chuyển:
+              </div>
+              <div><strong>Chi nhánh:</strong> {getBranchName(selectedSchedule.branchId)}</div>
+              <div><strong>Ca trực:</strong> {getShiftDetails(selectedSchedule.shiftId).name} ({getShiftDetails(selectedSchedule.shiftId).time})</div>
+              <div><strong>Ngày làm việc:</strong> {dayjs(selectedSchedule.workDate).format('DD/MM/YYYY (dddd)')}</div>
+              <div><strong>Nhân viên hiện tại:</strong> {getAccountName(selectedSchedule.accountId)}</div>
+            </div>
+
+            <Form
+              form={transferForm}
+              layout="vertical"
+              onFinish={handleTransferSubmit}
+            >
+              <Form.Item
+                name="targetAccountId"
+                label={<span style={{ fontWeight: '600', fontSize: '14px', color: '#000' }}>Chọn nhân viên nhận ca:</span>}
+                rules={[{ required: true, message: 'Vui lòng chọn nhân viên muốn chuyển ca!' }]}
+              >
+                <Select
+                  showSearch
+                  placeholder="Tìm kiếm theo tên nhân viên..."
+                  optionFilterProp="children"
+                  size="large"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={accounts
+                    .filter((acc) => acc.id !== selectedSchedule.accountId)
+                    .map((acc) => ({
+                      value: acc.id,
+                      label: `${acc.name} ${acc.phone ? `(${acc.phone})` : ''} - ID #${acc.id}`,
+                    }))}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="note"
+                label={<span style={{ fontWeight: '600', fontSize: '14px', color: '#000' }}>Ghi chú / Lý do chuyển ca (tùy chọn):</span>}
+              >
+                <Input.TextArea
+                  rows={3}
+                  placeholder="Nhập lý do chuyển ca hoặc lời nhắn gửi đồng nghiệp..."
+                  style={{ borderRadius: '6px' }}
+                />
+              </Form.Item>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+                <Button 
+                  size="large" 
+                  onClick={() => setTransferModalOpen(false)}
+                  style={{ borderRadius: '6px' }}
+                >
+                  Hủy
+                </Button>
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  size="large"
+                  loading={transferLoading}
+                  icon={<SwapOutlined />}
+                  style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold', borderRadius: '6px', color: '#fff' }}
+                >
+                  Xác nhận chuyển ca
+                </Button>
+              </div>
+            </Form>
           </div>
         )}
       </Modal>

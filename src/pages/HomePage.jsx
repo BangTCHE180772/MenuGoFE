@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Divider } from "antd";
 import { useAuth } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -42,7 +42,7 @@ const HomePage = () => {
       setTodayStats(resToday.data);
       setYesterdayStats(resYesterday.data);
     } catch (err) {
-      console.error("Lỗi khi lấy dữ liệu today:", err);
+      console.error("Lá»—i khi láº¥y dá»¯ liá»‡u today:", err);
       setTodayStats(null);
       setYesterdayStats(null);
     } finally {
@@ -80,7 +80,7 @@ const HomePage = () => {
         );
         setOverviewStats(res.data);
       } catch (err) {
-        console.error("Lỗi khi lấy dữ liệu overview:", err);
+        console.error("Lá»—i khi láº¥y dá»¯ liá»‡u overview:", err);
         setOverviewStats(null);
       } finally {
         setOverviewLoading(false);
@@ -113,10 +113,10 @@ const HomePage = () => {
       <div className="dashboard-welcome-container">
         <div>
           <h1 className="dashboard-welcome-title">
-            Xin chào, {user?.name ?? "bạn"} 👋
+            Xin chÃ o, {user?.name ?? "báº¡n"} ðŸ‘‹
           </h1>
           <p className="dashboard-welcome-subtitle">
-            Dashboard chi nhánh — cập nhật dữ liệu hoạt động hôm nay
+            Dashboard chi nhÃ¡nh â€” cáº­p nháº­t dá»¯ liá»‡u hoáº¡t Ä‘á»™ng hÃ´m nay
           </p>
         </div>
       </div>

@@ -17,3 +17,9 @@ export const updateCookingStatus = (detailId, cookingStatus) =>
  */
 export const batchUpdateCookingStatus = (detailIds, cookingStatus) =>
   Promise.all(detailIds.map(id => updateCookingStatus(id, cookingStatus)));
+
+/**
+ * Hủy món ăn chi tiết từ KDS
+ */
+export const cancelOrderDetail = (detailId) =>
+  axiosInstance.put(`/api/Order/details/${detailId}/cancel`);

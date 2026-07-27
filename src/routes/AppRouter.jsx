@@ -99,8 +99,18 @@ const AppRouter = () => {
                   )
                 }
               />
-              {/* Chef, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+              <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/reservations" element={<ReservationPage />} />
+
+              {/* Cashier, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
+              </Route>
+
+              {/* Chef, Cashier, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
@@ -109,7 +119,6 @@ const AppRouter = () => {
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
