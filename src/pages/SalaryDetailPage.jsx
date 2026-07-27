@@ -176,7 +176,7 @@ const SalaryDetailPage = () => {
     const pr = payrolls.find((p) => p.id === payrollId);
     if (pr) {
       const accName = pr.accountName || getAccountName(pr.accountId);
-      return `BL #${pr.id} - ${accName} (T${pr.Month || pr.month}/${pr.Year || pr.year})`;
+      return `${accName} (T${pr.Month || pr.month}/${pr.Year || pr.year})`;
     }
     return `Bảng lương #${payrollId}`;
   };
@@ -355,7 +355,7 @@ const SalaryDetailPage = () => {
       key: 'payrollId',
       render: (payrollId) => (
         <Tag color="blue">
-          BL #{payrollId}
+          #{payrollId}
         </Tag>
       ),
     },
@@ -592,8 +592,8 @@ const SalaryDetailPage = () => {
             onChange={(val) => setSelectedPayroll(val)}
           >
             {payrolls.map((p) => (
-              <Select.Option key={p.id} value={p.id} label={`BL #${p.id}`}>
-                BL #{p.id} - {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
+              <Select.Option key={p.id} value={p.id} label={`${p.accountName || getAccountName(p.accountId)}`}>
+                {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
               </Select.Option>
             ))}
           </Select>
@@ -698,9 +698,9 @@ const SalaryDetailPage = () => {
                       <Select.Option
                         key={p.id}
                         value={p.id}
-                        label={`BL #${p.id} ${p.accountName || getAccountName(p.accountId)}`}
+                        label={`${p.accountName || getAccountName(p.accountId)}`}
                       >
-                        BL #{p.id} - {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
+                        {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
                       </Select.Option>
                     ))}
                   </Select>
