@@ -12,6 +12,9 @@ export const createPayroll = (data) =>
 export const generatePayroll = (data) =>
   axiosInstance.post('/api/Payroll/generate', data);
 
+export const generateBatchPayroll = (data) =>
+  axiosInstance.post('/api/Payroll/generate-batch', data);
+
 export const updatePayroll = (data) =>
   axiosInstance.put('/api/Payroll', data);
 
