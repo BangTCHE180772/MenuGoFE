@@ -58,13 +58,22 @@ const WorkSchedulePage = () => {
   const { user, role } = useAuth();
   const isManager = user?.roleId === 3 || role === 'Manager';
   const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
-  const managerBranchId = user?.branchId;
+  const managerBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
   const [schedules, setSchedules] = useState([]);
   const [branches, setBranches] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const allowedBranches = useMemo(() => {
+    if (isManager && managerBranchId) {
+      return branches.filter((b) => b.id === managerBranchId);
+    }
+    return branches;
+  }, [branches, isManager, managerBranchId]);
+
+  const defaultBranchId = allowedBranches.length > 0 ? allowedBranches[0].id : null;
   
   // Filtering states
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -161,6 +170,7 @@ const WorkSchedulePage = () => {
         status: 'PENDING',
         managerApproved: true,
         workDate: dayjs(),
+        branchId: defaultBranchId,
       });
     }
   };
@@ -606,7 +616,11 @@ const WorkSchedulePage = () => {
                     borderColor: '#e8442a',
                     color: '#e8442a',
                   }}
-                  onClick={() => setIsBulkModalOpen(true)}
+                  onClick={() => {
+                    setIsBulkModalOpen(true);
+                    bulkForm.resetFields();
+                    bulkForm.setFieldsValue({ branchId: defaultBranchId });
+                  }}
                 >
                   Phân ca hàng loạt
                 </Button>
@@ -793,16 +807,25 @@ const WorkSchedulePage = () => {
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item
               name="accountId"
-              label="Nhân viên"
+              label="Nhân viên (Có hợp đồng)"
               rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn nhân viên..." showSearch optionFilterProp="label">
-                {accounts.map((a) => (
-                  <Select.Option key={a.id} value={a.id} label={a.name}>
-                    {a.name} (ID: {a.id})
-                  </Select.Option>
-                ))}
+                {accounts
+                  .filter((a) => {
+                    if (!a.contracts || a.contracts.length === 0) return false;
+                    return a.contracts.some((c) => {
+                      const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
+                      const isBranchMatch = !selectedFormBranchId || c.branchId === selectedFormBranchId;
+                      return isActive && isBranchMatch;
+                    });
+                  })
+                  .map((a) => (
+                    <Select.Option key={a.id} value={a.id} label={a.name}>
+                      {a.name} (ID: {a.id})
+                    </Select.Option>
+                  ))}
               </Select>
             </Form.Item>
 
@@ -813,7 +836,7 @@ const WorkSchedulePage = () => {
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn chi nhánh...">
-                {branches.map((b) => (
+                {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
                   </Select.Option>
@@ -939,11 +962,20 @@ const WorkSchedulePage = () => {
               optionFilterProp="label"
               style={{ width: '100%' }}
             >
-              {accounts.map((a) => (
-                <Select.Option key={a.id} value={a.id} label={a.name}>
-                  {a.name} (ID: {a.id})
-                </Select.Option>
-              ))}
+              {accounts
+                .filter((a) => {
+                  if (!a.contracts || a.contracts.length === 0) return false;
+                  return a.contracts.some((c) => {
+                    const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
+                    const isBranchMatch = !selectedBulkBranchId || c.branchId === selectedBulkBranchId;
+                    return isActive && isBranchMatch;
+                  });
+                })
+                .map((a) => (
+                  <Select.Option key={a.id} value={a.id} label={a.name}>
+                    {a.name} (ID: {a.id})
+                  </Select.Option>
+                ))}
             </Select>
           </Form.Item>
 
@@ -955,7 +987,7 @@ const WorkSchedulePage = () => {
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn chi nhánh...">
-                {branches.map((b) => (
+                {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
                   </Select.Option>
