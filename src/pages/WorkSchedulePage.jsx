@@ -55,7 +55,11 @@ const STATUS_OPTIONS = [
 ];
 
 const WorkSchedulePage = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isManager = user?.roleId === 3 || role === 'Manager';
+  const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
+  const managerBranchId = user?.branchId;
+
   const [schedules, setSchedules] = useState([]);
   const [branches, setBranches] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -330,7 +334,7 @@ const WorkSchedulePage = () => {
   };
 
   // Columns for Table
-  const columns = [
+  const baseColumns = [
     {
       title: 'Mã lịch',
       dataIndex: 'code',
@@ -411,44 +415,53 @@ const WorkSchedulePage = () => {
       key: 'approved',
       align: 'center',
       render: (_, record) => (
-        <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
-          <Switch
-            checkedChildren={<CheckCircleOutlined />}
-            unCheckedChildren={<CloseCircleOutlined />}
-            checked={record.managerApproved}
-            onChange={(checked) => handleToggleApprove(record, checked)}
-          />
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      fixed: 'right',
-      width: 110,
-      render: (_, record) => (
-        <Space size="middle">
-          <Tooltip title="Chỉnh sửa ca trực">
-            <Button
-              type="text"
-              icon={<EditOutlined style={{ color: '#1890ff' }} />}
-              onClick={() => handleOpenModal('edit', record)}
+        isManager ? (
+          <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
+            <Switch
+              checkedChildren={<CheckCircleOutlined />}
+              unCheckedChildren={<CloseCircleOutlined />}
+              checked={record.managerApproved}
+              onChange={(checked) => handleToggleApprove(record, checked)}
             />
           </Tooltip>
-          <Tooltip title="Xóa lịch làm việc">
-            <Popconfirm
-              title="Bạn chắc chắn muốn xóa lịch làm việc này?"
-              okText="Đồng ý"
-              cancelText="Hủy"
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
+        ) : (
+          <Tag color={record.managerApproved ? 'success' : 'default'}>
+            {record.managerApproved ? 'Đã duyệt' : 'Chưa duyệt'}
+          </Tag>
+        )
       ),
     },
   ];
+
+  const actionColumn = {
+    title: 'Thao tác',
+    key: 'actions',
+    fixed: 'right',
+    width: 110,
+    render: (_, record) => (
+      <Space size="middle">
+        <Tooltip title="Chỉnh sửa ca trực">
+          <Button
+            type="text"
+            icon={<EditOutlined style={{ color: '#1890ff' }} />}
+            onClick={() => handleOpenModal('edit', record)}
+          />
+        </Tooltip>
+        <Tooltip title="Xóa lịch làm việc">
+          <Popconfirm
+            title="Bạn chắc chắn muốn xóa lịch làm việc này?"
+            okText="Đồng ý"
+            cancelText="Hủy"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button type="text" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Tooltip>
+      </Space>
+    ),
+  };
+
+  const columns = isManager ? [...baseColumns, actionColumn] : baseColumns;
 
   // Calendar render helper
   const dateCellRender = (value) => {
@@ -582,33 +595,37 @@ const WorkSchedulePage = () => {
             >
               Làm mới
             </Button>
-            <Button
-              type="default"
-              icon={<TeamOutlined />}
-              size="large"
-              style={{
-                borderRadius: '8px',
-                borderColor: '#e8442a',
-                color: '#e8442a',
-              }}
-              onClick={() => setIsBulkModalOpen(true)}
-            >
-              Phân ca hàng loạt
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              style={{
-                background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
-              }}
-              onClick={() => handleOpenModal('create')}
-            >
-              Thêm ca trực lẻ
-            </Button>
+            {isManager && (
+              <>
+                <Button
+                  type="default"
+                  icon={<TeamOutlined />}
+                  size="large"
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#e8442a',
+                    color: '#e8442a',
+                  }}
+                  onClick={() => setIsBulkModalOpen(true)}
+                >
+                  Phân ca hàng loạt
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
+                  }}
+                  onClick={() => handleOpenModal('create')}
+                >
+                  Thêm ca trực lẻ
+                </Button>
+              </>
+            )}
           </Space>
         </div>
       </Card>
