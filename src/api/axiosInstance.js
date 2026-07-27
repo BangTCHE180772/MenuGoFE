@@ -78,6 +78,9 @@ axiosInstance.interceptors.response.use(
           error.response.data.message = fallbackMsg;
         }
       }
+    } else {
+      // 5. Nếu hoàn toàn không nhận được response (ví dụ: máy chủ bị tắt, rớt mạng Wi-Fi)
+      error.message = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc máy chủ.';
     }
 
     // Xử lý lỗi toàn cục: 401 → xóa token → về trang login
