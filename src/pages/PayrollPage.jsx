@@ -445,7 +445,7 @@ const PayrollPage = () => {
   const handleStatusSubmit = async (values) => {
     try {
       const pDate = values.status === PAYROLL_STATUS.Paid && values.paymentDate
-        ? values.paymentDate.format('YYYY-MM-DDTHH:mm:ss')
+        ? values.paymentDate.toISOString()
         : null;
 
       await updatePayrollStatus(statusTargetRecord.id, values.status, pDate);
