@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ROLES } from '../context/AuthContext';
+import { ROLES, useAuth } from '../context/AuthContext';
 
 import AuthLayout from '../Layout/AuthLayout';
 import MainLayout from '../Layout/MainLayout';
@@ -14,26 +14,38 @@ import HomePage from '../pages/HomePage';
 import CashierPage from '../pages/CashierPage';
 import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
+import WaiterStationPage from '../pages/WaiterStationPage';
+import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import AccountPage from '../pages/AccountPage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
+import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
-import ChainPagae from '../pages/ChainPage';
+import ChainPage from '../pages/ChainPage';
+import AttendancePage from '../pages/AttendancePage';
+import PayrollPage from '../pages/PayrollPage';
+import SalaryDetailPage from '../pages/SalaryDetailPage';
+
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
+import CustomerHomePage from '../pages/CustomerHomePage';
 import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
+import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ProductCatalogPage from '../pages/ProductCatalogPage';
+import InventoryManagementPage from '../pages/InventoryManagementPage';
 
 const AppRouter = () => {
+  const { user, role } = useAuth();
   return (
     <BrowserRouter>
       <SignalRProvider>
@@ -43,30 +55,50 @@ const AppRouter = () => {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
+          <Route path="/welcome" element={<CustomerHomePage />} />
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
 
           {/* ── Device Route: cần device_token ─────────── */}
-          <Route element={<DeviceRoute allowedTypes={[]} />}>
+          <Route element={<DeviceRoute />}>
             <Route element={<DeviceLayout />}>
               {/* POS */}
-              <Route path="/pos" element={<CashierPage />} />
+              <Route element={<DeviceRoute allowedTypes={['POS']} />}>
+                <Route path="/pos" element={<CashierPage />} />
+              </Route>
               {/* Waiter */}
-              <Route path="/station" element={<TableMapPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Waiter']} />}>
+                <Route path="/station" element={<WaiterStationPage />} />
+              </Route>
               {/* Kitchen */}
-              <Route path="/kitchen" element={<KDSPage />} />
+              <Route element={<DeviceRoute allowedTypes={['Kitchen']} />}>
+                <Route path="/kitchen" element={<KDSPage />} />
+              </Route>
               {/* Attendance */}
-              <Route path="/attendance" element={<div style={{ padding: 24, textAlign: 'center' }}><h1>Máy Điểm Danh</h1><p>Đang phát triển</p></div>} />
+              <Route element={<DeviceRoute allowedTypes={['Attendance']} />}>
+                <Route path="/attendance" element={<AttendancePage />} />
+              </Route>
             </Route>
           </Route>
 
-          {/* ── Private: cần đăng nhập ────────────────────────────────── */}
+          {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
           <Route element={<PrivateRoute />}>
+            <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
+            
             <Route element={<MainLayout />}>
-              <Route index element={<Navigate to="/home" replace />} />
-              <Route path="/home" element={<HomePage />} />
+            <Route index element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
-              <Route path="/work-schedule" element={<WorkSchedulePage />} />
+              <Route
+                path="/work-schedule"
+                element={
+                  ['Cashier', 'Chef', 'Waiter'].includes(role) ? (
+                    <MyWorkSchedulePage />
+                  ) : (
+                    <WorkSchedulePage />
+                  )
+                }
+              />
               <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/reservations" element={<ReservationPage />} />
@@ -81,9 +113,11 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
-
+              <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/product-catalog" element={<ProductCatalogPage />} />
+                <Route path="/inventory-management" element={<InventoryManagementPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
@@ -91,12 +125,14 @@ const AppRouter = () => {
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
+                <Route path="/payroll" element={<PayrollPage />} />
+                <Route path="/salary-details" element={<SalaryDetailPage />} />
               </Route>
 
               {/* Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/branches" element={<BranchPage />} />
-                <Route path="/chains" element={<ChainPagae />} />
+                <Route path="/chains" element={<ChainPage />} />
               </Route>
 
               {/* Admin only */}

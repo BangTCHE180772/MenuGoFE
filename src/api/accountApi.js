@@ -15,5 +15,5 @@ export const updateAccount = (data) =>
 export const deleteAccount = (id) =>
   axiosInstance.delete(`/api/Account/${id}`);
 
-export const getRoleRange = () =>
-  axiosInstance.get('/api/Account/role-range');
+export const getRoleRange = (branchId) =>
+  axiosInstance.get('/api/Account/exclude-roles', { params: { branchId } });

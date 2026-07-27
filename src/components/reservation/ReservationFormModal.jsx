@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { createReservation, searchCustomersOData } from '../../api/reservationApi';
+import { createReservation, searchCustomersOData, getAvailableTablesForReservation } from '../../api/reservationApi';
 import { getAllTables, getTablesByBranch } from '../../api/tableApi';
 import { getAllBranches } from '../../api/branchApi';
 import { useAuth } from '../../context/AuthContext';
@@ -37,7 +37,8 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       const allBranches = branchesRes.data;
 
       let availableBranches = allBranches;
-      if (user?.branchIds && user.branchIds.length > 0) {
+      const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
+      if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
         availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
       }
       setBranches(availableBranches);
@@ -55,10 +56,15 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     }
   };
 
-  const fetchTablesAndProducts = async (branchId) => {
+  const fetchTablesAndProducts = async (branchId, resTime = null) => {
     setFetchingData(true);
     try {
-      const tablesRes = await getTablesByBranch([branchId]);
+      let tablesRes;
+      if (resTime) {
+        tablesRes = { data: await getAvailableTablesForReservation(branchId, resTime.toISOString()) };
+      } else {
+        tablesRes = await getTablesByBranch([branchId]);
+      }
 
       const availableTables = tablesRes.data.filter(t => t.status === 'Empty' || t.status === 'Available');
       setTables(availableTables);
@@ -71,8 +77,16 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
 
   const handleBranchChange = (val) => {
     setSelectedBranch(val);
-    form.setFieldsValue({ tableId: undefined });
-    fetchTablesAndProducts(val);
+    form.setFieldsValue({ tableIds: [] });
+    const currentResTime = form.getFieldValue('reservationTime');
+    fetchTablesAndProducts(val, currentResTime);
+  };
+
+  const handleReservationTimeChange = (val) => {
+    form.setFieldsValue({ tableIds: [] });
+    if (selectedBranch) {
+      fetchTablesAndProducts(selectedBranch, val);
+    }
   };
 
   const handleSelectCustomer = (customer) => {
@@ -113,7 +127,10 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     setPreOrderItems(prev => prev.filter(item => item.productId !== productId));
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
     try {
       const values = await form.validateFields();
 
@@ -131,6 +148,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         }))
       };
 
+      isSubmittingRef.current = true;
       setLoading(true);
       await createReservation(payload);
       message.success('Đã tạo đặt bàn thành công!');
@@ -140,6 +158,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
       message.error(error.response?.data?.message || 'Tạo đặt bàn thất bại');
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -231,7 +250,17 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             <Form.Item
               name="reservationTime"
               label="Thời Gian Đến"
-              rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}
+              rules={[
+                { required: true, message: 'Vui lòng chọn thời gian' },
+                {
+                  validator: (_, value) => {
+                    if (value && value.isBefore(dayjs().add(10, 'minute'))) {
+                      return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                    }
+                    return Promise.resolve();
+                  }
+                }
+              ]}
               style={{ flex: 1 }}
             >
               <DatePicker
@@ -239,6 +268,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
                 format="DD/MM/YYYY HH:mm"
                 style={{ width: '100%' }}
                 disabledDate={current => current && current < dayjs().startOf('day')}
+                onChange={handleReservationTimeChange}
               />
             </Form.Item>
             <Form.Item

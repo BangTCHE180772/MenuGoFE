@@ -9,23 +9,34 @@ export const SignalRProvider = ({ children }) => {
   const [connection, setConnection] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const connect = new signalR.HubConnectionBuilder()
       .withUrl('http://localhost:5067/notificationHub')
       .withAutomaticReconnect()
       .build();
 
-    connect.start()
+    connect
+      .start()
       .then(() => {
-        console.log('Connected to SignalR Hub');
+        if (isMounted) {
+          console.log('Connected to SignalR Hub');
+          setConnection(connect);
+        } else {
+          connect.stop();
+        }
       })
       .catch((err) => {
-        console.error('SignalR Connection Error: ', err);
+        // Suppress unmount negotiation abort warnings
+        if (err.name !== 'AbortError' && !err.message?.includes('stopped during negotiation')) {
+          console.warn('SignalR Connection Error:', err.message || err);
+        }
       });
 
-    setConnection(connect);
-
     return () => {
-      connect.stop();
+      isMounted = false;
+      if (connect.state === signalR.HubConnectionState.Connected) {
+        connect.stop();
+      }
     };
   }, []);
 

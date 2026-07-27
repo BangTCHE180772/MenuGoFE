@@ -35,6 +35,7 @@ import {
   deleteAccount,
 } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 
 const GENDER_OPTIONS = [
   { value: 'Nam', label: 'Nam' },
@@ -51,9 +52,11 @@ const ROLES_MAP = {
 
 const AccountPage = () => {
   const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedRole, setSelectedRole] = useState(null);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,7 +69,7 @@ const AccountPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRoleRange();
+      const res = await getRoleRange(currentBranchId);
       setAccounts(res.data || []);
     } catch (err) {
       console.error(err);
@@ -74,7 +77,7 @@ const AccountPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     loadData();
@@ -142,7 +145,26 @@ const AccountPage = () => {
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin nhân viên!';
-      message.error(errorMsg);
+
+      // Map backend validation errors to specific form fields
+      const errorFieldMap = [
+        { keyword: 'Email', field: 'email' },
+        { keyword: 'điện thoại', field: 'phone' },
+        { keyword: 'CCCD', field: 'citizenIdCode' },
+      ];
+
+      let fieldErrorSet = false;
+      for (const { keyword, field } of errorFieldMap) {
+        if (errorMsg.includes(keyword)) {
+          form.setFields([{ name: field, errors: [errorMsg] }]);
+          fieldErrorSet = true;
+          break;
+        }
+      }
+
+      if (!fieldErrorSet) {
+        message.error(errorMsg);
+      }
     }
   };
 
@@ -162,12 +184,14 @@ const AccountPage = () => {
   // Filter
   const filteredAccounts = accounts.filter((a) => {
     const search = searchText.toLowerCase();
-    return (
+    const matchText =
       (a.name || '').toLowerCase().includes(search) ||
       (a.email || '').toLowerCase().includes(search) ||
       (a.phone || '').toLowerCase().includes(search) ||
-      (a.citizenIdCode || '').toLowerCase().includes(search)
-    );
+      (a.citizenIdCode || '').toLowerCase().includes(search);
+    if (!matchText) return false;
+    if (selectedRole && !(a.roleIds || []).includes(selectedRole)) return false;
+    return true;
   });
 
   // Columns
@@ -229,6 +253,13 @@ const AccountPage = () => {
       key: 'gender',
       width: 100,
       align: 'center',
+      render: (val) => {
+        if (!val) return '—';
+        const lower = val.toLowerCase();
+        if (lower === 'male' || lower === 'nam') return 'Nam';
+        if (lower === 'female' || lower === 'nữ' || lower === 'nu') return 'Nữ';
+        return val;
+      }
     },
     {
       title: 'Ngày sinh',
@@ -358,15 +389,28 @@ const AccountPage = () => {
 
       {/* Table */}
       <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Input
             placeholder="Tìm kiếm theo tên, email, SĐT, CCCD..."
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             allowClear
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 450, borderRadius: '8px' }}
+            style={{ maxWidth: 400, borderRadius: '8px' }}
           />
+          <Select
+            placeholder="Lọc theo vai trò"
+            style={{ width: 180 }}
+            allowClear
+            value={selectedRole}
+            onChange={(val) => setSelectedRole(val)}
+          >
+            {Object.entries(ROLES_MAP).map(([id, info]) => (
+              <Select.Option key={id} value={Number(id)}>
+                {info.label}
+              </Select.Option>
+            ))}
+          </Select>
         </div>
 
         <Table
@@ -374,7 +418,7 @@ const AccountPage = () => {
           dataSource={filteredAccounts}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 1200 }}
           bordered
         />

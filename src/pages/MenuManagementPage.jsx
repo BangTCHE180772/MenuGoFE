@@ -311,7 +311,6 @@ const MenuManagementPage = () => {
         name: values.name,
         description: values.description || '',
         skuCode: values.skuCode || '',
-        isActive: values.isActive,
         isSellable: values.isSellable,
         sellPrice: values.sellPrice,
         unitConversions,
@@ -661,11 +660,6 @@ const MenuManagementPage = () => {
                             ) : (
                               <span style={{ fontSize: 48 }}>🍲</span>
                             )}
-                            <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                              <Tag color={dish.isActive ? 'green' : 'red'}>
-                                {dish.isActive ? 'Hoạt động' : 'Tạm dừng'}
-                              </Tag>
-                            </div>
                           </div>
                         }
                         actions={[
@@ -674,14 +668,6 @@ const MenuManagementPage = () => {
                           </Tooltip>,
                           <Tooltip title="Chỉnh sửa" key="edit">
                             <EditOutlined onClick={() => handleOpenDishModal(dish)} />
-                          </Tooltip>,
-                          <Tooltip title={dish.isActive ? "Ngừng hoạt động" : "Kích hoạt"} key="toggle">
-                            <Switch
-                              size="small"
-                              checked={dish.isActive}
-                              onChange={() => handleToggleDishStatus(dish)}
-                              style={{ backgroundColor: dish.isActive ? 'var(--color-primary)' : 'rgba(0,0,0,0.25)' }}
-                            />
                           </Tooltip>,
                           <Popconfirm
                             title="Xác nhận xóa món ăn này?"
@@ -890,12 +876,7 @@ const MenuManagementPage = () => {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item name="isActive" label="Hoạt động" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
+            <Col span={12}>
               <Form.Item name="isSellable" label="Cho phép bán" valuePropName="checked">
                 <Switch />
               </Form.Item>
@@ -1024,11 +1005,6 @@ const MenuManagementPage = () => {
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label="Đơn vị tính cơ bản">{viewingDishDetails.unitName}</Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">
-                <Tag color={viewingDishDetails.isActive ? 'green' : 'red'}>
-                  {viewingDishDetails.isActive ? 'Đang hoạt động' : 'Tạm dừng hoạt động'}
-                </Tag>
-              </Descriptions.Item>
               <Descriptions.Item label="Mô tả">{viewingDishDetails.description || 'Chưa có mô tả.'}</Descriptions.Item>
               <Descriptions.Item label="Công thức ({name})" labelStyle={{ fontWeight: 600 }}>
                 {viewingDishDetails.recipeName}

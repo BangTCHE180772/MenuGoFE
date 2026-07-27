@@ -13,6 +13,7 @@ import {
   Alert,
   Spin,
   Tooltip,
+  Popconfirm,
 } from 'antd';
 import {
   FireOutlined,
@@ -24,7 +25,7 @@ import {
   AppstoreOutlined,
   BellOutlined,
 } from '@ant-design/icons';
-import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus } from '../api/kitchenApi';
+import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
 import { useSignalR } from '../context/SignalRContext';
 
 const { Title, Text } = Typography;
@@ -41,6 +42,7 @@ const KDSPage = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
+  const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const signalRConnection = useSignalR();
 
@@ -54,7 +56,6 @@ const KDSPage = () => {
       gain.connect(audioCtx.destination);
 
       if (type === 'cancel') {
-        // High pitch warning beep sequence for cancellation
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
         osc.frequency.setValueAtTime(440, audioCtx.currentTime + 0.15); // A4
@@ -62,7 +63,6 @@ const KDSPage = () => {
         osc.start();
         osc.stop(audioCtx.currentTime + 0.4);
       } else {
-        // Gentle chime for new order
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
@@ -110,7 +110,6 @@ const KDSPage = () => {
         message.info(`🔔 Món mới từ ${notif.tableName || 'khách hàng'}!`);
         fetchItems(false);
       } else if (notif.type === 'item-cancelled' || notif.type === 'order-cancelled') {
-        // EX-1: Cancellation warning from outside
         playAlertSound('cancel');
         const alertMsg = notif.message || `Món ăn #${notif.orderDetailId || ''} đã bị HỦY từ ngoài!`;
         setCancelledAlerts((prev) => [
@@ -147,46 +146,111 @@ const KDSPage = () => {
     }
   };
 
-  // AF1: Batch Processing Handler (Nhận/Nấu/Xong tất cả món trùng nhau)
-  const handleBatchStatusChange = async (batchDetailIds, nextStatus) => {
+  // Single Item Cancel Handler
+  const handleCancelItem = async (detailId) => {
     try {
-      await batchUpdateCookingStatus(batchDetailIds, nextStatus);
-      message.success(`Đã cập nhật ${batchDetailIds.length} món trong lô sang trạng thái mới!`);
+      await cancelOrderDetail(detailId);
+      message.success('Đã hủy món ăn thành công');
       fetchItems(false);
     } catch (err) {
       console.error(err);
-      message.error('Có lỗi xảy ra khi xử lý lô món.');
+      message.error('Không thể hủy món. Món đã chế biến xong hoặc đã bị hủy.');
     }
   };
 
-  // Group items by status for Filter Tabs
+  // AF1: Batch Processing Handler
+  const handleBatchStatusChange = async (batchDetailIds, nextStatus) => {
+    try {
+      await batchUpdateCookingStatus(batchDetailIds, nextStatus);
+      message.success(`Đã cập nhật trạng thái cho ${batchDetailIds.length} món trong mẻ!`);
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error('Có lỗi xảy ra khi xử lý lô/mẻ món.');
+    }
+  };
+
+  // Group items by status for Filter Tabs & Columns
   const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
   const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
   const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
   const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
 
-  // AF1: Aggregate identical dishes across active tables into Batches
+  // AF1: Split identical dishes into batches of 10
   const activeBatchGroups = useMemo(() => {
-    // Collect all items that are not yet Ready/Done
     const activeItems = items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
     const groups = {};
 
+    // Group active items by product ID/Name
     activeItems.forEach((item) => {
       const key = item.productId || item.productName;
       if (!groups[key]) {
         groups[key] = {
           productId: item.productId,
-          productName: item.ProductName || item.productName,
-          totalQty: 0,
+          productName: item.productName || item.ProductName,
+          productImage: item.productImage,
           details: [],
         };
       }
-      groups[key].totalQty += item.quantity;
       groups[key].details.push(item);
     });
 
-    // Return batches that have items from multiple tables or multiple active items
-    return Object.values(groups).filter((g) => g.details.length > 0);
+    const allBatches = [];
+
+    // Partition each group into batches of 10
+    Object.values(groups).forEach((group) => {
+      // Sort by createdAt ascending (FIFO)
+      const sortedDetails = [...group.details].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      );
+
+      let batchNum = 1;
+      let currentBatch = {
+        productId: group.productId,
+        productName: group.productName,
+        productImage: group.productImage,
+        batchIndex: batchNum,
+        totalQty: 0,
+        details: [],
+      };
+
+      sortedDetails.forEach((detail) => {
+        let remainingQty = detail.quantity;
+
+        while (remainingQty > 0) {
+          const capacity = 10 - currentBatch.totalQty;
+          if (capacity <= 0) {
+            allBatches.push(currentBatch);
+            batchNum += 1;
+            currentBatch = {
+              productId: group.productId,
+              productName: group.productName,
+              productImage: group.productImage,
+              batchIndex: batchNum,
+              totalQty: 0,
+              details: [],
+            };
+            continue;
+          }
+
+          const qtyToTake = Math.min(remainingQty, capacity);
+          currentBatch.details.push({
+            orderDetailId: detail.orderDetailId,
+            tableName: detail.tableName,
+            quantity: qtyToTake,
+            cookingStatus: detail.cookingStatus || COOKING_STATUS.WAITING,
+          });
+          currentBatch.totalQty += qtyToTake;
+          remainingQty -= qtyToTake;
+        }
+      });
+
+      if (currentBatch.totalQty > 0) {
+        allBatches.push(currentBatch);
+      }
+    });
+
+    return allBatches;
   }, [items]);
 
   // Display items based on current active tab
@@ -216,15 +280,207 @@ const KDSPage = () => {
     return `${minutes} phút trước`;
   };
 
+  // Reusable KDS Card component
+  const renderKdsCard = (item) => {
+    const status = item.cookingStatus || COOKING_STATUS.WAITING;
+
+    let cardBorderColor = '#303030';
+    let statusTag = <Tag color="red">MÓN MỚI (NEW)</Tag>;
+
+    if (status === COOKING_STATUS.ACCEPTED) {
+      cardBorderColor = '#1890ff';
+      statusTag = <Tag color="blue">ĐÃ NHẬN (ACCEPTED)</Tag>;
+    } else if (status === COOKING_STATUS.COOKING) {
+      cardBorderColor = '#fa8c16';
+      statusTag = <Tag color="orange">ĐANG NẤU (COOKING)</Tag>;
+    } else if (status === COOKING_STATUS.READY) {
+      cardBorderColor = '#52c41a';
+      statusTag = <Tag color="green">ĐÃ XONG (READY)</Tag>;
+    }
+
+    return (
+      <Card
+        key={item.orderDetailId}
+        hoverable
+        style={{
+          backgroundColor: '#1f1f1f',
+          borderColor: cardBorderColor,
+          borderRadius: 12,
+          borderWidth: 2,
+          boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+          marginBottom: 16,
+          width: '100%',
+        }}
+        bodyStyle={{ padding: 16 }}
+      >
+        {/* Card Header: Table Name & Time */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+          <Tag
+            color="volcano"
+            style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4, margin: 0 }}
+          >
+            🪑 {item.tableName}
+          </Tag>
+          <Text style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <ClockCircleOutlined style={{ marginRight: 4 }} />
+            {renderTimeElapsed(item.createdAt)}
+          </Text>
+        </div>
+
+        {/* Product Image, Name & Quantity */}
+        <div style={{ display: 'flex', marginBottom: 12, alignItems: 'center' }}>
+          {item.productImage ? (
+            <img
+              src={item.productImage}
+              alt={item.productName}
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 8,
+                objectFit: 'cover',
+                marginRight: 12,
+                border: '1px solid #434343'
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #303030, #202020)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#8c8c8c',
+                marginRight: 12,
+                border: '1px solid #434343'
+              }}
+            >
+              🍲
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <Title level={4} style={{ color: '#fff', margin: '0 0 4px 0', fontSize: 16 }}>
+              {item.productName}
+            </Title>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums' }}>
+              Số lượng: x{item.quantity}
+            </div>
+          </div>
+        </div>
+
+        {/* Note / Special instructions */}
+        {item.note && (
+          <div
+            style={{
+              backgroundColor: '#2b2111',
+              border: '1px solid #d48806',
+              borderRadius: 6,
+              padding: '6px 10px',
+              marginBottom: 12,
+              color: '#ffe58f',
+              fontSize: 13,
+            }}
+          >
+            <strong>📝 Ghi chú:</strong> {item.note}
+          </div>
+        )}
+
+        {/* Status Badge */}
+        <div style={{ marginBottom: 16 }}>{statusTag}</div>
+
+        {/* Action Buttons (Normal Flow) */}
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {status === COOKING_STATUS.WAITING && (
+            <Button
+              type="primary"
+              block
+              size="large"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.ACCEPTED)}
+              style={{ backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 600 }}
+            >
+              Nhận món (Accept)
+            </Button>
+          )}
+
+          {status === COOKING_STATUS.ACCEPTED && (
+            <Button
+              type="primary"
+              block
+              size="large"
+              icon={<FireOutlined />}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
+              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 }}
+            >
+              Bắt đầu nấu (Cook)
+            </Button>
+          )}
+
+          {status === COOKING_STATUS.COOKING && (
+            <Button
+              type="primary"
+              block
+              size="large"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
+              style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600 }}
+            >
+              Hoàn thành (Done)
+            </Button>
+          )}
+
+          {status === COOKING_STATUS.READY && (
+            <Button block disabled style={{ backgroundColor: '#262626', color: '#595959' }}>
+              Đã báo phục vụ
+            </Button>
+          )}
+
+          {/* Cancellation Option ("Huỷ món") */}
+          {status !== COOKING_STATUS.READY && (
+            <Popconfirm
+              title="Bạn có chắc chắn muốn hủy món này không?"
+              onConfirm={() => handleCancelItem(item.orderDetailId)}
+              okText="Đồng ý"
+              cancelText="Hủy bỏ"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                danger
+                block
+                type="text"
+                style={{
+                  marginTop: 4,
+                  borderColor: '#ff4d4f',
+                  color: '#ff4d4f',
+                  border: '1px dashed #ff4d4f',
+                }}
+              >
+                Hủy món
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      </Card>
+    );
+  };
+
   return (
-    <div style={{ padding: '16px', backgroundColor: '#141414', minHeight: 'calc(100vh - 64px)', color: '#fff' }}>
+    <div style={{
+      padding: '16px',
+      backgroundColor: '#141414',
+      minHeight: 'calc(100vh - 64px)',
+      color: '#fff',
+      fontFamily: "'Be Vietnam Pro', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    }}>
       {/* ── HEADER BANNER FOR KDS ────────────────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'linear-[#1f1f1f]',
           backgroundColor: '#1f1f1f',
           padding: '16px 24px',
           borderRadius: 12,
@@ -260,6 +516,26 @@ const KDSPage = () => {
         </Space>
 
         <Space size="middle">
+          {/* View Mode Toggle Button Group */}
+          <Button.Group>
+            <Button
+              type={viewMode === 'COLUMN' ? 'primary' : 'default'}
+              icon={<AppstoreOutlined />}
+              onClick={() => setViewMode('COLUMN')}
+              style={viewMode === 'COLUMN' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#fff' } : { backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
+            >
+              Chia dọc (Cột)
+            </Button>
+            <Button
+              type={viewMode === 'GRID' ? 'primary' : 'default'}
+              icon={<BellOutlined />}
+              onClick={() => setViewMode('GRID')}
+              style={viewMode === 'GRID' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#fff' } : { backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
+            >
+              Dạng Tabs
+            </Button>
+          </Button.Group>
+
           <Tooltip title="Làm mới danh sách">
             <Button
               icon={<ReloadOutlined />}
@@ -272,13 +548,13 @@ const KDSPage = () => {
 
           <Badge count={waitingItems.length} overflowCount={99}>
             <Tag color="#ff4d4f" style={{ fontSize: 14, padding: '4px 12px', borderRadius: 16 }}>
-              🔥 {waitingItems.length} Món mới chờ nhận
+              🔥 {waitingItems.length} Món mới
             </Tag>
           </Badge>
 
           <Badge count={cookingItems.length} overflowCount={99}>
             <Tag color="#faad14" style={{ fontSize: 14, padding: '4px 12px', borderRadius: 16 }}>
-              🍳 {cookingItems.length} Món đang nấu
+              🍳 {cookingItems.length} Đang nấu
             </Tag>
           </Badge>
         </Space>
@@ -313,15 +589,15 @@ const KDSPage = () => {
         </div>
       )}
 
-      {/* ── AF1: BATCH PROCESSING BAR (GỘP MÓN TRÙNG NHAU TỪ NHIỀU BÀN) ─────── */}
+      {/* ── AF1: BATCH PROCESSING BAR (CHIA MẺ 10 XUẤT 1 MẺ) ─────── */}
       <Card
         title={
           <Space>
             <ThunderboltOutlined style={{ color: '#faad14', fontSize: 18 }} />
             <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>
-              Thanh Chế Biến Theo Lô (Batch Processing Bar - AF1)
+              Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar - AF1)
             </span>
-            <Tag color="warning">Tối ưu giờ cao điểm</Tag>
+            <Tag color="warning">Tối ưu 10 phần/mẻ</Tag>
           </Space>
         }
         style={{
@@ -332,24 +608,22 @@ const KDSPage = () => {
         }}
       >
         {activeBatchGroups.length === 0 ? (
-          <Text style={{ color: '#595959' }}>Không có món trùng nhau cần gộp chế biến lúc này.</Text>
+          <Text style={{ color: '#595959' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
         ) : (
           <Row gutter={[16, 16]}>
             {activeBatchGroups.map((batch) => {
-              const batchWaitingIds = batch.details
-                .filter((d) => !d.cookingStatus || d.cookingStatus === COOKING_STATUS.WAITING)
-                .map((d) => d.orderDetailId);
-              const batchAcceptedIds = batch.details
+              const batchWaitingIds = [...new Set(batch.details
+                .filter((d) => d.cookingStatus === COOKING_STATUS.WAITING)
+                .map((d) => d.orderDetailId))];
+              const batchAcceptedIds = [...new Set(batch.details
                 .filter((d) => d.cookingStatus === COOKING_STATUS.ACCEPTED)
-                .map((d) => d.orderDetailId);
-              const batchCookingIds = batch.details
+                .map((d) => d.orderDetailId))];
+              const batchCookingIds = [...new Set(batch.details
                 .filter((d) => d.cookingStatus === COOKING_STATUS.COOKING)
-                .map((d) => d.orderDetailId);
-
-              const allBatchIds = batch.details.map((d) => d.orderDetailId);
+                .map((d) => d.orderDetailId))];
 
               return (
-                <Col xs={24} sm={12} md={8} lg={6} key={batch.productId || batch.productName}>
+                <Col xs={24} sm={12} md={8} lg={6} key={`${batch.productId || batch.productName}_batch_${batch.batchIndex}`}>
                   <div
                     style={{
                       background: '#262626',
@@ -358,23 +632,36 @@ const KDSPage = () => {
                       padding: 14,
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text strong style={{ color: '#fff', fontSize: 16 }}>
-                        🍲 {batch.productName}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                      <Text strong style={{ color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center' }}>
+                        {batch.productImage ? (
+                          <img
+                            src={batch.productImage}
+                            alt={batch.productName}
+                            style={{ width: 28, height: 28, borderRadius: 4, marginRight: 8, objectFit: 'cover', border: '1px solid #434343' }}
+                          />
+                        ) : (
+                          <span style={{ marginRight: 8 }}>🍲</span>
+                        )}
+                        <span>{batch.productName}</span>
                       </Text>
-                      <Tag color="red" style={{ fontSize: 14, fontWeight: 700 }}>
-                        Tổng: {batch.totalQty} phần
+                      <Tag color="cyan" style={{ margin: 0, fontWeight: 700 }}>
+                        Mẻ {batch.batchIndex}
                       </Tag>
                     </div>
 
-                    {/* Table markers */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                      <Text style={{ color: '#8c8c8c', fontSize: 12 }}>Số lượng trong mẻ:</Text>
+                      <Tag color="red" style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
+                        {batch.totalQty} phần
+                      </Tag>
+                    </div>
+
+                    {/* Table markers (Removed label 'Bàn yêu cầu:' as requested by 'Xoá tên bàn yêu cầu') */}
                     <div style={{ marginBottom: 12 }}>
-                      <Text style={{ color: '#8c8c8c', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                        Bàn yêu cầu:
-                      </Text>
                       <Space wrap size={[4, 4]}>
-                        {batch.details.map((d) => (
-                          <Tag key={d.orderDetailId} color="blue" style={{ fontSize: 12 }}>
+                        {batch.details.map((d, index) => (
+                          <Tag key={`${d.orderDetailId}_${index}`} color="blue" style={{ fontSize: 12, margin: 0 }}>
                             {d.tableName} ({d.quantity}x)
                           </Tag>
                         ))}
@@ -392,7 +679,7 @@ const KDSPage = () => {
                           onClick={() => handleBatchStatusChange(batchWaitingIds, COOKING_STATUS.ACCEPTED)}
                           style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
                         >
-                          Nhận tất cả ({batchWaitingIds.length} món)
+                          Nhận mẻ ({batchWaitingIds.length} món)
                         </Button>
                       )}
                       {(batchWaitingIds.length > 0 || batchAcceptedIds.length > 0) && (
@@ -409,7 +696,7 @@ const KDSPage = () => {
                           }
                           style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
                         >
-                          Nấu tất cả ({batchWaitingIds.length + batchAcceptedIds.length} món)
+                          Bắt đầu nấu ({batchWaitingIds.length + batchAcceptedIds.length} món)
                         </Button>
                       )}
                       {batchCookingIds.length > 0 && (
@@ -421,7 +708,7 @@ const KDSPage = () => {
                           onClick={() => handleBatchStatusChange(batchCookingIds, COOKING_STATUS.READY)}
                           style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                         >
-                          Hoàn thành lô ({batchCookingIds.length} món)
+                          Hoàn thành mẻ ({batchCookingIds.length} món)
                         </Button>
                       )}
                     </Space>
@@ -433,202 +720,165 @@ const KDSPage = () => {
         )}
       </Card>
 
-      {/* ── FILTER TABS & MAIN KITCHEN QUEUE ───────────────────────────────── */}
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        type="card"
-        style={{ color: '#fff' }}
-        items={[
-          {
-            key: 'ALL',
-            label: (
-              <span>
-                <AppstoreOutlined /> Tất cả món ({items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
-              </span>
-            ),
-          },
-          {
-            key: COOKING_STATUS.WAITING,
-            label: (
-              <span>
-                <BellOutlined /> Món mới chờ nhận ({waitingItems.length})
-              </span>
-            ),
-          },
-          {
-            key: COOKING_STATUS.ACCEPTED,
-            label: (
-              <span>
-                <ClockCircleOutlined /> Đã nhận ({acceptedItems.length})
-              </span>
-            ),
-          },
-          {
-            key: COOKING_STATUS.COOKING,
-            label: (
-              <span>
-                <FireOutlined /> Đang nấu ({cookingItems.length})
-              </span>
-            ),
-          },
-          {
-            key: COOKING_STATUS.READY,
-            label: (
-              <span>
-                <CheckCircleOutlined /> Đã xong ({readyItems.length})
-              </span>
-            ),
-          },
-        ]}
-      />
-
+      {/* ── MAIN KITCHEN QUEUE ───────────────────────────────── */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <Spin size="large" tip="Đang tải danh sách món ăn..." />
         </div>
-      ) : filteredItems.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '60px 0',
-            background: '#1f1f1f',
-            borderRadius: 12,
-            border: '1px border #303030',
-          }}
-        >
-          <Title level={4} style={{ color: '#595959' }}>
-            🎉 Bếp hiện không có món nào thuộc danh mục này!
-          </Title>
-        </div>
-      ) : (
-        <Row gutter={[16, 16]}>
-          {filteredItems.map((item) => {
-            const status = item.cookingStatus || COOKING_STATUS.WAITING;
+      ) : viewMode === 'COLUMN' ? (
+        /* Vertical Column Split View (Chia dọc) */
+        <Row gutter={[20, 20]}>
+          {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
+          <Col xs={24} md={8}>
+            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 16,
+                paddingBottom: 10,
+                borderBottom: '2px solid #1890ff'
+              }}>
+                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
+                  📋 Chờ Chế Biến ({waitingItems.length + acceptedItems.length})
+                </Title>
+                <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
+              </div>
+              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+                {[...waitingItems, ...acceptedItems].map(renderKdsCard)}
+                {[...waitingItems, ...acceptedItems].length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món chờ chế biến</div>
+                )}
+              </div>
+            </div>
+          </Col>
 
-            let cardBorderColor = '#303030';
-            let statusTag = <Tag color="red">MÓN MỚI (NEW)</Tag>;
+          {/* Column 2: Đang nấu (Cooking) */}
+          <Col xs={24} md={8}>
+            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 16,
+                paddingBottom: 10,
+                borderBottom: '2px solid #fa8c16'
+              }}>
+                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
+                  🍳 Đang Nấu ({cookingItems.length})
+                </Title>
+                <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
+              </div>
+              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+                {cookingItems.map(renderKdsCard)}
+                {cookingItems.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món đang nấu</div>
+                )}
+              </div>
+            </div>
+          </Col>
 
-            if (status === COOKING_STATUS.ACCEPTED) {
-              cardBorderColor = '#1890ff';
-              statusTag = <Tag color="blue">ĐÃ NHẬN (ACCEPTED)</Tag>;
-            } else if (status === COOKING_STATUS.COOKING) {
-              cardBorderColor = '#fa8c16';
-              statusTag = <Tag color="orange">ĐANG NẤU (COOKING)</Tag>;
-            } else if (status === COOKING_STATUS.READY) {
-              cardBorderColor = '#52c41a';
-              statusTag = <Tag color="green">ĐÃ XONG (READY)</Tag>;
-            }
-
-            return (
-              <Col xs={24} sm={12} md={8} lg={6} key={item.orderDetailId}>
-                <Card
-                  hoverable
-                  style={{
-                    backgroundColor: '#1f1f1f',
-                    borderColor: cardBorderColor,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
-                  }}
-                  bodyStyle={{ padding: 16 }}
-                >
-                  {/* Card Header: Table Name & Time */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Tag
-                      color="volcano"
-                      style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4 }}
-                    >
-                      🪑 {item.tableName}
-                    </Tag>
-                    <Text style={{ color: '#8c8c8c', fontSize: 12 }}>
-                      <ClockCircleOutlined style={{ marginRight: 4 }} />
-                      {renderTimeElapsed(item.createdAt)}
-                    </Text>
-                  </div>
-
-                  {/* Product Name & Quantity */}
-                  <div style={{ marginBottom: 12 }}>
-                    <Title level={4} style={{ color: '#fff', margin: '4px 0' }}>
-                      {item.productName}
-                    </Title>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14' }}>
-                      Số lượng: x{item.quantity}
-                    </div>
-                  </div>
-
-                  {/* Note / Special instructions */}
-                  {item.note && (
-                    <div
-                      style={{
-                        backgroundColor: '#2b2111',
-                        border: '1px solid #d48806',
-                        borderRadius: 6,
-                        padding: '6px 10px',
-                        marginBottom: 12,
-                        color: '#ffe58f',
-                        fontSize: 13,
-                      }}
-                    >
-                      <strong>📝 Ghi chú:</strong> {item.note}
-                    </div>
-                  )}
-
-                  {/* Status Badge */}
-                  <div style={{ marginBottom: 16 }}>{statusTag}</div>
-
-                  {/* Action Buttons (Normal Flow) */}
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    {status === COOKING_STATUS.WAITING && (
-                      <Button
-                        type="primary"
-                        block
-                        size="large"
-                        icon={<CheckCircleOutlined />}
-                        onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.ACCEPTED)}
-                        style={{ backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 600 }}
-                      >
-                        Accept (Nhận món)
-                      </Button>
-                    )}
-
-                    {status === COOKING_STATUS.ACCEPTED && (
-                      <Button
-                        type="primary"
-                        block
-                        size="large"
-                        icon={<FireOutlined />}
-                        onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
-                        style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 }}
-                      >
-                        Cook (Bắt đầu nấu)
-                      </Button>
-                    )}
-
-                    {status === COOKING_STATUS.COOKING && (
-                      <Button
-                        type="primary"
-                        block
-                        size="large"
-                        icon={<CheckCircleOutlined />}
-                        onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
-                        style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600 }}
-                      >
-                        Done (Hoàn thành món)
-                      </Button>
-                    )}
-
-                    {status === COOKING_STATUS.READY && (
-                      <Button block disabled style={{ backgroundColor: '#262626', color: '#595959' }}>
-                        Đã báo phục vụ
-                      </Button>
-                    )}
-                  </Space>
-                </Card>
-              </Col>
-            );
-          })}
+          {/* Column 3: Hoàn thành (Ready) */}
+          <Col xs={24} md={8}>
+            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 16,
+                paddingBottom: 10,
+                borderBottom: '2px solid #52c41a'
+              }}>
+                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
+                  ✅ Đã Xong / Hoàn Thành ({readyItems.length})
+                </Title>
+                <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
+              </div>
+              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+                {readyItems.map(renderKdsCard)}
+                {readyItems.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Chưa có món hoàn thành</div>
+                )}
+              </div>
+            </div>
+          </Col>
         </Row>
+      ) : (
+        /* Tab Mode (Original style but clean/refactored) */
+        <>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            type="card"
+            style={{ color: '#fff' }}
+            items={[
+              {
+                key: 'ALL',
+                label: (
+                  <span>
+                    <AppstoreOutlined /> Tất cả ({items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
+                  </span>
+                ),
+              },
+              {
+                key: COOKING_STATUS.WAITING,
+                label: (
+                  <span>
+                    <BellOutlined /> Chờ nhận ({waitingItems.length})
+                  </span>
+                ),
+              },
+              {
+                key: COOKING_STATUS.ACCEPTED,
+                label: (
+                  <span>
+                    <ClockCircleOutlined /> Đã nhận ({acceptedItems.length})
+                  </span>
+                ),
+              },
+              {
+                key: COOKING_STATUS.COOKING,
+                label: (
+                  <span>
+                    <FireOutlined /> Đang nấu ({cookingItems.length})
+                  </span>
+                ),
+              },
+              {
+                key: COOKING_STATUS.READY,
+                label: (
+                  <span>
+                    <CheckCircleOutlined /> Đã xong ({readyItems.length})
+                  </span>
+                ),
+              },
+            ]}
+          />
+
+          {filteredItems.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '60px 0',
+                background: '#1f1f1f',
+                borderRadius: 12,
+                border: '1px solid #303030',
+              }}
+            >
+              <Title level={4} style={{ color: '#595959' }}>
+                🎉 Bếp hiện không có món nào thuộc danh mục này!
+              </Title>
+            </div>
+          ) : (
+            <Row gutter={[16, 16]}>
+              {filteredItems.map((item) => (
+                <Col xs={24} sm={12} md={8} lg={6} key={item.orderDetailId}>
+                  {renderKdsCard(item)}
+                </Col>
+              ))}
+            </Row>
+          )}
+        </>
       )}
     </div>
   );

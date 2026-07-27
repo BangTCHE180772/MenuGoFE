@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Dropdown, Avatar, message } from "antd";
+import { Dropdown, Avatar, message, Select } from "antd";
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -16,9 +16,19 @@ import {
   BookOutlined,
   FireOutlined,
   GiftOutlined,
+  LeftOutlined,
+  RightOutlined,
+  RocketOutlined,
+  FileProtectOutlined,
+  ClockCircleOutlined,
+  AppstoreOutlined,
+  InboxOutlined,
   DollarOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
+import { useBranch } from "../context/BranchContext";
+import { useRef, useState, useEffect } from "react";
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
@@ -32,14 +42,19 @@ const ROLE_MENUS = {
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
     { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
   ],
@@ -53,14 +68,19 @@ const ROLE_MENUS = {
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -68,16 +88,22 @@ const ROLE_MENUS = {
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [
@@ -87,10 +113,10 @@ const ROLE_MENUS = {
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
@@ -99,8 +125,8 @@ const ROLE_MENUS = {
   ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
   ],
 };
 
@@ -116,6 +142,7 @@ const ROLE_LABELS = {
 
 const TopBar = () => {
   const { user, role, logout } = useAuth();
+  const { currentBranchId, selectBranch, branches } = useBranch();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -125,6 +152,85 @@ const TopBar = () => {
     await logout();
     message.success("Đã đăng xuất");
     navigate("/login");
+  };
+
+  // ─── Scroll & Drag-to-scroll logic ──────────────────────────────────────────
+  const navRef = useRef(null);
+  const [showLeftBtn, setShowLeftBtn] = useState(false);
+  const [showRightBtn, setShowRightBtn] = useState(false);
+
+  // Drag-to-scroll mouse states
+  const [isDown, setIsDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+
+  const updateScrollButtons = () => {
+    if (navRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
+      setShowLeftBtn(scrollLeft > 5);
+      setShowRightBtn(scrollLeft + clientWidth < scrollWidth - 5);
+    }
+  };
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (el) {
+      updateScrollButtons();
+      el.addEventListener("scroll", updateScrollButtons);
+      window.addEventListener("resize", updateScrollButtons);
+    }
+    return () => {
+      if (el) {
+        el.removeEventListener("scroll", updateScrollButtons);
+      }
+      window.removeEventListener("resize", updateScrollButtons);
+    };
+  }, [menuItems]);
+
+  const scrollNav = (direction) => {
+    if (navRef.current) {
+      const scrollAmount = 200;
+      navRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Mouse Drag Events
+  const handleMouseDown = (e) => {
+    if (!navRef.current) return;
+    setIsDown(true);
+    setStartX(e.pageX - navRef.current.offsetLeft);
+    setScrollLeftState(navRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDown(false);
+    if (navRef.current) {
+      navRef.current.classList.remove("dragging");
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDown(false);
+    if (navRef.current) {
+      navRef.current.classList.remove("dragging");
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDown || !navRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - navRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Tốc độ cuộn chuột
+
+    // Chỉ kích hoạt chế độ dragging khi kéo chuột di chuyển nhiều hơn 5px
+    if (Math.abs(x - startX) > 5) {
+      navRef.current.classList.add("dragging");
+    }
+
+    navRef.current.scrollLeft = scrollLeftState - walk;
   };
 
   // Dropdown menu khi click vào avatar/tên user
@@ -161,22 +267,62 @@ const TopBar = () => {
         <span className="topbar-logo-text">MenuGo</span>
       </Link>
 
-      {/* Navigation */}
-      <nav className="topbar-nav">
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      {/* Navigation với thanh trượt / kéo chuột */}
+      <div className="topbar-nav-wrapper">
+        {showLeftBtn && (
+          <button className="topbar-scroll-btn scroll-left" onClick={() => scrollNav("left")}>
+            <LeftOutlined />
+          </button>
+        )}
+
+        <nav
+          ref={navRef}
+          className="topbar-nav"
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+        >
+          {menuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        {showRightBtn && (
+          <button className="topbar-scroll-btn scroll-right" onClick={() => scrollNav("right")}>
+            <RightOutlined />
+          </button>
+        )}
+      </div>
 
       {/* User info */}
-      <div className="topbar-right">
+      <div className="topbar-right" style={{ display: 'flex', alignItems: 'center' }}>
+        {['Admin', 'Owner'].includes(role) && (
+          <Select
+            value={currentBranchId}
+            onChange={selectBranch}
+            style={{ width: 180, marginRight: 16 }}
+            placeholder="Tất cả chi nhánh"
+            allowClear
+            dropdownStyle={{ minWidth: 200 }}
+            className="topbar-branch-select"
+          >
+            <Select.Option value={null}>Tất cả chi nhánh</Select.Option>
+            {branches.map((b) => (
+              <Select.Option key={b.id} value={b.id}>
+                {b.name}
+              </Select.Option>
+            ))}
+          </Select>
+        )}
+
         <Dropdown
           menu={{ items: userDropdownItems }}
           placement="bottomRight"

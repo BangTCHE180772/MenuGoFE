@@ -63,7 +63,8 @@ const WorkSchedulePage = () => {
   const [loading, setLoading] = useState(false);
   
   // Filtering states
-  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
@@ -154,7 +155,7 @@ const WorkSchedulePage = () => {
       form.resetFields();
       form.setFieldsValue({
         status: 'PENDING',
-        managerApproved: false,
+        managerApproved: true,
         workDate: dayjs(),
       });
     }
@@ -174,12 +175,12 @@ const WorkSchedulePage = () => {
       // Combine date and time
       let checkInAt = null;
       if (values.checkInTime) {
-        checkInAt = dayjs(`${workDateStr} ${values.checkInTime.format('HH:mm:ss')}`).format('YYYY-MM-DDTHH:mm:ss');
+        checkInAt = dayjs(`${workDateStr} ${values.checkInTime.format('HH:mm:ss')}`).toISOString();
       }
 
       let checkOutAt = null;
       if (values.checkOutTime) {
-        checkOutAt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`).format('YYYY-MM-DDTHH:mm:ss');
+        checkOutAt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`).toISOString();
       }
 
       // Validations
@@ -306,19 +307,22 @@ const WorkSchedulePage = () => {
 
   // Filter schedules
   const filteredSchedules = schedules.filter((item) => {
-    if (selectedBranch && item.branchId !== selectedBranch) return false;
+    if (selectedAccount && item.accountId !== selectedAccount) return false;
+    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && item.status !== selectedStatus) return false;
     if (searchDate) {
-      const match = dayjs(item.workDate).isSame(dayjs(searchDate), 'day');
-      if (!match) return false;
+      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
+      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
+      if (itemDate !== filterDate) return false;
     }
     return true;
   });
 
   // Reset Filters
   const handleResetFilters = () => {
-    setSelectedBranch(null);
+    setSelectedAccount(null);
+    setSelectedApprovalStatus(null);
     setSelectedShift(null);
     setSelectedStatus(null);
     setSearchDate(null);
@@ -450,22 +454,82 @@ const WorkSchedulePage = () => {
   const dateCellRender = (value) => {
     const dateStr = value.format('YYYY-MM-DD');
     const daySchedules = schedules.filter((item) => item.workDate === dateStr);
+
+    // Group by shiftId
+    const shiftGroups = {};
+    daySchedules.forEach((item) => {
+      const shiftId = item.shiftId;
+      if (!shiftGroups[shiftId]) {
+        shiftGroups[shiftId] = {
+          shiftId,
+          count: 0,
+          pendingCount: 0,
+          approvedCount: 0,
+        };
+      }
+      shiftGroups[shiftId].count += 1;
+      if (item.managerApproved) {
+        shiftGroups[shiftId].approvedCount += 1;
+      } else {
+        shiftGroups[shiftId].pendingCount += 1;
+      }
+    });
+
+    // Convert to array and sort by shift startTime/name
+    const sortedShifts = Object.values(shiftGroups).map((group) => {
+      const details = getShiftDetails(group.shiftId);
+      return {
+        ...group,
+        name: details.name,
+        startTime: details.startTime || '',
+      };
+    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
     return (
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, overflow: 'hidden' }}>
-        {daySchedules.slice(0, 3).map((item) => {
-          const shiftInfo = getShiftDetails(item.shiftId);
-          const name = getAccountName(item.accountId);
+        {sortedShifts.map((group) => {
+          // If any schedule in this shift is pending, badge is warning (yellow), else success (green)
+          const badgeStatus = group.pendingCount > 0 ? 'warning' : 'success';
           return (
-            <li key={item.id} style={{ margin: '1px 0', padding: '1px 3px', borderRadius: '3px', background: '#fff2e8', borderLeft: '3px solid #ff7a45', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              <Badge status={item.managerApproved ? 'success' : 'warning'} text={<strong>{shiftInfo.name}:</strong>} /> {name}
+            <li
+              key={group.shiftId}
+              style={{
+                margin: '2px 0',
+                padding: '2px 4px',
+                borderRadius: '4px',
+                background: '#fff2e8',
+                borderLeft: '3px solid #ff7a45',
+                fontSize: '11px',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                cursor: 'pointer',
+              }}
+            >
+              <Tooltip
+                title={
+                  <div>
+                    <strong>Danh sách ca trực:</strong>
+                    <ul style={{ paddingLeft: 16, margin: '4px 0 0 0' }}>
+                      {daySchedules
+                        .filter((item) => item.shiftId === group.shiftId)
+                        .map((item) => (
+                          <li key={item.id}>
+                            {getAccountName(item.accountId)} {item.managerApproved ? '(Đã duyệt)' : '(Chờ duyệt)'}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                }
+              >
+                <div>
+                  <Badge status={badgeStatus} />
+                  <strong>{group.name}:</strong> {group.count} người
+                </div>
+              </Tooltip>
             </li>
           );
         })}
-        {daySchedules.length > 3 && (
-          <li style={{ fontSize: '11px', color: '#ff7a45', fontWeight: 'bold' }}>
-            + {daySchedules.length - 3} nhân viên khác...
-          </li>
-        )}
       </ul>
     );
   };
@@ -567,17 +631,30 @@ const WorkSchedulePage = () => {
                 {/* Advanced Search & Filtering Box */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
                   <Select
-                    placeholder="Lọc chi nhánh"
+                    placeholder="Lọc nhân viên"
                     style={{ width: 180 }}
                     allowClear
-                    value={selectedBranch}
-                    onChange={(val) => setSelectedBranch(val)}
+                    showSearch
+                    optionFilterProp="label"
+                    value={selectedAccount}
+                    onChange={(val) => setSelectedAccount(val)}
                   >
-                    {branches.map((b) => (
-                      <Select.Option key={b.id} value={b.id}>
-                        {b.name}
+                    {accounts.map((a) => (
+                      <Select.Option key={a.id} value={a.id} label={a.name}>
+                        {a.name}
                       </Select.Option>
                     ))}
+                  </Select>
+
+                  <Select
+                    placeholder="Lọc trạng thái duyệt"
+                    style={{ width: 180 }}
+                    allowClear
+                    value={selectedApprovalStatus}
+                    onChange={(val) => setSelectedApprovalStatus(val)}
+                  >
+                    <Select.Option value={true}>Đã duyệt</Select.Option>
+                    <Select.Option value={false}>Chưa duyệt</Select.Option>
                   </Select>
 
                   <Select
@@ -616,7 +693,7 @@ const WorkSchedulePage = () => {
                     format="DD/MM/YYYY"
                   />
 
-                  {(selectedBranch || selectedShift || selectedStatus || searchDate) && (
+                  {(selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
                     <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
                       Xóa lọc
                     </Button>
@@ -629,7 +706,7 @@ const WorkSchedulePage = () => {
                   dataSource={filteredSchedules}
                   rowKey="id"
                   loading={loading}
-                  pagination={{ pageSize: 12 }}
+                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
                   scroll={{ x: 1100 }}
                   bordered
                 />
@@ -679,7 +756,22 @@ const WorkSchedulePage = () => {
         }}
         cancelButtonProps={{ style: { borderRadius: '6px' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: 16 }}>
+        <Form 
+          form={form} 
+          layout="vertical" 
+          onFinish={handleSubmit} 
+          style={{ marginTop: 16 }}
+          onValuesChange={(changedValues, allValues) => {
+            if (changedValues.checkInTime || changedValues.checkOutTime) {
+              if (allValues.checkInTime && allValues.checkOutTime) {
+                const diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
+                if (diff > 0) {
+                  form.setFieldsValue({ actualHours: parseFloat(diff.toFixed(2)) });
+                }
+              }
+            }
+          }}
+        >
           {/* Row 1: Employee & Branch */}
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item

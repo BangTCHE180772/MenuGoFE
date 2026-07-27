@@ -35,5 +35,5 @@ export const getProfile = () =>
 /**
  * Lấy danh sách roles trong hệ thống
  */
-export const getRoleRange = () =>
-  axiosInstance.get('/api/Account/role-range');
+export const getRoleRange = (branchId) =>
+  axiosInstance.get('/api/Account/exclude-roles', { params: { branchId } });

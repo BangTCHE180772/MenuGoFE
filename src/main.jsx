@@ -4,6 +4,7 @@ import { ConfigProvider, App as AntdApp } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 
 import { AuthProvider } from './context/AuthContext';
+import { BranchProvider } from './context/BranchContext';
 import { DeviceProvider } from './context/DeviceContext';
 
 import './index.css';
@@ -24,9 +25,11 @@ createRoot(document.getElementById('root')).render(
     <ConfigProvider theme={antdTheme} locale={viVN}>
       <AntdApp>
         <AuthProvider>
-          <DeviceProvider>
-            <App />
-          </DeviceProvider>
+          <BranchProvider>
+            <DeviceProvider>
+              <App />
+            </DeviceProvider>
+          </BranchProvider>
         </AuthProvider>
       </AntdApp>
     </ConfigProvider>
