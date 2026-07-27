@@ -291,21 +291,20 @@ const TopBar = () => {
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center' }}>
         {['Admin', 'Owner'].includes(role) && (
           <Select
-            value={currentBranchId}
-            onChange={selectBranch}
+            value={currentBranchId || undefined}
+            onChange={(val) => selectBranch(val || null)}
             style={{ width: 180, marginRight: 16 }}
             placeholder="Tất cả chi nhánh"
             allowClear
-            dropdownStyle={{ minWidth: 200 }}
+            styles={{ popup: { root: { minWidth: 200 } } }}
             className="topbar-branch-select"
-          >
-            <Select.Option value={null}>Tất cả chi nhánh</Select.Option>
-            {branches.map((b) => (
-              <Select.Option key={b.id} value={b.id}>
-                {b.name}
-              </Select.Option>
-            ))}
-          </Select>
+            options={branches
+              .filter((b) => b && b.id != null)
+              .map((b) => ({
+                value: b.id,
+                label: b.name || 'Chi nhánh'
+              }))}
+          />
         )}
 
         <Dropdown

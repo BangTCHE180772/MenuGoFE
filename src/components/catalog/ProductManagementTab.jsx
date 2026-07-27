@@ -1448,8 +1448,8 @@ const ProductManagementTab = () => {
                       >
                         <InputNumber
                           style={{ width: '100%' }}
-                          formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                          parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                          formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                          parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                           min={0}
                         />
                       </Form.Item>
@@ -1501,8 +1501,8 @@ const ProductManagementTab = () => {
                                   style={{ width: '100%' }}
                                   min={0}
                                   max={1000000000}
-                                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                                 />
                               </Form.Item>
                             </Col>
@@ -1517,8 +1517,8 @@ const ProductManagementTab = () => {
                                   style={{ width: '100%' }}
                                   min={0}
                                   max={1000000000}
-                                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                                 />
                               </Form.Item>
                             </Col>
@@ -1719,7 +1719,7 @@ const ProductManagementTab = () => {
         size="small"
         width={400}
         zIndex={1100}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ paddingTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
@@ -1746,7 +1746,7 @@ const ProductManagementTab = () => {
         size="small"
         width={400}
         zIndex={1100}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ paddingTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
@@ -1773,7 +1773,7 @@ const ProductManagementTab = () => {
         size="small"
         width={400}
         zIndex={1150}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ paddingTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
@@ -1798,7 +1798,7 @@ const ProductManagementTab = () => {
         cancelText="Hủy"
         width={720}
         zIndex={1100}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ paddingTop: 4 }}>
           {['Processed', 'Manufactured'].includes(productTypeWatch) && (
@@ -1992,7 +1992,7 @@ const ProductManagementTab = () => {
         cancelText="Hủy"
         width={780}
         zIndex={1100}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
           {/* Header Title & Subtitle */}
@@ -2023,7 +2023,7 @@ const ProductManagementTab = () => {
                 setRecipeItems([...recipeItems, { productId: val, quantity: 1 }]);
                 notifySuccess('Đã thêm thành phần vào công thức!');
               }}
-              value={null}
+              value={undefined}
               style={{ width: 320 }}
             >
               {products

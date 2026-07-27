@@ -629,8 +629,8 @@ const ContractPage = () => {
               <InputNumber
                 addonAfter="đ"
                 style={{ width: '100%' }}
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                formatter={(value) => (value != null && value !== '' ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                parser={(value) => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
                 min={0}
               />
             </Form.Item>

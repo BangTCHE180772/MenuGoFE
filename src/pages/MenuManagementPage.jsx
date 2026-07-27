@@ -688,7 +688,7 @@ const MenuManagementPage = () => {
         onCancel={() => setCategoryModalVisible(false)}
         okText="Lưu"
         cancelText="Hủy"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={categoryForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
@@ -715,7 +715,7 @@ const MenuManagementPage = () => {
         okText="Lưu lại"
         cancelText="Hủy bỏ"
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={dishForm} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
@@ -780,8 +780,8 @@ const MenuManagementPage = () => {
               >
                 <InputNumber
                   style={{ width: '100%' }}
-                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  formatter={value => (value != null && value !== '' ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={value => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
                   placeholder="Giá bán của món ăn"
                 />
               </Form.Item>

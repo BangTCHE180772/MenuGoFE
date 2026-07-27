@@ -960,8 +960,8 @@ const PayrollPage = () => {
                 <InputNumber
                   addonAfter="đ"
                   style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                   min={0}
                 />
               </Form.Item>
@@ -997,8 +997,8 @@ const PayrollPage = () => {
                 <InputNumber
                   addonAfter="đ"
                   style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                   readOnly
                 />
               </Form.Item>
@@ -1057,8 +1057,8 @@ const PayrollPage = () => {
                         placeholder="Số tiền"
                         addonAfter="đ"
                         style={{ width: '100%' }}
-                        formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                        formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                        parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                         min={0}
                       />
                     </Form.Item>

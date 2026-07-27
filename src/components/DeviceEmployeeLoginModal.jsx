@@ -47,7 +47,7 @@ const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess, prefillEmail }) =
         onCancel();
       }}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width={600}
     >
       <div style={{ display: 'flex', gap: '20px' }}>
