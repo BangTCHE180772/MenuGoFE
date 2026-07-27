@@ -9,11 +9,7 @@ import {
 } from "@ant-design/icons";
 import { getMainChain } from "../api/chainApi";
 import { getAllBranches } from "../api/branchApi";
-import {
-  getAllMenus,
-  getMenuProducts,
-  getProductsODataPaged,
-} from "../api/menuApi";
+import { getAllMenus, getProductsODataPaged } from "../api/menuApi";
 
 import CustomerHeader from "../components/customer/CustomerHeader";
 import CustomerHeroBanner from "../components/customer/CustomerHeroBanner";
@@ -31,15 +27,16 @@ import "../styles/CustomerHomePage.css";
 //=======================================================================================================================Fake Data
 const MOCK_CHAIN = {
   id: 1,
-  name: "Chuỗi Nhà Hàng MenuGo Premium",
+  name: "Cửa hàng",
   logoImage:
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80",
+    // "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80",
+    "",
   backgroundImage:
-    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+    // "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+    "",
   openTime: "08:00:00",
   closeTime: "22:30:00",
-  newAddressName:
-    "123 Đường Lý Tự Trọng, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh",
+  newAddressName: "Địa chỉ",
 };
 
 const currentDate = new Date();
@@ -48,130 +45,27 @@ const currentMonthIsoString = currentDate.toISOString();
 const MOCK_PRODUCTS = [
   {
     id: 101,
-    name: "Bò Bit-Tết Thượng Hạng Sauce Nấm Truffle",
-    price: 350000,
+    name: "Tên món ăn mẫu (Mock)",
+    price: 100000,
     imageLink:
-      "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ ăn",
-    description:
-      "Thịt bò Wagyu nhập khẩu nướng xèo trên đá núi lửa, phủ xốt nấm Truffle đen đặc chế thơm lừng.",
+      // "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+      "",
+    groupName: "Món ăn",
+    description: "Mô tả.",
     createdAt: currentMonthIsoString,
     isNew: true,
-  },
-  {
-    id: 102,
-    name: "Cơm Chiên Hải Sản Hoàng Gia",
-    price: 185000,
-    imageLink:
-      "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ ăn",
-    description:
-      "Cơm chiên hạt ngọc tôm hùm, sò điệp Nhật Bản và trứng tôm ebiko giòn rụm.",
-    createdAt: currentMonthIsoString,
-    isNew: true,
-  },
-  {
-    id: 103,
-    name: "Lẩu Thái Hải Sản Chùa Vàng",
-    price: 490000,
-    imageLink:
-      "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ ăn",
-    description:
-      "Nước dùng chua cay đậm vị Tomyum truyền thống kết hợp hải sản tươi sống đánh bắt trong ngày.",
-    createdAt: "2025-10-15T10:00:00Z",
-    isNew: false,
-  },
-  {
-    id: 104,
-    name: "Trà Trái Cây Nhiệt Đới Special",
-    price: 65000,
-    imageLink:
-      "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ uống",
-    description:
-      "Trà ô long thanh mát kết hợp xoài chín, chanh dây và dâu tây tươi mọng nước.",
-    createdAt: currentMonthIsoString,
-    isNew: true,
-  },
-  {
-    id: 105,
-    name: "Matcha Latte Đậu Đỏ Kem Béo",
-    price: 72000,
-    imageLink:
-      "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ uống",
-    description:
-      "Bột Matcha nguyên chất Uji Nhật Bản pha chế cùng sữa tươi nguyên chất và lớp macchiato kem béo.",
-    createdAt: "2025-11-01T10:00:00Z",
-    isNew: false,
-  },
-  {
-    id: 106,
-    name: "Bánh Tiramisu Ý Truyền Thống",
-    price: 95000,
-    imageLink:
-      "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=800&q=80",
-    groupName: "Tráng miệng",
-    description:
-      "Lớp bánh Savoiardi thấm đẫm Espresso và rượu Kahlua quyện cùng kem Mascarpone mềm mịn.",
-    createdAt: currentMonthIsoString,
-    isNew: true,
-  },
-  {
-    id: 107,
-    name: "Cheesecake Chanh Dây Mát Lạnh",
-    price: 85000,
-    imageLink:
-      "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=800&q=80",
-    groupName: "Tráng miệng",
-    description:
-      "Bánh phô mai nướng thơm béo phủ sốt chanh dây tươi chua ngọt hài hòa.",
-    createdAt: "2025-08-20T10:00:00Z",
-    isNew: false,
-  },
-  {
-    id: 108,
-    name: "Mì Ý Carbonara Sốt Kem Thịt Muối",
-    price: 165000,
-    imageLink:
-      "https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=800&q=80",
-    groupName: "Đồ ăn",
-    description:
-      "Sợi mì Spaghetti chuẩn Al Dente bọc sốt trứng lòng đỏ, phô mai Parmesan và bacon giòn.",
-    createdAt: "2025-09-05T10:00:00Z",
-    isNew: false,
   },
 ];
 
 const MOCK_BRANCHES = [
   {
     id: 1,
-    name: "MenuGo Bến Thành (Trụ sở chính)",
-    newAddressName: "123 Đường Lý Tự Trọng, Phường Bến Thành, Quận 1, TP. HCM",
+    name: "nhánh mẫu ",
+    newAddressName: "Địa chỉ ",
     openTime: "08:00",
     closeTime: "22:30",
-    phone: "1900 6868",
+    phone: "0123456789",
     isMain: true,
-  },
-  {
-    id: 2,
-    name: "MenuGo Thảo Điền",
-    newAddressName: "45 Đường Xuân Thủy, Phường Thảo Điền, TP. Thủ Đức",
-    openTime: "09:00",
-    closeTime: "22:00",
-    phone: "028 3822 9999",
-    isMain: false,
-  },
-  {
-    id: 3,
-    name: "MenuGo Cầu Giấy",
-    newAddressName:
-      "88 Đường Trần Thái Tông, Phường Dịch Vọng, Cầu Giấy, Hà Nội",
-    openTime: "08:30",
-    closeTime: "22:00",
-    phone: "024 3988 7777",
-    isMain: false,
   },
 ];
 
@@ -248,13 +142,7 @@ const CustomerHomePage = () => {
   }, []);
 
   const fetchProducts = useCallback(
-    async (
-      searchText = "",
-      catId = "all",
-      currentMenus = [],
-      pageIdx = 1,
-      size = 8,
-    ) => {
+    async (searchText = "", catId = "all", pageIdx = 1, size = 8) => {
       setLoadingMenu(true);
       try {
         const data = await getProductsODataPaged({
@@ -482,7 +370,7 @@ const CustomerHomePage = () => {
     setActiveSection(sectionId);
     const element = document.getElementById(sectionId);
     if (element) {
-      const yOffset = -70; 
+      const yOffset = -70;
       const y =
         element.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: y, behavior: "smooth" });

@@ -1,991 +1,1605 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Table,
-  Button,
+  Card,
   Input,
   Select,
-  Card,
-  Space,
-  Tag,
-  Modal,
-  Form,
   InputNumber,
+  DatePicker,
+  Button,
+  Checkbox,
+  Tabs,
+  Table,
+  Space,
   Row,
   Col,
-  Tooltip,
-  Radio,
-  Checkbox,
-  Avatar,
-  Pagination,
-  notification,
+  Tag,
   Badge,
-  Divider,
   Dropdown,
+  Typography,
+  Popconfirm,
+  Tooltip,
+  Modal,
+  message
 } from 'antd';
 import {
-  PlusOutlined,
-  EditOutlined,
-  ExportOutlined,
-  ImportOutlined,
-  PictureOutlined,
-  ExperimentOutlined,
-  BuildOutlined,
-  ShoppingOutlined,
-  AppstoreOutlined,
-  SettingOutlined,
-  InboxOutlined,
-  WarningOutlined,
+  SearchOutlined,
+  DeleteOutlined,
+  CloseOutlined,
+  FullscreenOutlined,
+  PrinterOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
-  FilterOutlined,
-  ReloadOutlined,
-  DownOutlined,
-  DatabaseOutlined,
-  RiseOutlined,
-  FallOutlined,
+  ImportOutlined,
+  ExportOutlined,
   SwapOutlined,
   AuditOutlined,
-  SearchOutlined,
+  BuildOutlined
 } from '@ant-design/icons';
-import {
-  getAllProducts,
-  updateProduct,
-} from '../../api/productApi';
-import { getAllGroups } from '../../api/groupApi';
-import { getAllMenus } from '../../api/menuApi';
-import { getAllUnits } from '../../api/unitApi';
+import dayjs from 'dayjs';
+
 import { getAllBranches } from '../../api/branchApi';
+import { getAllProducts } from '../../api/productApi';
+import {
+  deleteDocument,
+  getDocuments,
+  receiveTransferDocument
+} from '../../api/documentApi';
 import { useAuth } from '../../context/AuthContext';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const PRODUCT_TYPES = [
-  { value: 'Processed', label: 'Món chế biến', color: 'purple', icon: <ExperimentOutlined /> },
-  { value: 'Manufactured', label: 'Món sản xuất', color: 'blue', icon: <BuildOutlined /> },
-  { value: 'Regular', label: 'Món thường', color: 'green', icon: <ShoppingOutlined /> },
-  { value: 'Ingredient', label: 'Nguyên liệu', color: 'orange', icon: <AppstoreOutlined /> },
-  { value: 'Tool', label: 'Công cụ', color: 'cyan', icon: <SettingOutlined /> },
-];
+// ─── STANDALONE MODAL COMPONENTS ──────────────────────────────────────────────
+import ImportDocumentModal from './modals/ImportDocumentModal';
+import CheckDocumentModal from './modals/CheckDocumentModal';
+import DisposalDocumentModal from './modals/DisposalDocumentModal';
+import ProductionDocumentModal from './modals/ProductionDocumentModal';
+import TransferDocumentModal from './modals/TransferDocumentModal';
+import ReturnDocumentModal from './modals/ReturnDocumentModal';
 
-const MENU_TYPES = [
-  { label: 'Đồ ăn', value: 'Food' },
-  { label: 'Đồ uống', value: 'Drink' },
-  { label: 'Dịch vụ', value: 'Service' },
-  { label: 'Khác', value: 'Other' },
-];
-
-const STOCK_STATUS_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả' },
-  { value: 'IN_STOCK', label: 'Còn hàng' },
-  { value: 'LOW', label: 'Dưới định mức' },
-  { value: 'HIGH', label: 'Vượt định mức' },
-  { value: 'OUT_OF_STOCK', label: 'Hết hàng' },
-];
-
-// Management tabs (top-right option bar matching KiotViet)
-const MGMT_TABS = [
-  { key: 'stock', label: 'Tồn kho', icon: <DatabaseOutlined /> },
-  { key: 'import', label: 'Nhập hàng', icon: <ImportOutlined /> },
-  { key: 'export', label: 'Xuất hàng', icon: <ExportOutlined /> },
-  { key: 'transfer', label: 'Chuyển kho', icon: <SwapOutlined /> },
-  { key: 'adjust', label: 'Điều chỉnh', icon: <AuditOutlined /> },
-];
-
-// ─── Helper ───────────────────────────────────────────────────────────────────
-const formatVND = (val) => (val ? val.toLocaleString('vi-VN') : '0');
-
-const getStockStatus = (record) => {
-  const stock = record.currentStock ?? (record.id * 17) % 150;
-  const isManaged = record.isManageQuantity;
-  const min = record.minStorage ?? 0;
-  const max = record.maxStorage ?? 1_000_000_000;
-  if (!isManaged) return { text: 'Không quản lý', color: 'default', badgeColor: '#9ca3af' };
-  if (stock <= 0) return { text: 'Hết hàng', color: 'error', badgeColor: '#ef4444' };
-  if (stock < min) return { text: 'Dưới định mức', color: 'warning', badgeColor: '#f59e0b' };
-  if (stock > max) return { text: 'Vượt định mức', color: 'orange', badgeColor: '#f97316' };
-  return { text: 'Đủ tồn kho', color: 'success', badgeColor: '#22c55e' };
+// ─── CONSTANTS & CONFIG ──────────────────────────────────────────────────────
+const DOC_TYPE_CONFIG = {
+  1: { label: 'Nhập kho', color: 'blue', icon: <ImportOutlined /> },
+  2: { label: 'Xuất hủy', color: 'red', icon: <ExportOutlined /> },
+  3: { label: 'Chuyển hàng', color: 'cyan', icon: <SwapOutlined /> },
+  4: { label: 'Trả hàng nhập', color: 'orange', icon: <ExportOutlined /> },
+  5: { label: 'Kiểm kho', color: 'gold', icon: <AuditOutlined /> },
+  6: { label: 'Sản xuất', color: 'purple', icon: <BuildOutlined /> }
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-const InventoryManagementTab = () => {
-  const { user } = useAuth();
+const SIDEBAR_HEADER_TITLES = {
+  overview: 'TỔNG QUAN',
+  '1_4': 'NHẬP HÀNG',
+  '4': 'TRẢ HÀNG NHẬP',
+  '6': 'SẢN XUẤT',
+  '3': 'CHUYỂN HÀNG',
+  '5': 'KIỂM KHO',
+  '2': 'XUẤT HỦY',
+  partners: 'NHÀ CUNG CẤP / ĐỐI TÁC',
+  dishes: 'MÓN',
+  dish_groups: 'NHÓM MÓN',
+  menu_list: 'THỰC ĐƠN',
+  invoices: 'HÓA ĐƠN',
+  returns: 'TRẢ HÀNG',
+  cashbook: 'SỔ QUỶ'
+};
 
-  // Data states
-  const [products, setProducts] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [menus, setMenus] = useState([]);
-  const [branches, setBranches] = useState([]);
+const INITIAL_DOCUMENTS = [
+  { id: 101, code: 'IM202607261001', type: 1, typeLabel: 'Nhập kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T10:00:00Z', totalAmount: 15500000, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 102, code: 'EX202607261115', type: 2, typeLabel: 'Xuất hủy', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T11:15:00Z', totalAmount: 450000, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 103, code: 'TR202607261200', type: 3, typeLabel: 'Chuyển hàng', branchName: 'Chi nhánh Trung Tâm -> CN Quận 3', businessDate: '2026-07-26T12:00:00Z', totalAmount: 3200000, status: 'Completed', transferStatus: 'Pending', creator: 'Quản lý Kho' },
+  { id: 104, code: 'AD202607261230', type: 5, typeLabel: 'Kiểm kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T12:30:00Z', totalAmount: 0, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 105, code: 'PR202607261245', type: 6, typeLabel: 'Sản xuất', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T12:45:00Z', totalAmount: 2100000, status: 'Completed', transferStatus: 'None', creator: 'Đầu Bếp Trưởng' },
+  { id: 106, code: 'IM202607261300', type: 1, typeLabel: 'Nhập kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T13:00:00Z', totalAmount: 8400000, status: 'Completed', transferStatus: 'None', creator: 'Nhân viên Nhập' },
+  { id: 107, code: 'RT202607261330', type: 4, typeLabel: 'Trả hàng nhập', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T13:30:00Z', totalAmount: 1200000, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 108, code: 'TR202607261400', type: 3, typeLabel: 'Chuyển hàng', branchName: 'Chi nhánh Trung Tâm -> CN Gò Vấp', businessDate: '2026-07-26T14:00:00Z', totalAmount: 5100000, status: 'Completed', transferStatus: 'Completed', creator: 'Quản lý Kho' },
+  { id: 109, code: 'EX202607261430', type: 2, typeLabel: 'Xuất hủy', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T14:30:00Z', totalAmount: 280000, status: 'Completed', transferStatus: 'None', creator: 'Bếp Phó' },
+  { id: 110, code: 'AD202607261500', type: 5, typeLabel: 'Kiểm kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T15:00:00Z', totalAmount: 0, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 111, code: 'IM202607261530', type: 1, typeLabel: 'Nhập kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T15:30:00Z', totalAmount: 19200000, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' },
+  { id: 112, code: 'PR202607261600', type: 6, typeLabel: 'Sản xuất', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T16:00:00Z', totalAmount: 3800000, status: 'Completed', transferStatus: 'None', creator: 'Đầu Bếp Trưởng' },
+  { id: 113, code: 'TR202607261630', type: 3, typeLabel: 'Chuyển hàng', branchName: 'Chi nhánh Trung Tâm -> CN Tân Bình', businessDate: '2026-07-26T16:30:00Z', totalAmount: 4200000, status: 'Completed', transferStatus: 'Pending', creator: 'Quản lý Kho' },
+  { id: 114, code: 'RT202607261700', type: 4, typeLabel: 'Trả hàng nhập', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T17:00:00Z', totalAmount: 850000, status: 'Completed', transferStatus: 'None', creator: 'Nhân viên Kho' },
+  { id: 115, code: 'IM202607261730', type: 1, typeLabel: 'Nhập kho', branchName: 'Chi nhánh Trung Tâm', businessDate: '2026-07-26T17:30:00Z', totalAmount: 6700000, status: 'Completed', transferStatus: 'None', creator: 'Quản lý Kho' }
+];
+
+const INITIAL_PARTNERS = [
+  { id: 1, name: 'Công ty Thực Phẩm Sạch VIETFOOD', type: 'Nhà cung cấp', phone: '0901234567', totalDebt: 15500000 },
+  { id: 2, name: 'Đơn Vị Vận Chuyển Nhanh 247', type: 'Vận chuyển', phone: '0988776655', totalDebt: 350000 },
+  { id: 3, name: 'Nông Trại Rau Xanh Đà Lạt Sạch', type: 'Nhà cung cấp', phone: '0912345678', totalDebt: 0 },
+  { id: 4, name: 'Nhà Phân Phối Đồ Uống Tân Hiệp', type: 'Nhà cung cấp', phone: '0933445566', totalDebt: 8200000 },
+  { id: 5, name: 'Công Ty Hải Sản Biển Đông', type: 'Nhà cung cấp', phone: '0977889900', totalDebt: 24000000 },
+  { id: 6, name: 'Xưởng Bao Bì & In Ấn Hoàng Nam', type: 'Nhà cung cấp', phone: '0944556677', totalDebt: 1200000 },
+  { id: 7, name: 'Đội Vận Chuyển Hàng Đông Lạnh Express', type: 'Vận chuyển', phone: '0922334455', totalDebt: 650000 },
+  { id: 8, name: 'Công Ty Thịt Bò Nhập Khẩu Mỹ-Úc', type: 'Nhà cung cấp', phone: '0966778899', totalDebt: 45000000 },
+  { id: 9, name: 'Cơ Sở Gia Vị & Nước Chấm Truyền Thống', type: 'Nhà cung cấp', phone: '0911223344', totalDebt: 890000 },
+  { id: 10, name: 'Đơn Vị Cung Cấp Gas Công Nghiệp Bình Minh', type: 'Nhà cung cấp', phone: '0955667788', totalDebt: 3400000 },
+  { id: 11, name: 'Nông Trại Trứng Gà Sạch Ba Huân', type: 'Nhà cung cấp', phone: '0988990011', totalDebt: 1500000 },
+  { id: 12, name: 'Công Ty Thiết Bị Bếp Công Nghiệp Inox', type: 'Đối tác dịch vụ', phone: '0933221100', totalDebt: 12500000 },
+  { id: 13, name: 'Công Ty Khăn Lạnh & Vật Tư Tiêu Hao', type: 'Nhà cung cấp', phone: '0977665544', totalDebt: 420000 },
+  { id: 14, name: 'Đơn Vị Thu Gom Rác Thải Sinh Hoạt MT', type: 'Đối tác dịch vụ', phone: '0944332211', totalDebt: 300000 },
+  { id: 15, name: 'Nhà Phân Phối Bia & Nước Giải Khát SABECO', type: 'Nhà cung cấp', phone: '0911998877', totalDebt: 31000000 }
+];
+
+const INITIAL_CASH_FLOWS = [
+  { id: 1, code: 'CF-001', date: '2026-07-26T10:00:00Z', direction: 'Outflow', amount: 15500000, category: 'Thanh toán nhập kho NCC', partner: 'Công ty Thực Phẩm Sạch VIETFOOD' },
+  { id: 2, code: 'CF-002', date: '2026-07-26T10:30:00Z', direction: 'Inflow', amount: 2450000, category: 'Thu tiền bán hàng ca sáng', partner: 'Khách lẻ' },
+  { id: 3, code: 'CF-003', date: '2026-07-26T11:45:00Z', direction: 'Outflow', amount: 350000, category: 'Chi phí vận chuyển', partner: 'Đơn Vị Vận Chuyển Nhanh 247' },
+  { id: 4, code: 'CF-004', date: '2026-07-26T12:15:00Z', direction: 'Inflow', amount: 8900000, category: 'Thu tiền đặt tiệc sinh nhật', partner: 'Anh Hoàng (Khách VIP)' },
+  { id: 5, code: 'CF-005', date: '2026-07-26T13:00:00Z', direction: 'Outflow', amount: 8200000, category: 'Thanh toán tiền nước giải khát', partner: 'Nhà Phân Phối Đồ Uống Tân Hiệp' },
+  { id: 6, code: 'CF-006', date: '2026-07-26T13:40:00Z', direction: 'Inflow', amount: 4150000, category: 'Thu tiền hóa đơn bán hàng', partner: 'Khách lẻ (Bàn 08)' },
+  { id: 7, code: 'CF-007', date: '2026-07-26T14:10:00Z', direction: 'Outflow', amount: 1200000, category: 'Chi trả tiền in ấn menu & bao bì', partner: 'Xưởng Bao Bì & In Ấn Hoàng Nam' },
+  { id: 8, code: 'CF-008', date: '2026-07-26T14:50:00Z', direction: 'Inflow', amount: 1250000, category: 'Thu tiền cọc đặt bàn trước', partner: 'Chị Lan' },
+  { id: 9, code: 'CF-009', date: '2026-07-26T15:20:00Z', direction: 'Outflow', amount: 3400000, category: 'Chi đổi bình gas công nghiệp', partner: 'Gas Bình Minh' },
+  { id: 10, code: 'CF-010', date: '2026-07-26T16:00:00Z', direction: 'Inflow', amount: 6700000, category: 'Thu tiền doanh thu bán lẻ ca chiều', partner: 'Khách lẻ' },
+  { id: 11, code: 'CF-011', date: '2026-07-26T16:30:00Z', direction: 'Outflow', amount: 4500000, category: 'Tạm ứng lương nhân viên bếp', partner: 'Nguyễn Văn B (Đầu bếp)' },
+  { id: 12, code: 'CF-012', date: '2026-07-26T17:00:00Z', direction: 'Inflow', amount: 3100000, category: 'Thu hoàn ứng tiền mua đồ lẻ', partner: 'Quản lý Kho' },
+  { id: 13, code: 'CF-013', date: '2026-07-26T17:30:00Z', direction: 'Outflow', amount: 890000, category: 'Chi gia vị & phụ gia bếp', partner: 'Cơ Sở Gia Vị Truyền Thống' },
+  { id: 14, code: 'CF-014', date: '2026-07-26T18:00:00Z', direction: 'Inflow', amount: 15400000, category: 'Thu tiền hóa đơn tiệc công ty', partner: 'Công ty Công Nghệ ABC' },
+  { id: 15, code: 'CF-015', date: '2026-07-26T18:30:00Z', direction: 'Outflow', amount: 1500000, category: 'Chi phí vệ sinh & diệt khuẩn', partner: 'Dịch vụ Môi Trường MT' }
+];
+
+const STATIC_INVOICES = [
+  { id: 1, code: 'HD20260726001', date: '2026-07-26T10:15:00Z', customer: 'Anh Tuấn (Bàn 03)', total: 450000, status: 'Paid' },
+  { id: 2, code: 'HD20260726002', date: '2026-07-26T11:00:00Z', customer: 'Chị Mai (VIP 1)', total: 1200000, status: 'Paid' },
+  { id: 3, code: 'HD20260726003', date: '2026-07-26T11:30:00Z', customer: 'Anh Hoàng (Bàn 05)', total: 890000, status: 'Paid' },
+  { id: 4, code: 'HD20260726004', date: '2026-07-26T12:15:00Z', customer: 'Chị Linh (Bàn 01)', total: 350000, status: 'Paid' },
+  { id: 5, code: 'HD20260726005', date: '2026-07-26T12:45:00Z', customer: 'Anh Đức (VIP 2)', total: 2400000, status: 'Paid' },
+  { id: 6, code: 'HD20260726006', date: '2026-07-26T13:20:00Z', customer: 'Khách lẻ (Bàn 08)', total: 670000, status: 'Paid' },
+  { id: 7, code: 'HD20260726007', date: '2026-07-26T14:00:00Z', customer: 'Công ty FPT (Sảnh chính)', total: 5800000, status: 'Paid' },
+  { id: 8, code: 'HD20260726008', date: '2026-07-26T14:40:00Z', customer: 'Chị Hải (Bàn 10)', total: 520000, status: 'Paid' },
+  { id: 9, code: 'HD20260726009', date: '2026-07-26T15:15:00Z', customer: 'Anh Nam (Bàn 04)', total: 980000, status: 'Paid' },
+  { id: 10, code: 'HD20260726010', date: '2026-07-26T16:00:00Z', customer: 'Chị Thảo (VIP 3)', total: 3100000, status: 'Paid' },
+  { id: 11, code: 'HD20260726011', date: '2026-07-26T16:30:00Z', customer: 'Anh Hùng (Bàn 06)', total: 420000, status: 'Paid' },
+  { id: 12, code: 'HD20260726012', date: '2026-07-26T17:10:00Z', customer: 'Khách lẻ (Bàn 02)', total: 760000, status: 'Paid' }
+];
+
+const STATIC_RETURNS = [
+  { id: 1, code: 'TH20260726001', date: '2026-07-26T14:20:00Z', customer: 'Khách lẻ (Bàn 05)', amount: 150000, reason: 'Đổi món ăn' },
+  { id: 2, code: 'TH20260726002', date: '2026-07-26T15:10:00Z', customer: 'Anh Minh (VIP 1)', amount: 220000, reason: 'Khách đổi nước uống' },
+  { id: 3, code: 'TH20260726003', date: '2026-07-26T16:05:00Z', customer: 'Chị Hồng (Bàn 02)', amount: 95000, reason: 'Hủy món gọi thừa' },
+  { id: 4, code: 'TH20260726004', date: '2026-07-26T16:45:00Z', customer: 'Khách lẻ (Bàn 09)', amount: 180000, reason: 'Món ăn nguội khách đổi' },
+  { id: 5, code: 'TH20260726005', date: '2026-07-26T17:30:00Z', customer: 'Anh Bảo (VIP 2)', amount: 450000, reason: 'Khách bớt suất tiệc' }
+];
+
+const STATIC_DISHES = [
+  { id: 1, code: 'M001', name: 'Lẩu Thái Hải Sản Đặc Biệt', group: 'Món Lẩu', price: 299000, status: 'Active' },
+  { id: 2, code: 'M002', name: 'Bò Lúc Lắc Sốt Tiêu Đen', group: 'Món Xào', price: 155000, status: 'Active' },
+  { id: 3, code: 'M003', name: 'Trà Đào Cam Sả Thạch', group: 'Đồ Uống', price: 45000, status: 'Active' },
+  { id: 4, code: 'M004', name: 'Cơm Chiên Dương Châu Hải Sản', group: 'Món Cơm', price: 95000, status: 'Active' },
+  { id: 5, code: 'M005', name: 'Gà Nướng Mật Ong Nguyên Con', group: 'Món Nướng', price: 240000, status: 'Active' },
+  { id: 6, code: 'M006', name: 'Súp Hải Sản Tóc Tiên', group: 'Khai Vị', price: 65000, status: 'Active' },
+  { id: 7, code: 'M007', name: 'Mì Ý Sốt Bò Bằm Bolognese', group: 'Món Mì', price: 120000, status: 'Active' },
+  { id: 8, code: 'M008', name: 'Salad Cá Hồi Sốt Chanh Dây', group: 'Khai Vị', price: 135000, status: 'Active' },
+  { id: 9, code: 'M009', name: 'Tôm Hùm Bỏ Lò Phô Mai', group: 'Hải Sản', price: 580000, status: 'Active' },
+  { id: 10, code: 'M010', name: 'Sinh Tố Bơ Nước Cốt Dừa', group: 'Đồ Uống', price: 50000, status: 'Active' },
+  { id: 11, code: 'M011', name: 'Mực Hấp Gừng Hành', group: 'Hải Sản', price: 175000, status: 'Active' },
+  { id: 12, code: 'M012', name: 'Lẩu Nấm Chim Câu Trắng', group: 'Món Lẩu', price: 350000, status: 'Active' },
+  { id: 13, code: 'M013', name: 'Rau Muống Xào Tỏi Hồng Bàng', group: 'Món Xào', price: 45000, status: 'Active' },
+  { id: 14, code: 'M014', name: 'Bia Heineken Silver Cống', group: 'Đồ Uống', price: 35000, status: 'Active' },
+  { id: 15, code: 'M015', name: 'Bánh Mì Tỏi Phô Mai Nướng', group: 'Tráng Miệng', price: 40000, status: 'Active' }
+];
+
+const STATIC_DISH_GROUPS = [
+  { id: 1, code: 'NG01', name: 'Món Lẩu', count: 12, note: 'Lẩu truyền thống & hiện đại' },
+  { id: 2, code: 'NG02', name: 'Món Xào', count: 18, note: 'Các món xào nóng hổi' },
+  { id: 3, code: 'NG03', name: 'Đồ Uống', count: 25, note: 'Trà, sinh tố, nước giải khát' },
+  { id: 4, code: 'NG04', name: 'Món Nướng', count: 14, note: 'Nướng than hoa & bỏ lò' },
+  { id: 5, code: 'NG05', name: 'Khai Vị & Salad', count: 10, note: 'Gỏi, salad, món súp' },
+  { id: 6, code: 'NG06', name: 'Món Mì & Cơm', count: 16, note: 'Cơm chiên, mì xào, mỳ Ý' },
+  { id: 7, code: 'NG07', name: 'Hải Sản Tươi Sống', count: 22, note: 'Tôm, cua, cá, mực hằng ngày' },
+  { id: 8, code: 'NG08', name: 'Tráng Miệng & Chè', count: 8, note: 'Kem, chè, hoa quả tươi' },
+  { id: 9, code: 'NG09', name: 'Món Hấp & Luộc', count: 15, note: 'Hấp thanh vị, giữ trọn dưỡng chất' },
+  { id: 10, code: 'NG10', name: 'Món Chiên Rán', count: 20, note: 'Chiên giòn rụm đậm vị' },
+  { id: 11, code: 'NG11', name: 'Đặc Sản Vùng Miền', count: 11, note: 'Hương vị truyền thống các vùng' },
+  { id: 12, code: 'NG12', name: 'Cơm Niêu & Cơm Thố', count: 9, note: 'Cơm niêu nóng hổi cháy giòn' },
+  { id: 13, code: 'NG13', name: 'Lẩu Hai Ngăn VIP', count: 7, note: 'Nước lẩu kép tùy chọn vị' },
+  { id: 14, code: 'NG14', name: 'Rượu & Đồ Uống Cùng Cồn', count: 30, note: 'Rượu vang, bia craft cao cấp' },
+  { id: 15, code: 'NG15', name: 'Nước Ép & Sinh Tố Tươi', count: 18, note: 'Trái cây tươi nguyên chất 100%' },
+  { id: 16, code: 'NG16', name: 'Món Chay Thanh Đạm', count: 14, note: 'Chế biến từ nấm và rau củ tươi' },
+  { id: 17, code: 'NG17', name: 'Món Trẻ Em (Kids Menu)', count: 6, note: 'Thiết kế riêng dinh dưỡng cho trẻ' },
+  { id: 18, code: 'NG18', name: 'Combo Gia Đình 4-6 Người', count: 5, note: 'Tiết kiệm 15% so với gọi món lẻ' },
+  { id: 19, code: 'NG19', name: 'Set Tiệc Công Ty', count: 4, note: 'Thực đơn tiệc trọn gói cao cấp' },
+  { id: 20, code: 'NG20', name: 'Món Đi Kèm & Gia Vị Extra', count: 22, note: 'Sốt chấm, kim chi, dưa góp' },
+  { id: 21, code: 'NG21', name: 'Bánh Ngọt & Soft Cake', count: 10, note: 'Bánh tráng miệng phong cách Âu' },
+  { id: 22, code: 'NG22', name: 'Cà Phê & Trà Chiều', count: 16, note: 'Espresso, Matcha, trà hoa quả' },
+  { id: 23, code: 'NG23', name: 'Súp & Chao Đêm', count: 8, note: 'Phục vụ ca đêm thanh nhẹ' },
+  { id: 24, code: 'NG24', name: 'Hải Sản Cao Cấp (Order Trước)', count: 5, note: 'Cua Kingcrab, tôm hùm Alaska' },
+  { id: 25, code: 'NG25', name: 'Món Nướng Hàn Quốc', count: 19, note: 'Dẻ sườn bò, ba chỉ ướp sốt' }
+];
+
+const STATIC_MENU_LIST = [
+  { id: 1, code: 'TD01', name: 'Thực đơn Bán Hàng Hằng Ngày', branch: 'Tất cả chi nhánh', status: 'Active' },
+  { id: 2, code: 'TD02', name: 'Thực đơn Tiệc & Sự Kiện', branch: 'Chi nhánh Trung Tâm', status: 'Active' },
+  { id: 3, code: 'TD03', name: 'Thực đơn Ăn Sáng & Coffee', branch: 'Tất cả chi nhánh', status: 'Active' },
+  { id: 4, code: 'TD04', name: 'Thực đơn Buffet Lẩu Hải Sản', branch: 'Chi nhánh Quận 3', status: 'Active' },
+  { id: 5, code: 'TD05', name: 'Thực đơn Khuyến Mãi Hè 2026', branch: 'Tất cả chi nhánh', status: 'Active' },
+  { id: 6, code: 'TD06', name: 'Thực đơn Mang Về & GrabFood', branch: 'Tất cả chi nhánh', status: 'Active' }
+];
+
+// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
+
+const InventorySidebar = ({ activeSubOption, activeMainCategory }) => {
+  return (
+    <div
+      style={{
+        width: 190,
+        minWidth: 190,
+        background: '#ffffff',
+        borderRight: '1px solid #e2e8f0',
+        color: '#475569',
+        display: 'flex',
+        flexDirection: 'column',
+        fontSize: 10.5,
+        padding: '8px 10px',
+        userSelect: 'none'
+      }}
+    >
+      {/* HEADER TÊN TÍNH NĂNG ĐANG TRUY CẬP (ĐỂ TRỐNG KHI Ở TỔNG QUAN) */}
+      {activeSubOption !== 'overview' && (
+        <div style={{ paddingBottom: 6, marginBottom: 8, borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 11, color: '#e8442a' }}>
+          <span style={{ textTransform: 'uppercase', color: '#e8442a', letterSpacing: '0.3px' }}>
+            {SIDEBAR_HEADER_TITLES[activeSubOption] || SIDEBAR_HEADER_TITLES[activeMainCategory]}
+          </span>
+        </div>
+      )}
+
+      {/* SIDEBAR BODY RESERVED FOR USER FILTER OPTIONS */}
+      <div style={{ flex: 1 }}></div>
+
+      <div style={{ marginTop: 'auto', paddingTop: 6, fontSize: 9.5, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
+        MenuGo ERP v2.5
+      </div>
+    </div>
+  );
+};
+
+const InventoryHeaderNav = ({
+  branches,
+  selectedBranchId,
+  setSelectedBranchId,
+  loading,
+  activeMainCategory,
+  setActiveMainCategory,
+  activeSubOption,
+  setActiveSubOption
+}) => {
+  const { Text } = Typography;
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '3px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: 38
+      }}
+    >
+      {/* LEFT GROUP: BRANCH SELECT & CAPSULE NAV BAR */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <Space size="small">
+          <Text strong style={{ fontSize: 11, color: '#334155' }}>Chi nhánh:</Text>
+          <Select
+            value={selectedBranchId}
+            onChange={(val) => setSelectedBranchId(val)}
+            style={{ width: 315 }}
+            size="small"
+            loading={loading}
+          >
+            {branches.map((b) => (
+              <Select.Option key={b.id} value={b.id}>
+                <span style={{ fontSize: 11, fontWeight: 600 }}>{b.name}</span>
+              </Select.Option>
+            ))}
+          </Select>
+        </Space>
+
+        {/* FULL ORANGE CAPSULE NAVIGATION OPTIONS */}
+        <div className="kiotviet-nav-bar">
+          <div
+            className={activeSubOption === 'overview' ? "kiotviet-nav-item active" : "kiotviet-nav-item"}
+            onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('overview'); }}
+          >
+            Tổng quan
+          </div>
+
+          {/* HOVER DROPDOWN MENU FOR THỰC ĐƠN */}
+          <Dropdown
+            popupRender={() => (
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 8,
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid #cbd5e1',
+                  padding: '4px 0',
+                  fontSize: 11,
+                  minWidth: 130
+                }}
+              >
+                <div
+                  onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('dishes'); }}
+                  style={{ padding: '6px 14px', cursor: 'pointer', color: activeSubOption === 'dishes' ? '#e8442a' : '#334155', fontWeight: activeSubOption === 'dishes' ? 700 : 500 }}
+                >
+                  Món
+                </div>
+                <div
+                  onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('dish_groups'); }}
+                  style={{ padding: '6px 14px', cursor: 'pointer', color: activeSubOption === 'dish_groups' ? '#e8442a' : '#334155', fontWeight: activeSubOption === 'dish_groups' ? 700 : 500 }}
+                >
+                  Nhóm món
+                </div>
+                <div
+                  onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('menu_list'); }}
+                  style={{ padding: '6px 14px', cursor: 'pointer', color: activeSubOption === 'menu_list' ? '#e8442a' : '#334155', fontWeight: activeSubOption === 'menu_list' ? 700 : 500 }}
+                >
+                  Thực đơn
+                </div>
+              </div>
+            )}
+            trigger={['hover']}
+          >
+            <div className={['dishes', 'dish_groups', 'menu_list'].includes(activeSubOption) ? "kiotviet-nav-item active" : "kiotviet-nav-item"}>Thực đơn</div>
+          </Dropdown>
+
+          {/* 2-COLUMN HOVER DROPDOWN MENU FOR KHO HÀNG */}
+          <Dropdown
+            popupRender={() => (
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 8,
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid #cbd5e1',
+                  display: 'flex',
+                  padding: '8px 0',
+                  fontSize: 11,
+                  minWidth: 320,
+                  overflow: 'hidden'
+                }}
+              >
+                {/* LEFT COLUMN: KHO HÀNG OPERATIONAL MODULES */}
+                <div style={{ flex: 1, borderRight: '1px solid #f1f5f9', padding: '2px 0' }}>
+                  <div style={{ padding: '4px 14px', fontSize: 10.5, fontWeight: 700, color: '#94a3b8' }}>Kho hàng</div>
+                  {[
+                    { key: '5', label: 'Kiểm kho' },
+                    { key: '6', label: 'Sản xuất' },
+                    { key: '3', label: 'Chuyển hàng' },
+                    { key: '2', label: 'Xuất hủy' }
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      onClick={() => {
+                        setActiveMainCategory('operations');
+                        setActiveSubOption(item.key);
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        cursor: 'pointer',
+                        color: activeSubOption === item.key ? '#e8442a' : '#334155',
+                        fontWeight: activeSubOption === item.key ? 700 : 500,
+                        background: activeSubOption === item.key ? '#fff1f0' : 'transparent',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* RIGHT COLUMN: NHẬP HÀNG & ĐỐI TÁC */}
+                <div style={{ flex: 1, padding: '2px 0' }}>
+                  <div style={{ padding: '4px 14px', fontSize: 10.5, fontWeight: 700, color: '#94a3b8' }}>Nhập hàng</div>
+                  {[
+                    { key: '1_4', label: 'Nhập hàng' },
+                    { key: '4', label: 'Trả hàng nhập' },
+                    { key: 'partners', label: 'Nhà cung cấp / Đối tác' }
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setActiveMainCategory('operations');
+                        setActiveSubOption(item.key);
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        cursor: 'pointer',
+                        color: activeSubOption === item.key ? '#e8442a' : '#334155',
+                        fontWeight: activeSubOption === item.key ? 700 : 500,
+                        background: activeSubOption === item.key ? '#fff1f0' : 'transparent',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            trigger={['hover']}
+          >
+            <div className={['1_4', '4', '5', '6', '3', '2'].includes(activeSubOption) && activeMainCategory === 'operations' ? "kiotviet-nav-item active" : "kiotviet-nav-item"}>Kho hàng</div>
+          </Dropdown>
+
+          {/* HOVER DROPDOWN MENU FOR GIAO DỊCH */}
+          <Dropdown
+            popupRender={() => (
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 8,
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid #cbd5e1',
+                  padding: '4px 0',
+                  fontSize: 11,
+                  minWidth: 120
+                }}
+              >
+                <div
+                  onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('invoices'); }}
+                  style={{ padding: '6px 14px', cursor: 'pointer', color: activeSubOption === 'invoices' ? '#e8442a' : '#334155', fontWeight: activeSubOption === 'invoices' ? 700 : 500 }}
+                >
+                  Hóa đơn
+                </div>
+                <div
+                  onClick={() => { setActiveMainCategory('operations'); setActiveSubOption('returns'); }}
+                  style={{ padding: '6px 14px', cursor: 'pointer', color: activeSubOption === 'returns' ? '#e8442a' : '#334155', fontWeight: activeSubOption === 'returns' ? 700 : 500 }}
+                >
+                  Trả hàng
+                </div>
+              </div>
+            )}
+            trigger={['hover']}
+          >
+            <div className={['invoices', 'returns', 'transactions'].includes(activeSubOption) ? "kiotviet-nav-item active" : "kiotviet-nav-item"}>Giao dịch</div>
+          </Dropdown>
+
+          <div className={activeMainCategory === 'cashbook' ? "kiotviet-nav-item active" : "kiotviet-nav-item"} onClick={() => { setActiveMainCategory('cashbook'); setActiveSubOption('cashbook'); }}>Sổ quỹ</div>
+        </div>
+      </div>
+
+      <Space size="small">
+        <Badge status="processing" text={<span style={{ fontSize: 10, color: '#10b981' }}>Live Synced</span>} />
+      </Space>
+    </div>
+  );
+};
+
+// ─── TABLES & VIEWS ──────────────────────────────────────────────────────────
+
+const DocumentsTable = ({
+  activeSubOption,
+  searchText,
+  setSearchText,
+  filteredDocuments,
+  loading,
+  setModalImportOpen,
+  setModalReturnOpen,
+  setModalExportOpen,
+  setModalTransferOpen,
+  setModalCheckOpen,
+  setModalProductionOpen,
+  setSelectedTransferDoc,
+  setModalTransferReceiveOpen,
+  handleDeleteDocument
+}) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo mã phiếu..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{
+            width: 240,
+            height: 24,
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: '#1e293b',
+            borderRadius: 16,
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+          }}
+        />
+        <Space wrap size={4}>
+          {activeSubOption === '1_4' && (
+            <Button size="small" type="primary" onClick={() => setModalImportOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Nhập kho
+            </Button>
+          )}
+
+          {activeSubOption === '4' && (
+            <Button size="small" type="primary" onClick={() => setModalReturnOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Trả hàng nhập
+            </Button>
+          )}
+
+          {activeSubOption === '2' && (
+            <Button size="small" type="primary" onClick={() => setModalExportOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Xuất hủy
+            </Button>
+          )}
+
+          {activeSubOption === '3' && (
+            <Button size="small" type="primary" onClick={() => setModalTransferOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Chuyển hàng
+            </Button>
+          )}
+
+          {activeSubOption === '5' && (
+            <Button size="small" type="primary" onClick={() => setModalCheckOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Kiểm kho
+            </Button>
+          )}
+
+          {activeSubOption === '6' && (
+            <Button size="small" type="primary" onClick={() => setModalProductionOpen(true)} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+              + Sản xuất
+            </Button>
+          )}
+
+          <Button
+            size="small"
+            onClick={() => message.info('Đã làm mới dữ liệu chứng từ.')}
+            style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}
+          >
+            Làm mới
+          </Button>
+
+          <Button
+            size="small"
+            onClick={() => message.success('Đã xuất file dữ liệu chứng từ thành công!')}
+            style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}
+          >
+            Xuất file
+          </Button>
+        </Space>
+      </div>
+
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={filteredDocuments}
+          rowKey="id"
+          loading={loading}
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          size="small"
+          columns={[
+            {
+              title: 'MÃ PHIẾU',
+              dataIndex: 'code',
+              render: (text) => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{text}</b>
+            },
+            {
+              title: 'LOẠI PHIẾU',
+              dataIndex: 'type',
+              render: (typeVal) => {
+                const cfg = DOC_TYPE_CONFIG[typeVal] || { label: 'Khác', color: 'default', icon: null };
+                return <Tag color={cfg.color} style={{ fontSize: 9.5, padding: '0 3px', lineHeight: '16px' }}>{cfg.label}</Tag>;
+              }
+            },
+            { title: 'CHI NHÁNH', dataIndex: 'branchName', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            {
+              title: 'NGÀY CHỨNG TỪ',
+              dataIndex: 'businessDate',
+              render: (date) => <span style={{ fontSize: 10 }}>{dayjs(date).format('DD/MM/YYYY HH:mm')}</span>
+            },
+            {
+              title: 'GIÁ TRỊ (VNĐ)',
+              dataIndex: 'totalAmount',
+              align: 'right',
+              render: (val) => <b style={{ fontSize: 10.5 }}>{val ? val.toLocaleString() : 0} đ</b>
+            },
+            {
+              title: 'TRẠNG THÁI',
+              dataIndex: 'status',
+              render: (status, record) => {
+                if (record.type === 3 && record.transferStatus === 'Pending') {
+                  return <Tag color="warning" style={{ fontSize: 9.5, padding: '0 3px' }}>Chờ nhận kho</Tag>;
+                }
+                return <Tag color="success" style={{ fontSize: 9.5, padding: '0 3px' }}>Hoàn thành</Tag>;
+              }
+            },
+            { title: 'NGƯỜI TẠO', dataIndex: 'creator', render: t => <span style={{ fontSize: 10, color: '#64748b' }}>{t}</span> },
+            {
+              title: 'THAO TÁC',
+              key: 'action',
+              align: 'center',
+              render: (_, record) => (
+                <Space size={2}>
+                  {record.type === 3 && record.transferStatus === 'Pending' && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<CheckCircleOutlined style={{ fontSize: 9.5 }} />}
+                      style={{ fontSize: 9.5, height: 20, padding: '0 4px' }}
+                      onClick={() => {
+                        setSelectedTransferDoc(record);
+                        setModalTransferReceiveOpen(true);
+                      }}
+                    >
+                      Nhận
+                    </Button>
+                  )}
+                  <Popconfirm
+                    title="Xóa chứng từ?"
+                    onConfirm={() => handleDeleteDocument(record.id)}
+                    okText="Xóa"
+                    cancelText="Hủy"
+                  >
+                    <Button size="small" type="text" danger icon={<DeleteOutlined style={{ fontSize: 10 }} />} style={{ height: 20, padding: '0 4px' }} />
+                  </Popconfirm>
+                </Space>
+              )
+            }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const PartnersTable = ({ searchText, setSearchText, partners }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo tên đối tác..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{
+            width: 240,
+            height: 24,
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: '#1e293b',
+            borderRadius: 16,
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+          }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form thêm Đối tác')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+            + Thêm đối tác
+          </Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới danh sách đối tác.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>
+            Làm mới
+          </Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file đối tác!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>
+            Xuất file
+          </Button>
+        </Space>
+      </div>
+
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={partners}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'TÊN ĐỐI TÁC', dataIndex: 'name', render: t => <b style={{ fontSize: 10.5, color: '#0f172a' }}>{t}</b> },
+            { title: 'PHÂN LOẠI', dataIndex: 'type', render: t => <Tag color="blue" style={{ fontSize: 9.5, padding: '0 3px' }}>{t}</Tag> },
+            { title: 'SỐ ĐIỆN THOẠI', dataIndex: 'phone', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            { title: 'CÔNG NỢ HỆ THỐNG', dataIndex: 'totalDebt', align: 'right', render: v => <b style={{ fontSize: 10.5, color: '#dc2626' }}>{v.toLocaleString()} VNĐ</b> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const CashbookTable = ({ searchText, setSearchText, cashFlows }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo mã phiếu thu/chi..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{
+            width: 240,
+            height: 24,
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: '#1e293b',
+            borderRadius: 16,
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+          }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form Lập phiếu THU')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+            + Lập phiếu thu
+          </Button>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form Lập phiếu CHI')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>
+            + Lập phiếu chi
+          </Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới sổ quỹ.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>
+            Làm mới
+          </Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file sổ quỹ!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>
+            Xuất file
+          </Button>
+        </Space>
+      </div>
+
+      <Row gutter={6} style={{ marginBottom: 4 }}>
+        <Col span={8}>
+          <div style={{ padding: '4px 8px', background: '#eff6ff', borderRadius: 4, border: '1px solid #bfdbfe' }}>
+            <div style={{ fontSize: 9.5, color: '#64748b' }}>Tổng Thu Quỹ:</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#2563eb' }}>+2,450,000 đ</div>
+          </div>
+        </Col>
+        <Col span={8}>
+          <div style={{ padding: '4px 8px', background: '#fef2f2', borderRadius: 4, border: '1px solid #fecaca' }}>
+            <div style={{ fontSize: 9.5, color: '#64748b' }}>Tổng Chi Quỹ:</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc2626' }}>-15,850,000 đ</div>
+          </div>
+        </Col>
+        <Col span={8}>
+          <div style={{ padding: '4px 8px', background: '#ecfdf5', borderRadius: 4, border: '1px solid #a7f3d0' }}>
+            <div style={{ fontSize: 9.5, color: '#64748b' }}>Số Dư Quỹ Tiền Mặt:</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#059669' }}>45,200,000 đ</div>
+          </div>
+        </Col>
+      </Row>
+
+      <div className="dense-table cashbook-table" style={{ flex: 1, overflow: 'hidden' }}>
+        <Table
+          dataSource={cashFlows}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 268px)' }}
+          columns={[
+            { title: 'MÃ PHIẾU', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{t}</b> },
+            { title: 'NGÀY SỔ QUỶ', dataIndex: 'date', render: d => <span style={{ fontSize: 10 }}>{dayjs(d).format('DD/MM/YYYY HH:mm')}</span> },
+            {
+              title: 'LOẠI QUỶ',
+              dataIndex: 'direction',
+              render: dir => dir === 'Inflow' ? <Tag color="green" style={{ fontSize: 9.5, padding: '0 3px' }}>Thu tiền</Tag> : <Tag color="red" style={{ fontSize: 9.5, padding: '0 3px' }}>Chi tiền</Tag>
+            },
+            { title: 'HẠNG MỤC', dataIndex: 'category', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            { title: 'ĐỐI TÁC / KHÁCH', dataIndex: 'partner', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            {
+              title: 'SỐ TIỀN',
+              dataIndex: 'amount',
+              align: 'right',
+              render: (val, r) => (
+                <b style={{ fontSize: 10.5, color: r.direction === 'Inflow' ? '#059669' : '#dc2626' }}>
+                  {r.direction === 'Inflow' ? '+' : '-'}{val.toLocaleString()} đ
+                </b>
+              )
+            }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const InvoicesTable = ({ searchText, setSearchText }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo mã hóa đơn..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{ width: 240, height: 24, fontSize: 10.5, fontWeight: 600, color: '#1e293b', borderRadius: 16, border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form Lập hóa đơn')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>+ Lập hóa đơn</Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Làm mới</Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Export file</Button>
+        </Space>
+      </div>
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={STATIC_INVOICES}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'MÃ HÓA ĐƠN', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{t}</b> },
+            { title: 'NGÀY LẬP', dataIndex: 'date', render: d => <span style={{ fontSize: 10 }}>{dayjs(d).format('DD/MM/YYYY HH:mm')}</span> },
+            { title: 'KHÁCH HÀNG', dataIndex: 'customer', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            { title: 'TỔNG TIỀN', dataIndex: 'total', align: 'right', render: v => <b style={{ fontSize: 10.5 }}>{v.toLocaleString()} đ</b> },
+            { title: 'TRẠNG THÁI', dataIndex: 'status', render: () => <Tag color="success" style={{ fontSize: 9.5, padding: '0 3px' }}>Đã thanh toán</Tag> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const ReturnsTable = ({ searchText, setSearchText }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo mã phiếu trả..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{ width: 240, height: 24, fontSize: 10.5, fontWeight: 600, color: '#1e293b', borderRadius: 16, border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form Tạo trả hàng')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>+ Tạo trả hàng</Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Làm mới</Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Export file</Button>
+        </Space>
+      </div>
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={STATIC_RETURNS}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'MÃ PHIẾU TRẢ', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#dc2626' }}>{t}</b> },
+            { title: 'NGÀY TRẢ', dataIndex: 'date', render: d => <span style={{ fontSize: 10 }}>{dayjs(d).format('DD/MM/YYYY HH:mm')}</span> },
+            { title: 'KHÁCH HÀNG', dataIndex: 'customer', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            { title: 'GIÁ TRỊ HOÀN', dataIndex: 'amount', align: 'right', render: v => <b style={{ fontSize: 10.5, color: '#dc2626' }}>{v.toLocaleString()} đ</b> },
+            { title: 'LÝ DO TRẢ', dataIndex: 'reason', render: t => <span style={{ fontSize: 10, color: '#64748b' }}>{t}</span> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const DishesTable = ({ searchText, setSearchText }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo tên món..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{ width: 240, height: 24, fontSize: 10.5, fontWeight: 600, color: '#1e293b', borderRadius: 16, border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form thêm Món ăn')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>+ Thêm món</Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Làm mới</Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Export file</Button>
+        </Space>
+      </div>
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={STATIC_DISHES}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'MÃ MÓN', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{t}</b> },
+            { title: 'TÊN MÓN ĂN', dataIndex: 'name', render: t => <b style={{ fontSize: 10.5 }}>{t}</b> },
+            { title: 'NHÓM MÓN', dataIndex: 'group', render: t => <Tag color="blue" style={{ fontSize: 9.5, padding: '0 3px' }}>{t}</Tag> },
+            { title: 'GIÁ BÁN (VNĐ)', dataIndex: 'price', align: 'right', render: v => <b style={{ fontSize: 10.5, color: '#059669' }}>{v.toLocaleString()} đ</b> },
+            { title: 'TRẠNG THÁI', dataIndex: 'status', render: () => <Tag color="success" style={{ fontSize: 9.5, padding: '0 3px' }}>Đang kinh doanh</Tag> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const DishGroupsTable = ({ searchText, setSearchText }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo tên nhóm món..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{ width: 240, height: 24, fontSize: 10.5, fontWeight: 600, color: '#1e293b', borderRadius: 16, border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form thêm Nhóm món')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>+ Thêm nhóm món</Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Làm mới</Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Export file</Button>
+        </Space>
+      </div>
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={STATIC_DISH_GROUPS}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'MÃ NHÓM', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{t}</b> },
+            { title: 'TÊN NHÓM MÓN', dataIndex: 'name', render: t => <b style={{ fontSize: 10.5 }}>{t}</b> },
+            { title: 'SỐ LƯỢNG MÓN', dataIndex: 'count', align: 'center', render: c => <Tag color="orange" style={{ fontSize: 9.5, padding: '0 4px' }}>{c} món</Tag> },
+            { title: 'GHI CHÚ', dataIndex: 'note', render: t => <span style={{ fontSize: 10, color: '#64748b' }}>{t}</span> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+const MenuListingsTable = ({ searchText, setSearchText }) => {
+  return (
+    <Card
+      variant="borderless"
+      style={{ borderRadius: 0, height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ body: { padding: '4px 6px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+        <Input
+          placeholder="Theo tên thực đơn..."
+          prefix={<SearchOutlined style={{ color: '#475569', fontSize: 11.5, marginRight: 2 }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          allowClear
+          size="small"
+          style={{ width: 240, height: 24, fontSize: 10.5, fontWeight: 600, color: '#1e293b', borderRadius: 16, border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+        />
+        <Space wrap size={4}>
+          <Button size="small" type="primary" onClick={() => message.info('Mở form tạo Thực đơn')} style={{ background: '#e8442a', borderColor: '#e8442a', fontSize: 10.5, fontWeight: 600, height: 22, padding: '0 8px', borderRadius: 4 }}>+ Thêm thực đơn</Button>
+          <Button size="small" onClick={() => message.info('Đã làm mới.')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Làm mới</Button>
+          <Button size="small" onClick={() => message.success('Đã xuất file!')} style={{ fontSize: 10.5, fontWeight: 500, height: 22, padding: '0 8px', borderRadius: 4, borderColor: '#cbd5e1', color: '#334155' }}>Export file</Button>
+        </Space>
+      </div>
+      <div className="dense-table" style={{ flex: 1, overflow: 'hidden', marginTop: 4 }}>
+        <Table
+          dataSource={STATIC_MENU_LIST}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 25, showSizeChanger: false, size: 'small', placement: 'bottomRight' }}
+          scroll={{ x: 'max-content', y: 'calc(100vh - 218px)' }}
+          columns={[
+            { title: 'MÃ THỰC ĐƠN', dataIndex: 'code', render: t => <b style={{ fontSize: 10.5, color: '#2563eb' }}>{t}</b> },
+            { title: 'TÊN THỰC ĐƠN', dataIndex: 'name', render: t => <b style={{ fontSize: 10.5 }}>{t}</b> },
+            { title: 'ÁP DỤNG CHI NHÁNH', dataIndex: 'branch', render: t => <span style={{ fontSize: 10 }}>{t}</span> },
+            { title: 'TRẠNG THÁI', dataIndex: 'status', render: () => <Tag color="success" style={{ fontSize: 9.5, padding: '0 3px' }}>Đang áp dụng</Tag> }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+// ─── TRANSFER RECEIVE MODAL (kept inline as it's simple) ─────────────────────
+
+const TransferReceiveModal = ({ open, onClose, onSuccess, transferDoc, document }) => {
   const [loading, setLoading] = useState(false);
+  const activeDoc = transferDoc || document;
 
-  // Active management tab (top bar)
-  const [activeMgmtTab, setActiveMgmtTab] = useState('stock');
+  if (!activeDoc) return null;
 
-  // Filter states
-  const [selectedBranchIds, setSelectedBranchIds] = useState([]);
-  const [selectedMenuTypes, setSelectedMenuTypes] = useState([]);
-  const [selectedTypes, setSelectedTypes] = useState([]);
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
-  const [selectedStockFilter, setSelectedStockFilter] = useState('ALL');
-  const [selectedDirectSellFilter, setSelectedDirectSellFilter] = useState('ALL');
-  const [selectedBusinessStatus, setSelectedBusinessStatus] = useState('ACTIVE');
-  const [searchText, setSearchText] = useState('');
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-
-  // Modals
-  const [isStockEditModalOpen, setIsStockEditModalOpen] = useState(false);
-  const [editingInventoryProduct, setEditingInventoryProduct] = useState(null);
-  const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
-  const [stockInProduct, setStockInProduct] = useState(null);
-  const [stockInQty, setStockInQty] = useState(10);
-  const [isManageQuantityWatch, setIsManageQuantityWatch] = useState(false);
-
-  const [stockForm] = Form.useForm();
-  const [notifyApi, notificationContextHolder] = notification.useNotification();
-
-  // ─── Notifications ────────────────────────────────────────────────────────
-  const notifySuccess = (msg, desc = '') =>
-    notifyApi.success({
-      message: msg, description: desc, placement: 'topRight', duration: 3,
-      style: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, color: '#166534', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-    });
-
-  const notifyError = (msg, desc = '') =>
-    notifyApi.error({
-      message: msg, description: desc, placement: 'topRight', duration: 3,
-      style: { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-    });
-
-  const notifyWarning = (msg, desc = '') =>
-    notifyApi.warning({
-      message: msg, description: desc, placement: 'topRight', duration: 3,
-      style: { background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8, color: '#854d0e', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-    });
-
-  // ─── Fetch Data ───────────────────────────────────────────────────────────
-  const fetchData = async () => {
+  const handleReceive = async () => {
     setLoading(true);
     try {
-      const [resProd, resGroup, resUnit, resMenu, resBranch] = await Promise.all([
-        getAllProducts(),
-        getAllGroups(),
-        getAllUnits(),
-        getAllMenus(),
-        getAllBranches().catch(() => ({ data: [] })),
-      ]);
-      const prodList = Array.isArray(resProd.data) ? resProd.data : resProd.data?.$values || [];
-      const groupList = Array.isArray(resGroup.data) ? resGroup.data : resGroup.data?.$values || resGroup.data?.items || [];
-      const menuList = Array.isArray(resMenu.data) ? resMenu.data : resMenu.data?.$values || resMenu.data?.items || [];
-      const branchList = Array.isArray(resBranch.data) ? resBranch.data : resBranch.data?.$values || resBranch.data?.items || [];
-      let unitList = Array.isArray(resUnit.data) ? resUnit.data : resUnit.data?.$values || resUnit.data?.items || [];
-      setProducts(prodList);
-      setGroups(groupList);
-      setUnits(unitList);
-      setMenus(menuList);
-      setBranches(branchList);
+      await receiveTransferDocument({ documentId: activeDoc.id });
+      message.success('Đã nhận đủ hàng chuyển!');
+      onSuccess?.();
+      onClose();
     } catch (err) {
-      console.error('Fetch Inventory Data Error:', err);
-      notifyError('Lỗi tải dữ liệu kho', 'Không thể kết nối đến máy chủ.');
+      message.error(err.response?.data?.message || err.message || 'Lỗi nhận hàng chuyển.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const columns = [
+    { title: 'Mã hàng', dataIndex: 'bInventoryCode', key: 'bInventoryCode' },
+    { title: 'Tên hàng', dataIndex: 'bInventoryName', key: 'bInventoryName' },
+    { title: 'Số lượng chuyển', dataIndex: 'quantity', key: 'quantity', align: 'right' }
+  ];
 
-  // ─── Filter Logic ─────────────────────────────────────────────────────────
-  const hasActiveFilters = selectedBranchIds.length > 0 || selectedTypes.length > 0 ||
-    selectedGroupIds.length > 0 || selectedMenuTypes.length > 0 ||
-    selectedStockFilter !== 'ALL' || selectedDirectSellFilter !== 'ALL' ||
-    selectedBusinessStatus !== 'ACTIVE';
-
-  const clearAllFilters = () => {
-    setSelectedBranchIds([]);
-    setSelectedMenuTypes([]);
-    setSelectedTypes([]);
-    setSelectedGroupIds([]);
-    setSelectedStockFilter('ALL');
-    setSelectedDirectSellFilter('ALL');
-    setSelectedBusinessStatus('ACTIVE');
-    setSearchText('');
-  };
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const currentStock = p.currentStock ?? (p.id * 17) % 150;
-      const isManaged = p.isManageQuantity;
-      const min = p.minStorage ?? 0;
-      const max = p.maxStorage ?? 1_000_000_000;
-
-      if (selectedTypes.length > 0 && !selectedTypes.includes(p.type)) return false;
-      if (selectedGroupIds.length > 0 && !selectedGroupIds.includes(p.groupId)) return false;
-
-      if (selectedStockFilter === 'LOW' && (!isManaged || currentStock >= min)) return false;
-      if (selectedStockFilter === 'HIGH' && (!isManaged || currentStock <= max)) return false;
-      if (selectedStockFilter === 'IN_STOCK' && currentStock <= 0) return false;
-      if (selectedStockFilter === 'OUT_OF_STOCK' && currentStock > 0) return false;
-
-      if (selectedDirectSellFilter === 'YES' && !p.isSellable) return false;
-      if (selectedDirectSellFilter === 'NO' && p.isSellable) return false;
-
-      if (selectedBusinessStatus === 'ACTIVE' && p.isActive === false) return false;
-      if (selectedBusinessStatus === 'INACTIVE' && p.isActive !== false) return false;
-
-      if (searchText) {
-        const t = searchText.toLowerCase();
-        if (!p.name?.toLowerCase().includes(t) && !p.skuCode?.toLowerCase().includes(t)) return false;
+  return (
+    <Modal
+      title={
+        <Space>
+          <CheckCircleOutlined style={{ color: '#52c41a' }} /> XÁC NHẬN NHẬN HÀNG CHUYỂN (#{activeDoc.code})
+        </Space>
       }
-      return true;
-    });
-  }, [products, selectedTypes, selectedGroupIds, selectedStockFilter, selectedDirectSellFilter, selectedBusinessStatus, searchText]);
+      open={open}
+      onCancel={onClose}
+      width={700}
+      footer={[
+        <Button key="cancel" onClick={onClose}>Hủy</Button>,
+        <Button key="submit" type="primary" loading={loading} onClick={handleReceive} icon={<CheckCircleOutlined />}>
+          Xác Nhận Nhận Hàng
+        </Button>
+      ]}
+    >
+      <div style={{ marginBottom: 16 }}>
+        <p><strong>Chi nhánh gửi:</strong> {activeDoc.branchName}</p>
+        <p><strong>Ngày gửi:</strong> {dayjs(activeDoc.businessDate).format('DD/MM/YYYY HH:mm')}</p>
+      </div>
 
-  useEffect(() => { setCurrentPage(1); }, [selectedTypes, selectedGroupIds, selectedStockFilter, selectedDirectSellFilter, selectedBusinessStatus, searchText]);
+      <Table
+        dataSource={activeDoc.details || []}
+        columns={columns}
+        rowKey="id"
+        pagination={false}
+        size="small"
+      />
+    </Modal>
+  );
+};
 
-  const pagedProducts = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredProducts.slice(start, start + pageSize);
-  }, [filteredProducts, currentPage, pageSize]);
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+const InventoryManagementTab = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  // ─── Summary Stats ────────────────────────────────────────────────────────
-  const summaryStats = useMemo(() => {
-    const total = filteredProducts.length;
-    const inStock = filteredProducts.filter(p => (p.currentStock ?? (p.id * 17) % 150) > 0).length;
-    const outStock = filteredProducts.filter(p => (p.currentStock ?? (p.id * 17) % 150) <= 0).length;
-    const lowStock = filteredProducts.filter(p => {
-      const s = p.currentStock ?? (p.id * 17) % 150;
-      return p.isManageQuantity && s < (p.minStorage ?? 0) && s > 0;
-    }).length;
-    return { total, inStock, outStock, lowStock };
-  }, [filteredProducts]);
+  // Branch & Data states
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // ─── Modal Handlers ───────────────────────────────────────────────────────
-  const handleOpenStockEditModal = (prod) => {
-    setEditingInventoryProduct(prod);
-    stockForm.resetFields();
-    setIsManageQuantityWatch(prod.isManageQuantity || false);
-    stockForm.setFieldsValue({
-      id: prod.id, name: prod.name, skuCode: prod.skuCode,
-      isManageQuantity: prod.isManageQuantity || false,
-      minStorage: prod.minStorage ?? 0,
-      maxStorage: prod.maxStorage ?? 1_000_000_000,
-      currentStock: prod.currentStock ?? ((prod.id * 17) % 150),
-    });
-    setIsStockEditModalOpen(true);
-  };
+  // Left Sidebar navigation states
+  const [activeMainCategory, setActiveMainCategory] = useState('operations'); // 'operations' | 'cashbook' | 'invoices'
+  const [isOperationsExpanded, setIsOperationsExpanded] = useState(true);
+  const [activeSubOption, setActiveSubOption] = useState('1_4'); // '1_4' | '6' | '3' | '5' | '2' ...
 
-  const handleSaveStockEdit = async () => {
+  // Collapsible Advance Search Panel state
+  const [isAdvanceSearchOpen, setIsAdvanceSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Document creation & receive modals states
+  const [modalImportOpen, setModalImportOpen] = useState(false);
+  const [modalReturnOpen, setModalReturnOpen] = useState(false);
+  const [modalExportOpen, setModalExportOpen] = useState(false);
+  const [modalTransferOpen, setModalTransferOpen] = useState(false);
+  const [modalTransferReceiveOpen, setModalTransferReceiveOpen] = useState(false);
+  const [selectedTransferDoc, setSelectedTransferDoc] = useState(null);
+  const [modalCheckOpen, setModalCheckOpen] = useState(false);
+  const [modalProductionOpen, setModalProductionOpen] = useState(false);
+
+  // Real & Mock Documents Data
+  const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);
+  // Partners Data
+  const [partners] = useState(INITIAL_PARTNERS);
+  // Cashbook Data
+  const [cashFlows] = useState(INITIAL_CASH_FLOWS);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const bRes = await getAllBranches();
+        const branchList = Array.isArray(bRes?.data) ? bRes.data : (Array.isArray(bRes) ? bRes : []);
+        setBranches(branchList);
+        if (branchList.length > 0) {
+          setSelectedBranchId(branchList[0].id);
+        }
+
+        const pRes = await getAllProducts();
+        setProducts(Array.isArray(pRes?.data) ? pRes.data : (Array.isArray(pRes) ? pRes : []));
+      } catch (err) {
+        console.error('Error loading branch/inventory data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const fetchDocuments = async (branchId) => {
+    if (!branchId) return;
+    setLoading(true);
     try {
-      const values = await stockForm.validateFields();
-      const payload = {
-        id: editingInventoryProduct.id,
-        groupId: editingInventoryProduct.groupId,
-        chainId: editingInventoryProduct.chainId,
-        type: editingInventoryProduct.type,
-        name: editingInventoryProduct.name,
-        description: editingInventoryProduct.description,
-        skuCode: editingInventoryProduct.skuCode,
-        imageUrl: editingInventoryProduct.imageUrl,
-        isSellable: editingInventoryProduct.isSellable,
-        sellPrice: editingInventoryProduct.sellPrice,
-        isManageQuantity: values.isManageQuantity,
-        minStorage: values.isManageQuantity ? values.minStorage : 0,
-        maxStorage: values.isManageQuantity ? values.maxStorage : 1_000_000_000,
-        currentStock: values.currentStock,
-      };
-      await updateProduct(payload);
-      notifySuccess('Cập nhật tồn kho thành công!');
-      setIsStockEditModalOpen(false);
-      fetchData();
+      const res = await getDocuments(branchId);
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setDocuments(data.length > 0 ? data : INITIAL_DOCUMENTS);
     } catch (err) {
-      console.error('Save stock error:', err);
-      notifyError('Lỗi cập nhật tồn kho', 'Vui lòng kiểm tra lại thông tin.');
+      console.error('Error fetching branch documents:', err);
+      setDocuments(INITIAL_DOCUMENTS);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ─── Truncated Cell ───────────────────────────────────────────────────────
-  const TruncatedCell = ({ text, style = {} }) => (
-    <Tooltip title={text} placement="topLeft">
-      <span style={{ display: 'inline-block', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle', ...style }}>
-        {text}
-      </span>
-    </Tooltip>
-  );
+  useEffect(() => {
+    if (selectedBranchId) {
+      fetchDocuments(selectedBranchId);
+    }
+  }, [selectedBranchId]);
 
-  // ─── Table Columns ────────────────────────────────────────────────────────
-  const columns = [
-    {
-      title: '',
-      key: 'star',
-      width: 32,
-      render: () => (
-        <span style={{ color: '#d1d5db', fontSize: 14, cursor: 'pointer', transition: 'color 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#f59e0b'}
-          onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>
-          ☆
-        </span>
-      ),
-    },
-    {
-      title: 'Mã món',
-      key: 'imageSku',
-      width: '13%',
-      ellipsis: true,
-      render: (_, record) => (
-        <Space size={6} style={{ flexWrap: 'nowrap', width: '100%', overflow: 'hidden' }}>
-          {record.imageUrl ? (
-            <Avatar src={record.imageUrl} shape="square" size={28} style={{ flexShrink: 0, borderRadius: 4 }} />
-          ) : (
-            <Avatar icon={<PictureOutlined />} shape="square" size={28}
-              style={{ background: '#f3f4f6', color: '#9ca3af', flexShrink: 0, borderRadius: 4 }} />
-          )}
-          <TruncatedCell text={record.skuCode || 'N/A'}
-            style={{ fontSize: 11.5, fontWeight: 600, color: '#1d4ed8', fontFamily: 'monospace' }} />
-        </Space>
-      ),
-    },
-    {
-      title: 'Tên món',
-      dataIndex: 'name',
-      key: 'name',
-      width: '22%',
-      ellipsis: true,
-      render: (text, record) => {
-        const baseUnitObj = record.unitConversions?.find((uc) => !uc.baseId);
-        const baseUnitName = units.find((u) => u.id === baseUnitObj?.unitId)?.name;
-        return (
-          <Space size={4} style={{ flexWrap: 'nowrap', width: '100%', overflow: 'hidden' }}>
-            <TruncatedCell text={text} style={{ fontSize: 12.5, fontWeight: 600, color: '#1d4ed8' }} />
-            {baseUnitName && (
-              <Tag style={{ margin: 0, fontSize: 9.5, background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '0 4px', flexShrink: 0, borderRadius: 4 }}>
-                {baseUnitName}
-              </Tag>
-            )}
-          </Space>
-        );
-      },
-    },
-    {
-      title: 'Nhóm món',
-      dataIndex: 'groupId',
-      key: 'groupId',
-      width: '13%',
-      ellipsis: true,
-      render: (groupId) => {
-        const gName = groups.find((g) => g.id === groupId)?.name || 'Chưa phân nhóm';
-        return (
-          <Tooltip title={gName} placement="topLeft">
-            <span style={{ fontSize: 11.5, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', width: '100%' }}>
-              {gName}
-            </span>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: 'Loại món',
-      dataIndex: 'type',
-      key: 'type',
-      width: '11%',
-      ellipsis: true,
-      render: (type) => {
-        const typeObj = PRODUCT_TYPES.find((t) => t.value === type) || { label: type, color: 'default' };
-        return (
-          <Tooltip title={typeObj.label} placement="topLeft">
-            <Tag color={typeObj.color}
-              style={{ borderRadius: 10, fontSize: 10, padding: '0 6px', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
-              {typeObj.label}
-            </Tag>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: 'Tồn kho',
-      key: 'currentStock',
-      align: 'right',
-      width: '11%',
-      sorter: (a, b) => (a.currentStock ?? (a.id * 17) % 150) - (b.currentStock ?? (b.id * 17) % 150),
-      render: (_, record) => {
-        const stock = record.currentStock ?? ((record.id * 17) % 150);
-        const { text, color, badgeColor } = getStockStatus(record);
-        return (
-          <Tooltip title={`${stock.toLocaleString('vi-VN')} — ${text}`} placement="topRight">
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: stock <= 0 ? '#ef4444' : '#0f172a', lineHeight: 1.2 }}>
-                {stock.toLocaleString('vi-VN')}
-              </div>
-              <div style={{ marginTop: 2 }}>
-                <span style={{ fontSize: 9.5, color: badgeColor, fontWeight: 600 }}>● {text}</span>
-              </div>
-            </div>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: 'Định mức (Min–Max)',
-      key: 'storageLimits',
-      align: 'center',
-      width: '14%',
-      render: (_, record) => {
-        if (!record.isManageQuantity)
-          return <span style={{ fontSize: 11, color: '#9ca3af' }}>Không quản lý</span>;
-        const minStr = (record.minStorage ?? 0).toLocaleString('vi-VN');
-        const maxStr = (record.maxStorage ?? 1_000_000_000) >= 1_000_000_000 ? '1 tỷ' : record.maxStorage.toLocaleString('vi-VN');
-        return (
-          <Tooltip title={`Tồn tối thiểu: ${minStr} | Tồn tối đa: ${maxStr}`}>
-            <Tag style={{ borderRadius: 8, fontSize: 10.5, border: '1px solid #e0e7ef', background: '#f8fafc', color: '#374151' }}>
-              {minStr} – {maxStr}
-            </Tag>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: 'Giá bán (VNĐ)',
-      dataIndex: 'sellPrice',
-      key: 'sellPrice',
-      align: 'right',
-      width: '10%',
-      sorter: (a, b) => (a.sellPrice || 0) - (b.sellPrice || 0),
-      render: (val) => (
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
-          {formatVND(val)}
-        </span>
-      ),
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      align: 'center',
-      width: 88,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size={2}>
-          <Tooltip title="Cập nhật định mức & tồn kho">
-            <Button type="text" size="small"
-              icon={<EditOutlined style={{ color: '#2563eb', fontSize: 13 }} />}
-              style={{ borderRadius: 4 }}
-              onClick={() => handleOpenStockEditModal(record)} />
-          </Tooltip>
-          <Tooltip title="Nhập hàng nhanh">
-            <Button type="text" size="small"
-              icon={<InboxOutlined style={{ color: '#16a34a', fontSize: 13 }} />}
-              style={{ borderRadius: 4 }}
-              onClick={() => { setStockInProduct(record); setStockInQty(10); setIsStockInModalOpen(true); }} />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+  const handleDeleteDocument = async (id) => {
+    try {
+      await deleteDocument(id);
+      message.success('Xóa chứng từ thành công!');
+      setDocuments(documents.filter((d) => d.id !== id));
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Xóa chứng từ thất bại.');
+    }
+  };
 
-  // ─── Import Action Dropdown ───────────────────────────────────────────────
-  const importActions = [
-    { key: 'manual', label: 'Nhập hàng thủ công', icon: <PlusOutlined style={{ color: '#16a34a' }} />, onClick: () => notifyWarning('Tính năng đang phát triển') },
-    { key: 'file', label: 'Nhập từ file Excel', icon: <ImportOutlined style={{ color: '#0891b2' }} />, onClick: () => notifyWarning('Tính năng đang phát triển') },
-    { key: 'adjust', label: 'Điều chỉnh tồn kho', icon: <AuditOutlined style={{ color: '#7c3aed' }} />, onClick: () => notifyWarning('Tính năng đang phát triển') },
-  ];
+  // Filtered documents list
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      // Sub-option filter
+      if (activeSubOption === '1_4' && doc.type !== 1 && doc.type !== 4) return false;
+      if (activeSubOption === '6' && doc.type !== 6) return false;
+      if (activeSubOption === '3' && doc.type !== 3) return false;
+      if (activeSubOption === '5' && doc.type !== 5) return false;
+      if (activeSubOption === '2' && doc.type !== 2) return false;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+      // Status filter
+      if (statusFilter !== 'ALL') {
+        if (statusFilter === 'Pending' && doc.transferStatus !== 'Pending') return false;
+        if (statusFilter === 'Completed' && doc.status !== 'Completed') return false;
+      }
+
+      // Search text
+      if (searchText) {
+        const lower = searchText.toLowerCase();
+        const matchCode = doc.code?.toLowerCase().includes(lower);
+        const matchCreator = doc.creator?.toLowerCase().includes(lower);
+        if (!matchCode && !matchCreator) return false;
+      }
+
+      // Date range
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        const docDate = dayjs(doc.businessDate);
+        if (docDate.isBefore(dateRange[0], 'day') || docDate.isAfter(dateRange[1], 'day')) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [documents, activeSubOption, statusFilter, searchText, dateRange]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
-      {notificationContextHolder}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontSize: 11 }}>
 
-      {/* ── Top Header Area ── */}
-      <div style={{ marginBottom: 10 }}>
-        {/* Row 1: Title (left) + Management tabs (right) */}
-        <Row gutter={[12, 0]} align="middle" style={{ marginBottom: 8 }}>
-          <Col xs={24} md={6} lg={5}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <DatabaseOutlined style={{ fontSize: 20, color: '#e8442a' }} />
-              <span style={{ fontSize: 18, fontWeight: 800, color: '#111827', letterSpacing: '-0.3px' }}>
-                Quản lý kho
-              </span>
-            </div>
-          </Col>
-          <Col xs={24} md={18} lg={19}>
-            {/* Management Tabs (like KiotViet's top option bar) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
-              {MGMT_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveMgmtTab(tab.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '5px 14px', borderRadius: 6, cursor: 'pointer',
-                    fontWeight: activeMgmtTab === tab.key ? 700 : 500,
-                    fontSize: 12.5,
-                    border: activeMgmtTab === tab.key ? '1.5px solid #2563eb' : '1.5px solid #e5e7eb',
-                    background: activeMgmtTab === tab.key ? '#2563eb' : '#ffffff',
-                    color: activeMgmtTab === tab.key ? '#ffffff' : '#374151',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.18s ease',
-                    boxShadow: activeMgmtTab === tab.key ? '0 2px 8px rgba(37,99,235,0.25)' : 'none',
-                  }}
-                  onMouseEnter={e => { if (activeMgmtTab !== tab.key) { e.currentTarget.style.background = '#f0f4ff'; e.currentTarget.style.borderColor = '#93c5fd'; } }}
-                  onMouseLeave={e => { if (activeMgmtTab !== tab.key) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e5e7eb'; } }}
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
-            </div>
-          </Col>
-        </Row>
+      {/* GLOBAL HIGH-DENSITY TABLE & SIDEBAR CSS OVERRIDES */}
+      <style>{`
+        .dense-table {
+          display: flex !important;
+          flex-direction: column !important;
+          flex: 1 !important;
+          min-height: 0 !important;
+          height: calc(100vh - 148px) !important;
+          max-height: calc(100vh - 148px) !important;
+          overflow: hidden !important;
+          border: 1px solid #cbd5e1 !important;
+          border-radius: 6px !important;
+          background: #ffffff !important;
+          position: relative !important;
+        }
+        .dense-table .ant-table-wrapper,
+        .dense-table .ant-spin-nested-loading,
+        .dense-table .ant-spin-container {
+          display: flex !important;
+          flex-direction: column !important;
+          flex: 1 !important;
+          min-height: 0 !important;
+          height: 100% !important;
+          overflow: hidden !important;
+        }
+        .dense-table .ant-table {
+          display: flex !important;
+          flex-direction: column !important;
+          flex: 1 !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          background: transparent !important;
+          border: none !important;
+        }
+        .dense-table .ant-table-container {
+          display: flex !important;
+          flex-direction: column !important;
+          flex: 1 !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          border: none !important;
+        }
+        .dense-table .ant-table-header {
+          flex-shrink: 0 !important;
+        }
+        .dense-table .ant-table-body,
+        .dense-table .ant-table-content {
+          flex: 1 !important;
+          min-height: 0 !important;
+          max-height: calc(100vh - 218px) !important;
+          overflow-y: auto !important;
+          overflow-x: auto !important;
+        }
+        .cashbook-table {
+          height: calc(100vh - 198px) !important;
+          max-height: calc(100vh - 198px) !important;
+        }
+        .cashbook-table .ant-table-body,
+        .cashbook-table .ant-table-content {
+          max-height: calc(100vh - 268px) !important;
+        }
+        .dense-table .ant-table-placeholder {
+          flex: 1 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        .dense-table .ant-pagination,
+        .dense-table .ant-table-pagination {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-end !important;
+          flex-shrink: 0 !important;
+          margin: 6px 12px 6px auto !important;
+          padding: 4px 0 !important;
+          background: #ffffff !important;
+          z-index: 10 !important;
+        }
+        .dense-table .ant-pagination-item {
+          border-radius: 50% !important;
+          min-width: 24px !important;
+          height: 24px !important;
+          line-height: 22px !important;
+          border-color: #e8442a !important;
+          font-size: 11px !important;
+        }
+        .dense-table .ant-pagination-item-active {
+          border-color: #e8442a !important;
+          background: #ffffff !important;
+        }
+        .dense-table .ant-pagination-item-active a {
+          color: #e8442a !important;
+          font-weight: 700 !important;
+        }
+        .dense-table .ant-pagination-prev .ant-pagination-item-link,
+        .dense-table .ant-pagination-next .ant-pagination-item-link {
+          border: none !important;
+          background: transparent !important;
+          font-size: 11px !important;
+          color: #64748b !important;
+        }
+        .dense-table .ant-table-thead > tr > th {
+          font-size: 10px !important;
+          font-weight: 700 !important;
+          background: #f1f5f9 !important;
+          color: #334155 !important;
+          padding: 6px 10px !important;
+          border-bottom: 1px solid #cbd5e1 !important;
+          border-radius: 0 !important;
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 2 !important;
+        }
+        .dense-table .ant-table-tbody > tr > td {
+          font-size: 10px !important;
+          padding: 6px 10px !important;
+          color: #1e293b !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+        }
+        .dense-table .ant-table-tbody > tr:hover > td {
+          background: #f0f7ff !important;
+        }
 
-        {/* Row 2: (empty left) + Search + Actions */}
-        <Row gutter={[12, 0]} align="middle">
-          <Col xs={24} md={6} lg={5}>
-            {/* Intentionally blank to align with filter panel */}
-          </Col>
-          <Col xs={24} md={18} lg={19}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              {/* Search */}
-              <Input
-                prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
-                placeholder="Theo mã hoặc tên món..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: 280, borderRadius: 20, fontSize: 12.5, background: '#ffffff', borderColor: '#e5e7eb' }}
-                size="small"
-                allowClear
-              />
+        /* LEFT SIDEBAR SMOOTH STYLES & ACCORDION TRANSITION */
+        .sidebar-item {
+          padding: 9px 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 13px;
+          font-weight: 500;
+          color: #334155;
+          transition: all 0.25s ease-in-out;
+          border-left: 3px solid transparent;
+        }
+        .sidebar-item:hover {
+          background: #fdf2f0;
+          color: #e8442a;
+          padding-left: 15px;
+        }
+        .sidebar-item.active {
+          background: #fff1f0;
+          color: #e8442a;
+          font-weight: 700;
+          border-left-color: #e8442a;
+        }
+        .sidebar-sub-container {
+          max-height: 0px;
+          opacity: 0;
+          overflow: hidden;
+          transition: max-height 0.35s ease-in-out, opacity 0.3s ease-in-out;
+          background: #fafafa;
+        }
+        .sidebar-sub-container.open {
+          max-height: 280px;
+          opacity: 1;
+        }
+        .sidebar-sub-item {
+          padding: 7px 12px 7px 28px;
+          cursor: pointer;
+          font-size: 12px;
+          color: #64748b;
+          transition: all 0.2s ease-in-out;
+        }
+        .sidebar-sub-item:hover {
+          color: #e8442a;
+          background: #fff5f3;
+          padding-left: 32px;
+        }
+        .sidebar-sub-item.active {
+          color: #e8442a;
+          font-weight: 600;
+          background: #fee2e2;
+          border-left: 2px solid #e8442a;
+        }
+        .arrow-rotate {
+          transition: transform 0.3s ease;
+        }
+        .arrow-rotate.open {
+          transform: rotate(180deg);
+        }
 
-              {/* Action Buttons */}
-              <Space size={6}>
-                <Tooltip title="Làm mới dữ liệu">
-                  <Button
-                    icon={<ReloadOutlined />} size="small"
-                    onClick={fetchData} loading={loading}
-                    style={{ borderRadius: 6, fontSize: 12, borderColor: '#e5e7eb' }}
-                  />
-                </Tooltip>
+        /* FULL ORANGE-RED CAPSULE NAVIGATION BAR STYLES */
+        .kiotviet-nav-bar {
+          display: flex;
+          align-items: center;
+          background: linear-gradient(90deg, #e8442a, #f97316);
+          border-radius: 20px;
+          padding: 3px 10px;
+        }
+        .kiotviet-nav-item {
+          padding: 3px 10px;
+          border-radius: 14px;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease-in-out;
+          white-space: nowrap;
+        }
+        .kiotviet-nav-item:hover {
+          background: rgba(255, 255, 255, 0.22);
+          color: #ffffff;
+        }
+        .kiotviet-nav-item.active {
+          background: #ffffff;
+          color: #e8442a;
+          font-weight: 700;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+      `}</style>
 
-                <Dropdown menu={{ items: importActions.map(a => ({ key: a.key, label: <Space>{a.icon}<span>{a.label}</span></Space>, onClick: a.onClick })) }} trigger={['click']}>
-                  <Button
-                    type="primary" size="small"
-                    icon={<ImportOutlined />}
-                    style={{ borderRadius: 6, fontWeight: 600, background: '#16a34a', borderColor: '#16a34a', fontSize: 12 }}
-                  >
-                    Nhập hàng <DownOutlined style={{ fontSize: 9, marginLeft: 2 }} />
-                  </Button>
-                </Dropdown>
+      {/* TOP HEADER NAVIGATION BAR */}
+      <InventoryHeaderNav
+        branches={branches}
+        selectedBranchId={selectedBranchId}
+        setSelectedBranchId={setSelectedBranchId}
+        loading={loading}
+        activeMainCategory={activeMainCategory}
+        setActiveMainCategory={setActiveMainCategory}
+        activeSubOption={activeSubOption}
+        setActiveSubOption={setActiveSubOption}
+      />
 
-                <Button
-                  icon={<ExportOutlined />} size="small"
-                  onClick={() => notifyWarning('Tính năng xuất file đang phát triển')}
-                  style={{ borderRadius: 6, fontSize: 12, borderColor: '#e5e7eb' }}
-                >
-                  Xuất file
-                </Button>
-              </Space>
-            </div>
-          </Col>
-        </Row>
+      {/* BODY CONTAINER: SIDEBAR + RIGHT MAIN CONTENT */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        <InventorySidebar
+          activeSubOption={activeSubOption}
+          activeMainCategory={activeMainCategory}
+        />
+
+        <div style={{ flex: 1, padding: 0, overflow: 'hidden', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
+
+          {/* VIEW: CHỨNG TỪ KHO HÀNG HÓA */}
+          {['1_4', '4', '2', '3', '5', '6'].includes(activeSubOption) && activeMainCategory === 'operations' && (
+            <DocumentsTable
+              activeSubOption={activeSubOption}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              filteredDocuments={filteredDocuments}
+              loading={loading}
+              setModalImportOpen={setModalImportOpen}
+              setModalReturnOpen={setModalReturnOpen}
+              setModalExportOpen={setModalExportOpen}
+              setModalTransferOpen={setModalTransferOpen}
+              setModalCheckOpen={setModalCheckOpen}
+              setModalProductionOpen={setModalProductionOpen}
+              setSelectedTransferDoc={setSelectedTransferDoc}
+              setModalTransferReceiveOpen={setModalTransferReceiveOpen}
+              handleDeleteDocument={handleDeleteDocument}
+            />
+          )}
+
+          {/* VIEW: ĐỐI TÁC */}
+          {activeMainCategory === 'operations' && activeSubOption === 'partners' && (
+            <PartnersTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+              partners={partners}
+            />
+          )}
+
+          {/* VIEW: SỔ QUỶ */}
+          {activeMainCategory === 'cashbook' && (
+            <CashbookTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+              cashFlows={cashFlows}
+            />
+          )}
+
+          {/* VIEW: HÓA ĐƠN & GIAO DỊCH */}
+          {activeSubOption === 'invoices' && (
+            <InvoicesTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+            />
+          )}
+
+          {/* VIEW: TRẢ HÀNG KHÁCH HÀNG */}
+          {activeSubOption === 'returns' && (
+            <ReturnsTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+            />
+          )}
+
+          {/* VIEW: MÓN ĂN */}
+          {activeSubOption === 'dishes' && (
+            <DishesTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+            />
+          )}
+
+          {/* VIEW: NHÓM MÓN */}
+          {activeSubOption === 'dish_groups' && (
+            <DishGroupsTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+            />
+          )}
+
+          {/* VIEW: THỰC ĐƠN */}
+          {activeSubOption === 'menu_list' && (
+            <MenuListingsTable
+              searchText={searchText}
+              setSearchText={setSearchText}
+            />
+          )}
+        </div>
       </div>
 
-      {/* ── Main Body: Left Filter + Right Table ── */}
-      <Row gutter={[10, 10]} style={{ flex: 1, minHeight: 0 }}>
-        {/* ── LEFT FILTER PANEL ── */}
-        <Col xs={24} sm={24} md={6} lg={5} style={{ height: '100%' }}>
-          <div style={{
-            background: '#ffffff', borderRadius: 10, border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            height: 'calc(100vh - 148px)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          }}>
-            {/* Filter header */}
-            <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <FilterOutlined style={{ color: '#6b7280' }} /> Bộ lọc
-              </span>
-              {hasActiveFilters && (
-                <Button type="link" size="small" onClick={clearAllFilters}
-                  style={{ padding: 0, fontSize: 11, color: '#e8442a', fontWeight: 600 }}>
-                  Xóa lọc
-                </Button>
-              )}
-            </div>
+      {/* MODAL DIALOGS */}
+      <ImportDocumentModal
+        open={modalImportOpen}
+        onClose={() => setModalImportOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu nhập kho thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        products={products}
+        partners={partners}
+      />
 
-            {/* Scrollable filter content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+      <ReturnDocumentModal
+        open={modalReturnOpen}
+        onClose={() => setModalReturnOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu trả hàng nhập thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        products={products}
+        partners={partners}
+      />
 
-              {/* 1. Chi nhánh */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Chi nhánh</div>
-                <Select
-                  mode="multiple" placeholder="Chi nhánh trung tâm"
-                  value={selectedBranchIds.length === 0 ? ['ALL'] : selectedBranchIds}
-                  onChange={(vals) => {
-                    if (vals.includes('ALL') && vals[vals.length - 1] === 'ALL') setSelectedBranchIds([]);
-                    else setSelectedBranchIds(vals.filter(v => v !== 'ALL'));
-                  }}
-                  style={{ width: '100%', fontSize: 12 }} size="small" allowClear
-                  suffixIcon={null}
-                >
-                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>
-                    Chi nhánh trung tâm ×
-                  </Select.Option>
-                  {branches.map((b) => (
-                    <Select.Option key={b.id} value={b.id}>{b.name}</Select.Option>
-                  ))}
-                </Select>
-              </div>
+      <DisposalDocumentModal
+        open={modalExportOpen}
+        onClose={() => setModalExportOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu xuất hủy thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        products={products}
+      />
 
-              {/* 2. Loại thực đơn */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Loại thực đơn</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {MENU_TYPES.map((mt) => (
-                    <label key={mt.value} style={checkboxLabelStyle}>
-                      <input
-                        type="checkbox"
-                        checked={selectedMenuTypes.includes(mt.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedMenuTypes(p => [...p, mt.value]);
-                          else setSelectedMenuTypes(p => p.filter(v => v !== mt.value));
-                        }}
-                        style={{ accentColor: '#2563eb', marginRight: 6 }}
-                      />
-                      {mt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+      <TransferDocumentModal
+        open={modalTransferOpen}
+        onClose={() => setModalTransferOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu chuyển hàng thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        branches={branches}
+        products={products}
+      />
 
-              <Divider style={{ margin: '8px 0' }} />
+      <TransferReceiveModal
+        open={modalTransferReceiveOpen}
+        onClose={() => setModalTransferReceiveOpen(false)}
+        onSuccess={() => {
+          message.success('Nhận hàng chuyển kho thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        transferDoc={selectedTransferDoc}
+      />
 
-              {/* 3. Loại món */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Loại món</div>
-                <Select
-                  mode="multiple" placeholder="Chọn loại món"
-                  value={selectedTypes.length === 0 ? ['ALL'] : selectedTypes}
-                  onChange={(vals) => {
-                    if (vals.includes('ALL') && vals[vals.length - 1] === 'ALL') setSelectedTypes([]);
-                    else setSelectedTypes(vals.filter(v => v !== 'ALL'));
-                  }}
-                  style={{ width: '100%', fontSize: 12 }} size="small" allowClear
-                >
-                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>Tất cả loại món</Select.Option>
-                  {PRODUCT_TYPES.map((t) => (
-                    <Select.Option key={t.value} value={t.value}>
-                      <Space size={4}>{t.icon}{t.label}</Space>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </div>
+      <CheckDocumentModal
+        open={modalCheckOpen}
+        onClose={() => setModalCheckOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu kiểm kho thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        products={products}
+      />
 
-              {/* 4. Nhóm món */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Nhóm món</div>
-                <Select
-                  mode="multiple" placeholder="Chọn nhóm món"
-                  value={selectedGroupIds.length === 0 ? ['ALL'] : selectedGroupIds}
-                  onChange={(vals) => {
-                    if (vals.includes('ALL') && vals[vals.length - 1] === 'ALL') setSelectedGroupIds([]);
-                    else setSelectedGroupIds(vals.filter(v => v !== 'ALL'));
-                  }}
-                  style={{ width: '100%', fontSize: 12 }} size="small" allowClear
-                >
-                  <Select.Option key="ALL" value="ALL" style={{ fontWeight: 600, color: '#2563eb' }}>Tất cả nhóm món</Select.Option>
-                  {groups.map((g) => (
-                    <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>
-                  ))}
-                </Select>
-              </div>
-
-              <Divider style={{ margin: '8px 0' }} />
-
-              {/* 5. Tồn kho */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Tình trạng tồn kho</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {STOCK_STATUS_OPTIONS.map((opt) => (
-                    <label key={opt.value} style={{ ...checkboxLabelStyle, color: selectedStockFilter === opt.value ? '#2563eb' : '#374151', fontWeight: selectedStockFilter === opt.value ? 600 : 400 }}>
-                      <input
-                        type="radio"
-                        name="stockFilter"
-                        value={opt.value}
-                        checked={selectedStockFilter === opt.value}
-                        onChange={() => setSelectedStockFilter(opt.value)}
-                        style={{ accentColor: '#2563eb', marginRight: 6 }}
-                      />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* 6. Bán trực tiếp */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={labelStyle}>Bán trực tiếp</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[{ v: 'ALL', l: 'Tất cả' }, { v: 'YES', l: 'Có' }, { v: 'NO', l: 'Không' }].map(({ v, l }) => (
-                    <button key={v} onClick={() => setSelectedDirectSellFilter(v)}
-                      style={{
-                        flex: 1, padding: '3px 0', borderRadius: 6, fontSize: 11.5, cursor: 'pointer',
-                        fontWeight: selectedDirectSellFilter === v ? 700 : 400,
-                        border: selectedDirectSellFilter === v ? '1.5px solid #2563eb' : '1.5px solid #e5e7eb',
-                        background: selectedDirectSellFilter === v ? '#eff6ff' : '#ffffff',
-                        color: selectedDirectSellFilter === v ? '#1d4ed8' : '#374151',
-                        transition: 'all 0.15s',
-                      }}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 7. Trạng thái kinh doanh */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={labelStyle}>Trạng thái kinh doanh</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {[{ v: 'ACTIVE', l: 'Đang kinh doanh', dot: '#22c55e' }, { v: 'INACTIVE', l: 'Ngừng kinh doanh', dot: '#ef4444' }, { v: 'ALL', l: 'Tất cả', dot: '#9ca3af' }].map(({ v, l, dot }) => (
-                    <label key={v} style={{ ...checkboxLabelStyle, color: selectedBusinessStatus === v ? '#2563eb' : '#374151', fontWeight: selectedBusinessStatus === v ? 600 : 400 }}>
-                      <input
-                        type="radio" name="bizStatus" value={v}
-                        checked={selectedBusinessStatus === v}
-                        onChange={() => setSelectedBusinessStatus(v)}
-                        style={{ accentColor: '#2563eb', marginRight: 6 }}
-                      />
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, display: 'inline-block' }} />
-                        {l}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Col>
-
-        {/* ── RIGHT CONTENT AREA ── */}
-        <Col xs={24} sm={24} md={18} lg={19} style={{ height: '100%' }}>
-          <div style={{
-            background: '#ffffff', borderRadius: 10, border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            overflow: 'hidden', display: 'flex', flexDirection: 'column',
-            height: 'calc(100vh - 148px)',
-          }}>
-            {/* Summary stat bar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 0,
-              borderBottom: '1px solid #f3f4f6', background: '#fafbfc', flexShrink: 0,
-            }}>
-              {[
-                { label: 'Tổng sản phẩm', value: summaryStats.total, color: '#2563eb', icon: <DatabaseOutlined /> },
-                { label: 'Còn hàng', value: summaryStats.inStock, color: '#16a34a', icon: <CheckCircleOutlined /> },
-                { label: 'Hết hàng', value: summaryStats.outStock, color: '#ef4444', icon: <CloseCircleOutlined /> },
-                { label: 'Dưới định mức', value: summaryStats.lowStock, color: '#f59e0b', icon: <WarningOutlined /> },
-              ].map((stat, i) => (
-                <div key={i} style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '10px 8px', borderRight: i < 3 ? '1px solid #f3f4f6' : 'none',
-                }}>
-                  <div style={{ fontSize: 10.5, color: '#6b7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ color: stat.color }}>{stat.icon}</span> {stat.label}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: stat.color, lineHeight: 1 }}>
-                    {stat.value.toLocaleString('vi-VN')}
-                  </div>
-                </div>
-              ))}
-
-              {/* Selected rows indicator */}
-              {selectedRowKeys.length > 0 && (
-                <div style={{ padding: '10px 16px', borderLeft: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <Tag color="blue" style={{ borderRadius: 10, fontWeight: 600, fontSize: 11 }}>
-                    Đã chọn {selectedRowKeys.length}
-                  </Tag>
-                  <Button type="link" size="small" style={{ padding: 0, fontSize: 11, color: '#ef4444' }}
-                    onClick={() => setSelectedRowKeys([])}>
-                    Bỏ chọn
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Table */}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <Table
-                className="kiotviet-table"
-                rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-                columns={columns}
-                dataSource={pagedProducts}
-                rowKey="id"
-                loading={loading}
-                size="small"
-                scroll={{ y: 'calc(100vh - 310px)', x: 'max-content' }}
-                pagination={false}
-                rowClassName={(_, index) => index % 2 === 0 ? 'table-row-even' : 'table-row-odd'}
-                onRow={(record) => ({
-                  style: { cursor: 'pointer', transition: 'background 0.15s' },
-                  onMouseEnter: (e) => e.currentTarget.style.background = '#f0f7ff',
-                  onMouseLeave: (e) => e.currentTarget.style.background = 'transparent',
-                })}
-              />
-            </div>
-
-            {/* Pagination footer */}
-            <div style={{
-              padding: '9px 16px', borderTop: '1px solid #f3f4f6', background: '#fafafa',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-            }}>
-              <div style={{ fontSize: 11.5, color: '#6b7280' }}>
-                Hiển thị{' '}
-                <strong style={{ color: '#111827' }}>
-                  {Math.min((currentPage - 1) * pageSize + 1, filteredProducts.length)}–{Math.min(currentPage * pageSize, filteredProducts.length)}
-                </strong>{' '}
-                trong <strong style={{ color: '#2563eb' }}>{filteredProducts.length}</strong> sản phẩm
-              </div>
-              <Pagination
-                current={currentPage} pageSize={pageSize} total={filteredProducts.length}
-                onChange={(page, size) => { setCurrentPage(page); setPageSize(size); }}
-                showSizeChanger pageSizeOptions={['10', '20', '50', '100']} size="small"
-              />
-            </div>
-          </div>
-        </Col>
-      </Row>
-
-      {/* ── Modal: Cập nhật định mức tồn kho ── */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EditOutlined style={{ color: '#fff', fontSize: 15 }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Cấu hình tồn kho</div>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{editingInventoryProduct?.name}</div>
-            </div>
-          </div>
-        }
-        open={isStockEditModalOpen}
-        onOk={handleSaveStockEdit} onCancel={() => setIsStockEditModalOpen(false)}
-        width={540} okText="Lưu định mức" cancelText="Hủy"
-        destroyOnHidden
-        okButtonProps={{ style: { background: '#2563eb', borderColor: '#2563eb', borderRadius: 6, fontWeight: 600 } }}
-        cancelButtonProps={{ style: { borderRadius: 6 } }}
-      >
-        <Form form={stockForm} layout="vertical" size="small" requiredMark={false} style={{ paddingTop: 12 }}>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="skuCode" label={<span style={{ fontSize: 11.5, fontWeight: 600, color: '#374151' }}>Mã món</span>}>
-                <Input disabled style={{ borderRadius: 6, background: '#f9fafb' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="name" label={<span style={{ fontSize: 11.5, fontWeight: 600, color: '#374151' }}>Tên món</span>}>
-                <Input disabled style={{ borderRadius: 6, background: '#f9fafb' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <div style={{ background: '#f8fafc', borderRadius: 8, border: '1px solid #e5e7eb', padding: '12px 14px', marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#111827' }}>Quản lý định mức tồn kho</div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                  {isManageQuantityWatch ? 'Đang theo dõi hạn mức số lượng tồn kho.' : 'Bật để thiết lập mức tồn tối thiểu & tối đa.'}
-                </div>
-              </div>
-              <Form.Item name="isManageQuantity" valuePropName="checked" noStyle>
-                <input type="checkbox" checked={isManageQuantityWatch}
-                  onChange={(e) => { setIsManageQuantityWatch(e.target.checked); stockForm.setFieldValue('isManageQuantity', e.target.checked); }}
-                  style={{ width: 16, height: 16, accentColor: '#2563eb', cursor: 'pointer' }} />
-              </Form.Item>
-            </div>
-
-            {isManageQuantityWatch && (
-              <Row gutter={12} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
-                <Col span={12}>
-                  <Form.Item name="minStorage" label={<span style={{ fontSize: 11, fontWeight: 600 }}>Tồn tối thiểu <span style={{ color: '#ef4444' }}>*</span></span>}
-                    rules={[{ required: true, message: 'Nhập định mức tồn tối thiểu' }]}>
-                    <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} max={1_000_000_000}
-                      formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={v => v.replace(/\$\s?|(,*)/g, '')} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="maxStorage" label={<span style={{ fontSize: 11, fontWeight: 600 }}>Tồn tối đa <span style={{ color: '#ef4444' }}>*</span></span>}
-                    rules={[{ required: true, message: 'Nhập định mức tồn tối đa' }]}>
-                    <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0} max={1_000_000_000}
-                      formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={v => v.replace(/\$\s?|(,*)/g, '')} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            )}
-          </div>
-
-          <Form.Item name="currentStock" label={<span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Số lượng tồn kho thực tế</span>}>
-            <InputNumber style={{ width: '100%', borderRadius: 6 }} min={0}
-              formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={v => v.replace(/\$\s?|(,*)/g, '')} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* ── Modal: Nhập hàng nhanh ── */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#16a34a,#22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <InboxOutlined style={{ color: '#fff', fontSize: 15 }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Nhập hàng nhanh</div>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{stockInProduct?.name}</div>
-            </div>
-          </div>
-        }
-        open={isStockInModalOpen}
-        onOk={() => { notifySuccess(`Đã cộng thêm ${stockInQty} vào kho thành công!`); setIsStockInModalOpen(false); }}
-        onCancel={() => setIsStockInModalOpen(false)}
-        width={400} okText="Xác nhận nhập kho" cancelText="Hủy"
-        destroyOnHidden
-        okButtonProps={{ style: { background: '#16a34a', borderColor: '#16a34a', borderRadius: 6, fontWeight: 600 } }}
-        cancelButtonProps={{ style: { borderRadius: 6 } }}
-      >
-        <div style={{ paddingTop: 12 }}>
-          <div style={{ background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', padding: '10px 14px', marginBottom: 14 }}>
-            <div style={{ fontSize: 11.5, color: '#4b5563' }}>
-              Mã món: <strong style={{ color: '#1d4ed8', fontFamily: 'monospace' }}>{stockInProduct?.skuCode || 'N/A'}</strong>
-            </div>
-            <div style={{ fontSize: 11.5, color: '#4b5563', marginTop: 4 }}>
-              Tồn hiện tại: <strong style={{ color: '#111827' }}>{((stockInProduct?.currentStock ?? ((stockInProduct?.id * 17) % 150)) || 0).toLocaleString('vi-VN')}</strong>
-            </div>
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-            Số lượng nhập thêm vào kho:
-          </div>
-          <InputNumber
-            style={{ width: '100%', borderRadius: 8 }}
-            min={1} value={stockInQty}
-            onChange={(val) => setStockInQty(val || 1)}
-            formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={v => v.replace(/\$\s?|(,*)/g, '')}
-            size="large"
-          />
-        </div>
-      </Modal>
+      <ProductionDocumentModal
+        open={modalProductionOpen}
+        onClose={() => setModalProductionOpen(false)}
+        onSuccess={() => {
+          message.success('Tạo phiếu sản xuất thành công!');
+          fetchDocuments(selectedBranchId);
+        }}
+        branchId={selectedBranchId}
+        products={products}
+      />
     </div>
   );
 };
 
-// ─── Shared inline style helpers ─────────────────────────────────────────────
-const labelStyle = {
-  fontSize: 11.5, fontWeight: 700, color: '#374151', marginBottom: 7,
-  textTransform: 'uppercase', letterSpacing: '0.4px',
-};
-
-const checkboxLabelStyle = {
-  display: 'flex', alignItems: 'center', fontSize: 12, color: '#374151',
-  cursor: 'pointer', padding: '2px 0',
-};
-
 export default InventoryManagementTab;
+

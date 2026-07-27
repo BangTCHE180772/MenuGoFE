@@ -37,6 +37,7 @@ import {
 } from '../api/accountApi';
 import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
+import { useBranch } from '../context/BranchContext';
 
 const GENDER_OPTIONS = [
   { value: 'Nam', label: 'Nam' },
@@ -59,6 +60,7 @@ const STAFF_ROLES_MAP = {
 
 const AccountPage = () => {
   const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);

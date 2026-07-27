@@ -21,8 +21,8 @@ import dayjs from "dayjs";
 import {
   searchBranches,
   deleteBranch,
-  getBranchDashboardStats,
 } from "../api/branchApi";
+import { getBranchDashboardStats } from "../api/dashboardApi";
 import "../styles/BranchPage.css";
 import CreateUpdateBranchFormPopup from "../Popup/CreateUpdateBranchFormPopup";
 import { getMainChain } from "../api/chainApi";
@@ -59,7 +59,6 @@ const BranchPage = () => {
 
   const [mainChainId, setMainChainId] = useState(null);
 
-  // Financial Stats state from Backend
   const [stats, setStats] = useState({ revenue: 0, expenses: 0, profit: 0 });
   // const [loadingStats, setLoadingStats] = useState(false);
   const [, setLoadingStats] = useState(false);
@@ -374,7 +373,7 @@ const BranchPage = () => {
         );
 
         return (
-          <Dropdown dropdownRender={() => ActionsMenu} trigger={["click"]}>
+          <Dropdown popupRender={() => ActionsMenu} trigger={["click"]}>
             <span className="branch-action-btn">
               <MoreOutlined style={{ fontSize: 18 }} />
             </span>

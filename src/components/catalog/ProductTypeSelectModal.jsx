@@ -79,7 +79,7 @@ const ProductTypeSelectModal = ({ open, onCancel, onSelectType }) => {
       onCancel={onCancel}
       footer={null}
       width={780}
-      destroyOnClose
+      destroyOnHidden
       style={{ top: 30 }}
     >
       <Row gutter={[14, 14]} style={{ marginTop: 12 }}>

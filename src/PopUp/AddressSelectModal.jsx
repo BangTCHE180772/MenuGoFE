@@ -165,7 +165,7 @@ const AddressSelectModal = ({ open, onClose, onSelect, mode = "new", title }) =>
           Xác nhận
         </Button>,
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <Spin spinning={loading}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>

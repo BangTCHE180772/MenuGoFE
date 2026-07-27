@@ -122,6 +122,150 @@ img {
   font-size: 12px !important;
 }
 
+/* ─── Dense Table Container with Fixed Outer Border & Bottom-Right Pagination ─── */
+.dense-table {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
+  position: relative !important;
+}
+
+.dense-table .ant-table-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.dense-table .ant-spin-nested-loading {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.dense-table .ant-spin-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.dense-table .ant-table {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.dense-table .ant-table-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+.dense-table .ant-table-header {
+  flex-shrink: 0 !important;
+}
+
+.dense-table .ant-table-content,
+.dense-table .ant-table-body {
+  flex: 1 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+}
+
+.dense-table .ant-table-placeholder {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.dense-table .ant-pagination {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-shrink: 0 !important;
+  margin: 6px 12px 6px auto !important;
+  padding: 4px 0 !important;
+  background: #ffffff !important;
+  z-index: 10 !important;
+}
+
+.dense-table .ant-pagination-item {
+  border-radius: 50% !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  line-height: 22px !important;
+  border-color: #e8442a !important;
+  font-size: 11px !important;
+}
+
+.dense-table .ant-pagination-item-active {
+  border-color: #e8442a !important;
+  background: #ffffff !important;
+}
+
+.dense-table .ant-pagination-item-active a {
+  color: #e8442a !important;
+  font-weight: 700 !important;
+}
+
+.dense-table .ant-pagination-prev .ant-pagination-item-link,
+.dense-table .ant-pagination-next .ant-pagination-item-link {
+  border: none !important;
+  background: transparent !important;
+  font-size: 11px !important;
+  color: #64748b !important;
+}
+
+.dense-table .ant-table-thead > tr > th {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+  background: #f8fafc !important;
+  padding: 6px 10px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-radius: 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+}
+
+.dense-table .ant-table-tbody > tr > td {
+  font-size: 11px !important;
+  padding: 6px 10px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.dense-table .ant-table-tbody > tr:hover > td {
+  background: #f0f7ff !important;
+}
+
+
+
+
 /* ─── Inventory Filter Panel Scrollbar ───────────────────────────────────── */
 .inv-filter-scroll::-webkit-scrollbar {
   width: 4px;
@@ -1899,3 +2043,34 @@ img {
   color: white;
   border-color: var(--color-primary);
 }
+
+/* ─── Dashboard / BI ──────────────────────────────────────────────────────── */
+.dashboard-page {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* KPI card hover lift */
+.ant-card.ant-card-hoverable:hover {
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-2px);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+/* Topbar branch select */
+.topbar-branch-select .ant-select-selector {
+  border-radius: 20px !important;
+  background: rgba(255,255,255,0.12) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+  color: #1e293b !important;
+}
+
+/* Scrollbar for cashflow list */
+.ant-list::-webkit-scrollbar {
+  width: 4px;
+}
+.ant-list::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+

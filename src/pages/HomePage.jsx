@@ -1,89 +1,144 @@
-import { Card, Row, Col, Statistic } from 'antd';
-import {
-  ShoppingCartOutlined,
-  TeamOutlined,
-  TableOutlined,
-  CalendarOutlined,
-} from '@ant-design/icons';
-import { useAuth, ROLES } from '../context/AuthContext';
+import { useState, useEffect, useCallback } from "react";
+import { Divider } from "antd";
+import { useAuth } from "../context/AuthContext";
+import { useBranch } from "../context/BranchContext";
+import ExecutiveSummary from "../components/dashboard/ExecutiveSummary";
+import OverviewSection from "../components/dashboard/OverviewSection";
+import { getBranchDashboardStats } from "../api/dashboardApi";
+import "../styles/HomePage.css";
 
 const HomePage = () => {
-  const { user, role, hasRole } = useAuth();
+  const { user } = useAuth();
+  const { currentBranchId } = useBranch();
+
+  const [todayStats, setTodayStats] = useState(null);
+  const [yesterdayStats, setYesterdayStats] = useState(null);
+  const [todayLoading, setTodayLoading] = useState(true);
+
+  const [overviewStats, setOverviewStats] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewRange, setOverviewRange] = useState("thisMonth");
+  const [overviewCustomDates, setOverviewCustomDates] = useState(null);
+
+  const fetchTodayData = useCallback(async () => {
+    setTodayLoading(true);
+    try {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yyyymmdd = (d) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+      const [resToday, resYesterday] = await Promise.all([
+        getBranchDashboardStats("today", null, null, currentBranchId),
+        getBranchDashboardStats(
+          "custom",
+          yyyymmdd(yesterday),
+          yyyymmdd(yesterday),
+          currentBranchId,
+        ),
+      ]);
+
+      setTodayStats(resToday.data);
+      setYesterdayStats(resYesterday.data);
+    } catch (err) {
+      console.error("Lỗi khi lấy dữ liệu today:", err);
+      setTodayStats(null);
+      setYesterdayStats(null);
+    } finally {
+      setTodayLoading(false);
+    }
+  }, [currentBranchId]);
+
+  const fetchOverviewData = useCallback(
+    async (range, customDates) => {
+      setOverviewLoading(true);
+      try {
+        let startDateStr = null;
+        let endDateStr = null;
+
+        if (range === "custom" && customDates?.[0] && customDates?.[1]) {
+          const fmt = (d) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          startDateStr = fmt(
+            customDates[0].toDate
+              ? customDates[0].toDate()
+              : new Date(customDates[0]),
+          );
+          endDateStr = fmt(
+            customDates[1].toDate
+              ? customDates[1].toDate()
+              : new Date(customDates[1]),
+          );
+        }
+
+        const res = await getBranchDashboardStats(
+          range,
+          startDateStr,
+          endDateStr,
+          currentBranchId,
+        );
+        setOverviewStats(res.data);
+      } catch (err) {
+        console.error("Lỗi khi lấy dữ liệu overview:", err);
+        setOverviewStats(null);
+      } finally {
+        setOverviewLoading(false);
+      }
+    },
+    [currentBranchId],
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTodayData();
+  }, [fetchTodayData]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOverviewData(overviewRange, overviewCustomDates);
+  }, [fetchOverviewData, overviewRange, overviewCustomDates]);
+
+  const handleOverviewRangeChange = useCallback((range) => {
+    setOverviewRange(range);
+  }, []);
+
+  const handleOverviewCustomDatesChange = useCallback((dates) => {
+    setOverviewCustomDates(dates);
+    if (dates) setOverviewRange("custom");
+  }, []);
 
   return (
-    <div className="home-page">
-      {/* Welcome Banner */}
-      <div className="home-banner">
-        <div className="home-banner-content">
-          <h1 className="home-banner-title">
-            Xin chào, <span>{user?.name ?? 'bạn'}</span>! 👋
+    <div className="dashboard-page">
+      <div className="dashboard-welcome-container">
+        <div>
+          <h1 className="dashboard-welcome-title">
+            Xin chào, {user?.name ?? "bạn"} 👋
           </h1>
-          <p className="home-banner-subtitle">
-            Hôm nay là một ngày tuyệt vời để quản lý nhà hàng
+          <p className="dashboard-welcome-subtitle">
+            Dashboard chi nhánh — cập nhật dữ liệu hoạt động hôm nay
           </p>
         </div>
-        <div className="home-banner-emoji">🍜</div>
       </div>
 
-      {/* Stats cards - hiện theo role */}
-      <Row gutter={[16, 16]} className="home-stats">
-        {hasRole(ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN, ROLES.CASHIER) && (
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="stat-card stat-card-blue" hoverable>
-              <Statistic
-                title="Đơn hàng hôm nay"
-                value={0}
-                prefix={<ShoppingCartOutlined />}
-                suffix="đơn"
-              />
-            </Card>
-          </Col>
-        )}
+      <ExecutiveSummary
+        loading={todayLoading}
+        todayStats={todayStats}
+        yesterdayStats={yesterdayStats}
+        onRefresh={fetchTodayData}
+      />
 
-        {hasRole(ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN) && (
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="stat-card stat-card-green" hoverable>
-              <Statistic
-                title="Nhân sự hiện có"
-                value={0}
-                prefix={<TeamOutlined />}
-                suffix="người"
-              />
-            </Card>
-          </Col>
-        )}
+      <Divider style={{ margin: "0", borderColor: "var(--color-border)" }} />
 
-        {hasRole(ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN, ROLES.CASHIER, ROLES.WAITER) && (
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="stat-card stat-card-orange" hoverable>
-              <Statistic
-                title="Bàn đang hoạt động"
-                value={0}
-                prefix={<TableOutlined />}
-                suffix="bàn"
-              />
-            </Card>
-          </Col>
-        )}
-
-        <Col xs={24} sm={12} lg={6}>
-          <Card className="stat-card stat-card-purple" hoverable>
-            <Statistic
-              title="Ca làm việc hôm nay"
-              value={0}
-              prefix={<CalendarOutlined />}
-              suffix="ca"
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Placeholder nội dung */}
-      <div className="home-placeholder">
-        <div className="home-placeholder-icon">🚧</div>
-        <h3>Đang phát triển</h3>
-        <p>Nội dung dashboard sẽ được bổ sung sau khi hoàn thiện các tính năng</p>
-      </div>
+      <OverviewSection
+        loading={overviewLoading}
+        overviewStats={overviewStats}
+        range={overviewRange}
+        customDates={overviewCustomDates}
+        onRangeChange={handleOverviewRangeChange}
+        onCustomDatesChange={handleOverviewCustomDatesChange}
+        onRefresh={() => fetchOverviewData(overviewRange, overviewCustomDates)}
+      />
     </div>
   );
 };

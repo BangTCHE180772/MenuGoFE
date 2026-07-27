@@ -835,8 +835,8 @@ const SalaryDetailPage = () => {
               >
                 <InputNumber
                   style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                   min={0}
                   step={50000}
                 />
