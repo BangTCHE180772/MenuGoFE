@@ -76,3 +76,11 @@ export const deleteDocument = async (id) => {
   const response = await axiosInstance.delete(`/api/Document/${id}`);
   return response.data;
 };
+
+// Get Documents
+export const getDocuments = async (branchId, type) => {
+  const response = await axiosInstance.get('/api/Document', {
+    params: { branchId, type }
+  });
+  return response.data;
+};

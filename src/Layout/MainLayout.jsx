@@ -17,8 +17,21 @@ const MainLayout = () => {
   useEffect(() => {
     if (connection) {
       const handleNotification = (data) => {
+        if (data.type === 'cooking-status-changed' && data.cookingStatus !== 'Ready') {
+          return;
+        }
+
+        let title = 'Thông báo hệ thống';
+        if (data.type === 'cooking-status-changed') {
+          title = 'Thông báo từ Bếp';
+        } else if (data.type === 'new-order') {
+          title = 'Đơn hàng mới';
+        } else if (data.type === 'call-staff') {
+          title = 'Khách gọi phục vụ';
+        }
+
         notification.info({
-          message: 'Thông báo từ khách hàng',
+          message: title,
           description: data.message,
           placement: 'topRight',
           duration: 5,

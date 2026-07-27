@@ -373,7 +373,7 @@ const BranchPage = () => {
         );
 
         return (
-          <Dropdown dropdownRender={() => ActionsMenu} trigger={["click"]}>
+          <Dropdown popupRender={() => ActionsMenu} trigger={["click"]}>
             <span className="branch-action-btn">
               <MoreOutlined style={{ fontSize: 18 }} />
             </span>

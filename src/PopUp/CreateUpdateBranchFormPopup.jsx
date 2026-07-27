@@ -205,7 +205,7 @@ const CreateUpdateBranchFormPopup = ({
           </Button>,
         ]}
         onCancel={onClose}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}

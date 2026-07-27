@@ -19,6 +19,7 @@ import {
   Statistic,
   Descriptions,
   Divider,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -34,6 +35,7 @@ import {
   ClockCircleOutlined,
   UserOutlined,
   BankOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -41,6 +43,7 @@ import {
   getPayrollById,
   createPayroll,
   generatePayroll,
+  generateBatchPayroll,
   updatePayroll,
   updatePayrollStatus,
   deletePayroll,
@@ -88,6 +91,23 @@ const PayrollPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const isOwnerOrAdmin =
+    user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
+    user?.roleIds?.some((id) => id === 1 || id === 2);
+
+  const titleText = isOwnerOrAdmin ? 'Quản Lý Bảng Lương Quản Lý' : 'Quản Lý Bảng Lương Nhân Viên Chi Nhánh';
+  const subtitleText = isOwnerOrAdmin
+    ? 'Quản lý tính toán, phê duyệt và thanh toán tiền lương của Quản lý các chi nhánh'
+    : 'Tính toán, phê duyệt và thanh toán tiền lương cho nhân viên trong chi nhánh';
+
+  const filteredAccounts = accounts.filter((a) => {
+    if (!a.roleIds || a.roleIds.length === 0) return false;
+    if (isOwnerOrAdmin) {
+      return a.roleIds.includes(3); // Owner only manages Manager accounts (roleId 3)
+    }
+    return !a.roleIds.some((rId) => [1, 2, 3].includes(rId)); // Manager only manages Staff accounts
+  });
+
   // Filter States
   const [searchText, setSearchText] = useState('');
   const [selectedBranch, setSelectedBranch] = useState(null);
@@ -103,6 +123,9 @@ const PayrollPage = () => {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
 
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchLoading, setBatchLoading] = useState(false);
+
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -112,6 +135,7 @@ const PayrollPage = () => {
 
   const [form] = Form.useForm();
   const [generateForm] = Form.useForm();
+  const [batchForm] = Form.useForm();
   const [statusForm] = Form.useForm();
 
   // Format Currency Utility
@@ -235,6 +259,7 @@ const PayrollPage = () => {
     } else {
       form.resetFields();
       form.setFieldsValue({
+        branchId: branches[0]?.id || 1,
         monthYear: dayjs(),
         salaryType: 'Monthly',
         baseSalary: 5000000,
@@ -365,6 +390,32 @@ const PayrollPage = () => {
     }
   };
 
+  // Submit Batch Auto Generate Payroll
+  const handleBatchSubmit = async (values) => {
+    setBatchLoading(true);
+    try {
+      const monthDate = values.monthYear;
+      const payload = {
+        month: monthDate.month() + 1,
+        year: monthDate.year(),
+        branchId: values.branchId ? Number(values.branchId) : null,
+        createdBy: user?.id || 1,
+      };
+
+      const res = await generateBatchPayroll(payload);
+      const list = res.data || [];
+      message.success(`Tự động tính lương hàng loạt thành công cho ${list.length} nhân sự!`);
+      setIsBatchModalOpen(false);
+      batchForm.resetFields();
+      loadData();
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Có lỗi xảy ra khi tự động tính lương hàng loạt!');
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   // Open Detail Modal
   const handleOpenDetail = async (record) => {
     setIsDetailModalOpen(true);
@@ -394,7 +445,7 @@ const PayrollPage = () => {
   const handleStatusSubmit = async (values) => {
     try {
       const pDate = values.status === PAYROLL_STATUS.Paid && values.paymentDate
-        ? values.paymentDate.format('YYYY-MM-DDTHH:mm:ss')
+        ? values.paymentDate.toISOString()
         : null;
 
       await updatePayrollStatus(statusTargetRecord.id, values.status, pDate);
@@ -605,10 +656,10 @@ const PayrollPage = () => {
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: '#e8442a', fontWeight: 700 }}>
-                Quản Lý Bảng Lương Nhân Viên
+                {titleText}
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                Tính toán, phê duyệt và thanh toán tiền lương dựa trên hợp đồng và lịch chấm công
+                {subtitleText}
               </p>
             </div>
           </div>
@@ -619,9 +670,38 @@ const PayrollPage = () => {
               icon={<CalculatorOutlined style={{ color: '#e8442a' }} />}
               size="large"
               style={{ borderRadius: '8px', borderColor: '#ffdeda' }}
-              onClick={() => setIsGenerateModalOpen(true)}
+              onClick={() => {
+                generateForm.resetFields();
+                generateForm.setFieldsValue({
+                  branchId: branches[0]?.id || 1,
+                  monthYear: dayjs(),
+                });
+                setIsGenerateModalOpen(true);
+              }}
             >
-              Tự động tính lương
+              Tự động tính cá nhân
+            </Button>
+            <Button
+              type="primary"
+              icon={<ThunderboltOutlined />}
+              size="large"
+              style={{
+                background: 'linear-gradient(135deg, #1890ff, #36cfc9)',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(24, 144, 255, 0.25)',
+                fontWeight: 600,
+              }}
+              onClick={() => {
+                batchForm.resetFields();
+                batchForm.setFieldsValue({
+                  monthYear: dayjs(),
+                  branchId: selectedBranch ? Number(selectedBranch) : undefined,
+                });
+                setIsBatchModalOpen(true);
+              }}
+            >
+              Tính lương hàng loạt
             </Button>
             <Button
               type="primary"
@@ -709,19 +789,21 @@ const PayrollPage = () => {
             onChange={(val) => setSelectedMonthYear(val)}
           />
 
-          <Select
-            placeholder="Chi nhánh"
-            style={{ width: 170 }}
-            allowClear
-            value={selectedBranch}
-            onChange={(val) => setSelectedBranch(val)}
-          >
-            {branches.map((b) => (
-              <Select.Option key={b.id} value={b.id}>
-                {b.name}
-              </Select.Option>
-            ))}
-          </Select>
+          {isOwnerOrAdmin && (
+            <Select
+              placeholder="Chi nhánh"
+              style={{ width: 170 }}
+              allowClear
+              value={selectedBranch}
+              onChange={(val) => setSelectedBranch(val)}
+            >
+              {branches.map((b) => (
+                <Select.Option key={b.id} value={b.id}>
+                  {b.name}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
           <Select
             placeholder="Lọc nhân viên"
@@ -732,7 +814,7 @@ const PayrollPage = () => {
             value={selectedAccount}
             onChange={(val) => setSelectedAccount(val)}
           >
-            {accounts.map((a) => (
+            {filteredAccounts.map((a) => (
               <Select.Option key={a.id} value={a.id} label={a.name}>
                 {a.name} (ID: {a.id})
               </Select.Option>
@@ -818,8 +900,18 @@ const PayrollPage = () => {
             label="Chọn nhân viên"
             rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
           >
-            <Select placeholder="Chọn nhân viên cần tính lương..." showSearch optionFilterProp="label">
-              {accounts.map((a) => (
+            <Select
+              placeholder="Chọn nhân viên cần tính lương..."
+              showSearch
+              optionFilterProp="label"
+              onChange={(val) => {
+                const acc = accounts.find((a) => a.id === val);
+                if (acc && acc.branchId) {
+                  generateForm.setFieldsValue({ branchId: acc.branchId });
+                }
+              }}
+            >
+              {filteredAccounts.map((a) => (
                 <Select.Option key={a.id} value={a.id} label={a.name}>
                   {a.name} (ID: {a.id})
                 </Select.Option>
@@ -827,19 +919,25 @@ const PayrollPage = () => {
             </Select>
           </Form.Item>
 
-          <Form.Item
-            name="branchId"
-            label="Chi nhánh làm việc"
-            rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
-          >
-            <Select placeholder="Chọn chi nhánh...">
-              {branches.map((b) => (
-                <Select.Option key={b.id} value={b.id}>
-                  {b.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+          {isOwnerOrAdmin ? (
+            <Form.Item
+              name="branchId"
+              label="Chi nhánh làm việc"
+              rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
+            >
+              <Select placeholder="Chọn chi nhánh...">
+                {branches.map((b) => (
+                  <Select.Option key={b.id} value={b.id}>
+                    {b.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          ) : (
+            <Form.Item name="branchId" hidden>
+              <Input />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="monthYear"
@@ -903,8 +1001,18 @@ const PayrollPage = () => {
                 label="Nhân viên"
                 rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
               >
-                <Select placeholder="Chọn nhân viên..." showSearch optionFilterProp="label">
-                  {accounts.map((a) => (
+                <Select
+                  placeholder="Chọn nhân viên..."
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={(val) => {
+                    const acc = accounts.find((a) => a.id === val);
+                    if (acc && acc.branchId) {
+                      form.setFieldsValue({ branchId: acc.branchId });
+                    }
+                  }}
+                >
+                  {filteredAccounts.map((a) => (
                     <Select.Option key={a.id} value={a.id} label={a.name}>
                       {a.name} (ID: {a.id})
                     </Select.Option>
@@ -913,21 +1021,27 @@ const PayrollPage = () => {
               </Form.Item>
             </Col>
 
-            <Col span={12}>
-              <Form.Item
-                name="branchId"
-                label="Chi nhánh"
-                rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
-              >
-                <Select placeholder="Chọn chi nhánh...">
-                  {branches.map((b) => (
-                    <Select.Option key={b.id} value={b.id}>
-                      {b.name}
-                    </Select.Option>
-                  ))}
-                </Select>
+            {isOwnerOrAdmin ? (
+              <Col span={12}>
+                <Form.Item
+                  name="branchId"
+                  label="Chi nhánh"
+                  rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
+                >
+                  <Select placeholder="Chọn chi nhánh...">
+                    {branches.map((b) => (
+                      <Select.Option key={b.id} value={b.id}>
+                        {b.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            ) : (
+              <Form.Item name="branchId" hidden>
+                <Input />
               </Form.Item>
-            </Col>
+            )}
           </Row>
 
           <Row gutter={16}>
@@ -960,8 +1074,8 @@ const PayrollPage = () => {
                 <InputNumber
                   addonAfter="đ"
                   style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                   min={0}
                 />
               </Form.Item>
@@ -997,8 +1111,8 @@ const PayrollPage = () => {
                 <InputNumber
                   addonAfter="đ"
                   style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                   readOnly
                 />
               </Form.Item>
@@ -1057,8 +1171,8 @@ const PayrollPage = () => {
                         placeholder="Số tiền"
                         addonAfter="đ"
                         style={{ width: '100%' }}
-                        formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={(val) => val.replace(/\$\s?|(,*)/g, '')}
+                        formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                        parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
                         min={0}
                       />
                     </Form.Item>
@@ -1263,6 +1377,77 @@ const PayrollPage = () => {
               ) : null
             }
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 5. Modal Batch Generate Payroll */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#1890ff' }}>
+            <ThunderboltOutlined />
+            <span>TỰ ĐỘNG TÍNH BẢNG LƯƠNG HÀNG LOẠT</span>
+          </div>
+        }
+        open={isBatchModalOpen}
+        onCancel={() => setIsBatchModalOpen(false)}
+        onOk={() => batchForm.submit()}
+        confirmLoading={batchLoading}
+        okText="Tính lương hàng loạt"
+        cancelText="Hủy bỏ"
+        okButtonProps={{
+          style: {
+            background: 'linear-gradient(135deg, #1890ff, #36cfc9)',
+            border: 'none',
+          },
+        }}
+      >
+        <Alert
+          message={
+            isOwnerOrAdmin
+              ? 'Hệ thống sẽ tự động tính toán và khởi tạo bảng lương cho toàn bộ QUẢN LÝ thuộc các chi nhánh theo hợp đồng còn hiệu lực.'
+              : 'Hệ thống sẽ tự động tính toán và khởi tạo bảng lương cho toàn bộ NHÂN VIÊN thuộc chi nhánh của bạn theo hợp đồng còn hiệu lực.'
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form
+          form={batchForm}
+          layout="vertical"
+          onFinish={handleBatchSubmit}
+          initialValues={{
+            monthYear: dayjs(),
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={isOwnerOrAdmin ? 12 : 24}>
+              <Form.Item
+                name="monthYear"
+                label="Chọn Tháng / Năm"
+                rules={[{ required: true, message: 'Vui lòng chọn tháng năm!' }]}
+              >
+                <DatePicker picker="month" format="MM/YYYY" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            {isOwnerOrAdmin && (
+              <Col span={12}>
+                <Form.Item
+                  name="branchId"
+                  label="Chi nhánh (Để trống = Tất cả)"
+                >
+                  <Select placeholder="Tất cả chi nhánh" allowClear style={{ width: '100%' }}>
+                    {branches.map((b) => (
+                      <Select.Option key={b.id} value={b.id}>
+                        {b.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
         </Form>
       </Modal>
     </div>

@@ -175,7 +175,7 @@ const CustomerOrderPage = () => {
     isSubmittingRef.current = true;
     setOrderLoading(true);
     try {
-      let orderId = summary?.activeOrderId;
+      let orderId = summary?.originalOrderId || summary?.activeOrderId;
 
       if (!orderId) {
         const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);

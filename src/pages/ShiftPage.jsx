@@ -31,7 +31,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const ShiftPage = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -143,7 +144,7 @@ const ShiftPage = () => {
   });
 
   // Columns
-  const columns = [
+  const baseColumns = [
     {
       title: 'Mã ca',
       dataIndex: 'id',
@@ -196,38 +197,41 @@ const ShiftPage = () => {
       render: (date) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
       sorter: (a, b) => dayjs(a.createdAt).unix() - dayjs(b.createdAt).unix(),
     },
-    {
-      title: 'Hành động',
-      key: 'actions',
-      fixed: 'right',
-      width: 110,
-      render: (_, record) => (
-        <Space size="middle">
-          <Tooltip title="Chỉnh sửa">
+  ];
+
+  const actionColumn = {
+    title: 'Hành động',
+    key: 'actions',
+    fixed: 'right',
+    width: 110,
+    render: (_, record) => (
+      <Space size="middle">
+        <Tooltip title="Chỉnh sửa">
+          <Button
+            type="text"
+            icon={<EditOutlined style={{ color: '#1890ff' }} />}
+            onClick={() => handleOpenModal('edit', record)}
+          />
+        </Tooltip>
+        <Tooltip title="Xóa ca làm việc">
+          <Popconfirm
+            title="Bạn chắc chắn muốn xóa ca làm việc này?"
+            okText="Đồng ý"
+            cancelText="Hủy"
+            onConfirm={() => handleDelete(record.id)}
+          >
             <Button
               type="text"
-              icon={<EditOutlined style={{ color: '#1890ff' }} />}
-              onClick={() => handleOpenModal('edit', record)}
+              danger
+              icon={<DeleteOutlined />}
             />
-          </Tooltip>
-          <Tooltip title="Xóa ca làm việc">
-            <Popconfirm
-              title="Bạn chắc chắn muốn xóa ca làm việc này?"
-              okText="Đồng ý"
-              cancelText="Hủy"
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+          </Popconfirm>
+        </Tooltip>
+      </Space>
+    ),
+  };
+
+  const columns = isOwnerOrAdmin ? [...baseColumns, actionColumn] : baseColumns;
 
   return (
     <div className="shifts-page animate-fade-in" style={{ padding: '4px 0' }}>
@@ -267,20 +271,22 @@ const ShiftPage = () => {
             </div>
           </div>
 
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="large"
-            style={{
-              background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
-              border: 'none',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
-            }}
-            onClick={() => handleOpenModal('create')}
-          >
-            Thêm ca mới
-          </Button>
+          {isOwnerOrAdmin && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="large"
+              style={{
+                background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
+              }}
+              onClick={() => handleOpenModal('create')}
+            >
+              Thêm ca mới
+            </Button>
+          )}
         </div>
       </Card>
 

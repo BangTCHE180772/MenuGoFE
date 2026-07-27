@@ -1,7 +1,7 @@
 import axiosInstance from './axiosInstance';
 
-export const getContracts = () =>
-  axiosInstance.get('/api/Contract');
+export const getContracts = (branchId) =>
+  axiosInstance.get('/api/Contract', { params: { branchId } });
 
 export const getContractById = (id) =>
   axiosInstance.get(`/api/Contract/${id}`);

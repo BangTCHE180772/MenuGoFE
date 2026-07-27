@@ -55,12 +55,25 @@ const STATUS_OPTIONS = [
 ];
 
 const WorkSchedulePage = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isManager = user?.roleId === 3 || role === 'Manager';
+  const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
+  const managerBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
+
   const [schedules, setSchedules] = useState([]);
   const [branches, setBranches] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const allowedBranches = useMemo(() => {
+    if (isManager && managerBranchId) {
+      return branches.filter((b) => b.id === managerBranchId);
+    }
+    return branches;
+  }, [branches, isManager, managerBranchId]);
+
+  const defaultBranchId = allowedBranches.length > 0 ? allowedBranches[0].id : null;
   
   // Filtering states
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -157,6 +170,7 @@ const WorkSchedulePage = () => {
         status: 'PENDING',
         managerApproved: true,
         workDate: dayjs(),
+        branchId: defaultBranchId,
       });
     }
   };
@@ -330,7 +344,7 @@ const WorkSchedulePage = () => {
   };
 
   // Columns for Table
-  const columns = [
+  const baseColumns = [
     {
       title: 'Mã lịch',
       dataIndex: 'code',
@@ -411,44 +425,53 @@ const WorkSchedulePage = () => {
       key: 'approved',
       align: 'center',
       render: (_, record) => (
-        <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
-          <Switch
-            checkedChildren={<CheckCircleOutlined />}
-            unCheckedChildren={<CloseCircleOutlined />}
-            checked={record.managerApproved}
-            onChange={(checked) => handleToggleApprove(record, checked)}
-          />
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      fixed: 'right',
-      width: 110,
-      render: (_, record) => (
-        <Space size="middle">
-          <Tooltip title="Chỉnh sửa ca trực">
-            <Button
-              type="text"
-              icon={<EditOutlined style={{ color: '#1890ff' }} />}
-              onClick={() => handleOpenModal('edit', record)}
+        isManager ? (
+          <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
+            <Switch
+              checkedChildren={<CheckCircleOutlined />}
+              unCheckedChildren={<CloseCircleOutlined />}
+              checked={record.managerApproved}
+              onChange={(checked) => handleToggleApprove(record, checked)}
             />
           </Tooltip>
-          <Tooltip title="Xóa lịch làm việc">
-            <Popconfirm
-              title="Bạn chắc chắn muốn xóa lịch làm việc này?"
-              okText="Đồng ý"
-              cancelText="Hủy"
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
+        ) : (
+          <Tag color={record.managerApproved ? 'success' : 'default'}>
+            {record.managerApproved ? 'Đã duyệt' : 'Chưa duyệt'}
+          </Tag>
+        )
       ),
     },
   ];
+
+  const actionColumn = {
+    title: 'Thao tác',
+    key: 'actions',
+    fixed: 'right',
+    width: 110,
+    render: (_, record) => (
+      <Space size="middle">
+        <Tooltip title="Chỉnh sửa ca trực">
+          <Button
+            type="text"
+            icon={<EditOutlined style={{ color: '#1890ff' }} />}
+            onClick={() => handleOpenModal('edit', record)}
+          />
+        </Tooltip>
+        <Tooltip title="Xóa lịch làm việc">
+          <Popconfirm
+            title="Bạn chắc chắn muốn xóa lịch làm việc này?"
+            okText="Đồng ý"
+            cancelText="Hủy"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button type="text" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Tooltip>
+      </Space>
+    ),
+  };
+
+  const columns = isManager ? [...baseColumns, actionColumn] : baseColumns;
 
   // Calendar render helper
   const dateCellRender = (value) => {
@@ -582,33 +605,41 @@ const WorkSchedulePage = () => {
             >
               Làm mới
             </Button>
-            <Button
-              type="default"
-              icon={<TeamOutlined />}
-              size="large"
-              style={{
-                borderRadius: '8px',
-                borderColor: '#e8442a',
-                color: '#e8442a',
-              }}
-              onClick={() => setIsBulkModalOpen(true)}
-            >
-              Phân ca hàng loạt
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              style={{
-                background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
-              }}
-              onClick={() => handleOpenModal('create')}
-            >
-              Thêm ca trực lẻ
-            </Button>
+            {isManager && (
+              <>
+                <Button
+                  type="default"
+                  icon={<TeamOutlined />}
+                  size="large"
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#e8442a',
+                    color: '#e8442a',
+                  }}
+                  onClick={() => {
+                    setIsBulkModalOpen(true);
+                    bulkForm.resetFields();
+                    bulkForm.setFieldsValue({ branchId: defaultBranchId });
+                  }}
+                >
+                  Phân ca hàng loạt
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
+                  }}
+                  onClick={() => handleOpenModal('create')}
+                >
+                  Thêm ca trực lẻ
+                </Button>
+              </>
+            )}
           </Space>
         </div>
       </Card>
@@ -776,16 +807,25 @@ const WorkSchedulePage = () => {
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item
               name="accountId"
-              label="Nhân viên"
+              label="Nhân viên (Có hợp đồng)"
               rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn nhân viên..." showSearch optionFilterProp="label">
-                {accounts.map((a) => (
-                  <Select.Option key={a.id} value={a.id} label={a.name}>
-                    {a.name} (ID: {a.id})
-                  </Select.Option>
-                ))}
+                {accounts
+                  .filter((a) => {
+                    if (!a.contracts || a.contracts.length === 0) return false;
+                    return a.contracts.some((c) => {
+                      const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
+                      const isBranchMatch = !selectedFormBranchId || c.branchId === selectedFormBranchId;
+                      return isActive && isBranchMatch;
+                    });
+                  })
+                  .map((a) => (
+                    <Select.Option key={a.id} value={a.id} label={a.name}>
+                      {a.name} (ID: {a.id})
+                    </Select.Option>
+                  ))}
               </Select>
             </Form.Item>
 
@@ -796,7 +836,7 @@ const WorkSchedulePage = () => {
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn chi nhánh...">
-                {branches.map((b) => (
+                {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
                   </Select.Option>
@@ -922,11 +962,20 @@ const WorkSchedulePage = () => {
               optionFilterProp="label"
               style={{ width: '100%' }}
             >
-              {accounts.map((a) => (
-                <Select.Option key={a.id} value={a.id} label={a.name}>
-                  {a.name} (ID: {a.id})
-                </Select.Option>
-              ))}
+              {accounts
+                .filter((a) => {
+                  if (!a.contracts || a.contracts.length === 0) return false;
+                  return a.contracts.some((c) => {
+                    const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
+                    const isBranchMatch = !selectedBulkBranchId || c.branchId === selectedBulkBranchId;
+                    return isActive && isBranchMatch;
+                  });
+                })
+                .map((a) => (
+                  <Select.Option key={a.id} value={a.id} label={a.name}>
+                    {a.name} (ID: {a.id})
+                  </Select.Option>
+                ))}
             </Select>
           </Form.Item>
 
@@ -938,7 +987,7 @@ const WorkSchedulePage = () => {
               style={{ flex: 1 }}
             >
               <Select placeholder="Chọn chi nhánh...">
-                {branches.map((b) => (
+                {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
                   </Select.Option>
