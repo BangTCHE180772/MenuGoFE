@@ -181,17 +181,22 @@ const ImportDocumentModal = ({
     return items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
   }, [items]);
 
+  const rawSupplierAmount = Math.max(0, totalGoodsAmount - (Number(formData.discount) || 0));
+  const supplierAmountDue = Math.round(rawSupplierAmount);
+  const roundingDiff = rawSupplierAmount - supplierAmountDue;
+
   const extraTotalDue = useMemo(() => {
-    return extraPartners.reduce((sum, ep) => sum + (Number(ep.amountDue) || 0), 0);
+    return extraPartners.reduce((sum, ep) => sum + Math.round(Number(ep.amountDue) || 0), 0);
   }, [extraPartners]);
 
   const extraTotalPaid = useMemo(() => {
     return extraPartners.reduce((sum, ep) => sum + (Number(ep.amountPaid) || 0), 0);
   }, [extraPartners]);
 
-  const rawNetAmount = totalGoodsAmount - (Number(formData.discount) || 0) + extraTotalDue;
-  const netAmount = Math.max(0, Math.round(rawNetAmount));
-  const debtAmount = Math.max(0, netAmount - ((Number(formData.paidAmount) || 0) + extraTotalPaid));
+  const netAmount = supplierAmountDue + extraTotalDue;
+  const supplierAmountPaid = Number(formData.paidAmount) || 0;
+  const totalPaid = supplierAmountPaid + extraTotalPaid;
+  const debtAmount = Math.max(0, netAmount - totalPaid);
 
   const handleSelectProduct = (opt) => {
     const conversions = opt.conversions || opt.unitConversions || [];
@@ -925,140 +930,158 @@ const ImportDocumentModal = ({
                   </div>
                 )}
               </div>
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.length})</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                      {totalGoodsAmount.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>Giảm giá</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formData.discount}
-                      onChange={(e) => setFormData({ ...formData, discount: Math.max(0, Number(e.target.value) || 0) })}
-                      style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
-                    />
-                  </div>
-
-                  {extraTotalDue > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#475569' }}>Phí đối tác khác</span>
-                      <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 12 }}>
-                        +{extraTotalDue.toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>Tổng tiền cần trả</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                      {netAmount.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>Tiền trả NCC</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formData.paidAmount}
-                      onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
-                      style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
-                    />
-                  </div>
-
-                  {extraTotalPaid > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#475569' }}>Tiền trả đối tác khác</span>
-                      <span style={{ fontWeight: 600, color: '#16a34a', fontSize: 12 }}>
-                        {extraTotalPaid.toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#475569' }}>Tính vào công nợ</span>
-                    <span style={{ fontWeight: 700, color: debtAmount > 0 ? '#ef4444' : '#0f172a', fontSize: 13 }}>
-                      {debtAmount.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.length})</span>
+                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+                    {totalGoodsAmount.toLocaleString('vi-VN')}
+                  </span>
                 </div>
 
-                <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569' }}>Giảm giá</span>
                   <input
-                    type="text"
-                    maxLength={250}
-                    value={formData.note}
-                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    placeholder="Ghi chú phiếu nhập (tối đa 250 ký tự)"
-                    style={{
-                      width: '100%',
-                      borderRadius: 6,
-                      padding: '6px 10px',
-                      border: '1px solid #cbd5e1',
-                      outline: 'none',
-                      fontSize: 11,
-                      height: 32,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
+                    type="number"
+                    min={0}
+                    value={formData.discount}
+                    onChange={(e) => setFormData({ ...formData, discount: Math.max(0, Number(e.target.value) || 0) })}
+                    style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
                   />
                 </div>
+
+                {roundingDiff !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748b', fontSize: 10 }}>
+                      Làm tròn NCC ({roundingDiff > 0 ? 'làm tròn xuống' : 'làm tròn lên'})
+                    </span>
+                    <span style={{ fontWeight: 600, color: roundingDiff > 0 ? '#16a34a' : '#ea580c', fontSize: 11 }}>
+                      {roundingDiff > 0 ? `-${roundingDiff.toLocaleString('vi-VN')}` : `+${Math.abs(roundingDiff).toLocaleString('vi-VN')}`}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569' }}>Cần trả NCC</span>
+                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 12 }}>
+                    {supplierAmountDue.toLocaleString('vi-VN')}
+                  </span>
+                </div>
+
+                {extraTotalDue > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#475569' }}>Phí đối tác khác</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 12 }}>
+                      +{extraTotalDue.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Tổng tiền cần trả</span>
+                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+                    {netAmount.toLocaleString('vi-VN')}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569' }}>Tiền trả NCC</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.paidAmount}
+                    onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
+                    style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
+                  />
+                </div>
+
+                {extraTotalPaid > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#475569' }}>Tiền trả đối tác khác</span>
+                    <span style={{ fontWeight: 600, color: '#16a34a', fontSize: 12 }}>
+                      {extraTotalPaid.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Tính vào công nợ</span>
+                  <span style={{ fontWeight: 700, color: debtAmount > 0 ? '#ef4444' : '#0f172a', fontSize: 13 }}>
+                    {debtAmount.toLocaleString('vi-VN')}
+                  </span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleSubmit(true)}
+              <div>
+                <input
+                  type="text"
+                  maxLength={250}
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                  placeholder="Ghi chú phiếu nhập (tối đa 250 ký tự)"
                   style={{
-                    flex: 1,
-                    background: '#ffffff',
-                    border: '1px solid #e8442a',
-                    color: '#e8442a',
-                    fontWeight: 600,
+                    width: '100%',
                     borderRadius: 6,
-                    padding: '8px 0',
-                    cursor: 'pointer'
+                    padding: '6px 10px',
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    fontSize: 11,
+                    height: 32,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}
-                >
-                  Lưu tạm
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleSubmit(false)}
-                  style={{
-                    flex: 1,
-                    background: '#e8442a',
-                    border: '1px solid #e8442a',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    borderRadius: 6,
-                    padding: '8px 0',
-                    cursor: 'pointer'
-                  }}
-                >
-                  HOÀN THÀNH
-                </button>
+                />
               </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleSubmit(true)}
+                style={{
+                  flex: 1,
+                  background: '#ffffff',
+                  border: '1px solid #e8442a',
+                  color: '#e8442a',
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  padding: '8px 0',
+                  cursor: 'pointer'
+                }}
+              >
+                Lưu tạm
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleSubmit(false)}
+                style={{
+                  flex: 1,
+                  background: '#e8442a',
+                  border: '1px solid #e8442a',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  borderRadius: 6,
+                  padding: '8px 0',
+                  cursor: 'pointer'
+                }}
+              >
+                HOÀN THÀNH
+              </button>
             </div>
           </div>
         </div>
-        <QuickCreatePartnerModal
-          open={createPartnerModalOpen}
-          onClose={() => setCreatePartnerModalOpen(false)}
-          branchId={branchId}
-          defaultType={createPartnerDefaultType}
-          onSuccess={handlePartnerCreated}
-        />
       </div>
-    );
-  };
+      <QuickCreatePartnerModal
+        open={createPartnerModalOpen}
+        onClose={() => setCreatePartnerModalOpen(false)}
+        branchId={branchId}
+        defaultType={createPartnerDefaultType}
+        onSuccess={handlePartnerCreated}
+      />
+    </div>
+  );
+};
 
 export default ImportDocumentModal;

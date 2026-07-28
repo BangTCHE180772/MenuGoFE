@@ -178,17 +178,17 @@ const ReturnDocumentModal = ({
   const searchOptions = useMemo(() => {
     return bInventoryList.length > 0
       ? bInventoryList
-          .filter((b) => b && (b.id != null || b.bInventoryId != null || b.productId != null))
-          .map((b) => ({
-            value: b.id ?? b.bInventoryId ?? b.productId,
-            label: `${b.code || 'SP'} - ${b.name || 'Sản phẩm'} (Tồn: ${b.quantity ?? 0})`
-          }))
+        .filter((b) => b && (b.id != null || b.bInventoryId != null || b.productId != null))
+        .map((b) => ({
+          value: b.id ?? b.bInventoryId ?? b.productId,
+          label: `${b.code || 'SP'} - ${b.name || 'Sản phẩm'} (Tồn: ${b.quantity ?? 0})`
+        }))
       : products
-          .filter((p) => p && p.id != null)
-          .map((p) => ({
-            value: p.id,
-            label: `${p.code || `SP${p.id}`} - ${p.name || 'Sản phẩm'}`
-          }));
+        .filter((p) => p && p.id != null)
+        .map((p) => ({
+          value: p.id,
+          label: `${p.code || `SP${p.id}`} - ${p.name || 'Sản phẩm'}`
+        }));
   }, [bInventoryList, products]);
 
   if (!open) return null;

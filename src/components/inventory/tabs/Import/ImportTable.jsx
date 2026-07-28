@@ -162,12 +162,28 @@ const ImportTable = ({
 
                 // Details calculations
                 const detailsList = doc.details || [];
-                const supplierName = doc.partners?.[0]?.partnerName || '---';
-                const supplierCost = doc.partners?.[0]?.cost ?? doc.totalAmount ?? 0;
+                const supplierPartner = (doc.partners || []).find((p) => p.partnerType === 1 || p.partnerType === 'Supplier') || doc.partners?.[0];
+                const supplierName = supplierPartner?.partnerName || '---';
+
+                // Nợ gốc (DocumentPartner.cost)
+                const supplierRawCost = Number(supplierPartner?.cost ?? supplierPartner?.amountDue ?? 0);
+
+                // Dòng CashFlowDetail loại Rounding
+                const roundingCfd = (supplierPartner?.cashFlowDetails || []).find((cfd) => cfd.type === 5 || cfd.type === 'Rounding');
+                const roundingValue = Number(roundingCfd?.amount || 0);
+
+                // Số tiền phải trả NCC = Nợ gốc - cfd ROUNDING
+                const supplierAmountDue = supplierRawCost - roundingValue;
+
+                // Tiền đã trả NCC
+                const supplierAmountPaid = Number(supplierPartner?.amountPaid ?? 0);
+
+                // Còn nợ NCC
+                const supplierDebt = Math.max(0, supplierAmountDue - supplierAmountPaid);
 
                 const totalQuantity = detailsList.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
                 const totalItemsCount = detailsList.length;
-                const totalGoodsAmount = doc.totalAmount || detailsList.reduce((sum, d) => sum + (Number(d.quantity || 0) * Number(d.unitPrice || 0)), 0);
+                const totalGoodsAmount = detailsList.reduce((sum, d) => sum + (Number(d.quantity || 0) * Number(d.unitPrice || 0)), 0);
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -265,7 +281,7 @@ const ImportTable = ({
                                   fontSize: 12
                                 }}
                               >
-                                Dịch vụ khác ({ (doc.partners || []).filter(p => p.partnerType === 3 || p.partnerType === 4 || p.partnerType === 'Transporter' || p.partnerType === 'Other').length })
+                                Dịch vụ khác ({(doc.partners || []).filter(p => p.partnerType === 3 || p.partnerType === 4 || p.partnerType === 'Transporter' || p.partnerType === 'Other').length})
                               </button>
                               <button
                                 onClick={() => handleTabChange(doc.id, 'payment')}
@@ -421,13 +437,17 @@ const ImportTable = ({
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>Cần trả NCC</span>
-                                      <strong style={{ color: '#0f172a' }}>{totalGoodsAmount.toLocaleString('vi-VN')}</strong>
+                                      <strong style={{ color: '#0f172a' }}>{supplierAmountDue.toLocaleString('vi-VN')}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>
                                         Tiền đã trả NCC <CreditCardOutlined style={{ fontSize: 10, color: '#64748b' }} />
                                       </span>
-                                      <strong style={{ color: '#e8442a', fontWeight: 800 }}>{supplierCost.toLocaleString('vi-VN')}</strong>
+                                      <strong style={{ color: '#16a34a', fontWeight: 800 }}>{supplierAmountPaid.toLocaleString('vi-VN')}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                      <span>Còn nợ NCC</span>
+                                      <strong style={{ color: supplierDebt > 0 ? '#ef4444' : '#0f172a', fontWeight: 700 }}>{supplierDebt.toLocaleString('vi-VN')}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -683,44 +703,65 @@ const ImportTable = ({
                             {/* TAB 3: LỊCH SỬ THANH TOÁN */}
                             {currentTab === 'payment' && (
                               <div style={{ padding: 16 }}>
-                                <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                    <thead>
-                                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ CHỨNG TỪ</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>THỜI GIAN</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>PHƯƠNG THỨC</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI THU/CHI</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIÁ TRỊ (VNĐ)</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                        <td style={{ padding: '8px 10px', fontWeight: 600, color: '#e8442a' }}>
-                                          TT-{doc.code}
-                                        </td>
-                                        <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                          {dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}
-                                        </td>
-                                        <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                          Chuyển khoản / Tiền mặt
-                                        </td>
-                                        <td style={{ padding: '8px 10px', color: '#64748b' }}>
-                                          {doc.creator || 'Hệ thống'}
-                                        </td>
-                                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                                          {supplierCost.toLocaleString('vi-VN')} đ
-                                        </td>
-                                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
-                                            Thành công
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
+                                {(() => {
+                                  const allCashFlows = (doc.partners || []).flatMap((p) =>
+                                    (p.cashFlowDetails || [])
+                                      .filter((cfd) => cfd.type !== 5 && cfd.type !== 'Rounding')
+                                      .map((cfd) => ({
+                                        ...cfd,
+                                        partnerName: p.partnerName
+                                      }))
+                                  );
+
+                                  if (allCashFlows.length === 0) {
+                                    return (
+                                      <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+                                        Phiếu nhập kho này chưa phát sinh giao dịch thanh toán nào.
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                        <thead>
+                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ CHỨNG TỪ</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>ĐỐI TÁC</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>THỜI GIAN</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>PHƯƠNG THỨC</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>SỐ TIỀN</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>GHI CHÚ</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {allCashFlows.map((cfd, cfdIdx) => (
+                                            <tr key={cfd.id || cfdIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#e8442a' }}>
+                                                {cfd.cashFlowCode || `TT-${cfd.cashFlowId || doc.id}`}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
+                                                {cfd.partnerName || '---'}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                {cfd.businessDate ? dayjs(cfd.businessDate).format('DD/MM/YYYY HH:mm') : dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                {cfd.paymentMethod || 'Tiền mặt'}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                                                {Number(cfd.amount || 0).toLocaleString('vi-VN')} đ
+                                              </td>
+                                              <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                                                {cfd.note || '---'}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             )}
                           </div>
