@@ -257,9 +257,8 @@ const KDSPage = () => {
   const filteredItems = useMemo(() => {
     switch (activeTab) {
       case COOKING_STATUS.WAITING:
-        return waitingItems;
       case COOKING_STATUS.ACCEPTED:
-        return acceptedItems;
+        return [...waitingItems, ...acceptedItems];
       case COOKING_STATUS.COOKING:
         return cookingItems;
       case COOKING_STATUS.READY:
@@ -393,20 +392,7 @@ const KDSPage = () => {
 
         {/* Action Buttons (Normal Flow) */}
         <Space direction="vertical" style={{ width: '100%' }}>
-          {status === COOKING_STATUS.WAITING && (
-            <Button
-              type="primary"
-              block
-              size="large"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.ACCEPTED)}
-              style={{ backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 600 }}
-            >
-              Nhận món (Accept)
-            </Button>
-          )}
-
-          {status === COOKING_STATUS.ACCEPTED && (
+          {(status === COOKING_STATUS.WAITING || status === COOKING_STATUS.ACCEPTED) && (
             <Button
               type="primary"
               block
@@ -415,7 +401,7 @@ const KDSPage = () => {
               onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
               style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 }}
             >
-              Bắt đầu nấu (Cook)
+              Xác nhận làm (Cook)
             </Button>
           )}
 
@@ -428,7 +414,7 @@ const KDSPage = () => {
               onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
               style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600 }}
             >
-              Hoàn thành (Done)
+              Đã nấu xong (Ready)
             </Button>
           )}
 
@@ -670,18 +656,6 @@ const KDSPage = () => {
 
                     {/* Batch Action Buttons */}
                     <Space direction="vertical" style={{ width: '100%' }}>
-                      {batchWaitingIds.length > 0 && (
-                        <Button
-                          type="primary"
-                          block
-                          size="small"
-                          icon={<ThunderboltOutlined />}
-                          onClick={() => handleBatchStatusChange(batchWaitingIds, COOKING_STATUS.ACCEPTED)}
-                          style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
-                        >
-                          Nhận mẻ ({batchWaitingIds.length} món)
-                        </Button>
-                      )}
                       {(batchWaitingIds.length > 0 || batchAcceptedIds.length > 0) && (
                         <Button
                           type="primary"
@@ -696,7 +670,7 @@ const KDSPage = () => {
                           }
                           style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
                         >
-                          Bắt đầu nấu ({batchWaitingIds.length + batchAcceptedIds.length} món)
+                          Xác nhận làm mẻ ({batchWaitingIds.length + batchAcceptedIds.length} món)
                         </Button>
                       )}
                       {batchCookingIds.length > 0 && (
@@ -708,7 +682,7 @@ const KDSPage = () => {
                           onClick={() => handleBatchStatusChange(batchCookingIds, COOKING_STATUS.READY)}
                           style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                         >
-                          Hoàn thành mẻ ({batchCookingIds.length} món)
+                          Đã nấu xong mẻ ({batchCookingIds.length} món)
                         </Button>
                       )}
                     </Space>
@@ -740,7 +714,7 @@ const KDSPage = () => {
                 borderBottom: '2px solid #1890ff'
               }}>
                 <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  📋 Chờ Chế Biến ({waitingItems.length + acceptedItems.length})
+                  📋 Chờ Bếp Làm (Waiting) ({waitingItems.length + acceptedItems.length})
                 </Title>
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
@@ -765,14 +739,14 @@ const KDSPage = () => {
                 borderBottom: '2px solid #fa8c16'
               }}>
                 <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  🍳 Đang Nấu ({cookingItems.length})
+                  🍳 Đang Làm (Cooking) ({cookingItems.length})
                 </Title>
                 <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
               </div>
               <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
                 {cookingItems.map(renderKdsCard)}
                 {cookingItems.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món đang nấu</div>
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món đang làm</div>
                 )}
               </div>
             </div>
@@ -790,7 +764,7 @@ const KDSPage = () => {
                 borderBottom: '2px solid #52c41a'
               }}>
                 <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  ✅ Đã Xong / Hoàn Thành ({readyItems.length})
+                  ✅ Đã Nấu Xong (Ready) ({readyItems.length})
                 </Title>
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
@@ -824,15 +798,7 @@ const KDSPage = () => {
                 key: COOKING_STATUS.WAITING,
                 label: (
                   <span>
-                    <BellOutlined /> Chờ nhận ({waitingItems.length})
-                  </span>
-                ),
-              },
-              {
-                key: COOKING_STATUS.ACCEPTED,
-                label: (
-                  <span>
-                    <ClockCircleOutlined /> Đã nhận ({acceptedItems.length})
+                    <BellOutlined /> Chờ bếp làm ({waitingItems.length + acceptedItems.length})
                   </span>
                 ),
               },
@@ -840,7 +806,7 @@ const KDSPage = () => {
                 key: COOKING_STATUS.COOKING,
                 label: (
                   <span>
-                    <FireOutlined /> Đang nấu ({cookingItems.length})
+                    <FireOutlined /> Đang làm ({cookingItems.length})
                   </span>
                 ),
               },
@@ -848,7 +814,7 @@ const KDSPage = () => {
                 key: COOKING_STATUS.READY,
                 label: (
                   <span>
-                    <CheckCircleOutlined /> Đã xong ({readyItems.length})
+                    <CheckCircleOutlined /> Đã nấu xong ({readyItems.length})
                   </span>
                 ),
               },
