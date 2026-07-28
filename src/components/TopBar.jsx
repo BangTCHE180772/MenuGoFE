@@ -60,10 +60,6 @@ const ROLE_MENUS = {
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -81,12 +77,10 @@ const ROLE_MENUS = {
       path: "/work-schedule",
       icon: <CalendarOutlined />,
     },
+    { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
-    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
@@ -108,11 +102,6 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
   ],
   [ROLES.CHEF]: [

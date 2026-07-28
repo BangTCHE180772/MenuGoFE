@@ -99,20 +99,7 @@ const AppRouter = () => {
                   )
                 }
               />
-              <Route path="/orders" element={<OrderPage />} />
-              <Route path="/table-map" element={<TableMapPage />} />
-              <Route path="/reservations" element={<ReservationPage />} />
 
-              {/* Cashier, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-                <Route path="/cashier" element={<CashierPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
-              </Route>
-
-              {/* Chef, Cashier, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-                <Route path="/kds" element={<KDSPage />} />
-              </Route>
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
@@ -127,6 +114,7 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
               </Route>
 
               {/* Owner, Admin */}
