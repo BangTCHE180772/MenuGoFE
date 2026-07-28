@@ -37,6 +37,7 @@ const ROLE_MENUS = {
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
+    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },

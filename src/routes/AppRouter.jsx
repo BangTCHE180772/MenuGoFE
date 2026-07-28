@@ -108,13 +108,13 @@ const AppRouter = () => {
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
               </Route>
 
               {/* Owner, Admin */}
@@ -126,6 +126,11 @@ const AppRouter = () => {
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+                <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/reservations" element={<ReservationPage />} />
+              <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>
           </Route>
