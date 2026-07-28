@@ -10,6 +10,8 @@ import {
   DatePicker,
   InputNumber,
   Space,
+  Row,
+  Col,
   Tag,
   Tooltip,
   Popconfirm,
@@ -58,6 +60,12 @@ const ROLES_LIST = [
   { value: 6, label: 'Phục vụ (Waiter)' },
 ];
 
+const STAFF_ROLES_LIST = [
+  { value: 4, label: 'Thu ngân (Cashier)' },
+  { value: 5, label: 'Bếp trưởng (Chef)' },
+  { value: 6, label: 'Phục vụ (Waiter)' },
+];
+
 const ContractPage = () => {
   const { user } = useAuth();
   const [contracts, setContracts] = useState([]);
@@ -65,6 +73,7 @@ const ContractPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -77,11 +86,11 @@ const ContractPage = () => {
   const [form] = Form.useForm();
 
   // Load lists
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (branchIdFilter = selectedBranch) => {
     setLoading(true);
     try {
       const [contractsRes, branchesRes, accountsRes] = await Promise.all([
-        getContracts(),
+        getContracts(branchIdFilter),
         getAllBranches(),
         getRoleRange(),
       ]);
@@ -94,11 +103,15 @@ const ContractPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedBranch]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const isOwnerOrAdmin =
+    user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
+    user?.roleIds?.some((id) => id === 1 || id === 2);
 
   // Handle Create / Edit Open
   const handleOpenModal = (type, record = null) => {
@@ -123,11 +136,14 @@ const ContractPage = () => {
       });
     } else {
       form.resetFields();
+      const defaultBranchId = branches.length > 0 ? branches[0].id : undefined;
       form.setFieldsValue({
         status: 'Active',
         salaryType: 'Fixed',
         type: 'Full-time',
         baseWorkDay: 26,
+        branchId: defaultBranchId,
+        roleId: isOwnerOrAdmin ? 3 : undefined,
       });
     }
   };
@@ -364,10 +380,12 @@ const ContractPage = () => {
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: '#e8442a', fontWeight: 700 }}>
-                Quản Lý Hợp Đồng Nhân Sự
+                {isOwnerOrAdmin ? 'Quản Lý Hợp Đồng Quản Lý' : 'Quản Lý Hợp Đồng Nhân Viên'}
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                Danh sách, trạng thái và chế độ đãi ngộ trong hợp đồng của các nhân viên
+                {isOwnerOrAdmin
+                  ? 'Danh sách, trạng thái và chế độ đãi ngộ trong hợp đồng của các Quản lý chi nhánh'
+                  : 'Danh sách, trạng thái và chế độ đãi ngộ trong hợp đồng của các nhân viên trong chi nhánh'}
               </p>
             </div>
           </div>
@@ -384,7 +402,7 @@ const ContractPage = () => {
             }}
             onClick={() => handleOpenModal('create')}
           >
-            Thêm hợp đồng mới
+            {isOwnerOrAdmin ? 'Tạo hợp đồng Quản lý' : 'Tạo hợp đồng Nhân viên'}
           </Button>
         </div>
       </Card>
@@ -400,19 +418,38 @@ const ContractPage = () => {
             onChange={(e) => setSearchText(e.target.value)}
             style={{ maxWidth: 320, borderRadius: '8px' }}
           />
-          <Select
-            placeholder="Lọc vai trò"
-            style={{ width: 160 }}
-            allowClear
-            value={selectedRole}
-            onChange={(val) => setSelectedRole(val)}
-          >
-            {ROLES_LIST.map((r) => (
-              <Select.Option key={r.value} value={r.value}>
-                {r.label}
-              </Select.Option>
-            ))}
-          </Select>
+          {isOwnerOrAdmin ? (
+            <Select
+              placeholder="Lọc chi nhánh"
+              style={{ width: 180 }}
+              allowClear
+              value={selectedBranch}
+              onChange={(val) => {
+                setSelectedBranch(val);
+                loadData(val);
+              }}
+            >
+              {branches.map((b) => (
+                <Select.Option key={b.id} value={b.id}>
+                  {b.name}
+                </Select.Option>
+              ))}
+            </Select>
+          ) : (
+            <Select
+              placeholder="Lọc vai trò"
+              style={{ width: 160 }}
+              allowClear
+              value={selectedRole}
+              onChange={(val) => setSelectedRole(val)}
+            >
+              {STAFF_ROLES_LIST.map((r) => (
+                <Select.Option key={r.value} value={r.value}>
+                  {r.label}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
           <Select
             placeholder="Lọc loại hợp đồng"
             style={{ width: 180 }}
@@ -439,15 +476,17 @@ const ContractPage = () => {
               </Select.Option>
             ))}
           </Select>
-          {(searchText || selectedRole || selectedType || selectedStatus) && (
+          {(searchText || selectedRole || selectedType || selectedStatus || selectedBranch) && (
             <Button
               type="link"
               danger
               onClick={() => {
                 setSearchText('');
+                setSelectedBranch(null);
                 setSelectedRole(null);
                 setSelectedType(null);
                 setSelectedStatus(null);
+                loadData(null);
               }}
             >
               Xóa bộ lọc
@@ -471,7 +510,15 @@ const ContractPage = () => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <FileProtectOutlined />
-            <span>{modalType === 'create' ? 'TẠO MỚI HỢP ĐỒNG LAO ĐỘNG' : 'CẬP NHẬT HỢP ĐỒNG LAO ĐỘNG'}</span>
+            <span>
+              {isOwnerOrAdmin
+                ? modalType === 'create'
+                  ? 'TẠO MỚI HỢP ĐỒNG QUẢN LÝ'
+                  : 'CẬP NHẬT HỢP ĐỒNG QUẢN LÝ'
+                : modalType === 'create'
+                ? 'TẠO MỚI HỢP ĐỒNG NHÂN VIÊN'
+                : 'CẬP NHẬT HỢP ĐỒNG NHÂN VIÊN'}
+            </span>
           </div>
         }
         open={isModalOpen}
@@ -500,177 +547,210 @@ const ContractPage = () => {
           style={{ marginTop: 16 }}
         >
           {/* Row 1: Account Selection & Role Selection */}
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            {modalType === 'edit' ? (
-              <>
+          <Row gutter={24}>
+            <Col span={12}>
+              {modalType === 'edit' ? (
+                <>
+                  <Form.Item
+                    name="accountName"
+                    label="Nhân viên hợp đồng"
+                  >
+                    <Input disabled style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                  </Form.Item>
+                  <Form.Item name="accountId" noStyle>
+                    <Input type="hidden" />
+                  </Form.Item>
+                </>
+              ) : (
                 <Form.Item
-                  name="accountName"
+                  name="accountId"
                   label="Nhân viên hợp đồng"
-                  style={{ width: 330 }}
+                  rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
                 >
-                  <Input disabled style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                  <Select
+                    placeholder="Chọn nhân viên..."
+                    showSearch
+                    optionFilterProp="label"
+                    onChange={handleAccountChange}
+                  >
+                    {accounts.map((a) => (
+                      <Select.Option key={a.id} value={a.id} label={a.name}>
+                        {a.name} (Code: {a.id})
+                      </Select.Option>
+                    ))}
+                  </Select>
                 </Form.Item>
-                <Form.Item name="accountId" noStyle>
-                  <Input type="hidden" />
+              )}
+            </Col>
+            <Col span={12}>
+              {isOwnerOrAdmin ? (
+                <>
+                  <Form.Item label="Chức danh" required>
+                    <Input disabled value="Quản lý (Manager)" style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                  </Form.Item>
+                  <Form.Item name="roleId" noStyle>
+                    <Input type="hidden" />
+                  </Form.Item>
+                </>
+              ) : (
+                <Form.Item
+                  name="roleId"
+                  label="Chức danh"
+                  rules={[{ required: true, message: 'Vui lòng chọn chức danh!' }]}
+                >
+                  <Select placeholder="Chọn chức danh/vai trò...">
+                    {STAFF_ROLES_LIST.map((r) => (
+                      <Select.Option key={r.value} value={r.value}>
+                        {r.label}
+                      </Select.Option>
+                    ))}
+                  </Select>
                 </Form.Item>
-              </>
-            ) : (
+              )}
+            </Col>
+          </Row>
+
+          {/* Row 2: Branch Selection & Status Selection */}
+          <Row gutter={24}>
+            <Col span={12}>
+              {isOwnerOrAdmin ? (
+                <Form.Item
+                  name="branchId"
+                  label="Chi nhánh áp dụng"
+                  rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
+                >
+                  <Select placeholder="Chọn chi nhánh...">
+                    {branches.map((b) => (
+                      <Select.Option key={b.id} value={b.id}>
+                        {b.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              ) : (
+                <>
+                  <Form.Item
+                    label="Chi nhánh áp dụng"
+                    required
+                  >
+                    <Input
+                      disabled
+                      value={branches.length > 0 ? branches[0].name : 'Chi nhánh của quản lý'}
+                      style={{ color: 'rgba(0, 0, 0, 0.85)' }}
+                    />
+                  </Form.Item>
+                  <Form.Item name="branchId" noStyle>
+                    <Input type="hidden" />
+                  </Form.Item>
+                </>
+              )}
+            </Col>
+            <Col span={12}>
               <Form.Item
-                name="accountId"
-                label="Nhân viên hợp đồng"
-                rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
-                style={{ width: 330 }}
+                name="status"
+                label="Trạng thái hợp đồng"
+                rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
               >
-                <Select
-                  placeholder="Chọn nhân viên..."
-                  showSearch
-                  optionFilterProp="label"
-                  onChange={handleAccountChange}
-                >
-                  {accounts.map((a) => (
-                    <Select.Option key={a.id} value={a.id} label={a.name}>
-                      {a.name} (Code: {a.id})
+                <Select placeholder="Chọn trạng thái...">
+                  {STATUS_OPTIONS.map((s) => (
+                    <Select.Option key={s.value} value={s.value}>
+                      {s.label}
                     </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
-            )}
-
-            <Form.Item
-              name="roleId"
-              label="Chức danh"
-              rules={[{ required: true, message: 'Vui lòng chọn chức danh!' }]}
-              style={{ width: 330 }}
-            >
-              <Select placeholder="Chọn chức danh/vai trò...">
-                {ROLES_LIST.map((r) => (
-                  <Select.Option key={r.value} value={r.value}>
-                    {r.label}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Space>
-
-          {/* Row 2: Branch Selection & Status Selection */}
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="branchId"
-              label="Chi nhánh áp dụng"
-              rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
-              style={{ width: 330 }}
-            >
-              <Select placeholder="Chọn chi nhánh...">
-                {branches.map((b) => (
-                  <Select.Option key={b.id} value={b.id}>
-                    {b.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              name="status"
-              label="Trạng thái hợp đồng"
-              rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
-              style={{ width: 330 }}
-            >
-              <Select placeholder="Chọn trạng thái...">
-                {STATUS_OPTIONS.map((s) => (
-                  <Select.Option key={s.value} value={s.value}>
-                    {s.label}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Space>
+            </Col>
+          </Row>
 
           {/* Row 3: Contract Type & Salary Type */}
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="type"
-              label="Loại hợp đồng"
-              rules={[{ required: true, message: 'Vui lòng chọn loại hợp đồng!' }]}
-              style={{ width: 330 }}
-            >
-              <Select placeholder="Chọn loại hợp đồng...">
-                {CONTRACT_TYPES.map((t) => (
-                  <Select.Option key={t.value} value={t.value}>
-                    {t.label}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              name="salaryType"
-              label="Hình thức lương"
-              rules={[{ required: true, message: 'Vui lòng chọn hình thức lương!' }]}
-              style={{ width: 330 }}
-            >
-              <Select placeholder="Chọn hình thức lương...">
-                {SALARY_TYPES.map((st) => (
-                  <Select.Option key={st.value} value={st.value}>
-                    {st.label}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Space>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="type"
+                label="Loại hợp đồng"
+                rules={[{ required: true, message: 'Vui lòng chọn loại hợp đồng!' }]}
+              >
+                <Select placeholder="Chọn loại hợp đồng...">
+                  {CONTRACT_TYPES.map((t) => (
+                    <Select.Option key={t.value} value={t.value}>
+                      {t.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="salaryType"
+                label="Hình thức lương"
+                rules={[{ required: true, message: 'Vui lòng chọn hình thức lương!' }]}
+              >
+                <Select placeholder="Chọn hình thức lương...">
+                  {SALARY_TYPES.map((st) => (
+                    <Select.Option key={st.value} value={st.value}>
+                      {st.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
 
           {/* Row 4: Base Salary & Base Work Day */}
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="baseSalary"
-              label="Lương cơ bản (VND)"
-              rules={[{ required: true, message: 'Vui lòng nhập lương cơ bản!' }]}
-              style={{ width: 330 }}
-            >
-              <InputNumber
-                addonAfter="đ"
-                style={{ width: '100%' }}
-                formatter={(value) => (value != null && value !== '' ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
-                parser={(value) => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
-                min={0}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="baseWorkDay"
-              label="Số ngày công chuẩn / tháng"
-              rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
-              style={{ width: 330 }}
-            >
-              <InputNumber style={{ width: '100%' }} min={1} max={31} />
-            </Form.Item>
-          </Space>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="baseSalary"
+                label="Lương cơ bản (VND)"
+                rules={[{ required: true, message: 'Vui lòng nhập lương cơ bản!' }]}
+              >
+                <InputNumber
+                  addonAfter="đ"
+                  style={{ width: '100%' }}
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  min={0}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="baseWorkDay"
+                label="Số ngày công chuẩn / tháng"
+                rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
+              >
+                <InputNumber style={{ width: '100%' }} min={1} max={31} />
+              </Form.Item>
+            </Col>
+          </Row>
 
           {/* Row 5: Start Date & End Date */}
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="startDate"
-              label="Ngày bắt đầu hiệu lực"
-              rules={[{ required: true, message: 'Vui lòng chọn ngày hiệu lực!' }]}
-              style={{ width: 330 }}
-            >
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày bắt đầu" />
-            </Form.Item>
-
-            <Form.Item
-              name="endDate"
-              label={
-                <span>
-                  Ngày hết hạn (Nếu có){' '}
-                  <Tooltip title="Bỏ trống nếu là hợp đồng vô thời hạn.">
-                    <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
-                  </Tooltip>
-                </span>
-              }
-              style={{ width: 330 }}
-            >
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày hết hạn" />
-            </Form.Item>
-          </Space>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="startDate"
+                label="Ngày bắt đầu hiệu lực"
+                rules={[{ required: true, message: 'Vui lòng chọn ngày hiệu lực!' }]}
+              >
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày bắt đầu" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="endDate"
+                label={
+                  <span>
+                    Ngày hết hạn (Nếu có){' '}
+                    <Tooltip title="Bỏ trống nếu là hợp đồng vô thời hạn.">
+                      <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+                    </Tooltip>
+                  </span>
+                }
+              >
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày hết hạn" />
+              </Form.Item>
+            </Col>
+          </Row>
 
           {/* Row 6: Note */}
           <Form.Item name="note" label="Ghi chú thêm">

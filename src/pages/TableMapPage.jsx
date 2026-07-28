@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { message, Spin, Select } from 'antd';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { getAllBranches } from '../api/branchApi';
@@ -145,6 +145,11 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
     }
   }, []);
 
+  const selectedTableRef = useRef(selectedTable);
+  useEffect(() => {
+    selectedTableRef.current = selectedTable;
+  }, [selectedTable]);
+
   useEffect(() => {
     if (connection) {
       const handleNotification = (data) => {
@@ -153,14 +158,14 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
             loadTables();
           } else {
             setTables(prev => prev.map(t => {
-              if (t.id === data.tableId) {
+              if (String(t.id) === String(data.tableId)) {
                 return { ...t, isBlinking: true };
               }
               return t;
             }));
           }
 
-          if (selectedTable?.id === data.tableId) {
+          if (String(selectedTableRef.current?.id) === String(data.tableId)) {
             loadOrderSummary(data.tableId);
           }
         }
@@ -168,7 +173,7 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
       connection.on('ReceiveNotification', handleNotification);
       return () => connection.off('ReceiveNotification', handleNotification);
     }
-  }, [connection, selectedTable, loadTables, loadOrderSummary]);
+  }, [connection, loadTables, loadOrderSummary]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 

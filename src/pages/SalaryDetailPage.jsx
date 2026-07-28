@@ -120,6 +120,11 @@ const SalaryDetailPage = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
 
+  // Role permissions
+  const isOwner = user?.roleId === 1 || user?.roleId === 2;
+  const isManager = user?.roleId === 3;
+  const managerBranchId = user?.branchId;
+
   // Modals
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formModalType, setFormModalType] = useState('create'); // 'create' | 'edit'
@@ -176,10 +181,66 @@ const SalaryDetailPage = () => {
     const pr = payrolls.find((p) => p.id === payrollId);
     if (pr) {
       const accName = pr.accountName || getAccountName(pr.accountId);
-      return `BL #${pr.id} - ${accName} (T${pr.Month || pr.month}/${pr.Year || pr.year})`;
+      return `${accName} (T${pr.Month || pr.month}/${pr.Year || pr.year})`;
     }
     return `Bảng lương #${payrollId}`;
   };
+
+  // Allowed Accounts filtered by Role & Branch
+  const allowedAccounts = useMemo(() => {
+    return accounts.filter((a) => {
+      const roleIds = a.roleIds || (a.roles ? a.roles.map((r) => r.id) : []);
+      const hasActiveContract = a.contracts && a.contracts.some((c) => c.status === 1 || c.status === 'Active');
+      if (!hasActiveContract) return false;
+
+      if (isOwner) {
+        return roleIds.includes(3);
+      }
+
+      if (isManager) {
+        const isStaff = roleIds.some((r) => [4, 5, 6].includes(r));
+        if (!isStaff) return false;
+
+        if (managerBranchId && a.branchId) {
+          return a.branchId === managerBranchId;
+        }
+        if (managerBranchId && a.contracts) {
+          return a.contracts.some(
+            (c) => (c.status === 1 || c.status === 'Active') && c.branchId === managerBranchId
+          );
+        }
+        return true;
+      }
+
+      return true;
+    });
+  }, [accounts, isOwner, isManager, managerBranchId]);
+
+  // Filter payrolls to only include Draft status & role/branch permission
+  const draftPayrolls = useMemo(() => {
+    return payrolls.filter((p) => {
+      const isDraft = p.status === 1 || p.status === 'Draft';
+      if (!isDraft) return false;
+
+      const acc = accounts.find((a) => a.id === p.accountId);
+      const roleIds = acc?.roleIds || (acc?.roles ? acc.roles.map((r) => r.id) : []);
+
+      if (isOwner) {
+        return roleIds.length > 0 ? roleIds.includes(3) : true;
+      }
+
+      if (isManager) {
+        if (managerBranchId && p.branchId && p.branchId !== managerBranchId) {
+          return false;
+        }
+        if (roleIds.length > 0 && !roleIds.some((r) => [4, 5, 6].includes(r))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [payrolls, accounts, isOwner, isManager, managerBranchId]);
 
   // Statistics calculation
   const stats = useMemo(() => {
@@ -234,9 +295,12 @@ const SalaryDetailPage = () => {
     setIsFormModalOpen(true);
 
     if (type === 'edit' && record) {
+      const pr = payrolls.find((p) => p.id === record.payrollId);
+      const accName = record.accountName || (pr ? pr.accountName : getAccountName(record.accountId));
       form.setFieldsValue({
         payrollId: record.payrollId,
         accountId: record.accountId,
+        employeeNameDisplay: accName,
         title: record.title,
         type: parseType(record.type),
         amount: record.amount,
@@ -244,9 +308,15 @@ const SalaryDetailPage = () => {
       });
     } else {
       form.resetFields();
+      const firstPayrollId = selectedPayroll || (draftPayrolls[0]?.id ?? undefined);
+      const pr = payrolls.find((p) => p.id === firstPayrollId);
+      const accId = pr ? pr.accountId : (selectedAccount || allowedAccounts[0]?.id);
+      const accName = pr ? (pr.accountName || getAccountName(pr.accountId)) : (accId ? getAccountName(accId) : '');
+
       form.setFieldsValue({
-        payrollId: selectedPayroll || (payrolls[0]?.id ?? undefined),
-        accountId: selectedAccount || (accounts[0]?.id ?? undefined),
+        payrollId: firstPayrollId,
+        accountId: accId,
+        employeeNameDisplay: accName,
         type: ADJUSTMENT_TYPES.Allowance,
         amount: 100000,
       });
@@ -257,7 +327,11 @@ const SalaryDetailPage = () => {
   const handlePayrollChangeInForm = (payrollId) => {
     const pr = payrolls.find((p) => p.id === payrollId);
     if (pr) {
-      form.setFieldsValue({ accountId: pr.accountId });
+      const accName = pr.accountName || getAccountName(pr.accountId);
+      form.setFieldsValue({
+        accountId: pr.accountId,
+        employeeNameDisplay: accName,
+      });
     }
   };
 
@@ -355,7 +429,7 @@ const SalaryDetailPage = () => {
       key: 'payrollId',
       render: (payrollId) => (
         <Tag color="blue">
-          BL #{payrollId}
+          #{payrollId}
         </Tag>
       ),
     },
@@ -591,9 +665,9 @@ const SalaryDetailPage = () => {
             value={selectedPayroll}
             onChange={(val) => setSelectedPayroll(val)}
           >
-            {payrolls.map((p) => (
-              <Select.Option key={p.id} value={p.id} label={`BL #${p.id}`}>
-                BL #{p.id} - {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
+            {draftPayrolls.map((p) => (
+              <Select.Option key={p.id} value={p.id} label={`${p.accountName || getAccountName(p.accountId)}`}>
+                {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
               </Select.Option>
             ))}
           </Select>
@@ -607,7 +681,7 @@ const SalaryDetailPage = () => {
             value={selectedAccount}
             onChange={(val) => setSelectedAccount(val)}
           >
-            {accounts.map((a) => (
+            {allowedAccounts.map((a) => (
               <Select.Option key={a.id} value={a.id} label={a.name}>
                 {a.name} (ID: {a.id})
               </Select.Option>
@@ -694,31 +768,36 @@ const SalaryDetailPage = () => {
                     optionFilterProp="label"
                     onChange={handlePayrollChangeInForm}
                   >
-                    {payrolls.map((p) => (
+                    {draftPayrolls.map((p) => (
                       <Select.Option
                         key={p.id}
                         value={p.id}
-                        label={`BL #${p.id} ${p.accountName || getAccountName(p.accountId)}`}
+                        label={`${p.accountName || getAccountName(p.accountId)}`}
                       >
-                        BL #{p.id} - {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
+                        {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
                       </Select.Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
               <Col span={12}>
+                <Form.Item name="accountId" hidden rules={[{ required: true, message: 'Vui lòng chọn bảng lương!' }]}>
+                  <Input />
+                </Form.Item>
                 <Form.Item
-                  name="accountId"
-                  label="Nhân Viên"
-                  rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
+                  name="employeeNameDisplay"
+                  label="Nhân Viên (Theo Bảng Lương)"
                 >
-                  <Select placeholder="Chọn nhân viên" showSearch optionFilterProp="label">
-                    {accounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name} (ID: {a.id})
-                      </Select.Option>
-                    ))}
-                  </Select>
+                  <Input
+                    disabled
+                    placeholder="Tự động theo bảng lương"
+                    style={{
+                      color: '#111827',
+                      fontWeight: 600,
+                      backgroundColor: '#f3f4f6',
+                      cursor: 'not-allowed',
+                    }}
+                  />
                 </Form.Item>
               </Col>
             </Row>

@@ -33,7 +33,8 @@ const WaiterMobileSessionPage = () => {
       const todayStr = dayjs().format('YYYY-MM-DD');
       const todaySchedules = schedules.filter(s => dayjs(s.workDate).format('YYYY-MM-DD') === todayStr);
 
-      const checkedInSchedule = todaySchedules.find(s => s.checkInAt != null);
+      const checkedInSchedule = todaySchedules.find(s => s.status === 'Working')
+        || todaySchedules.filter(s => s.checkInAt != null).pop();
 
       if (!checkedInSchedule) {
         setAuthorized(false);

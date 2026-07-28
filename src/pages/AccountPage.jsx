@@ -26,6 +26,7 @@ import {
   MailOutlined,
   PhoneOutlined,
   LockOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -34,6 +35,7 @@ import {
   updateAccount,
   deleteAccount,
 } from '../api/accountApi';
+import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 
@@ -50,13 +52,33 @@ const ROLES_MAP = {
   6: { label: 'Phục vụ', color: 'green' },
 };
 
+const STAFF_ROLES_MAP = {
+  4: { label: 'Thu ngân', color: 'blue' },
+  5: { label: 'Bếp trưởng', color: 'orange' },
+  6: { label: 'Phục vụ', color: 'green' },
+};
+
 const AccountPage = () => {
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const [accounts, setAccounts] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedGender, setSelectedGender] = useState(null);
+  const [selectedBranch, setSelectedBranch] = useState(null);
+
+  const isOwnerOrAdmin =
+    user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
+    user?.roleIds?.some((id) => id === 1 || id === 2);
+
+  const titleText = isOwnerOrAdmin ? 'Quản Lý Tài Khoản Quản Lý' : 'Quản Lý Nhân Viên Chi Nhánh';
+  const subtitleText = isOwnerOrAdmin
+    ? 'Quản lý danh sách tài khoản Quản lý các chi nhánh'
+    : 'Quản lý thông tin tài khoản, trạng thái và vai trò của nhân viên';
+  const buttonText = isOwnerOrAdmin ? 'Thêm quản lý mới' : 'Thêm nhân viên mới';
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,15 +91,20 @@ const AccountPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRoleRange(currentBranchId);
-      setAccounts(res.data || []);
+      const [accRes, branchRes] = await Promise.all([
+        getRoleRange(selectedBranch || undefined),
+        isOwnerOrAdmin ? getAllBranches().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+      ]);
+      setAccounts(accRes.data || []);
+      if (isOwnerOrAdmin) setBranches(branchRes.data || []);
     } catch (err) {
       console.error(err);
-      message.error('Không thể tải danh sách nhân viên!');
+      const errMsg = err.response?.data?.message || 'Không thể tải danh sách tài khoản!';
+      message.error(errMsg);
     } finally {
       setLoading(false);
     }
-  }, [currentBranchId]);
+  }, [selectedBranch, isOwnerOrAdmin]);
 
   useEffect(() => {
     loadData();
@@ -191,6 +218,14 @@ const AccountPage = () => {
       (a.citizenIdCode || '').toLowerCase().includes(search);
     if (!matchText) return false;
     if (selectedRole && !(a.roleIds || []).includes(selectedRole)) return false;
+    if (selectedStatus !== null && selectedStatus !== undefined && a.isActive !== selectedStatus) return false;
+    if (selectedGender) {
+      if (!a.gender) return false;
+      const gLower = a.gender.toLowerCase();
+      if (selectedGender === 'Nam' && gLower !== 'nam' && gLower !== 'male') return false;
+      if (selectedGender === 'Nữ' && gLower !== 'nữ' && gLower !== 'nu' && gLower !== 'female') return false;
+      if (selectedGender === 'Khác' && (gLower === 'nam' || gLower === 'male' || gLower === 'nữ' || gLower === 'nu' || gLower === 'female')) return false;
+    }
     return true;
   });
 
@@ -362,10 +397,10 @@ const AccountPage = () => {
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: '#e8442a', fontWeight: 700 }}>
-                Quản Lý Nhân Sự
+                {titleText}
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                Quản lý thông tin tài khoản, trạng thái và vai trò của nhân viên
+                {subtitleText}
               </p>
             </div>
           </div>
@@ -382,7 +417,7 @@ const AccountPage = () => {
             }}
             onClick={() => handleOpenModal('create')}
           >
-            Thêm nhân viên mới
+            {buttonText}
           </Button>
         </div>
       </Card>
@@ -396,21 +431,79 @@ const AccountPage = () => {
             allowClear
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 400, borderRadius: '8px' }}
+            style={{ maxWidth: 320, borderRadius: '8px' }}
           />
+
           <Select
-            placeholder="Lọc theo vai trò"
-            style={{ width: 180 }}
+            placeholder="Lọc theo giới tính"
+            style={{ width: 160 }}
             allowClear
-            value={selectedRole}
-            onChange={(val) => setSelectedRole(val)}
+            value={selectedGender}
+            onChange={(val) => setSelectedGender(val)}
           >
-            {Object.entries(ROLES_MAP).map(([id, info]) => (
-              <Select.Option key={id} value={Number(id)}>
-                {info.label}
+            {GENDER_OPTIONS.map((g) => (
+              <Select.Option key={g.value} value={g.value}>
+                {g.label}
               </Select.Option>
             ))}
           </Select>
+
+          <Select
+            placeholder="Lọc theo trạng thái"
+            style={{ width: 160 }}
+            allowClear
+            value={selectedStatus}
+            onChange={(val) => setSelectedStatus(val)}
+          >
+            <Select.Option value={true}>Hoạt động</Select.Option>
+            <Select.Option value={false}>Vô hiệu</Select.Option>
+          </Select>
+
+          {isOwnerOrAdmin ? (
+            <Select
+              placeholder="Lọc theo chi nhánh"
+              style={{ width: 180 }}
+              allowClear
+              value={selectedBranch}
+              onChange={(val) => setSelectedBranch(val)}
+            >
+              {branches.map((b) => (
+                <Select.Option key={b.id} value={b.id}>
+                  {b.name}
+                </Select.Option>
+              ))}
+            </Select>
+          ) : (
+            <Select
+              placeholder="Lọc theo vai trò"
+              style={{ width: 160 }}
+              allowClear
+              value={selectedRole}
+              onChange={(val) => setSelectedRole(val)}
+            >
+              {Object.entries(STAFF_ROLES_MAP).map(([id, info]) => (
+                <Select.Option key={id} value={Number(id)}>
+                  {info.label}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
+
+          {(searchText || selectedRole || selectedStatus !== null || selectedGender || selectedBranch) && (
+            <Button
+              type="link"
+              danger
+              onClick={() => {
+                setSearchText('');
+                setSelectedRole(null);
+                setSelectedStatus(null);
+                setSelectedGender(null);
+                setSelectedBranch(null);
+              }}
+            >
+              Xóa bộ lọc
+            </Button>
+          )}
         </div>
 
         <Table

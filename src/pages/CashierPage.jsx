@@ -1,77 +1,186 @@
-import { useState } from 'react';
-import { Tabs, Typography } from 'antd';
-import { TableOutlined, ShoppingCartOutlined, BookOutlined } from '@ant-design/icons';
-import OrderPage from './OrderPage';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Row,
+  Col,
+  Card,
+  Button,
+  Table,
+  Tag,
+  Space,
+  Typography,
+  Tabs,
+  Select,
+  message,
+  Statistic,
+} from 'antd';
+import {
+  DollarOutlined,
+  BookOutlined,
+  ReloadOutlined,
+  SafetyCertificateOutlined,
+  ThunderboltOutlined,
+  CreditCardOutlined,
+  PayCircleOutlined,
+} from '@ant-design/icons';
+import { getAllOrders } from '../api/orderApi';
+import { getAllShifts } from '../api/shiftApi';
 import TableMapPage from './TableMapPage';
 import ReservationPage from './ReservationPage';
+import ShiftStatsPanel from '../components/payment/ShiftStatsPanel';
+import { useSignalR } from '../context/SignalRContext';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
-/**
- * Màn hình Thu Ngân (POS) - POS Hub
- * Đóng vai trò là trung tâm cho cashier điều hướng giữa 3 chức năng chính.
- */
 const CashierPage = () => {
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('CHECKOUT');
 
-  const items = [
-    {
-      key: 'table-map',
-      label: (
-        <span style={{ fontSize: '16px', padding: '0 12px' }}>
-          <TableOutlined /> Sơ đồ bàn
-        </span>
-      ),
-      children: <TableMapPage isPosHub={true} />,
-    },
-    {
-      key: 'orders',
-      label: (
-        <span style={{ fontSize: '16px', padding: '0 12px' }}>
-          <ShoppingCartOutlined /> Bán hàng
-        </span>
-      ),
-      children: <OrderPage isPosHub={true} />,
-    },
-    {
-      key: 'reservations',
-      label: (
-        <span style={{ fontSize: '16px', padding: '0 12px' }}>
-          <BookOutlined /> Đặt bàn
-        </span>
-      ),
-      children: <ReservationPage isPosHub={true} />,
-    },
-  ];
+  const [orders, setOrders] = useState([]);
+  const [shifts, setShifts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // SignalR Connection
+  const signalRConnection = useSignalR();
+
+  // Fetch Orders and Shifts
+  const fetchData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const [oRes, sRes] = await Promise.allSettled([
+        getAllOrders(),
+        getAllShifts(),
+      ]);
+
+      if (oRes.status === 'fulfilled') setOrders(oRes.value.data || []);
+      if (sRes.status === 'fulfilled') setShifts(sRes.value.data || []);
+    } catch (err) {
+      console.error(err);
+      message.error('Không thể tải dữ liệu quầy thu ngân.');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), 15000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // SignalR Listener for real-time order/payment updates
+  useEffect(() => {
+    if (!signalRConnection) return;
+
+    const handleNotif = (notif) => {
+      if (
+        notif.type === 'cooking-status-changed' ||
+        notif.type === 'new-order' ||
+        notif.type === 'order-cancelled' ||
+        notif.type === 'PaymentWebhook' ||
+        notif.Type === 'PaymentWebhook'
+      ) {
+        fetchData(false);
+      }
+    };
+
+    signalRConnection.on('ReceiveNotification', handleNotif);
+    return () => {
+      signalRConnection.off('ReceiveNotification', handleNotif);
+    };
+  }, [signalRConnection, fetchData]);
+
+  // Active / Pending Checkout Orders (ONLY Orders that are non-empty and in checkout state)
+  const pendingOrders = useMemo(() => {
+    return orders.filter(
+      (o) =>
+        (o.status === 'Active' ||
+          o.status === 'Serving' ||
+          o.status === 'Pending' ||
+          o.status === 'Unpaid' ||
+          o.status === 'CustomerPending') &&
+        (o.totalAmount > 0 || o.finalAmount > 0)
+    );
+  }, [orders]);
+
+  // Paid Today Orders
+  const paidTodayOrders = useMemo(() => {
+    const today = new Date().toDateString();
+    return orders.filter(
+      (o) =>
+        (o.status === 'Paid' || o.status === 'Completed') &&
+        o.createdAt &&
+        new Date(o.createdAt).toDateString() === today
+    );
+  }, [orders]);
 
   return (
-    <div style={{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <style>
-        {`
-          .pos-hub-tabs .ant-tabs-content-holder {
-            flex-grow: 1;
-            overflow: hidden;
-            background: #fff;
-          }
-          .pos-hub-tabs .ant-tabs-content {
-            height: 100%;
-          }
-          .pos-hub-tabs .ant-tabs-tabpane {
-            height: 100%;
-            overflow: auto;
-          }
-        `}
-      </style>
+    <div className="cashier-page" style={{ padding: '24px' }}>
+      {/* ── HEADER QUẦY THU NGÂN CHUẨN MỰC ──────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <Title level={3} style={{ margin: 0 }}>Quầy Thu Ngân</Title>
+        <Space size="middle">
+          <Tag icon={<SafetyCertificateOutlined />} color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
+            Thiết bị đã xác thực
+          </Tag>
+          <Button icon={<ReloadOutlined />} onClick={() => fetchData(true)}>
+            Làm mới
+          </Button>
+        </Space>
+      </div>
+
+      {/* ── MAIN WORKSPACE TABS ─────────────────────────────────────────────── */}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
-        items={items}
-        size="large"
         type="card"
-        tabBarStyle={{ marginBottom: 0, padding: '16px 16px 0 16px', backgroundColor: '#f0f2f5' }}
-        style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-        className="pos-hub-tabs"
+        style={{ marginBottom: 16 }}
+        items={[
+          {
+            key: 'CHECKOUT',
+            label: (
+              <span>
+                <DollarOutlined /> Thanh Toán Hóa Đơn ({pendingOrders.length} bàn chờ)
+              </span>
+            ),
+          },
+          {
+            key: 'RESERVATION',
+            label: (
+              <span>
+                <BookOutlined /> Quản Lý Đặt Bàn
+              </span>
+            ),
+          },
+          {
+            key: 'SHIFT_STATS',
+            label: (
+              <span>
+                <ThunderboltOutlined /> Thống Kê Ca Thu Ngân ({paidTodayOrders.length} HĐ đã thu)
+              </span>
+            ),
+          },
+        ]}
       />
+
+      {/* ── TAB 1: MÀN HÌNH THANH TOÁN HÓA ĐƠN (CHỈ DÙNG SƠ ĐỒ BÀN) ────────── */}
+      {activeTab === 'CHECKOUT' && (
+        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 0 }}>
+          <TableMapPage isPosHub={true} />
+        </Card>
+      )}
+
+      {/* ── TAB 2: QUẢN LÝ ĐẶT BÀN ───────────────────────────────────────────── */}
+      {activeTab === 'RESERVATION' && (
+        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
+          <ReservationPage isPosHub={true} />
+        </Card>
+      )}
+
+      {/* ── TAB 3: THỐNG KÊ CA THU NGÂN ─────────────────────────────────────── */}
+      {activeTab === 'SHIFT_STATS' && (
+        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 24 }}>
+          <ShiftStatsPanel shifts={shifts} paidTodayOrders={paidTodayOrders} loading={loading} />
+        </Card>
+      )}
     </div>
   );
 };

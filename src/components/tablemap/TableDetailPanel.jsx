@@ -63,7 +63,9 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
     }
   };
 
+  const currentTableOrderId = summary?.originalOrderId || summary?.activeOrderId;
   const activeItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
+  const displayItems = summary?.items || [];
   const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
 
   const handlePaymentClick = () => {
@@ -145,14 +147,14 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
       </div>
 
       <div className="tablemap-order-list">
-        <h4>Danh sách món ({summary?.items?.length || 0})</h4>
+        <h4>Danh sách món ({displayItems?.length || 0})</h4>
         {loading ? (
           <div className="tablemap-loading">
             <Spin />
           </div>
-        ) : summary?.items?.length > 0 ? (
+        ) : displayItems?.length > 0 ? (
           <div className="tablemap-items">
-            {summary.items.map((item) => (
+            {displayItems.map((item) => (
               <div key={item.orderDetailId} className="tablemap-item-row">
                 <div className="tablemap-item-info">
                   <div className="tablemap-item-name">
@@ -220,6 +222,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
         visible={isPaymentModalVisible}
         branchId={branchId}
         orderId={summary?.activeOrderId}
+        tableName={summary?.tableName || table?.name}
         items={summary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}
         onSuccess={() => {

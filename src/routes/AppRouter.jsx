@@ -100,19 +100,16 @@ const AppRouter = () => {
                   )
                 }
               />
-              {/* Chef, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-                <Route path="/kds" element={<KDSPage />} />
-              </Route>
+
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
@@ -131,6 +128,11 @@ const AppRouter = () => {
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+                <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/reservations" element={<ReservationPage />} />
+              <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>
           </Route>
