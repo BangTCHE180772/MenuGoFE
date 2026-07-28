@@ -19,11 +19,10 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getBInventories } from '../../../api/binventoryApi';
-import { createCheckDocument } from '../../../api/documentApi';
+import { getBInventories } from '../../../../api/binventoryApi';
+import { createExportDeleteDocument } from '../../../../api/documentApi';
 
-// ─── PHIẾU KIỂM KHO (CHECK / AUDIT) ──────────────────────────────────────────
-const CheckDocumentModal = ({
+const DisposalDocumentModal = ({
   open,
   onClose,
   onSuccess,
@@ -37,13 +36,12 @@ const CheckDocumentModal = ({
   const [searchVal, setSearchVal] = useState(undefined);
 
   const [formData, setFormData] = useState({
-    auditor: '',
+    reason: '',
     docCode: '',
     note: ''
   });
   const [items, setItems] = useState([]);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       const now = dayjs();
@@ -52,14 +50,14 @@ const CheckDocumentModal = ({
       setSearchVal(undefined);
 
       setFormData({
-        auditor: '',
+        reason: '',
         docCode: '',
         note: ''
       });
       setItems([]);
 
       if (branchId) {
-        getBInventories(branchId, '', 'CHECK', 2)
+        getBInventories(branchId, '', 'DISPOSAL', 2)
           .then((res) => {
             const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
             setBInventoryList(data);
@@ -81,12 +79,19 @@ const CheckDocumentModal = ({
     const itemId = binv ? binv.bInventoryId || binv.id : (prod ? prod.id : bInvId);
     const name = binv ? binv.name : (prod ? prod.name : `Sản phẩm #${bInvId}`);
     const code = binv ? binv.code : (prod ? prod.code : `SP${bInvId}`);
-    const systemStock = binv ? (binv.stockQuantity ?? binv.quantity ?? 0) : (prod ? prod.stockQuantity || 0 : 0);
+    const stock = binv ? binv.stockQuantity : (prod ? prod.stockQuantity || 100 : 100);
+    const costPrice = binv ? binv.purchasePrice : (prod ? prod.purchasePrice || 0 : 0);
 
     const existingIndex = items.findIndex((i) => i.bInventoryId === itemId);
 
     if (existingIndex >= 0) {
-      message.info(`${name} đã có trong danh sách kiểm kho.`);
+      const updated = [...items];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        quantity: (updated[existingIndex].quantity || 0) + 1
+      };
+      setItems(updated);
+      message.info(`Đã tăng số lượng ${name}`);
     } else {
       setItems([
         ...items,
@@ -94,23 +99,36 @@ const CheckDocumentModal = ({
           bInventoryId: itemId,
           code,
           name,
-          systemStock,
-          actualQuantity: systemStock,
-          difference: 0
+          stock,
+          quantity: 1,
+          costPrice,
+          disposalPrice: costPrice
         }
       ]);
     }
     setSearchVal(undefined);
   };
 
-  // Total difference value
-  const totalDifference = useMemo(() => {
-    return items.reduce((sum, i) => sum + (i.difference || 0), 0);
+  const totalDisposalAmount = useMemo(() => {
+    return items.reduce((sum, i) => sum + (i.quantity || 0) * (i.disposalPrice || 0), 0);
   }, [items]);
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
-      message.error('Vui lòng chọn ít nhất 1 sản phẩm để kiểm kho.');
+      message.error('Vui lòng chọn ít nhất 1 sản phẩm.');
+      return;
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.quantity || item.quantity < 1) {
+        message.error(`Số lượng sản phẩm ${item.name} không hợp lệ.`);
+        return;
+      }
+    }
+
+    if (!formData.reason || !formData.reason.trim()) {
+      message.error('Vui lòng nhập lý do xuất hủy.');
       return;
     }
 
@@ -118,20 +136,20 @@ const CheckDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: openTimeISO || new Date().toISOString(),
+        reason: formData.reason || 'Xuất hủy kiểm kê',
         details: items.map((i) => ({
           bInventoryId: Number(i.bInventoryId),
-          actualQuantity: Number(i.actualQuantity),
+          quantity: Number(i.quantity),
           note: ''
         }))
       };
-      await createCheckDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Kiểm kho thành công!`);
+      await createExportDeleteDocument(dto);
+      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Xuất hủy thành công!`);
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu kiểm kho.';
+      const errMsg = err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu xuất hủy.';
       message.error(errMsg);
     } finally {
       setLoading(false);
@@ -196,48 +214,69 @@ const CheckDocumentModal = ({
       render: (val) => <span style={{ fontWeight: 600, color: '#0f172a' }}>{val}</span>
     },
     {
-      title: 'Tồn hệ thống',
-      dataIndex: 'systemStock',
-      key: 'systemStock',
-      width: 120,
-      align: 'right',
-      render: (val) => <span style={{ color: '#64748b' }}>{val != null ? val.toLocaleString('vi-VN') : '0'}</span>
-    },
-    {
-      title: 'Tồn thực tế',
-      dataIndex: 'actualQuantity',
-      key: 'actualQuantity',
+      title: 'Số lượng',
+      dataIndex: 'quantity',
+      key: 'quantity',
       width: 150,
       align: 'center',
       render: (_, record, index) => (
+        <Space size={4}>
+          <InputNumber
+            min={1}
+            value={record.quantity ?? 1}
+            onChange={(v) => {
+              const val = v != null ? Math.max(1, Number(v) || 1) : 1;
+              const updated = [...items];
+              updated[index] = { ...updated[index], quantity: val };
+              setItems(updated);
+            }}
+            style={{ width: 70, borderRadius: 16, textAlign: 'center' }}
+          />
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>/{record.stock || 0}</span>
+        </Space>
+      )
+    },
+    {
+      title: 'Giá vốn',
+      dataIndex: 'costPrice',
+      key: 'costPrice',
+      width: 130,
+      align: 'right',
+      render: (val) => (val != null ? val.toLocaleString('vi-VN') : '0')
+    },
+    {
+      title: 'Đơn giá hủy',
+      dataIndex: 'disposalPrice',
+      key: 'disposalPrice',
+      width: 140,
+      align: 'right',
+      render: (_, record, index) => (
         <InputNumber
           min={0}
-          value={record.actualQuantity ?? 0}
+          value={record.disposalPrice ?? 0}
           onChange={(v) => {
-            const val = v != null ? Math.max(0, Number(v) || 0) : 0;
+            const val = v != null && v !== '' ? Math.max(0, Number(v) || 0) : 0;
             const updated = [...items];
-            updated[index] = {
-              ...updated[index],
-              actualQuantity: val,
-              difference: val - (updated[index].systemStock || 0)
-            };
+            updated[index] = { ...updated[index], disposalPrice: val };
             setItems(updated);
           }}
-          style={{ width: 90, borderRadius: 16, textAlign: 'center' }}
+          formatter={(v) => (v != null && v !== '' ? `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+          parser={(v) => (v ? v.replace(/,/g, '') : '')}
+          style={{ width: 110, borderRadius: 16, textAlign: 'right' }}
         />
       )
     },
     {
-      title: 'Số lượng lệch',
-      key: 'difference',
-      width: 120,
+      title: 'Thành tiền',
+      key: 'total',
+      width: 130,
       align: 'right',
       render: (_, record) => {
-        const diff = (record.actualQuantity || 0) - (record.systemStock || 0);
-        const color = diff > 0 ? '#059669' : diff < 0 ? '#dc2626' : '#64748b';
+        const qty = record.quantity || 0;
+        const price = record.disposalPrice || 0;
         return (
-          <span style={{ fontWeight: 700, color }}>
-            {diff > 0 ? '+' : ''}{diff}
+          <span style={{ fontWeight: 700, color: '#dc2626' }}>
+            {(qty * price).toLocaleString('vi-VN')}
           </span>
         );
       }
@@ -259,7 +298,6 @@ const CheckDocumentModal = ({
         fontSize: 12
       }}
     >
-      {/* HEADER BAR */}
       <div
         style={{
           height: 48,
@@ -273,13 +311,13 @@ const CheckDocumentModal = ({
       >
         <Space size="large">
           <span style={{ fontWeight: 700, fontSize: 16, color: '#38bdf8' }}>
-            Kiểm kho & Điều chỉnh
+            Xuất hủy hàng hóa
           </span>
 
           <div style={{ width: 420 }}>
             <Select
               showSearch
-              placeholder="Tìm theo mã hoặc tên hàng hóa... (F1)"
+              placeholder="Tìm theo mã hoặc tên hàng hóa..."
               optionFilterProp="label"
               value={searchVal}
               onChange={handleSelectProduct}
@@ -306,9 +344,7 @@ const CheckDocumentModal = ({
         </Space>
       </div>
 
-      {/* BODY WORKSPACE */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT PRODUCT TABLE */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div
             style={{
@@ -328,12 +364,11 @@ const CheckDocumentModal = ({
               pagination={false}
               scroll={{ y: 'calc(100vh - 170px)' }}
               size="small"
-              locale={{ emptyText: 'Chưa có sản phẩm nào được chọn để kiểm kho.' }}
+              locale={{ emptyText: 'Chưa có sản phẩm nào được chọn để xuất hủy.' }}
             />
           </div>
         </div>
 
-        {/* RIGHT CONTROL SIDEBAR */}
         <div
           style={{
             width: 340,
@@ -349,25 +384,23 @@ const CheckDocumentModal = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: 11 }}>
                 <span>Thời gian: <strong>{openTimeFormatted || 'Hôm nay'}</strong></span>
-                <Tag color="gold" style={{ borderRadius: 12, padding: '0 8px' }}>Kiểm kho</Tag>
+                <Tag color="red" style={{ borderRadius: 12, padding: '0 8px' }}>Xuất hủy</Tag>
               </div>
 
-              {/* NGƯỜI KIỂM KHO */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>
-                  Người kiểm kho (F4)
+                  Lý do xuất hủy <span style={{ color: '#ef4444' }}>*</span>
                 </div>
                 <Input
-                  value={formData.auditor}
-                  onChange={(e) => setFormData({ ...formData, auditor: e.target.value })}
-                  placeholder="Nhập tên người kiểm kho..."
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  placeholder="Lý do xuất hủy..."
                   style={{ borderRadius: 6 }}
                 />
               </div>
 
-              {/* MÃ KIỂM KHO */}
               <div>
-                <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã kiểm kho</div>
+                <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã xuất hủy</div>
                 <Input
                   value={formData.docCode}
                   onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
@@ -376,43 +409,33 @@ const CheckDocumentModal = ({
                 />
               </div>
 
-              {/* TỔNG KẾT KIỂM KHO */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng mặt hàng kiểm ({items.length})</span>
+                  <span style={{ color: '#475569' }}>Tổng mặt hàng hủy ({items.length})</span>
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
                     {items.length} sản phẩm
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng chênh lệch</span>
-                  <span style={{ fontWeight: 700, color: totalDifference !== 0 ? '#ef4444' : '#059669', fontSize: 13 }}>
-                    {totalDifference > 0 ? '+' : ''}{totalDifference}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Mặt hàng lệch</span>
-                  <span style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>
-                    {items.filter((i) => (i.actualQuantity || 0) !== (i.systemStock || 0)).length} mặt hàng
+                  <span style={{ color: '#475569' }}>Tổng tiền hủy</span>
+                  <span style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>
+                    {totalDisposalAmount.toLocaleString('vi-VN')}
                   </span>
                 </div>
               </div>
 
-              {/* GHI CHÚ */}
               <div>
                 <Input.TextArea
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                   rows={3}
-                  placeholder="Ghi chú kiểm kho"
+                  placeholder="Ghi chú xuất hủy"
                   style={{ borderRadius: 6 }}
                 />
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
               <Button
                 type="default"
@@ -438,4 +461,4 @@ const CheckDocumentModal = ({
   );
 };
 
-export default CheckDocumentModal;
+export default DisposalDocumentModal;

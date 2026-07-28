@@ -19,11 +19,10 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getSuppliers } from '../../../api/partnerApi';
-import { getBInventories } from '../../../api/binventoryApi';
-import { createReturnDocument } from '../../../api/documentApi';
+import { getSuppliers } from '../../../../api/partnerApi';
+import { getBInventories } from '../../../../api/binventoryApi';
+import { createReturnDocument } from '../../../../api/documentApi';
 
-// ─── PHIẾU TRẢ HÀNG NHẬP (RETURN) ─────────────────────────────────────────────
 const ReturnDocumentModal = ({
   open,
   onClose,
@@ -48,7 +47,6 @@ const ReturnDocumentModal = ({
   });
   const [items, setItems] = useState([]);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       const now = dayjs();
@@ -130,7 +128,6 @@ const ReturnDocumentModal = ({
     setSearchVal(undefined);
   };
 
-  // Calculations
   const totalGoodsAmount = useMemo(() => {
     return items.reduce((sum, i) => sum + (i.quantity || 0) * (i.returnPrice || 0), 0);
   }, [items]);
@@ -329,7 +326,6 @@ const ReturnDocumentModal = ({
         fontSize: 12
       }}
     >
-      {/* HEADER BAR */}
       <div
         style={{
           height: 48,
@@ -349,7 +345,7 @@ const ReturnDocumentModal = ({
           <div style={{ width: 420 }}>
             <Select
               showSearch
-              placeholder="Tìm theo mã hoặc tên hàng hóa... (F1)"
+              placeholder="Tìm theo mã hoặc tên hàng hóa..."
               optionFilterProp="label"
               value={searchVal}
               onChange={handleSelectProduct}
@@ -376,9 +372,7 @@ const ReturnDocumentModal = ({
         </Space>
       </div>
 
-      {/* BODY WORKSPACE */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT PRODUCT TABLE */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div
             style={{
@@ -403,7 +397,6 @@ const ReturnDocumentModal = ({
           </div>
         </div>
 
-        {/* RIGHT CONTROL SIDEBAR */}
         <div
           style={{
             width: 340,
@@ -422,7 +415,6 @@ const ReturnDocumentModal = ({
                 <Tag color="orange" style={{ borderRadius: 12, padding: '0 8px' }}>Trả hàng</Tag>
               </div>
 
-              {/* NHÀ CUNG CẤP */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>
                   Chọn nhà cung cấp
@@ -430,7 +422,7 @@ const ReturnDocumentModal = ({
                 <Select
                   value={formData.supplierId}
                   onChange={(val) => setFormData({ ...formData, supplierId: val ? Number(val) : undefined })}
-                  placeholder="Chọn nhà cung cấp... (F4)"
+                  placeholder="Chọn nhà cung cấp..."
                   style={{ width: '100%', borderRadius: 6 }}
                   allowClear
                 >
@@ -442,7 +434,6 @@ const ReturnDocumentModal = ({
                 </Select>
               </div>
 
-              {/* MÃ TRẢ HÀNG */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã trả hàng nhập</div>
                 <Input
@@ -453,7 +444,6 @@ const ReturnDocumentModal = ({
                 />
               </div>
 
-              {/* TỔNG TIỀN & THANH TOÁN */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.length})</span>
@@ -482,7 +472,7 @@ const ReturnDocumentModal = ({
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tiền nhà cung cấp trả (F8)</span>
+                  <span style={{ color: '#475569' }}>Tiền nhà cung cấp trả</span>
                   <InputNumber
                     min={0}
                     value={formData.paidAmount}
@@ -501,7 +491,6 @@ const ReturnDocumentModal = ({
                 </div>
               </div>
 
-              {/* GHI CHÚ */}
               <div>
                 <Input.TextArea
                   value={formData.note}
@@ -513,7 +502,6 @@ const ReturnDocumentModal = ({
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
               <Button
                 type="default"
