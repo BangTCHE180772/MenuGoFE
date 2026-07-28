@@ -35,7 +35,13 @@ import { useRef, useState, useEffect } from "react";
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
+    { label: "Hiệu quả Kinh Doanh", path: "/financedashboard", icon: <BarChartOutlined /> },
+    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
+    { label: "Table Dashboard", path: "/admin", icon: <BarChartOutlined /> },
+    { label: "Customer Dashboard", path: "/admin", icon: <BarChartOutlined /> },
+    { label: "Employee Dashboard", path: "/admin", icon: <BarChartOutlined /> },
+    { label: "Inventory Dashboard", path: "/admin", icon: <BarChartOutlined /> },
+    { label: "Alert Dashboard", path: "/admin", icon: <BarChartOutlined /> },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
@@ -94,11 +100,7 @@ const ROLE_MENUS = {
     { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
-    {
-      label: "Lịch làm việc",
-      path: "/work-schedule",
-      icon: <CalendarOutlined />,
-    },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined />, },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [
