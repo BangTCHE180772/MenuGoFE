@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
 import { useSignalR } from '../context/SignalRContext';
+import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -39,12 +40,24 @@ const COOKING_STATUS = {
 };
 
 const KDSPage = () => {
+  const { user } = useAuth();
+  const currentBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const signalRConnection = useSignalR();
+
+  // Join branch-specific SignalR group
+  useEffect(() => {
+    if (signalRConnection && currentBranchId) {
+      signalRConnection
+        .invoke('JoinBranchGroup', Number(currentBranchId))
+        .catch((err) => console.log('JoinBranchGroup error:', err));
+    }
+  }, [signalRConnection, currentBranchId]);
 
   // Helper sound generator for EX-1 (Cancellation Warning & New Order Warning)
   const playAlertSound = useCallback((type = 'cancel') => {
@@ -104,6 +117,12 @@ const KDSPage = () => {
 
     const handleNotification = (notif) => {
       console.log('KDS Notification received:', notif);
+
+      // Branch isolation check: Bỏ qua nếu thông báo thuộc chi nhánh khác
+      if (notif.branchId && currentBranchId && Number(notif.branchId) !== Number(currentBranchId)) {
+        console.log('KDS Notification ignored due to branch mismatch:', notif.branchId, 'vs', currentBranchId);
+        return;
+      }
 
       if (notif.type === 'new-order' || notif.type === 'new-item') {
         playAlertSound('new');
@@ -468,52 +487,13 @@ const KDSPage = () => {
   };
 
   return (
-    <div style={{
-      padding: '16px',
-      backgroundColor: '#141414',
-      minHeight: 'calc(100vh - 64px)',
-      color: '#fff',
-      fontFamily: "'Be Vietnam Pro', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      {/* ── HEADER BANNER FOR KDS ────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#1f1f1f',
-          padding: '16px 24px',
-          borderRadius: 12,
-          marginBottom: 20,
-          border: '1px solid #303030',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-        }}
-      >
-        <Space size="large">
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #ff4d4f, #ff7875)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 24,
-              color: '#fff',
-            }}
-          >
-            <FireOutlined />
-          </div>
-          <div>
-            <Title level={3} style={{ color: '#fff', margin: 0 }}>
-              Màn hình Bếp & Chế biến (KDS)
-            </Title>
-            <Text style={{ color: '#8c8c8c' }}>
-              UC-097: Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
-            </Text>
-          </div>
-        </Space>
+    <div className="kds-page" style={{ padding: '24px' }}>
+      {/* ── HEADER KDS CHUẨN MỰC ────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>Màn hình Bếp & Chế biến (KDS)</Title>
+          <Text type="secondary">Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực</Text>
+        </div>
 
         <Space size="middle">
           {/* View Mode Toggle Button Group */}
@@ -522,7 +502,6 @@ const KDSPage = () => {
               type={viewMode === 'COLUMN' ? 'primary' : 'default'}
               icon={<AppstoreOutlined />}
               onClick={() => setViewMode('COLUMN')}
-              style={viewMode === 'COLUMN' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#fff' } : { backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
             >
               Chia dọc (Cột)
             </Button>

@@ -309,6 +309,7 @@ const OrderPage = ({ isWaiterMode }) => {
       <PaymentModal
         visible={isPaymentModalVisible}
         orderId={orderSummary?.activeOrderId}
+        tableName={orderSummary?.tableName || selectedTable?.name}
         items={orderSummary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}
         onSuccess={() => {

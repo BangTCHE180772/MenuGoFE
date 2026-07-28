@@ -64,8 +64,8 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
   };
 
   const currentTableOrderId = summary?.originalOrderId || summary?.activeOrderId;
-  const activeItems = summary?.items?.filter(i => i.status !== 'Cancelled' && i.orderId === currentTableOrderId) || [];
-  const displayItems = summary?.items?.filter(i => i.orderId === currentTableOrderId) || [];
+  const activeItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
+  const displayItems = summary?.items || [];
   const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
 
   const handlePaymentClick = () => {
@@ -222,6 +222,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
         visible={isPaymentModalVisible}
         branchId={branchId}
         orderId={summary?.activeOrderId}
+        tableName={summary?.tableName || table?.name}
         items={summary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}
         onSuccess={() => {

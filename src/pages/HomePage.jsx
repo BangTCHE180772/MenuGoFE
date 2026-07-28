@@ -42,7 +42,7 @@ const HomePage = () => {
       setTodayStats(resToday.data);
       setYesterdayStats(resYesterday.data);
     } catch (err) {
-      console.error("Lá»—i khi láº¥y dá»¯ liá»‡u today:", err);
+      console.error("Lỗi khi lấy dữ liệu today:", err);
       setTodayStats(null);
       setYesterdayStats(null);
     } finally {
@@ -80,7 +80,7 @@ const HomePage = () => {
         );
         setOverviewStats(res.data);
       } catch (err) {
-        console.error("Lá»—i khi láº¥y dá»¯ liá»‡u overview:", err);
+        console.error("Lỗi khi lấy dữ liệu overview:", err);
         setOverviewStats(null);
       } finally {
         setOverviewLoading(false);
@@ -113,10 +113,10 @@ const HomePage = () => {
       <div className="dashboard-welcome-container">
         <div>
           <h1 className="dashboard-welcome-title">
-            Xin chÃ o, {user?.name ?? "báº¡n"} ðŸ‘‹
+            Xin chào, {user?.name ?? "bạn"} 👋
           </h1>
           <p className="dashboard-welcome-subtitle">
-            Dashboard chi nhÃ¡nh â€” cáº­p nháº­t dá»¯ liá»‡u hoáº¡t Ä‘á»™ng hÃ´m nay
+            Dashboard chi nhánh — cập nhật dữ liệu hoạt động hôm nay
           </p>
         </div>
       </div>
