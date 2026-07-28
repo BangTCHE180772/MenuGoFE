@@ -183,7 +183,6 @@ const ImportDocumentModal = ({
 
   const rawSupplierAmount = Math.max(0, totalGoodsAmount - (Number(formData.discount) || 0));
   const supplierAmountDue = Math.round(rawSupplierAmount);
-  const roundingDiff = rawSupplierAmount - supplierAmountDue;
 
   const extraTotalDue = useMemo(() => {
     return extraPartners.reduce((sum, ep) => sum + Math.round(Number(ep.amountDue) || 0), 0);
@@ -949,16 +948,6 @@ const ImportDocumentModal = ({
                   />
                 </div>
 
-                {roundingDiff !== 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: 10 }}>
-                      Làm tròn NCC ({roundingDiff > 0 ? 'làm tròn xuống' : 'làm tròn lên'})
-                    </span>
-                    <span style={{ fontWeight: 600, color: roundingDiff > 0 ? '#16a34a' : '#ea580c', fontSize: 11 }}>
-                      {roundingDiff > 0 ? `-${roundingDiff.toLocaleString('vi-VN')}` : `+${Math.abs(roundingDiff).toLocaleString('vi-VN')}`}
-                    </span>
-                  </div>
-                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#475569' }}>Cần trả NCC</span>

@@ -168,18 +168,11 @@ const ImportTable = ({
                 // Nợ gốc (DocumentPartner.cost)
                 const supplierRawCost = Number(supplierPartner?.cost ?? supplierPartner?.amountDue ?? 0);
 
-                // Dòng CashFlowDetail loại Rounding
-                const roundingCfd = (supplierPartner?.cashFlowDetails || []).find((cfd) => cfd.type === 5 || cfd.type === 'Rounding');
-                const roundingValue = Number(roundingCfd?.amount || 0);
-
-                // Số tiền phải trả NCC = Nợ gốc - cfd ROUNDING
-                const supplierAmountDue = supplierRawCost - roundingValue;
+                // Số tiền cần/phải trả NCC = Nợ gốc đã trừ bớt phần lẻ làm tròn (Rounding) -> Luôn là số nguyên
+                const supplierAmountDue = Math.round(supplierRawCost);
 
                 // Tiền đã trả NCC
                 const supplierAmountPaid = Number(supplierPartner?.amountPaid ?? 0);
-
-                // Còn nợ NCC
-                const supplierDebt = Math.max(0, supplierAmountDue - supplierAmountPaid);
 
                 const totalQuantity = detailsList.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
                 const totalItemsCount = detailsList.length;
@@ -206,7 +199,7 @@ const ImportTable = ({
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || 'Chi nhánh trung tâm'}</td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.businessDate).format('DD/MM/YYYY HH:mm')}</td>
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        {doc.totalAmount ? Number(doc.totalAmount).toLocaleString('vi-VN') : 0} đ
+                        {doc.totalAmount ? Math.round(Number(doc.totalAmount)).toLocaleString('vi-VN') : 0} đ
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                         <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
@@ -373,8 +366,8 @@ const ImportTable = ({
                                           const qty = Number(item.quantity || 0);
                                           const price = Number(item.unitPrice || 0);
                                           const discount = Number(item.discount || 0);
-                                          const importPrice = price - discount;
-                                          const amount = item.amount != null ? Number(item.amount) : qty * importPrice;
+                                          const importPrice = Math.round(price - discount);
+                                          const amount = Math.round(item.amount != null ? Number(item.amount) : qty * (price - discount));
 
                                           return (
                                             <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -388,16 +381,16 @@ const ImportTable = ({
                                                 {qty.toLocaleString('vi-VN')}
                                               </td>
                                               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {price.toLocaleString('vi-VN')}
+                                                {Math.round(price).toLocaleString('vi-VN')}
                                               </td>
                                               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {discount.toLocaleString('vi-VN')}
+                                                {Math.round(discount).toLocaleString('vi-VN')}
                                               </td>
                                               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {importPrice.toLocaleString('vi-VN')}
+                                                {Math.round(importPrice).toLocaleString('vi-VN')}
                                               </td>
                                               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                                                {amount.toLocaleString('vi-VN')}
+                                                {Math.round(amount).toLocaleString('vi-VN')}
                                               </td>
                                             </tr>
                                           );
@@ -427,7 +420,7 @@ const ImportTable = ({
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>Tổng tiền hàng</span>
-                                      <strong style={{ color: '#0f172a' }}>{totalGoodsAmount.toLocaleString('vi-VN')}</strong>
+                                      <strong style={{ color: '#0f172a' }}>{Math.round(totalGoodsAmount).toLocaleString('vi-VN')}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>
@@ -437,17 +430,13 @@ const ImportTable = ({
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>Cần trả NCC</span>
-                                      <strong style={{ color: '#0f172a' }}>{supplierAmountDue.toLocaleString('vi-VN')}</strong>
+                                      <strong style={{ color: '#0f172a' }}>{Math.round(supplierAmountDue).toLocaleString('vi-VN')}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                       <span>
                                         Tiền đã trả NCC <CreditCardOutlined style={{ fontSize: 10, color: '#64748b' }} />
                                       </span>
-                                      <strong style={{ color: '#16a34a', fontWeight: 800 }}>{supplierAmountPaid.toLocaleString('vi-VN')}</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>Còn nợ NCC</span>
-                                      <strong style={{ color: supplierDebt > 0 ? '#ef4444' : '#0f172a', fontWeight: 700 }}>{supplierDebt.toLocaleString('vi-VN')}</strong>
+                                      <strong style={{ color: '#16a34a', fontWeight: 800 }}>{Math.round(supplierAmountPaid).toLocaleString('vi-VN')}</strong>
                                     </div>
                                   </div>
                                 </div>
@@ -663,7 +652,9 @@ const ImportTable = ({
                                                               </tr>
                                                             </thead>
                                                             <tbody>
-                                                              {p.cashFlowDetails.map((cfd, cfdIdx) => (
+                                                              {p.cashFlowDetails
+                                                                .filter((cfd) => cfd.type !== 5 && cfd.type !== 'Rounding')
+                                                                .map((cfd, cfdIdx) => (
                                                                 <tr key={cfd.id || cfdIdx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                                                   <td style={{ padding: '4px 8px', fontWeight: 600, color: '#e8442a' }}>
                                                                     {cfd.cashFlowCode || `TT-${cfd.cashFlowId}`}
