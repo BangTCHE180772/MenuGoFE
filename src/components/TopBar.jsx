@@ -25,6 +25,7 @@ import {
   InboxOutlined,
   DollarOutlined,
   FileTextOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -34,6 +35,7 @@ import { useRef, useState, useEffect } from "react";
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -57,6 +59,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -77,6 +80,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },

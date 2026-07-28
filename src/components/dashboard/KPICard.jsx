@@ -28,12 +28,18 @@ const KPICard = ({
   onRefresh,
   isDemo = false,
   description,
+  inverseTrend = false,
 }) => {
   const growth = useMemo(
     () => calcGrowth(value, prevValue),
     [value, prevValue],
   );
-  const isPositive = growth !== null && growth >= 0;
+  const isUp = growth !== null && growth >= 0;
+  const isGood = useMemo(() => {
+    if (growth === null) return true;
+    return inverseTrend ? growth <= 0 : growth >= 0;
+  }, [growth, inverseTrend]);
+
   const formattedValue = isPercent
     ? formatPercent(value)
     : countFormat
@@ -180,14 +186,14 @@ const KPICard = ({
                   gap: 4,
                   padding: "3px 10px",
                   borderRadius: 20,
-                  background: isPositive ? "#22c55e18" : "#ef444418",
+                  background: isGood ? "#22c55e18" : "#ef444418",
                   fontSize: 12,
                   fontWeight: 700,
-                  color: isPositive ? "#16a34a" : "#dc2626",
+                  color: isGood ? "#16a34a" : "#dc2626",
                   cursor: "default",
                 }}
               >
-                {isPositive ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                {isUp ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
                 {Math.abs(growth).toFixed(1)}%
                 <span
                   style={{

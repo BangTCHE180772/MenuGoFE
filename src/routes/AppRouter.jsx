@@ -43,6 +43,7 @@ import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
+import FinanceDashboardPage from '../pages/FinanceDashboardPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -118,6 +119,7 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
+                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
               </Route>
 
               {/* Owner, Admin */}
