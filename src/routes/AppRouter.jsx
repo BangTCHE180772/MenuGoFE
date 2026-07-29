@@ -44,6 +44,7 @@ import DeviceAuthPage from '../pages/DeviceAuthPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 import FinanceDashboardPage from '../pages/FinanceDashboardPage';
+import OrderDashboard from '../pages/OrderDashboard';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -119,6 +120,7 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/financedashboard" element={<FinanceDashboardPage />} />
+                <Route path="/orderdashboard" element={<OrderDashboard />} />
               </Route>
 
               {/* Owner, Admin */}
