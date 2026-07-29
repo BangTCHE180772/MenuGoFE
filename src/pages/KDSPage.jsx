@@ -284,17 +284,17 @@ const KDSPage = () => {
     const status = item.cookingStatus || COOKING_STATUS.WAITING;
 
     let cardBorderColor = '#303030';
-    let statusTag = <Tag color="red">MÓN MỚI (NEW)</Tag>;
+    let statusTag = <Tag color="red">CHỜ XÁC NHẬN</Tag>;
 
     if (status === COOKING_STATUS.ACCEPTED) {
       cardBorderColor = '#1890ff';
-      statusTag = <Tag color="blue">ĐÃ NHẬN (ACCEPTED)</Tag>;
+      statusTag = <Tag color="blue">ĐÃ NHẬN</Tag>;
     } else if (status === COOKING_STATUS.COOKING) {
       cardBorderColor = '#fa8c16';
-      statusTag = <Tag color="orange">ĐANG NẤU (COOKING)</Tag>;
+      statusTag = <Tag color="orange">ĐANG NẤU</Tag>;
     } else if (status === COOKING_STATUS.READY) {
       cardBorderColor = '#52c41a';
-      statusTag = <Tag color="green">ĐÃ XONG (READY)</Tag>;
+      statusTag = <Tag color="green">READY</Tag>;
     }
 
     return (
@@ -302,7 +302,7 @@ const KDSPage = () => {
         key={item.orderDetailId}
         hoverable
         style={{
-          backgroundColor: '#1f1f1f',
+          backgroundColor: '#ffffff',
           borderColor: cardBorderColor,
           borderRadius: 12,
           borderWidth: 2,
@@ -320,7 +320,7 @@ const KDSPage = () => {
           >
             🪑 {item.tableName}
           </Tag>
-          <Text style={{ color: '#8c8c8c', fontSize: 12 }}>
+          <Text style={{ color: '#595959', fontSize: 12 }}>
             <ClockCircleOutlined style={{ marginRight: 4 }} />
             {renderTimeElapsed(item.createdAt)}
           </Text>
@@ -352,7 +352,7 @@ const KDSPage = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 24,
-                color: '#8c8c8c',
+                color: '#595959',
                 marginRight: 12,
                 border: '1px solid #434343'
               }}
@@ -361,7 +361,7 @@ const KDSPage = () => {
             </div>
           )}
           <div style={{ flex: 1 }}>
-            <Title level={4} style={{ color: '#fff', margin: '0 0 4px 0', fontSize: 16 }}>
+            <Title level={4} style={{ color: '#000000', margin: '0 0 4px 0', fontSize: 16 }}>
               {item.productName}
             </Title>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums' }}>
@@ -399,9 +399,9 @@ const KDSPage = () => {
               size="large"
               icon={<FireOutlined />}
               onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
-              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 }}
+              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff' }}
             >
-              Xác nhận làm (Cook)
+              Xác nhận
             </Button>
           )}
 
@@ -412,14 +412,14 @@ const KDSPage = () => {
               size="large"
               icon={<CheckCircleOutlined />}
               onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
-              style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600 }}
+              style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600, color: '#ffffff' }}
             >
-              Đã nấu xong (Ready)
+              Hoàn thành
             </Button>
           )}
 
           {status === COOKING_STATUS.READY && (
-            <Button block disabled style={{ backgroundColor: '#262626', color: '#595959' }}>
+            <Button block disabled style={{ backgroundColor: '#ffffff', color: '#595959' }}>
               Đã báo phục vụ
             </Button>
           )}
@@ -456,9 +456,9 @@ const KDSPage = () => {
   return (
     <div style={{
       padding: '16px',
-      backgroundColor: '#141414',
+      backgroundColor: '#f0f2f5',
       minHeight: 'calc(100vh - 64px)',
-      color: '#fff',
+      color: '#000000',
       fontFamily: "'Be Vietnam Pro', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
     }}>
       {/* ── HEADER BANNER FOR KDS ────────────────────────────────────────────── */}
@@ -467,7 +467,7 @@ const KDSPage = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: '#1f1f1f',
+          backgroundColor: '#ffffff',
           padding: '16px 24px',
           borderRadius: 12,
           marginBottom: 20,
@@ -486,16 +486,16 @@ const KDSPage = () => {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 24,
-              color: '#fff',
+              color: '#ffffff',
             }}
           >
             <FireOutlined />
           </div>
           <div>
-            <Title level={3} style={{ color: '#fff', margin: 0 }}>
+            <Title level={3} style={{ color: '#000000', margin: 0 }}>
               Màn hình Bếp & Chế biến (KDS)
             </Title>
-            <Text style={{ color: '#8c8c8c' }}>
+            <Text style={{ color: '#595959' }}>
               UC-097: Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
             </Text>
           </div>
@@ -508,7 +508,7 @@ const KDSPage = () => {
               type={viewMode === 'COLUMN' ? 'primary' : 'default'}
               icon={<AppstoreOutlined />}
               onClick={() => setViewMode('COLUMN')}
-              style={viewMode === 'COLUMN' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#fff' } : { backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
+              style={viewMode === 'COLUMN' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#ffffff' } : { backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
             >
               Chia dọc (Cột)
             </Button>
@@ -516,7 +516,7 @@ const KDSPage = () => {
               type={viewMode === 'GRID' ? 'primary' : 'default'}
               icon={<BellOutlined />}
               onClick={() => setViewMode('GRID')}
-              style={viewMode === 'GRID' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#fff' } : { backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
+              style={viewMode === 'GRID' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#ffffff' } : { backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
             >
               Dạng Tabs
             </Button>
@@ -526,7 +526,7 @@ const KDSPage = () => {
             <Button
               icon={<ReloadOutlined />}
               onClick={() => fetchItems(true)}
-              style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#fff' }}
+              style={{ backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
             >
               Làm mới
             </Button>
@@ -567,7 +567,7 @@ const KDSPage = () => {
                 marginBottom: 8,
                 backgroundColor: '#2a1215',
                 borderColor: '#ff4d4f',
-                color: '#fff',
+                color: '#000000',
                 borderRadius: 8,
               }}
             />
@@ -580,15 +580,15 @@ const KDSPage = () => {
         title={
           <Space>
             <ThunderboltOutlined style={{ color: '#faad14', fontSize: 18 }} />
-            <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>
+            <span style={{ color: '#000000', fontWeight: 600, fontSize: 16 }}>
               Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar - AF1)
             </span>
             <Tag color="warning">Tối ưu 10 phần/mẻ</Tag>
           </Space>
         }
         style={{
-          backgroundColor: '#1f1f1f',
-          borderColor: '#303030',
+          backgroundColor: '#ffffff',
+          borderColor: '#d9d9d9',
           borderRadius: 12,
           marginBottom: 20,
         }}
@@ -612,14 +612,14 @@ const KDSPage = () => {
                 <Col xs={24} sm={12} md={8} lg={6} key={`${batch.productId || batch.productName}_batch_${batch.batchIndex}`}>
                   <div
                     style={{
-                      background: '#262626',
+                      background: '#ffffff',
                       border: '1px solid #434343',
                       borderRadius: 8,
                       padding: 14,
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                      <Text strong style={{ color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center' }}>
+                      <Text strong style={{ color: '#000000', fontSize: 15, display: 'flex', alignItems: 'center' }}>
                         {batch.productImage ? (
                           <img
                             src={batch.productImage}
@@ -637,7 +637,7 @@ const KDSPage = () => {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                      <Text style={{ color: '#8c8c8c', fontSize: 12 }}>Số lượng trong mẻ:</Text>
+                      <Text style={{ color: '#595959', fontSize: 12 }}>Số lượng trong mẻ:</Text>
                       <Tag color="red" style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
                         {batch.totalQty} phần
                       </Tag>
@@ -704,7 +704,7 @@ const KDSPage = () => {
         <Row gutter={[20, 20]}>
           {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -713,8 +713,8 @@ const KDSPage = () => {
                 paddingBottom: 10,
                 borderBottom: '2px solid #1890ff'
               }}>
-                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  📋 Chờ Bếp Làm (Waiting) ({waitingItems.length + acceptedItems.length})
+                <Title level={4} style={{ color: '#000000', margin: 0, fontSize: 16 }}>
+                  📋 Chờ xác nhận ({waitingItems.length + acceptedItems.length})
                 </Title>
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
@@ -729,7 +729,7 @@ const KDSPage = () => {
 
           {/* Column 2: Đang nấu (Cooking) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -738,8 +738,8 @@ const KDSPage = () => {
                 paddingBottom: 10,
                 borderBottom: '2px solid #fa8c16'
               }}>
-                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  🍳 Đang Làm (Cooking) ({cookingItems.length})
+                <Title level={4} style={{ color: '#000000', margin: 0, fontSize: 16 }}>
+                  🍳 Đang nấu ({cookingItems.length})
                 </Title>
                 <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
               </div>
@@ -754,7 +754,7 @@ const KDSPage = () => {
 
           {/* Column 3: Hoàn thành (Ready) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#1f1f1f', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -763,8 +763,8 @@ const KDSPage = () => {
                 paddingBottom: 10,
                 borderBottom: '2px solid #52c41a'
               }}>
-                <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                  ✅ Đã Nấu Xong (Ready) ({readyItems.length})
+                <Title level={4} style={{ color: '#000000', margin: 0, fontSize: 16 }}>
+                  ✅ Ready ({readyItems.length})
                 </Title>
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
@@ -784,7 +784,7 @@ const KDSPage = () => {
             activeKey={activeTab}
             onChange={setActiveTab}
             type="card"
-            style={{ color: '#fff' }}
+            style={{ color: '#000000' }}
             items={[
               {
                 key: 'ALL',
@@ -798,7 +798,7 @@ const KDSPage = () => {
                 key: COOKING_STATUS.WAITING,
                 label: (
                   <span>
-                    <BellOutlined /> Chờ bếp làm ({waitingItems.length + acceptedItems.length})
+                    <BellOutlined /> Chờ xác nhận ({waitingItems.length + acceptedItems.length})
                   </span>
                 ),
               },

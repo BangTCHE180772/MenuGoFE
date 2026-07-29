@@ -33,7 +33,7 @@ import { useNavigate } from 'react-router-dom';
 import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
-import { getRoleRange } from '../api/accountApi';
+import { getAllAccounts } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 
 const MyWorkSchedulePage = () => {
@@ -74,7 +74,7 @@ const MyWorkSchedulePage = () => {
       const [branchesRes, shiftsRes, accountsRes] = await Promise.all([
         getAllBranches(),
         getAllShifts(),
-        getRoleRange(),
+        getAllAccounts(),
       ]);
       setSchedules(scheds);
       setBranches(branchesRes.data || []);
@@ -643,29 +643,47 @@ const MyWorkSchedulePage = () => {
         }
         open={detailModalOpen}
         onCancel={() => setDetailModalOpen(false)}
-        footer={[
-          <Button
-            key="leave"
-            type="primary"
-            icon={<FileTextOutlined />}
-            onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
-            style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }}
-          >
-            Xin nghỉ ca này
-          </Button>,
-          <Button
-            key="transfer"
-            type="primary"
-            icon={<SwapOutlined />}
-            onClick={handleOpenTransfer}
-            style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }}
-          >
-            Đổi ca
-          </Button>,
-          <Button key="close" type="primary" onClick={() => setDetailModalOpen(false)} style={{ background: '#1890ff', borderColor: '#1890ff' }}>
-            Đóng
-          </Button>
-        ]}
+        footer={(() => {
+          const shiftInfo = selectedSchedule ? getShiftDetails(selectedSchedule.shiftId) : null;
+          let isShiftPast = false;
+          if (selectedSchedule && shiftInfo && shiftInfo.endTime) {
+            const dateStr = dayjs(selectedSchedule.workDate).format('YYYY-MM-DD');
+            const endStr = shiftInfo.endTime.length > 5 ? shiftInfo.endTime : `${shiftInfo.endTime}:00`;
+            isShiftPast = dayjs(`${dateStr} ${endStr}`).isBefore(dayjs());
+          }
+          
+          return [
+            <Button
+              key="leave"
+              type="primary"
+              icon={<FileTextOutlined />}
+              onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
+              style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }}
+            >
+              Xin nghỉ ca này
+            </Button>,
+            <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể chuyển ca." : ""} key="transfer-tooltip">
+              <Button
+                key="transfer"
+                type="primary"
+                icon={<SwapOutlined />}
+                onClick={handleOpenTransfer}
+                disabled={isShiftPast}
+                style={{ 
+                  background: isShiftPast ? '#d9d9d9' : '#fa8c16', 
+                  borderColor: isShiftPast ? '#d9d9d9' : '#fa8c16', 
+                  fontWeight: 'bold',
+                  color: isShiftPast ? '#8c8c8c' : '#fff'
+                }}
+              >
+                Đổi ca
+              </Button>
+            </Tooltip>,
+            <Button key="close" type="primary" onClick={() => setDetailModalOpen(false)} style={{ background: '#1890ff', borderColor: '#1890ff' }}>
+              Đóng
+            </Button>
+          ];
+        })()}
         width={420}
       >
         {selectedSchedule && (
