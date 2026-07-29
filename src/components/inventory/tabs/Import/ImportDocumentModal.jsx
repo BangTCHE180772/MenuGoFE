@@ -367,23 +367,25 @@ const ImportDocumentModal = ({
       <div
         style={{
           height: 48,
-          background: '#0f172a',
+          background: 'linear-gradient(135deg, #e8442a 0%, #d9381e 100%)',
           color: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px'
+          padding: '0 16px',
+          boxShadow: '0 2px 8px rgba(232, 68, 42, 0.25)',
+          flexShrink: 0
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <span style={{ fontWeight: 700, fontSize: 16, color: '#f97316' }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
             Nhập hàng
           </span>
 
           {/* SEARCH PRODUCT DROPDOWN CONTAINER */}
           <div style={{ position: 'relative', width: 420 }}>
-            <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', borderRadius: 16, padding: '2px 10px' }}>
-              <SearchOutlined style={{ color: '#94a3b8', marginRight: 6 }} />
+            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255, 255, 255, 0.95)', borderRadius: 16, padding: '3px 12px', border: '1px solid rgba(255,255,255,0.4)' }}>
+              <SearchOutlined style={{ color: '#e8442a', marginRight: 6 }} />
               <input
                 type="text"
                 placeholder="Tìm theo mã hoặc tên hàng hóa..."
@@ -449,23 +451,56 @@ const ImportDocumentModal = ({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <button
+            type="button"
             title="Toàn màn hình"
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.18)',
+              border: 'none',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             <FullscreenOutlined />
           </button>
           <button
+            type="button"
             title="In phiếu"
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.18)',
+              border: 'none',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             <PrinterOutlined />
           </button>
           <button
+            type="button"
             title="Đóng"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: 18 }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: 15,
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             <CloseOutlined />
           </button>

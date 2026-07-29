@@ -28,6 +28,12 @@ export const deleteImportDocument = async (id) => {
   return response.data;
 };
 
+export const getImportReturnDetails = async (id) => {
+  if (!id || id <= 0) return null;
+  const response = await axiosInstance.get(`/api/Document/import/${id}/return-details`);
+  return response.data;
+};
+
 // ==========================================
 // 2. EXPORT DELETE DOCUMENT (Type 2)
 // ==========================================

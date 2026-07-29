@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+// import React, { useState, useMemo } from 'react';
 import ImportReturnSidebar from './ImportReturnSidebar';
 import ImportReturnTable from './ImportReturnTable';
-import ReturnDocumentModal from './ReturnDocumentModal';
 
 const ImportReturnTab = ({
   documents = [],

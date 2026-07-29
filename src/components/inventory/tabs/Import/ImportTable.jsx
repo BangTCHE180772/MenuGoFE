@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
+import { Modal } from 'antd';
 import {
   EnvironmentOutlined,
   DeleteOutlined,
   PrinterOutlined,
-  CopyOutlined,
-  ExportOutlined,
-  MailOutlined,
   RollbackOutlined,
-  BarcodeOutlined,
   EditOutlined,
   InfoCircleOutlined,
-  CreditCardOutlined
+  CreditCardOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 const ImportTable = ({
   documents = [],
+  allDocuments = [],
   searchText,
   setSearchText,
   loading,
   setModalImportOpen,
-  handleDeleteDocument
+  handleDeleteDocument,
+  onOpenReturnModal
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
@@ -44,6 +44,28 @@ const ImportTable = ({
 
   const handleTabChange = (docId, tabKey) => {
     setActiveTabMap((prev) => ({ ...prev, [docId]: tabKey }));
+  };
+
+  const openDeleteConfirm = (doc) => {
+    Modal.confirm({
+      title: <span style={{ fontWeight: 700, fontSize: 14 }}>Xác nhận hủy phiếu nhập</span>,
+      icon: <ExclamationCircleOutlined style={{ color: '#ef4444' }} />,
+      content: (
+        <div style={{ marginTop: 8, fontSize: 12, color: '#475569' }}>
+          Bạn có chắc chắn muốn hủy / xóa phiếu nhập kho <strong style={{ color: '#e8442a' }}>{doc.code}</strong> không?
+          <br />
+          Thao tác này sẽ cập nhật lại số lượng tồn kho và không thể hoàn tác.
+        </div>
+      ),
+      okText: 'Xác nhận hủy',
+      okType: 'danger',
+      cancelText: 'Bỏ qua',
+      centered: true,
+      maskClosable: true,
+      onOk() {
+        handleDeleteDocument(doc.id);
+      }
+    });
   };
 
   const handleCopyCode = (code) => {
@@ -143,17 +165,16 @@ const ImportTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIÁ TRỊ (VNĐ)</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -207,32 +228,12 @@ const ImportTable = ({
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator || 'Hệ thống'}</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm('Bạn có chắc chắn muốn xóa chứng từ này?')) {
-                              handleDeleteDocument(doc.id);
-                            }
-                          }}
-                          style={{
-                            background: 'transparent',
-                            color: '#dc2626',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: 11
-                          }}
-                        >
-                          Xóa
-                        </button>
-                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL BOX ROW */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={7} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -291,6 +292,21 @@ const ImportTable = ({
                               >
                                 Lịch sử thanh toán
                               </button>
+                              <button
+                                onClick={() => handleTabChange(doc.id, 'returnHistory')}
+                                style={{
+                                  padding: '10px 16px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  fontWeight: currentTab === 'returnHistory' ? 700 : 500,
+                                  color: currentTab === 'returnHistory' ? '#e8442a' : '#64748b',
+                                  borderBottom: currentTab === 'returnHistory' ? '2px solid #e8442a' : '2px solid transparent',
+                                  cursor: 'pointer',
+                                  fontSize: 12
+                                }}
+                              >
+                                Lịch sử trả hàng nhập ({(allDocuments || []).filter(d => (d.type === 4 || d.type === 'Return') && (d.parentDocumentId === doc.id || d.parentDocumentId === Number(doc.id))).length})
+                              </button>
                             </div>
 
                             {/* TAB 1: THÔNG TIN */}
@@ -347,6 +363,7 @@ const ImportTable = ({
                                       <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
                                         <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ HÀNG HÓA</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>ĐVT</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'center' }}>SỐ LƯỢNG</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'right' }}>ĐƠN GIÁ</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIẢM GIÁ</th>
@@ -357,7 +374,7 @@ const ImportTable = ({
                                     <tbody>
                                       {detailsList.length === 0 ? (
                                         <tr>
-                                          <td colSpan={7} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
+                                          <td colSpan={8} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
                                             Không có chi tiết hàng hóa nào
                                           </td>
                                         </tr>
@@ -376,6 +393,11 @@ const ImportTable = ({
                                               </td>
                                               <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
                                                 {item.productName || item.name || 'Sản phẩm'}
+                                              </td>
+                                              <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>
+                                                <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 10, border: '1px solid #cbd5e1', fontWeight: 600 }}>
+                                                  {item.unitName || 'Cái'}
+                                                </span>
                                               </td>
                                               <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                                                 {qty.toLocaleString('vi-VN')}
@@ -440,109 +462,86 @@ const ImportTable = ({
                                     </div>
                                   </div>
                                 </div>
+                                 {/* BOTTOM ACTION BAR (SYMMETRICAL LAYOUT) */}
+                                 <div
+                                   style={{
+                                     display: 'flex',
+                                     justify: 'space-between',
+                                     alignItems: 'center',
+                                     borderTop: '1px solid #e2e8f0',
+                                     paddingTop: 12,
+                                     flexWrap: 'wrap',
+                                     gap: 8
+                                   }}
+                                 >
+                                   {/* LEFT SIDE: HỦY BỎ BUTTON */}
+                                   <div>
+                                     <button
+                                       onClick={() => openDeleteConfirm(doc)}
+                                       style={{
+                                         background: '#ffffff',
+                                         border: '1px solid #fca5a5',
+                                         borderRadius: 4,
+                                         padding: '4px 12px',
+                                         fontSize: 11,
+                                         fontWeight: 600,
+                                         color: '#dc2626',
+                                         cursor: 'pointer',
+                                         display: 'flex',
+                                         alignItems: 'center',
+                                         gap: 4
+                                       }}
+                                     >
+                                       <DeleteOutlined /> Hủy bỏ
+                                     </button>
+                                   </div>
 
-                                {/* BOTTOM ACTION BAR */}
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    justify: 'space-between',
-                                    alignItems: 'center',
-                                    borderTop: '1px solid #e2e8f0',
-                                    paddingTop: 12,
-                                    flexWrap: 'wrap',
-                                    gap: 8
-                                  }}
-                                >
-                                  {/* LEFT ACTION BUTTONS */}
-                                  <div style={{ display: 'flex', gap: 12 }}>
-                                    <button
-                                      onClick={() => {
-                                        if (window.confirm(`Bạn có chắc muốn hủy/xóa phiếu ${doc.code}?`)) {
-                                          handleDeleteDocument(doc.id);
-                                        }
-                                      }}
-                                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                                    >
-                                      <DeleteOutlined /> Hủy bỏ
-                                    </button>
-                                    <button
-                                      onClick={() => handleCopyCode(doc.code)}
-                                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                                    >
-                                      <CopyOutlined /> Sao chép
-                                    </button>
-                                    <button
-                                      onClick={() => handleExport(doc.code)}
-                                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                                    >
-                                      <ExportOutlined /> Xuất file
-                                    </button>
-                                    <button
-                                      onClick={() => handleSendEmail(doc.code)}
-                                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                                    >
-                                      <MailOutlined /> Gửi Email
-                                    </button>
-                                  </div>
-
-                                  {/* RIGHT ACTION BUTTONS */}
-                                  <div style={{ display: 'flex', gap: 6 }}>
-                                    <button
-                                      onClick={() => handleReturn(doc.code)}
-                                      style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: 4,
-                                        padding: '4px 10px',
-                                        fontSize: 11,
-                                        fontWeight: 600,
-                                        color: '#334155',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 4
-                                      }}
-                                    >
-                                      <RollbackOutlined /> Trả hàng
-                                    </button>
-                                    <button
-                                      onClick={() => handlePrint(doc.code)}
-                                      style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: 4,
-                                        padding: '4px 10px',
-                                        fontSize: 11,
-                                        fontWeight: 600,
-                                        color: '#334155',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 4
-                                      }}
-                                    >
-                                      <PrinterOutlined /> In
-                                    </button>
-                                    <button
-                                      onClick={() => handleBarcodePrint(doc.code)}
-                                      style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: 4,
-                                        padding: '4px 10px',
-                                        fontSize: 11,
-                                        fontWeight: 600,
-                                        color: '#334155',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 4
-                                      }}
-                                    >
-                                      <BarcodeOutlined /> In mã vạch
-                                    </button>
-                                  </div>
-                                </div>
+                                   {/* RIGHT SIDE: TRẢ HÀNG & IN BUTTONS */}
+                                   <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                                     <button
+                                       onClick={() => {
+                                         if (onOpenReturnModal) {
+                                           onOpenReturnModal(doc);
+                                         } else {
+                                           handleReturn(doc.code);
+                                         }
+                                       }}
+                                       style={{
+                                         background: '#ffffff',
+                                         border: '1px solid #cbd5e1',
+                                         borderRadius: 4,
+                                         padding: '4px 12px',
+                                         fontSize: 11,
+                                         fontWeight: 600,
+                                         color: '#334155',
+                                         cursor: 'pointer',
+                                         display: 'flex',
+                                         alignItems: 'center',
+                                         gap: 4
+                                       }}
+                                     >
+                                       <RollbackOutlined /> Trả hàng
+                                     </button>
+                                     <button
+                                       onClick={() => handlePrint(doc.code)}
+                                       style={{
+                                         background: '#ffffff',
+                                         border: '1px solid #cbd5e1',
+                                         borderRadius: 4,
+                                         padding: '4px 12px',
+                                         fontSize: 11,
+                                         fontWeight: 600,
+                                         color: '#334155',
+                                         cursor: 'pointer',
+                                         display: 'flex',
+                                         alignItems: 'center',
+                                         gap: 4
+                                       }}
+                                     >
+                                       <PrinterOutlined /> In
+                                     </button>
+                                   </div>
+                                 </div>
                               </div>
                             )}
 
@@ -748,6 +747,67 @@ const ImportTable = ({
                                               </td>
                                             </tr>
                                           ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
+                            {/* TAB 4: LỊCH SỬ TRẢ HÀNG NHẬP */}
+                            {currentTab === 'returnHistory' && (
+                              <div style={{ padding: 16 }}>
+                                {(() => {
+                                  const returnHistoryList = (allDocuments || []).filter(
+                                    (d) => (d.type === 4 || d.type === 'Return') && (d.parentDocumentId === doc.id || d.parentDocumentId === Number(doc.id))
+                                  );
+
+                                  if (returnHistoryList.length === 0) {
+                                    return (
+                                      <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+                                        Chưa có giao dịch trả hàng nhập nào cho phiếu nhập kho này.
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                        <thead>
+                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
+                                            <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}>STT</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ PHIẾU TRẢ</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>THỜI GIAN TRẢ</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>TỔNG TIỀN HÀNG TRẢ</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>NCC ĐÃ TRẢ TIỀN</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {returnHistoryList.map((rd, rIdx) => {
+                                            const totalReturnAmt = Math.round(Number(rd.totalAmount || 0));
+                                            const paidAmt = Math.round(
+                                              (rd.partners || []).reduce((acc, p) => acc + Number(p.amountPaid || 0), 0)
+                                            );
+
+                                            return (
+                                              <tr key={rd.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{rIdx + 1}</td>
+                                                <td style={{ padding: '8px 10px', fontWeight: 700, color: '#e8442a' }}>{rd.code}</td>
+                                                <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                  {dayjs(rd.businessDate || rd.createdAt).format('DD/MM/YYYY HH:mm')}
+                                                </td>
+                                                <td style={{ padding: '8px 10px', color: '#334155' }}>{rd.creator || 'Hệ thống'}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                                                  {totalReturnAmt.toLocaleString('vi-VN')} ₫
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                                                  {paidAmt.toLocaleString('vi-VN')} ₫
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
                                         </tbody>
                                       </table>
                                     </div>
