@@ -116,31 +116,43 @@ const KitchenOverview = ({
   ];
 
   const baseDishes = MOCK_DATA[dishesPeriod]?.topDishes || [];
-  let topDishes = [];
+
+  let mostOrderedData = [];
+  let leastOrderedData = [];
 
   if (dishesRealStats && dishesRealStats.topDishes && dishesRealStats.topDishes.length > 0) {
-    topDishes = dishesRealStats.topDishes.map(d => ({
+    mostOrderedData = dishesRealStats.topDishes.map(d => ({
       name: d.name || d.Name || "Chưa rõ",
       quantity: d.quantity ?? d.Quantity ?? 0
     }));
   } else {
-    topDishes = baseDishes.map(d => ({
+    mostOrderedData = baseDishes.map(d => ({
+      ...d,
+      quantity: 0
+    }));
+  }
+
+  if (dishesRealStats && dishesRealStats.leastDishes && dishesRealStats.leastDishes.length > 0) {
+    leastOrderedData = dishesRealStats.leastDishes.map(d => ({
+      name: d.name || d.Name || "Chưa rõ",
+      quantity: d.quantity ?? d.Quantity ?? 0
+    }));
+  } else if (dishesRealStats && dishesRealStats.topDishes && dishesRealStats.topDishes.length > 0) {
+    leastOrderedData = [...dishesRealStats.topDishes]
+      .sort((a, b) => (a.quantity ?? a.Quantity ?? 0) - (b.quantity ?? b.Quantity ?? 0))
+      .slice(0, 10)
+      .map(d => ({
+        name: d.name || d.Name || "Chưa rõ",
+        quantity: d.quantity ?? d.Quantity ?? 0
+      }));
+  } else {
+    leastOrderedData = baseDishes.map(d => ({
       ...d,
       quantity: 0
     }));
   }
 
   const dishesLabelText = getPeriodLabel(dishesPeriod, dishesCustom);
-
-  // Sort descending for Top 10 Most Ordered
-  const mostOrderedData = [...topDishes]
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 10);
-
-  // Sort ascending for Top 10 Least Ordered
-  const leastOrderedData = [...topDishes]
-    .sort((a, b) => a.quantity - b.quantity)
-    .slice(0, 10);
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -322,7 +334,7 @@ const KitchenOverview = ({
                   margin={{ top: 5, right: 20, left: 24, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <XAxis type="number" domain={[0, (dataMax) => (dataMax > 0 ? dataMax : 10)]} tick={{ fontSize: 11 }} />
                   <YAxis
                     type="category"
                     dataKey="name"
@@ -396,7 +408,7 @@ const KitchenOverview = ({
                   margin={{ top: 5, right: 20, left: 24, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <XAxis type="number" domain={[0, (dataMax) => (dataMax > 0 ? dataMax : 10)]} tick={{ fontSize: 11 }} />
                   <YAxis
                     type="category"
                     dataKey="name"

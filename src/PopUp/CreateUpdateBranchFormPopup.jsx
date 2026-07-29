@@ -52,7 +52,7 @@ const CreateUpdateBranchFormPopup = ({
 
   const [addressModalConfig, setAddressModalConfig] = useState({
     open: false,
-    mode: "new", 
+    mode: "new",
     title: "",
   });
 
@@ -343,6 +343,7 @@ const CreateUpdateBranchFormPopup = ({
           </div>
 
           {/* Khu vực Địa chỉ cũ */}
+          {/*
           <div
             style={{
               background: "#f8fafc",
@@ -397,6 +398,7 @@ const CreateUpdateBranchFormPopup = ({
               </div>
             </div>
           </div>
+ */}
         </Form>
       </Modal>
 
