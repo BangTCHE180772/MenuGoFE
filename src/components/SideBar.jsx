@@ -239,6 +239,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
             <Link
               key={idx}
               to={item.path}
+              state={{ from: location }}
               className={`sidebar-nav-item ${isActive ? "active" : ""}`}
             >
               <span className="sidebar-nav-icon">{item.icon}</span>

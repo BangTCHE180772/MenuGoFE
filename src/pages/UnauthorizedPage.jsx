@@ -12,9 +12,14 @@ const UnauthorizedPage = () => {
         title="403 Forbidden"
         subTitle="Xin lỗi, bạn không có quyền truy cập vào trang này."
         extra={
-          <Button type="primary" onClick={() => navigate('/')}>
-            Quay Về Trang Chủ
-          </Button>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button onClick={() => navigate(-1)}>
+              Quay Lại Trang Trước
+            </Button>
+            <Button type="primary" onClick={() => navigate('/home')}>
+              Trang Chủ
+            </Button>
+          </div>
         }
       />
     </div>
