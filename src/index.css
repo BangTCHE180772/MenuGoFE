@@ -17,7 +17,6 @@
   --color-text: #111827;
   --color-text-secondary: #6b7280;
 
-  --topbar-height: 64px;
   --sidebar-width: 250px;
   --sidebar-collapsed-width: 72px;
   --border-radius-sm: 6px;
@@ -2113,14 +2112,6 @@ img {
   box-shadow: var(--shadow-md) !important;
   transform: translateY(-2px);
   transition: box-shadow 0.2s, transform 0.2s;
-}
-
-/* Topbar branch select */
-.topbar-branch-select .ant-select-selector {
-  border-radius: 20px !important;
-  background: rgba(255,255,255,0.12) !important;
-  border-color: rgba(255,255,255,0.25) !important;
-  color: #1e293b !important;
 }
 
 /* Scrollbar for cashflow list */
