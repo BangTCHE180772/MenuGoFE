@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Modal, Form, Input, InputNumber, DatePicker, message } from 'antd';
 import dayjs from 'dayjs';
 import { updateReservation } from '../../api/reservationApi';
+import CustomerSearchInput from '../common/CustomerSearchInput';
 
 const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (visible && reservation) {
@@ -21,9 +23,14 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
     }
   }, [visible, reservation, form]);
 
-  const handleOk = async () => {
+  const handleSelectCustomer = (customer) => {
+    form.setFieldsValue({ customerName: customer.name });
+  };
+
+  const submitUpdate = async (values, confirmUpdateCustomer = false) => {
     try {
-      const values = await form.validateFields();
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
       setLoading(true);
 
       const updateData = {
@@ -31,17 +38,43 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
         customerPhone: values.customerPhone,
         numberOfGuests: values.numberOfGuests,
         reservationTime: values.reservationTime.toISOString(),
-        note: values.note || ''
+        note: values.note || '',
+        confirmUpdateCustomer
       };
 
       await updateReservation(reservation.id, updateData);
       message.success('Cập nhật thông tin đặt bàn thành công');
       onSuccess();
     } catch (error) {
-      if (error.errorFields) return;
-      message.error(error.response?.data?.message || 'Cập nhật thất bại');
+      if (error.response?.status === 409) {
+        Modal.confirm({
+          title: 'Trùng số điện thoại',
+          content: error.response.data.message,
+          okText: 'Cập nhật',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            isSubmittingRef.current = false;
+            await submitUpdate(values, true);
+          },
+          onCancel: () => {
+             isSubmittingRef.current = false;
+          }
+        });
+      } else {
+        message.error(error.response?.data?.message || 'Cập nhật thất bại');
+      }
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      await submitUpdate(values, false);
+    } catch (error) {
+      // Validation error
     }
   };
 
@@ -69,15 +102,30 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
           label="Số điện thoại"
           rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
         >
-          <Input placeholder="Nhập số điện thoại" />
+          <CustomerSearchInput onSelectCustomer={handleSelectCustomer} />
         </Form.Item>
 
         <Form.Item
           name="reservationTime"
           label="Thời gian đặt bàn"
-          rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}
+          rules={[
+            { required: true, message: 'Vui lòng chọn thời gian' },
+            {
+              validator: (_, value) => {
+                if (value && value.isBefore(dayjs().add(10, 'minute'))) {
+                  return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                }
+                return Promise.resolve();
+              }
+            }
+          ]}
         >
-          <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          <DatePicker 
+            showTime 
+            format="DD/MM/YYYY HH:mm" 
+            style={{ width: '100%' }} 
+            disabledDate={current => current && current < dayjs().startOf('day')}
+          />
         </Form.Item>
 
         <Form.Item

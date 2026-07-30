@@ -129,8 +129,42 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
 
   const isSubmittingRef = useRef(false);
 
+  const submitCreate = async (payload, confirmUpdateCustomer = false) => {
+    try {
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
+      setLoading(true);
+
+      const dataToSubmit = { ...payload, confirmUpdateCustomer };
+      await createReservation(dataToSubmit);
+      message.success('Đã tạo đặt bàn thành công!');
+      onSuccess();
+    } catch (error) {
+      if (error.response?.status === 409) {
+        Modal.confirm({
+          title: 'Trùng số điện thoại',
+          content: error.response.data.message,
+          okText: 'Cập nhật',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            isSubmittingRef.current = false;
+            await submitCreate(payload, true);
+          },
+          onCancel: () => {
+             isSubmittingRef.current = false;
+          }
+        });
+      } else {
+        if (error.errorFields) return;
+        message.error(error.response?.data?.message || 'Tạo đặt bàn thất bại');
+      }
+    } finally {
+      setLoading(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
   const handleSubmit = async () => {
-    if (isSubmittingRef.current) return;
     try {
       const values = await form.validateFields();
 
@@ -148,17 +182,9 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         }))
       };
 
-      isSubmittingRef.current = true;
-      setLoading(true);
-      await createReservation(payload);
-      message.success('Đã tạo đặt bàn thành công!');
-      onSuccess();
+      await submitCreate(payload, false);
     } catch (error) {
-      if (error.errorFields) return;
-      message.error(error.response?.data?.message || 'Tạo đặt bàn thất bại');
-    } finally {
-      setLoading(false);
-      isSubmittingRef.current = false;
+      // Validation error
     }
   };
 
