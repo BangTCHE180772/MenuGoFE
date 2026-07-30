@@ -48,7 +48,7 @@ const OrderPage = ({ isWaiterMode }) => {
     try {
       let res;
       const shiftBranchId = localStorage.getItem('activeShiftBranchId');
-      
+
       if (deviceInfo) {
         res = await getTablesByBranch(deviceInfo.branchId);
       } else if (shiftBranchId) {
@@ -134,30 +134,30 @@ const OrderPage = ({ isWaiterMode }) => {
     if (actionRef.current) return;
     actionRef.current = true;
 
-      if (newStatus === 'CHECK_IN') {
-        if (!orderSummary?.reservationId) {
-          message.error("Không tìm thấy thông tin đặt bàn!");
-          actionRef.current = false;
-          return;
-        }
-        try {
-          await checkInReservation(orderSummary.reservationId);
-          message.success("Đã xác nhận khách đến!");
-          const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
-          setSelectedTable(updated);
-          setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
-          const summaryRes = await getTableOrderSummary(selectedTable.id);
-          setOrderSummary(summaryRes.data);
-        } catch (err) {
-          console.error(err);
-          message.error("Xác nhận khách đến thất bại!");
-        } finally {
-          actionRef.current = false;
-        }
+    if (newStatus === 'CHECK_IN') {
+      if (!orderSummary?.reservationId) {
+        message.error("Không tìm thấy thông tin đặt bàn!");
+        actionRef.current = false;
         return;
       }
+      try {
+        await checkInReservation(orderSummary.reservationId);
+        message.success("Đã xác nhận khách đến!");
+        const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
+        setSelectedTable(updated);
+        setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        setOrderSummary(summaryRes.data);
+      } catch (err) {
+        console.error(err);
+        message.error("Xác nhận khách đến thất bại!");
+      } finally {
+        actionRef.current = false;
+      }
+      return;
+    }
 
-      if (newStatus === TABLE_STATUS.CLEANING) {
+    if (newStatus === TABLE_STATUS.CLEANING) {
       try {
         const summaryRes = await getTableOrderSummary(selectedTable.id);
         if (summaryRes.data?.activeOrderId) {
@@ -242,7 +242,7 @@ const OrderPage = ({ isWaiterMode }) => {
 
       message.success(`Gọi thêm món thành công!`);
       setCartItems([]);
-      
+
       const newSummaryRes = await getTableOrderSummary(selectedTable.id);
       setOrderSummary(newSummaryRes.data);
     } catch (err) {
@@ -309,7 +309,6 @@ const OrderPage = ({ isWaiterMode }) => {
       <PaymentModal
         visible={isPaymentModalVisible}
         orderId={orderSummary?.activeOrderId}
-        tableName={orderSummary?.tableName || selectedTable?.name}
         items={orderSummary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}
         onSuccess={() => {
