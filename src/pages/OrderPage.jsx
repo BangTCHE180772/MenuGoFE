@@ -14,7 +14,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -254,6 +254,21 @@ const OrderPage = ({ isWaiterMode }) => {
     }
   };
 
+  const handlePaymentClick = () => {
+    const activeItems = orderSummary?.items?.filter(i => i.status !== 'Cancelled') || [];
+    const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
+
+    if (hasUnservedItems) {
+      Modal.warning({
+        title: 'Cảnh báo: Bàn chưa lên hết món',
+        content: 'Vẫn còn món chưa được phục vụ (đang chờ hoặc đang nấu). Vui lòng phục vụ hoặc huỷ món trước khi thanh toán.',
+        okText: 'Đã hiểu',
+      });
+    } else {
+      setIsPaymentModalVisible(true);
+    }
+  };
+
   const isOccupied = selectedTable?.status?.toLowerCase() === 'occupied';
 
   return (
@@ -299,7 +314,7 @@ const OrderPage = ({ isWaiterMode }) => {
           onNoteChange={handleNoteChange}
           onConfirm={handleConfirmOrder}
           onChangeStatus={handleChangeTableStatus}
-          onPayment={() => setIsPaymentModalVisible(true)}
+          onPayment={handlePaymentClick}
           onMerge={() => setIsMergeModalVisible(true)}
           loading={orderLoading}
           isWaiterMode={isWaiterMode}
