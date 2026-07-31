@@ -20,6 +20,7 @@ import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
+import MyContractPage from '../pages/MyContractPage';
 import AccountPage from '../pages/AccountPage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
 import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
@@ -103,6 +104,18 @@ const AppRouter = () => {
                 }
               />
               <Route path="/my-work-schedule" element={<MyWorkSchedulePage />} />
+              <Route
+                path="/contracts"
+                element={
+                  ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+                  [1, 2, 3].includes(user?.roleId) ? (
+                    <ContractPage />
+                  ) : (
+                    <MyContractPage />
+                  )
+                }
+              />
+              <Route path="/my-contract" element={<MyContractPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
