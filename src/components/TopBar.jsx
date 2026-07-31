@@ -107,6 +107,7 @@ const ROLE_MENUS = {
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -116,12 +117,14 @@ const ROLE_MENUS = {
       icon: <CalendarOutlined />,
     },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
   ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
   ],
 };
 

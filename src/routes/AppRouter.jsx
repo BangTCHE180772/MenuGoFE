@@ -30,6 +30,7 @@ import KDSPage from '../pages/KDSPage';
 import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 import PayrollPage from '../pages/PayrollPage';
+import MyPayrollPage from '../pages/MyPayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
 
 
@@ -116,6 +117,7 @@ const AppRouter = () => {
                 }
               />
               <Route path="/my-contract" element={<MyContractPage />} />
+              <Route path="/my-payroll" element={<MyPayrollPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}

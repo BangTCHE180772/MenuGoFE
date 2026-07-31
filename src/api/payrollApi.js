@@ -3,6 +3,9 @@ import axiosInstance from './axiosInstance';
 export const getPayrolls = (params) =>
   axiosInstance.get('/api/Payroll', { params });
 
+export const getMyPayrolls = (params) =>
+  axiosInstance.get('/api/Payroll/my-payroll', { params });
+
 export const getPayrollById = (id) =>
   axiosInstance.get(`/api/Payroll/${id}`);
 
