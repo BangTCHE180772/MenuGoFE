@@ -43,6 +43,8 @@ import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
+import FinanceDashboardPage from '../pages/FinanceDashboardPage';
+import OrderDashboard from '../pages/OrderDashboard';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -83,22 +85,24 @@ const AppRouter = () => {
           {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
           <Route element={<PrivateRoute />}>
             <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
-            
+
             <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<HomePage />} />
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route
                 path="/work-schedule"
                 element={
-                  ['Cashier', 'Chef', 'Waiter'].includes(role) ? (
-                    <MyWorkSchedulePage />
-                  ) : (
+                  ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+                  [1, 2, 3].includes(user?.roleId) ? (
                     <WorkSchedulePage />
+                  ) : (
+                    <MyWorkSchedulePage />
                   )
                 }
               />
+              <Route path="/my-work-schedule" element={<MyWorkSchedulePage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
@@ -116,6 +120,8 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
+                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
+                <Route path="/orderdashboard" element={<OrderDashboard />} />
               </Route>
 
               {/* Owner, Admin */}

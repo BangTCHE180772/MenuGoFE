@@ -125,6 +125,7 @@ const ExecutiveSummary = ({
             compareLabel="So với hôm qua"
             loading={loading}
             fullFormat
+            inverseTrend
             description={
               <>
                 Tổng chi phí phát sinh.

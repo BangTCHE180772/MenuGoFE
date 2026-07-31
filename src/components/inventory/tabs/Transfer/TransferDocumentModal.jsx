@@ -19,10 +19,9 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getBInventories } from '../../../api/binventoryApi';
-import { createTransferDocument } from '../../../api/documentApi';
+import { getBInventories } from '../../../../api/binventoryApi';
+import { createTransferDocument } from '../../../../api/documentApi';
 
-// ─── PHIẾU CHUYỂN HÀNG (TRANSFER) ─────────────────────────────────────────────
 const TransferDocumentModal = ({
   open,
   onClose,
@@ -44,7 +43,6 @@ const TransferDocumentModal = ({
   });
   const [items, setItems] = useState([]);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       const now = dayjs();
@@ -112,7 +110,6 @@ const TransferDocumentModal = ({
     setSearchVal(undefined);
   };
 
-  // Calculations
   const totalTransferAmount = useMemo(() => {
     return items.reduce((sum, i) => sum + (i.quantity || 0) * (i.transferPrice || 0), 0);
   }, [items]);
@@ -306,7 +303,6 @@ const TransferDocumentModal = ({
         fontSize: 12
       }}
     >
-      {/* HEADER BAR */}
       <div
         style={{
           height: 48,
@@ -326,7 +322,7 @@ const TransferDocumentModal = ({
           <div style={{ width: 420 }}>
             <Select
               showSearch
-              placeholder="Tìm theo mã hoặc tên hàng hóa... (F1)"
+              placeholder="Tìm theo mã hoặc tên hàng hóa..."
               optionFilterProp="label"
               value={searchVal}
               onChange={handleSelectProduct}
@@ -353,9 +349,7 @@ const TransferDocumentModal = ({
         </Space>
       </div>
 
-      {/* BODY WORKSPACE */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT PRODUCT TABLE */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div
             style={{
@@ -380,7 +374,6 @@ const TransferDocumentModal = ({
           </div>
         </div>
 
-        {/* RIGHT CONTROL SIDEBAR */}
         <div
           style={{
             width: 340,
@@ -399,10 +392,9 @@ const TransferDocumentModal = ({
                 <Tag color="cyan" style={{ borderRadius: 12, padding: '0 8px' }}>Chuyển hàng</Tag>
               </div>
 
-              {/* CHI NHÁNH NHẬN */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>
-                  Chi nhánh nhận (F4) <span style={{ color: '#ef4444' }}>*</span>
+                  Chi nhánh nhận <span style={{ color: '#ef4444' }}>*</span>
                 </div>
                 <Select
                   value={formData.toBranchId}
@@ -420,7 +412,6 @@ const TransferDocumentModal = ({
                 </Select>
               </div>
 
-              {/* MÃ CHUYỂN HÀNG */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã chuyển hàng</div>
                 <Input
@@ -431,7 +422,6 @@ const TransferDocumentModal = ({
                 />
               </div>
 
-              {/* TỔNG TIỀN CHUYỂN */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#475569' }}>Tổng mặt hàng ({items.length})</span>
@@ -448,7 +438,6 @@ const TransferDocumentModal = ({
                 </div>
               </div>
 
-              {/* GHI CHÚ */}
               <div>
                 <Input.TextArea
                   value={formData.note}
@@ -460,7 +449,6 @@ const TransferDocumentModal = ({
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
               <Button
                 type="default"

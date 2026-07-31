@@ -304,7 +304,7 @@ const ContractPage = () => {
       key: 'duration',
       render: (_, record) => {
         const start = record.startDate ? dayjs(record.startDate).format('DD/MM/YYYY') : 'Chưa rõ';
-        const end = record.endDate ? dayjs(record.endDate).format('DD/MM/YYYY') : 'Không thời hạn';
+        const end = record.endDate ? dayjs(record.endDate).format('DD/MM/YYYY') : 'Chưa rõ';
         return `${start} - ${end}`;
       },
     },
@@ -730,24 +730,60 @@ const ContractPage = () => {
               <Form.Item
                 name="startDate"
                 label="Ngày bắt đầu hiệu lực"
-                rules={[{ required: true, message: 'Vui lòng chọn ngày hiệu lực!' }]}
+                rules={[
+                  { required: true, message: 'Vui lòng chọn ngày bắt đầu!' },
+                  modalType === 'create' && {
+                    validator: (_, value) => {
+                      if (value && value.isBefore(dayjs().startOf('day'))) {
+                        return Promise.reject(new Error('Ngày bắt đầu phải từ ngày hôm nay trở đi!'));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ].filter(Boolean)}
               >
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày bắt đầu" />
+                <DatePicker
+                  style={{ width: '100%' }}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày bắt đầu"
+                  disabledDate={(current) =>
+                    modalType === 'create' && current && current < dayjs().startOf('day')
+                  }
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
                 name="endDate"
-                label={
-                  <span>
-                    Ngày hết hạn (Nếu có){' '}
-                    <Tooltip title="Bỏ trống nếu là hợp đồng vô thời hạn.">
-                      <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
-                    </Tooltip>
-                  </span>
-                }
+                label="Ngày kết thúc hiệu lực"
+                rules={[
+                  { required: true, message: 'Vui lòng chọn ngày kết thúc!' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const startDate = getFieldValue('startDate');
+                      if (!value || !startDate || value.isAfter(startDate) || value.isSame(startDate, 'day')) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!'));
+                    },
+                  }),
+                ]}
               >
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày hết hạn" />
+                <DatePicker
+                  style={{ width: '100%' }}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày kết thúc"
+                  disabledDate={(current) => {
+                    const startDate = form.getFieldValue('startDate');
+                    if (modalType === 'create' && current && current < dayjs().startOf('day')) {
+                      return true;
+                    }
+                    if (startDate && current && current < startDate.startOf('day')) {
+                      return true;
+                    }
+                    return false;
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>

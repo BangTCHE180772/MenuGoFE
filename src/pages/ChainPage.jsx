@@ -200,20 +200,32 @@ const ChainPage = () => {
       let finalBanner = chain.backgroundImage || "";
 
       if (logoFile) {
-        message.loading({ content: "Đang tải Logo lên Cloudinary...", key: "uploadLogo" });
+        message.loading({
+          content: "Đang tải Logo lên Cloudinary...",
+          key: "uploadLogo",
+        });
         const logoRes = await uploadImage(logoFile);
         if (logoRes.data?.imageLink) {
           finalLogo = logoRes.data.imageLink;
-          message.success({ content: "Tải Logo lên Cloudinary thành công!", key: "uploadLogo" });
+          message.success({
+            content: "Tải Logo lên Cloudinary thành công!",
+            key: "uploadLogo",
+          });
         }
       }
 
       if (bannerFile) {
-        message.loading({ content: "Đang tải ảnh bìa lên Cloudinary...", key: "uploadBanner" });
+        message.loading({
+          content: "Đang tải ảnh bìa lên Cloudinary...",
+          key: "uploadBanner",
+        });
         const bannerRes = await uploadImage(bannerFile);
         if (bannerRes.data?.imageLink) {
           finalBanner = bannerRes.data.imageLink;
-          message.success({ content: "Tải ảnh bìa lên Cloudinary thành công!", key: "uploadBanner" });
+          message.success({
+            content: "Tải ảnh bìa lên Cloudinary thành công!",
+            key: "uploadBanner",
+          });
         }
       }
 
@@ -470,6 +482,7 @@ const ChainPage = () => {
               </div>
 
               {/* Old */}
+              {/* 
               <div className="chain-address-box">
                 <div className="chain-address-title">
                   <Tag color="default">CŨ</Tag>
@@ -495,6 +508,7 @@ const ChainPage = () => {
                   </div>
                 </div>
               </div>
+ */}
             </Card>
           </Col>
 

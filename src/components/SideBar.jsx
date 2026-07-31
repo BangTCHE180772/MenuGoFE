@@ -1,5 +1,6 @@
+import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Dropdown, Avatar, message, Select } from "antd";
+import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -16,8 +17,6 @@ import {
   BookOutlined,
   FireOutlined,
   GiftOutlined,
-  LeftOutlined,
-  RightOutlined,
   RocketOutlined,
   FileProtectOutlined,
   ClockCircleOutlined,
@@ -25,15 +24,19 @@ import {
   InboxOutlined,
   DollarOutlined,
   FileTextOutlined,
+  BarChartOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
-import { useRef, useState, useEffect } from "react";
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả Kinh Doanh", path: "/financedashboard", icon: <BarChartOutlined /> },
+    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
@@ -51,16 +54,14 @@ const ROLE_MENUS = {
     { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
-    {
-      label: "Lịch làm việc",
-      path: "/work-schedule",
-      icon: <CalendarOutlined />,
-    },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
     { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
+    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -73,15 +74,13 @@ const ROLE_MENUS = {
     { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
-    {
-      label: "Lịch làm việc",
-      path: "/work-schedule",
-      icon: <CalendarOutlined />,
-    },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
+    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
@@ -94,11 +93,7 @@ const ROLE_MENUS = {
     { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
-    {
-      label: "Lịch làm việc",
-      path: "/work-schedule",
-      icon: <CalendarOutlined />,
-    },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [
@@ -107,11 +102,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CHEF]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
-    {
-      label: "Lịch làm việc",
-      path: "/work-schedule",
-      icon: <CalendarOutlined />,
-    },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
   ],
   [ROLES.WAITER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -130,7 +121,7 @@ const ROLE_LABELS = {
   [ROLES.WAITER]: "Phục vụ",
 };
 
-const TopBar = () => {
+const SideBar = ({ collapsed, onToggleCollapse }) => {
   const { user, role, logout } = useAuth();
   const { currentBranchId, selectBranch, branches } = useBranch();
   const location = useLocation();
@@ -144,199 +135,161 @@ const TopBar = () => {
     navigate("/login");
   };
 
-  // ─── Scroll & Drag-to-scroll logic ──────────────────────────────────────────
-  const navRef = useRef(null);
-  const [showLeftBtn, setShowLeftBtn] = useState(false);
-  const [showRightBtn, setShowRightBtn] = useState(false);
-
-  // Drag-to-scroll mouse states
-  const [isDown, setIsDown] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeftState, setScrollLeftState] = useState(0);
-
-  const updateScrollButtons = () => {
-    if (navRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
-      setShowLeftBtn(scrollLeft > 5);
-      setShowRightBtn(scrollLeft + clientWidth < scrollWidth - 5);
-    }
-  };
-
-  useEffect(() => {
-    const el = navRef.current;
-    if (el) {
-      updateScrollButtons();
-      el.addEventListener("scroll", updateScrollButtons);
-      window.addEventListener("resize", updateScrollButtons);
-    }
-    return () => {
-      if (el) {
-        el.removeEventListener("scroll", updateScrollButtons);
-      }
-      window.removeEventListener("resize", updateScrollButtons);
-    };
-  }, [menuItems]);
-
-  const scrollNav = (direction) => {
-    if (navRef.current) {
-      const scrollAmount = 200;
-      navRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
-
-  // Mouse Drag Events
-  const handleMouseDown = (e) => {
-    if (!navRef.current) return;
-    setIsDown(true);
-    setStartX(e.pageX - navRef.current.offsetLeft);
-    setScrollLeftState(navRef.current.scrollLeft);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDown(false);
-    if (navRef.current) {
-      navRef.current.classList.remove("dragging");
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDown(false);
-    if (navRef.current) {
-      navRef.current.classList.remove("dragging");
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDown || !navRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - navRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Tốc độ cuộn chuột
-
-    // Chỉ kích hoạt chế độ dragging khi kéo chuột di chuyển nhiều hơn 5px
-    if (Math.abs(x - startX) > 5) {
-      navRef.current.classList.add("dragging");
-    }
-
-    navRef.current.scrollLeft = scrollLeftState - walk;
-  };
-
-  // Dropdown menu khi click vào avatar/tên user
-  const userDropdownItems = [
+  const userMenuItems = [
     {
-      key: "profile",
-      icon: <UserOutlined />,
-      label: "Thông tin cá nhân",
-      disabled: true, // TODO: thêm trang profile sau
+      key: "user-info",
+      label: (
+        <div style={{ padding: "4px 8px" }}>
+          <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+            {user?.name || user?.fullName || "Người dùng"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+            {user?.email || ""}
+          </div>
+        </div>
+      ),
+      disabled: true,
     },
     { type: "divider" },
     {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Thông tin tài khoản",
+    },
+    {
       key: "logout",
       icon: <LogoutOutlined />,
-      label: "Đăng xuất",
       danger: true,
+      label: "Đăng xuất",
       onClick: handleLogout,
     },
   ];
 
-  const logoUrl = "/src/assets/logo.png";
-
   return (
-    <header className="topbar">
-      {/* Logo */}
-      <Link to="/home" className="topbar-logo">
-        <span className="topbar-logo-icon">
-          {logoUrl && logoUrl.trim() !== "" ? (
-            <img src={logoUrl} alt="Logo" />
-          ) : (
-            "🍜"
-          )}
-        </span>
-        <span className="topbar-logo-text">MenuGo</span>
-      </Link>
-
-      {/* Navigation với thanh trượt / kéo chuột */}
-      <div className="topbar-nav-wrapper">
-        {showLeftBtn && (
-          <button className="topbar-scroll-btn scroll-left" onClick={() => scrollNav("left")}>
-            <LeftOutlined />
-          </button>
-        )}
-
-        <nav
-          ref={navRef}
-          className="topbar-nav"
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-        >
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {showRightBtn && (
-          <button className="topbar-scroll-btn scroll-right" onClick={() => scrollNav("right")}>
-            <RightOutlined />
-          </button>
-        )}
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      {/* Sidebar Header: Logo & Toggle Button */}
+      <div className="sidebar-header">
+        <Link to="/home" className="sidebar-logo">
+          <div className="sidebar-logo-icon">
+            <CrownOutlined style={{ fontSize: 22, color: "var(--color-primary)" }} />
+          </div>
+          {!collapsed && <span className="sidebar-logo-text">MenuGo</span>}
+        </Link>
+        <Button
+          type="text"
+          className="sidebar-toggle-btn"
+          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          onClick={onToggleCollapse}
+          title={collapsed ? "Mở rộng Sidebar" : "Thu gọn Sidebar"}
+        />
       </div>
 
-      {/* User info */}
-      <div className="topbar-right" style={{ display: 'flex', alignItems: 'center' }}>
-        {['Admin', 'Owner'].includes(role) && (
-          <Select
-            value={currentBranchId || undefined}
-            onChange={(val) => selectBranch(val || null)}
-            style={{ width: 180, marginRight: 16 }}
-            placeholder="Tất cả chi nhánh"
-            allowClear
-            styles={{ popup: { root: { minWidth: 200 } } }}
-            className="topbar-branch-select"
-            options={branches
-              .filter((b) => b && b.id != null)
-              .map((b) => ({
+      {/* Branch Selector */}
+      {branches && branches.length > 0 && (
+        <div className="sidebar-branch-wrapper">
+          {!collapsed ? (
+            <Select
+              className="sidebar-branch-select"
+              value={currentBranchId || undefined}
+              onChange={(value) => selectBranch(value)}
+              placeholder="Chọn chi nhánh"
+              options={branches.map((b) => ({
+                label: (
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>
+                    <ShopOutlined style={{ marginRight: 6, color: "var(--color-primary)" }} />
+                    {b.name}
+                  </span>
+                ),
                 value: b.id,
-                label: b.name || 'Chi nhánh'
               }))}
-          />
-        )}
-
-        <Dropdown
-          menu={{ items: userDropdownItems }}
-          placement="bottomRight"
-          arrow
-        >
-          <div className="topbar-user">
-            <Avatar
-              icon={<UserOutlined />}
-              src={user?.avatarImage}
-              className="topbar-avatar"
             />
-            <div className="topbar-user-info">
-              <span className="topbar-user-name">
-                {user?.name ?? "Người dùng"}
-              </span>
-              <span className="topbar-user-role">
-                <CrownOutlined style={{ fontSize: 10, marginRight: 3 }} />
-                {ROLE_LABELS[role] ?? role}
-              </span>
-            </div>
+          ) : (
+            <Tooltip title="Đổi chi nhánh" placement="right">
+              <Dropdown
+                trigger={["click"]}
+                menu={{
+                  items: branches.map((b) => ({
+                    key: b.id,
+                    label: b.name,
+                    icon: <ShopOutlined />,
+                    onClick: () => selectBranch(b.id),
+                  })),
+                  selectedKeys: [String(currentBranchId)],
+                }}
+              >
+                <Button
+                  type="text"
+                  className="sidebar-branch-collapsed-btn"
+                  icon={<ShopOutlined style={{ color: "var(--color-primary)", fontSize: 18 }} />}
+                />
+              </Dropdown>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {/* Sidebar Nav List */}
+      <nav className="sidebar-nav">
+        {menuItems.map((item, idx) => {
+          const isActive =
+            location.pathname === item.path ||
+            (item.path !== "/home" && location.pathname.startsWith(item.path));
+
+          const navLinkContent = (
+            <Link
+              key={idx}
+              to={item.path}
+              state={{ from: location }}
+              className={`sidebar-nav-item ${isActive ? "active" : ""}`}
+            >
+              <span className="sidebar-nav-icon">{item.icon}</span>
+              {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
+            </Link>
+          );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={idx} title={item.label} placement="right">
+                {navLinkContent}
+              </Tooltip>
+            );
+          }
+
+          return navLinkContent;
+        })}
+      </nav>
+
+      {/* Sidebar Footer: User Info & Logout */}
+      <div className="sidebar-footer">
+        <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="topRight">
+          <div className="sidebar-user">
+            <Avatar className="sidebar-avatar" icon={<UserOutlined />} />
+            {!collapsed && (
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name">
+                  {user?.name || user?.fullName || "Người dùng"}
+                </span>
+                <span className="sidebar-user-role">
+                  {ROLE_LABELS[role] || role || "Nhân viên"}
+                </span>
+              </div>
+            )}
           </div>
         </Dropdown>
+        {!collapsed && (
+          <Tooltip title="Đăng xuất" placement="right">
+            <Button
+              type="text"
+              danger
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+              className="sidebar-logout-btn"
+            />
+          </Tooltip>
+        )}
       </div>
-    </header>
+    </aside>
   );
 };
 
-export default TopBar;
+export default SideBar;
