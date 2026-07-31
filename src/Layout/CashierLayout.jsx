@@ -4,8 +4,8 @@ import { Button } from 'antd';
 import { LoginOutlined } from '@ant-design/icons';
 
 /**
- * Layout full-screen cho màn thu ngân / điểm danh
- * Không có TopBar thường - có nút quay về nếu cần
+ * Layout full-screen cho màn thu ngân & đặt bàn
+ * Không có Sidebar - có nút quay về nếu cần
  */
 const CashierLayout = () => {
   const navigate = useNavigate();

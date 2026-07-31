@@ -15,10 +15,9 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 
-import { getBInventories } from '../../../api/binventoryApi';
-import { createProductionDocument } from '../../../api/documentApi';
+import { getBInventories } from '../../../../api/binventoryApi';
+import { createProductionDocument } from '../../../../api/documentApi';
 
-// ─── PHIẾU SẢN XUẤT (PRODUCTION) ──────────────────────────────────────────────
 const ProductionDocumentModal = ({
   open,
   onClose,
@@ -73,7 +72,6 @@ const ProductionDocumentModal = ({
 
   const selectedProduct = products.find((p) => p.id === formData.productId);
 
-  // BOM ingredients calculation
   const ingredients = selectedProduct?.ingredients || [
     { id: 101, code: 'NL001', name: 'Đường cát trắng', unitName: 'kg', normQty: 0.1, stockQty: 50 },
     { id: 102, code: 'NL002', name: 'Sữa tươi không đường', unitName: 'lít', normQty: 0.2, stockQty: 30 },

@@ -17,6 +17,11 @@ export const createReservation = async (data) => {
   return response.data;
 };
 
+export const updateReservation = async (id, data) => {
+  const response = await axiosInstance.put(`/api/Reservation/${id}`, data);
+  return response.data;
+};
+
 export const checkInReservation = async (id) => {
   const response = await axiosInstance.put(`/api/Reservation/${id}/check-in`);
   return response.data;

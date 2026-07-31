@@ -19,36 +19,29 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getSuppliers } from '../../../api/partnerApi';
-import { getBInventories } from '../../../api/binventoryApi';
-import { createImportDocument } from '../../../api/documentApi';
+import { getBInventories } from '../../../../api/binventoryApi';
+import { createExportDeleteDocument } from '../../../../api/documentApi';
 
-// ─── PHIẾU NHẬP KHO (IMPORT) ─────────────────────────────────────────────────
-const ImportDocumentModal = ({
+const DisposalDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = [],
-  partners = []
+  products = []
 }) => {
   const [loading, setLoading] = useState(false);
   const [openTimeFormatted, setOpenTimeFormatted] = useState('');
   const [openTimeISO, setOpenTimeISO] = useState('');
-  const [suppliersList, setSuppliersList] = useState([]);
   const [bInventoryList, setBInventoryList] = useState([]);
   const [searchVal, setSearchVal] = useState(undefined);
 
   const [formData, setFormData] = useState({
-    supplierId: undefined,
+    reason: '',
     docCode: '',
-    discount: 0,
-    paidAmount: 0,
     note: ''
   });
   const [items, setItems] = useState([]);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       const now = dayjs();
@@ -57,26 +50,14 @@ const ImportDocumentModal = ({
       setSearchVal(undefined);
 
       setFormData({
-        supplierId: undefined,
+        reason: '',
         docCode: '',
-        discount: 0,
-        paidAmount: 0,
         note: ''
       });
       setItems([]);
 
       if (branchId) {
-        getSuppliers(branchId)
-          .then((res) => {
-            const data = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
-            setSuppliersList(data.length > 0 ? data : partners);
-          })
-          .catch((err) => {
-            console.error('Failed to load suppliers:', err);
-            setSuppliersList(partners);
-          });
-
-        getBInventories(branchId, '', 'IMPORT', 1)
+        getBInventories(branchId, '', 'DISPOSAL', 2)
           .then((res) => {
             const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
             setBInventoryList(data);
@@ -87,7 +68,7 @@ const ImportDocumentModal = ({
           });
       }
     }
-  }, [open, branchId, partners]);
+  }, [open, branchId]);
 
   const handleSelectProduct = (bInvId) => {
     if (!bInvId) return;
@@ -99,8 +80,7 @@ const ImportDocumentModal = ({
     const name = binv ? binv.name : (prod ? prod.name : `Sản phẩm #${bInvId}`);
     const code = binv ? binv.code : (prod ? prod.code : `SP${bInvId}`);
     const stock = binv ? binv.stockQuantity : (prod ? prod.stockQuantity || 100 : 100);
-    const price = binv ? binv.purchasePrice : (prod ? prod.purchasePrice || 0 : 0);
-    const conversions = binv ? binv.unitConversions : (prod ? prod.unitConversions : []);
+    const costPrice = binv ? binv.purchasePrice : (prod ? prod.purchasePrice || 0 : 0);
 
     const existingIndex = items.findIndex((i) => i.bInventoryId === itemId);
 
@@ -121,22 +101,17 @@ const ImportDocumentModal = ({
           name,
           stock,
           quantity: 1,
-          purchasePrice: price,
-          unitPrice: price,
-          unitConversions: conversions || []
+          costPrice,
+          disposalPrice: costPrice
         }
       ]);
     }
     setSearchVal(undefined);
   };
 
-  // Calculations
-  const totalGoodsAmount = useMemo(() => {
-    return items.reduce((sum, i) => sum + (i.quantity || 0) * (i.unitPrice || 0), 0);
+  const totalDisposalAmount = useMemo(() => {
+    return items.reduce((sum, i) => sum + (i.quantity || 0) * (i.disposalPrice || 0), 0);
   }, [items]);
-
-  const netAmount = Math.max(0, totalGoodsAmount - formData.discount);
-  const debtAmount = Math.max(0, netAmount - formData.paidAmount);
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
@@ -152,8 +127,8 @@ const ImportDocumentModal = ({
       }
     }
 
-    if (!formData.supplierId) {
-      message.error('Vui lòng chọn nhà cung cấp.');
+    if (!formData.reason || !formData.reason.trim()) {
+      message.error('Vui lòng nhập lý do xuất hủy.');
       return;
     }
 
@@ -161,29 +136,20 @@ const ImportDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: openTimeISO || new Date().toISOString(),
-        note: formData.note || '',
+        reason: formData.reason || 'Xuất hủy kiểm kê',
         details: items.map((i) => ({
           bInventoryId: Number(i.bInventoryId),
           quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice || i.purchasePrice),
           note: ''
-        })),
-        partners: [
-          {
-            partnerId: Number(formData.supplierId),
-            cost: Number(netAmount),
-            note: 'Thanh toán tiền hàng cho Nhà cung cấp'
-          }
-        ]
+        }))
       };
-      await createImportDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Nhập hàng thành công!`);
+      await createExportDeleteDocument(dto);
+      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Xuất hủy thành công!`);
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu nhập kho.';
+      const errMsg = err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu xuất hủy.';
       message.error(errMsg);
     } finally {
       setLoading(false);
@@ -245,16 +211,7 @@ const ImportDocumentModal = ({
       title: 'Tên hàng',
       dataIndex: 'name',
       key: 'name',
-      render: (val, record) => (
-        <div>
-          <span style={{ fontWeight: 600, color: '#0f172a' }}>{val}</span>
-          {record.unitConversions && record.unitConversions.length > 0 && (
-            <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-              Đơn vị quy đổi: {record.unitConversions.map((uc) => `${uc.unitName} (x${uc.conversionPoint})`).join(', ')}
-            </div>
-          )}
-        </div>
-      )
+      render: (val) => <span style={{ fontWeight: 600, color: '#0f172a' }}>{val}</span>
     },
     {
       title: 'Số lượng',
@@ -280,27 +237,27 @@ const ImportDocumentModal = ({
       )
     },
     {
-      title: 'Giá nhập',
-      dataIndex: 'purchasePrice',
-      key: 'purchasePrice',
+      title: 'Giá vốn',
+      dataIndex: 'costPrice',
+      key: 'costPrice',
       width: 130,
       align: 'right',
       render: (val) => (val != null ? val.toLocaleString('vi-VN') : '0')
     },
     {
-      title: 'Đơn giá',
-      dataIndex: 'unitPrice',
-      key: 'unitPrice',
+      title: 'Đơn giá hủy',
+      dataIndex: 'disposalPrice',
+      key: 'disposalPrice',
       width: 140,
       align: 'right',
       render: (_, record, index) => (
         <InputNumber
           min={0}
-          value={record.unitPrice ?? 0}
+          value={record.disposalPrice ?? 0}
           onChange={(v) => {
             const val = v != null && v !== '' ? Math.max(0, Number(v) || 0) : 0;
             const updated = [...items];
-            updated[index] = { ...updated[index], unitPrice: val };
+            updated[index] = { ...updated[index], disposalPrice: val };
             setItems(updated);
           }}
           formatter={(v) => (v != null && v !== '' ? `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
@@ -316,9 +273,9 @@ const ImportDocumentModal = ({
       align: 'right',
       render: (_, record) => {
         const qty = record.quantity || 0;
-        const price = record.unitPrice || 0;
+        const price = record.disposalPrice || 0;
         return (
-          <span style={{ fontWeight: 700, color: '#0f172a' }}>
+          <span style={{ fontWeight: 700, color: '#dc2626' }}>
             {(qty * price).toLocaleString('vi-VN')}
           </span>
         );
@@ -341,7 +298,6 @@ const ImportDocumentModal = ({
         fontSize: 12
       }}
     >
-      {/* HEADER BAR */}
       <div
         style={{
           height: 48,
@@ -355,13 +311,13 @@ const ImportDocumentModal = ({
       >
         <Space size="large">
           <span style={{ fontWeight: 700, fontSize: 16, color: '#38bdf8' }}>
-            Nhập hàng
+            Xuất hủy hàng hóa
           </span>
 
           <div style={{ width: 420 }}>
             <Select
               showSearch
-              placeholder="Tìm theo mã hoặc tên hàng hóa... (F1)"
+              placeholder="Tìm theo mã hoặc tên hàng hóa..."
               optionFilterProp="label"
               value={searchVal}
               onChange={handleSelectProduct}
@@ -388,9 +344,7 @@ const ImportDocumentModal = ({
         </Space>
       </div>
 
-      {/* BODY WORKSPACE */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT PRODUCT TABLE */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div
             style={{
@@ -410,12 +364,11 @@ const ImportDocumentModal = ({
               pagination={false}
               scroll={{ y: 'calc(100vh - 170px)' }}
               size="small"
-              locale={{ emptyText: 'Chưa có sản phẩm nào được chọn.' }}
+              locale={{ emptyText: 'Chưa có sản phẩm nào được chọn để xuất hủy.' }}
             />
           </div>
         </div>
 
-        {/* RIGHT CONTROL SIDEBAR */}
         <div
           style={{
             width: 340,
@@ -431,32 +384,23 @@ const ImportDocumentModal = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: 11 }}>
                 <span>Thời gian: <strong>{openTimeFormatted || 'Hôm nay'}</strong></span>
-                <Tag color="blue" style={{ borderRadius: 12, padding: '0 8px' }}>Chính thức</Tag>
+                <Tag color="red" style={{ borderRadius: 12, padding: '0 8px' }}>Xuất hủy</Tag>
               </div>
 
-              {/* NHÀ CUNG CẤP */}
               <div>
                 <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>
-                  Chọn nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
+                  Lý do xuất hủy <span style={{ color: '#ef4444' }}>*</span>
                 </div>
-                <Select
-                  value={formData.supplierId}
-                  onChange={(val) => setFormData({ ...formData, supplierId: val ? Number(val) : undefined })}
-                  placeholder="Chọn nhà cung cấp... (F4)"
-                  style={{ width: '100%', borderRadius: 6 }}
-                  allowClear
-                >
-                  {suppliersList.map((s) => (
-                    <Select.Option key={s.id} value={s.id}>
-                      {s.name} ({s.code || s.phone || `NCC#${s.id}`})
-                    </Select.Option>
-                  ))}
-                </Select>
+                <Input
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  placeholder="Lý do xuất hủy..."
+                  style={{ borderRadius: 6 }}
+                />
               </div>
 
-              {/* MÃ NHẬP HÀNG */}
               <div>
-                <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã nhập hàng</div>
+                <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Mã xuất hủy</div>
                 <Input
                   value={formData.docCode}
                   onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
@@ -465,67 +409,33 @@ const ImportDocumentModal = ({
                 />
               </div>
 
-              {/* TỔNG TIỀN & THANH TOÁN */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.length})</span>
+                  <span style={{ color: '#475569' }}>Tổng mặt hàng hủy ({items.length})</span>
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {totalGoodsAmount.toLocaleString('vi-VN')}
+                    {items.length} sản phẩm
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Giảm giá</span>
-                  <InputNumber
-                    min={0}
-                    value={formData.discount}
-                    onChange={(v) => setFormData({ ...formData, discount: v != null && v !== '' ? Number(v) || 0 : 0 })}
-                    formatter={(v) => (v != null && v !== '' ? `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
-                    parser={(v) => (v ? v.replace(/,/g, '') : '')}
-                    style={{ width: 120, textAlign: 'right', borderRadius: 6 }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng tiền cần trả</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {netAmount.toLocaleString('vi-VN')}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tiền trả NCC (F8)</span>
-                  <InputNumber
-                    min={0}
-                    value={formData.paidAmount}
-                    onChange={(v) => setFormData({ ...formData, paidAmount: v != null && v !== '' ? Number(v) || 0 : 0 })}
-                    formatter={(v) => (v != null && v !== '' ? `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
-                    parser={(v) => (v ? v.replace(/,/g, '') : '')}
-                    style={{ width: 120, textAlign: 'right', borderRadius: 6 }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tính vào công nợ</span>
-                  <span style={{ fontWeight: 700, color: debtAmount > 0 ? '#ef4444' : '#0f172a', fontSize: 13 }}>
-                    {debtAmount.toLocaleString('vi-VN')}
+                  <span style={{ color: '#475569' }}>Tổng tiền hủy</span>
+                  <span style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>
+                    {totalDisposalAmount.toLocaleString('vi-VN')}
                   </span>
                 </div>
               </div>
 
-              {/* GHI CHÚ */}
               <div>
                 <Input.TextArea
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                   rows={3}
-                  placeholder="Ghi chú"
+                  placeholder="Ghi chú xuất hủy"
                   style={{ borderRadius: 6 }}
                 />
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
               <Button
                 type="default"
@@ -551,4 +461,4 @@ const ImportDocumentModal = ({
   );
 };
 
-export default ImportDocumentModal;
+export default DisposalDocumentModal;

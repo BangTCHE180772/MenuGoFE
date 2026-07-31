@@ -43,6 +43,8 @@ import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
+import FinanceDashboardPage from '../pages/FinanceDashboardPage';
+import OrderDashboard from '../pages/OrderDashboard';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -83,36 +85,25 @@ const AppRouter = () => {
           {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
           <Route element={<PrivateRoute />}>
             <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
-            
+
             <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<HomePage />} />
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="/home" element={<HomePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route
                 path="/work-schedule"
                 element={
-                  ['Cashier', 'Chef', 'Waiter'].includes(role) ? (
-                    <MyWorkSchedulePage />
-                  ) : (
+                  ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+                  [1, 2, 3].includes(user?.roleId) ? (
                     <WorkSchedulePage />
+                  ) : (
+                    <MyWorkSchedulePage />
                   )
                 }
               />
-              <Route path="/orders" element={<OrderPage />} />
-              <Route path="/table-map" element={<TableMapPage />} />
-              <Route path="/reservations" element={<ReservationPage />} />
+              <Route path="/my-work-schedule" element={<MyWorkSchedulePage />} />
 
-              {/* Cashier, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-                <Route path="/cashier" element={<CashierPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
-              </Route>
-
-              {/* Chef, Cashier, Manager, Owner, Admin */}
-              <Route element={<RoleRoute allowedRoles={[ROLES.CHEF, ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
-                <Route path="/kds" element={<KDSPage />} />
-              </Route>
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
@@ -121,12 +112,16 @@ const AppRouter = () => {
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
+                <Route path="/vouchers" element={<VoucherPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
+                <Route path="/reservations" element={<ReservationPage />} />
+                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
+                <Route path="/orderdashboard" element={<OrderDashboard />} />
               </Route>
 
               {/* Owner, Admin */}
@@ -138,6 +133,10 @@ const AppRouter = () => {
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
+                <Route path="/orders" element={<OrderPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>
           </Route>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Tag, Space, message, Tabs, Modal, Typography, DatePicker, Radio, Calendar, Badge, Row, Col, Empty } from 'antd';
-import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, AppstoreOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, AppstoreOutlined, CalendarOutlined, EditOutlined } from '@ant-design/icons';
 import { getReservations, checkInReservation, cancelReservation } from '../api/reservationApi';
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
+import ReservationEditModal from '../components/reservation/ReservationEditModal';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -11,6 +12,8 @@ const ReservationPage = ({ isPosHub }) => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingReservation, setEditingReservation] = useState(null);
 
   const [viewMode, setViewMode] = useState('cards');
   const [selectedDate, setSelectedDate] = useState(dayjs());
@@ -140,9 +143,17 @@ const ReservationPage = ({ isPosHub }) => {
           }
           extra={
             isPending && (
-              <Button type="text" danger size="small" onClick={() => handleCancel(r.id)} title="Hủy lịch">
-                <CloseCircleOutlined />
-              </Button>
+              <Space>
+                <Button type="text" style={{ color: '#1890ff' }} size="small" onClick={() => {
+                  setEditingReservation(r);
+                  setIsEditModalVisible(true);
+                }} title="Sửa thông tin">
+                  <EditOutlined />
+                </Button>
+                <Button type="text" danger size="small" onClick={() => handleCancel(r.id)} title="Hủy lịch">
+                  <CloseCircleOutlined />
+                </Button>
+              </Space>
             )
           }
         >
@@ -257,6 +268,20 @@ const ReservationPage = ({ isPosHub }) => {
         onCancel={() => setIsModalVisible(false)}
         onSuccess={() => {
           setIsModalVisible(false);
+          fetchReservations();
+        }}
+      />
+
+      <ReservationEditModal
+        visible={isEditModalVisible}
+        reservation={editingReservation}
+        onClose={() => {
+          setIsEditModalVisible(false);
+          setEditingReservation(null);
+        }}
+        onSuccess={() => {
+          setIsEditModalVisible(false);
+          setEditingReservation(null);
           fetchReservations();
         }}
       />

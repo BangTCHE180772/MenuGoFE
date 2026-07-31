@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode, Select } from 'antd';
+import { PrinterOutlined } from '@ant-design/icons';
 import { payOrder } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
 import { checkVoucher, getAllVouchers } from '../../api/voucherApi';
@@ -10,7 +11,7 @@ const { Text, Title } = Typography;
 
 const formatPrice = (price) => Number(price).toLocaleString('vi-VN') + 'đ';
 
-const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }) => {
+const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -52,7 +53,7 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
   useEffect(() => {
     if (connection && visible && paymentMethod === 'PayOS') {
       const handleNotification = (data) => {
-        if (data && data.type === 'PaymentWebhook' || data?.Type === 'PaymentWebhook') {
+        if ((data && data.type === 'PaymentWebhook') || data?.Type === 'PaymentWebhook') {
           message.success(data.message || data.Message || 'Thanh toán thành công qua PayOS!');
           if (onSuccess) onSuccess();
         }
@@ -100,7 +101,7 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
 
   const applicableVouchers = useMemo(() => {
     const now = new Date();
-    return allVouchers.filter(v => {
+    return allVouchers.filter((v) => {
       if (!v.isActive) return false;
       if (v.usedCount >= v.quantity) return false;
       if (new Date(v.startDate) > now || new Date(v.endDate) < now) return false;
@@ -117,7 +118,7 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
       const res = await checkVoucher(voucherCode, branchId || 0, baseTotal);
       setAppliedVoucher({
         discountAmount: res.discountAmount,
-        message: res.message
+        message: res.message,
       });
       message.success(res.message);
     } catch (error) {
@@ -155,7 +156,7 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
         customerName: customerDeclined ? null : customerName,
         customerPhone: customerDeclined ? null : customerPhone,
         voucherCode: appliedVoucher ? voucherCode : null,
-        pointsUsed: pointsDiscount
+        pointsUsed: pointsDiscount,
       };
 
       if (paymentMethod === 'Cash') {
@@ -178,6 +179,73 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
       setLoading(false);
       isPayingRef.current = false;
     }
+  };
+
+  // Print Pre-Bill Action directly inside PaymentModal with exact discounts
+  const handlePrintPreBill = () => {
+    if (!groupedItems || groupedItems.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    const itemsHtml = groupedItems
+      .map(
+        (item) =>
+          `<tr>
+            <td>${item.name || 'Món ăn'}</td>
+            <td style="text-align: center;">${item.quantity}</td>
+            <td style="text-align: right;">${formatPrice(item.price)}</td>
+            <td style="text-align: right;">${formatPrice(item.totalPrice)}</td>
+          </tr>`
+      )
+      .join('');
+
+    const voucherText = voucherDiscount > 0 ? `<p>Voucher giảm: -${formatPrice(voucherDiscount)}</p>` : '';
+    const pointsText = pointsDiscount > 0 ? `<p>Dùng điểm: -${formatPrice(pointsDiscount)}</p>` : '';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>PHIẾU TẠM TÍNH - ${tableName || 'BÀN'}</title>
+          <style>
+            body { font-family: monospace; padding: 20px; width: 320px; margin: 0 auto; }
+            h2, h3 { text-align: center; margin: 4px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { padding: 4px 0; font-size: 12px; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+            .summary { font-size: 12px; text-align: right; margin-top: 6px; }
+            .total { font-weight: bold; font-size: 15px; text-align: right; margin-top: 10px; color: #000; }
+          </style>
+        </head>
+        <body>
+          <h2>NHÀ HÀNG MENUGO</h2>
+          <h3>PHIẾU TẠM TÍNH</h3>
+          <p>Mã HĐ: #${orderId} | ${tableName || 'N/A'}</p>
+          <p>Thời gian: ${new Date().toLocaleString('vi-VN')}</p>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Món</th>
+                <th style="text-align: center;">SL</th>
+                <th style="text-align: right;">Đ.Giá</th>
+                <th style="text-align: right;">T.Tiền</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <div class="divider"></div>
+          <div class="summary">
+            <p>Tạm tính: ${formatPrice(subTotal)}</p>
+            <p>VAT (8%): ${formatPrice(vat)}</p>
+            ${voucherText}
+            ${pointsText}
+          </div>
+          <div class="divider"></div>
+          <div class="total">TỔNG CỘNG THANH TOÁN: ${formatPrice(grandTotal > 0 ? grandTotal : 0)}</div>
+          <p style="text-align: center; margin-top: 20px; font-size: 11px;">Cảm ơn quý khách và hẹn gặp lại!</p>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const columns = [
@@ -211,17 +279,24 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
 
   return (
     <Modal
-      title={<Title level={4} style={{ margin: 0 }}>Xác nhận thanh toán</Title>}
+      title={
+        <Title level={4} style={{ margin: 0 }}>
+          Xác nhận thanh toán #{orderId} {tableName ? `(${tableName})` : ''}
+        </Title>
+      }
       open={visible}
       onCancel={onCancel}
       footer={[
+        <Button key="print" icon={<PrinterOutlined />} onClick={handlePrintPreBill} style={{ float: 'left' }}>
+          In Phiếu Tạm Tính
+        </Button>,
         <Button key="back" onClick={onCancel} disabled={loading}>
-          Huỷ
+          Hủy
         </Button>,
         <Button
           key="submit"
           type="primary"
-          danger
+          style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
           onClick={handlePay}
           loading={loading}
           disabled={qrCodeData && paymentMethod === 'PayOS'}
@@ -229,10 +304,10 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
           {paymentMethod === 'PayOS' ? (qrCodeData ? 'Đang chờ thanh toán...' : 'Tạo mã QR PayOS') : 'Thanh toán hoá đơn'}
         </Button>,
       ]}
-      width={500}
+      width={560}
     >
       <div style={{ marginBottom: 16 }}>
-        <Text type="secondary">Vui lòng kiểm tra kỹ danh sách món trước khi thanh toán.</Text>
+        <Text type="secondary">Vui lòng kiểm tra kỹ danh sách món và chọn giảm giá/tích điểm trước khi thanh toán.</Text>
       </div>
 
       <Table
@@ -333,7 +408,9 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
         </Row>
         {customerData && (
           <div style={{ marginTop: 8 }}>
-            <Text type="secondary">Điểm tích luỹ: <strong style={{ color: '#52c41a' }}>{customerData.point || 0} điểm</strong></Text>
+            <Text type="secondary">
+              Điểm tích luỹ: <strong style={{ color: '#52c41a' }}>{customerData.point || 0} điểm</strong>
+            </Text>
             {customerData.point > 0 && (
               <div style={{ marginTop: 4 }}>
                 <Checkbox checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)}>
@@ -348,16 +425,16 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
       <div style={{ marginBottom: 16 }}>
         <Row gutter={8}>
           <Col flex="auto">
-            <Select 
-              placeholder="Chọn mã Voucher (nếu có)" 
-              value={voucherCode || null} 
+            <Select
+              placeholder="Chọn mã Voucher (nếu có)"
+              value={voucherCode || null}
               onChange={(val) => setVoucherCode(val || '')}
               disabled={!!appliedVoucher}
               style={{ width: '100%' }}
               allowClear
               notFoundContent="Không có mã giảm giá phù hợp"
             >
-              {applicableVouchers.map(v => (
+              {applicableVouchers.map((v) => (
                 <Select.Option key={v.code} value={v.code}>
                   {v.name} ({v.code}) - {v.discountType === 'Fixed' ? formatPrice(v.discountValue) : `${v.discountValue}%`}
                 </Select.Option>
@@ -366,9 +443,20 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
           </Col>
           <Col>
             {appliedVoucher ? (
-              <Button type="dashed" danger onClick={() => { setVoucherCode(''); setAppliedVoucher(null); }}>Huỷ mã</Button>
+              <Button
+                type="dashed"
+                danger
+                onClick={() => {
+                  setVoucherCode('');
+                  setAppliedVoucher(null);
+                }}
+              >
+                Huỷ mã
+              </Button>
             ) : (
-              <Button type="primary" onClick={handleCheckVoucher} loading={loading} disabled={!voucherCode}>Áp dụng</Button>
+              <Button type="primary" onClick={handleCheckVoucher} loading={loading} disabled={!voucherCode}>
+                Áp dụng
+              </Button>
             )}
           </Col>
         </Row>
@@ -396,8 +484,12 @@ const PaymentModal = ({ visible, orderId, items, branchId, onCancel, onSuccess }
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginTop: 8 }}>
-          <Text strong style={{ fontSize: 16 }}>Tổng cộng:</Text>
-          <Text strong style={{ fontSize: 18, color: '#f5222d' }}>{formatPrice(grandTotal > 0 ? grandTotal : 0)}</Text>
+          <Text strong style={{ fontSize: 16 }}>
+            Tổng cộng:
+          </Text>
+          <Text strong style={{ fontSize: 18, color: '#f5222d' }}>
+            {formatPrice(grandTotal > 0 ? grandTotal : 0)}
+          </Text>
         </div>
       </div>
     </Modal>
