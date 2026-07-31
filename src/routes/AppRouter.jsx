@@ -134,6 +134,7 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
+                <Route path="/reservations" element={<ReservationPage />} />
                 <Route path="/financedashboard" element={<FinanceDashboardPage />} />
                 <Route path="/orderdashboard" element={<OrderDashboard />} />
               </Route>
@@ -148,9 +149,8 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
                 <Route path="/orders" element={<OrderPage />} />
-                <Route path="/table-map" element={<TableMapPage />} />
-                <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/cashier" element={<CashierPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/cashier" element={<CashierPage />} />
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>

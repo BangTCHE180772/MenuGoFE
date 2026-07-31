@@ -97,7 +97,8 @@ const CashierPage = () => {
           o.status === 'Pending' ||
           o.status === 'Unpaid' ||
           o.status === 'CustomerPending') &&
-        (o.totalAmount > 0 || o.finalAmount > 0)
+        (o.totalAmount > 0 || o.finalAmount > 0) &&
+        !o.fatherId
     );
   }, [orders]);
 
@@ -108,7 +109,8 @@ const CashierPage = () => {
       (o) =>
         (o.status === 'Paid' || o.status === 'Completed') &&
         o.createdAt &&
-        new Date(o.createdAt).toDateString() === today
+        new Date(o.createdAt).toDateString() === today &&
+        !o.fatherId
     );
   }, [orders]);
 
