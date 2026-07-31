@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Modal, Select, message } from 'antd';
-import { mergeOrder } from '../../api/orderApi';
+import { mergeOrder, createOrder } from '../../api/orderApi';
 import { getTableOrderSummary } from '../../api/tableMapApi';
 
 const MergeTableModal = ({ visible, onClose, tables, currentTable, onMerged }) => {
@@ -22,13 +22,22 @@ const MergeTableModal = ({ visible, onClose, tables, currentTable, onMerged }) =
     setLoading(true);
     try {
       const fatherSummary = await getTableOrderSummary(currentTable.id);
-      const fatherOrderId = fatherSummary.data?.activeOrderId;
+      let fatherOrderId = fatherSummary.data?.activeOrderId;
       
       const childSummary = await getTableOrderSummary(selectedTableId);
-      const childOrderId = childSummary.data?.activeOrderId;
+      let childOrderId = childSummary.data?.activeOrderId;
+
+      if (!fatherOrderId) {
+        const res = await createOrder({ tableId: currentTable.id, status: 'Active', totalAmount: 0 });
+        fatherOrderId = res.data.id;
+      }
+      if (!childOrderId) {
+        const res = await createOrder({ tableId: selectedTableId, status: 'Active', totalAmount: 0 });
+        childOrderId = res.data.id;
+      }
 
       if (!fatherOrderId || !childOrderId) {
-        message.error("Không tìm thấy đơn hàng của một trong hai bàn");
+        message.error("Không thể tạo đơn hàng để gộp bàn");
         setLoading(false);
         return;
       }
