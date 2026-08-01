@@ -14,7 +14,8 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { message, Modal } from 'antd';
+import { message, Modal, Button } from 'antd';
+import { FireOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -27,6 +28,7 @@ import MenuPanel from '../components/order/MenuPanel';
 import OrderPanel from '../components/order/OrderPanel';
 import PaymentModal from '../components/payment/PaymentModal';
 import MergeTableModal from '../components/tablemap/MergeTableModal';
+import RequestRestockModal from '../components/order/RequestRestockModal';
 
 const OrderPage = ({ isWaiterMode }) => {
   const [tables, setTables] = useState([]);
@@ -36,6 +38,7 @@ const OrderPage = ({ isWaiterMode }) => {
   const [orderLoading, setOrderLoading] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+  const [isRestockModalVisible, setIsRestockModalVisible] = useState(false);
 
   const [searchParams] = useSearchParams();
   const tableIdParam = searchParams.get('tableId');
@@ -279,6 +282,14 @@ const OrderPage = ({ isWaiterMode }) => {
           <span className="pos-top-bar-title">MenuGo POS</span>
           <span className="pos-top-bar-divider">|</span>
           <span className="pos-top-bar-sub">Phục vụ</span>
+          <Button 
+            type="primary"
+            icon={<FireOutlined />}
+            style={{ marginLeft: 16, backgroundColor: '#f5222d', borderColor: '#f5222d', fontWeight: 'bold' }}
+            onClick={() => setIsRestockModalVisible(true)}
+          >
+            Yêu cầu Bếp
+          </Button>
         </div>
         <div className="pos-top-bar-right">
           <span className="pos-top-bar-time" suppressHydrationWarning>
@@ -353,6 +364,12 @@ const OrderPage = ({ isWaiterMode }) => {
           }}
         />
       )}
+
+      <RequestRestockModal
+        visible={isRestockModalVisible}
+        onClose={() => setIsRestockModalVisible(false)}
+        branchId={deviceInfo?.branchId || user?.branchIds?.[0]}
+      />
     </div>
   );
 };
