@@ -17,12 +17,23 @@ const AdjustmentTab = ({
 
   const adjustmentDocs = useMemo(() => {
     return documents.filter((doc) => {
-      if (doc.type !== 11 && doc.type !== 5) return false;
-      if (statusFilter !== 'ALL' && doc.status !== statusFilter) return false;
+      // DocumentType 11 = CostAdjustment
+      const typeStr = String(doc.type ?? '').toLowerCase();
+      if (doc.type !== 11 && typeStr !== 'costadjustment') return false;
+
+      if (statusFilter !== 'ALL') {
+        const normFilter = String(statusFilter).toUpperCase();
+        const docSt = String(doc.status ?? '').toUpperCase();
+
+        if (normFilter === 'PENDING' && !(docSt === '0' || docSt === 'PENDING')) return false;
+        if (normFilter === 'COMPLETED' && !(docSt === '1' || docSt === 'COMPLETED')) return false;
+        if (normFilter === 'CANCELLED' && !(docSt === '2' || docSt === 'CANCELLED' || docSt === 'CANCELED')) return false;
+      }
+
       if (searchText) {
         const lower = searchText.toLowerCase().trim();
         const matchCode = doc.code?.toLowerCase().includes(lower);
-        const matchCreator = doc.creator?.toLowerCase().includes(lower);
+        const matchCreator = (doc.creator || doc.creatorName || doc.snapshotCreatedByName)?.toLowerCase().includes(lower);
         const matchNote = doc.note?.toLowerCase().includes(lower);
         if (!matchCode && !matchCreator && !matchNote) return false;
       }

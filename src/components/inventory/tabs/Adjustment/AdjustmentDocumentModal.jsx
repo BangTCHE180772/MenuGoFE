@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CloseOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useMemo } from 'react';
+import { CloseOutlined, SearchOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons';
 import {
   createCostAdjustmentPending,
   createCostAdjustmentCompleted,
@@ -8,6 +8,7 @@ import {
   deleteCostAdjustmentPendingDocument,
   getCostAdjustmentById
 } from '../../../../api/documentApi';
+import { getBInventories } from '../../../../api/binventoryApi';
 
 const showToast = (text, type = 'success') => {
   const toast = document.createElement('div');
@@ -26,7 +27,7 @@ const showToast = (text, type = 'success') => {
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
   `;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2200);
+  setTimeout(() => toast.remove(), 2500);
 };
 
 const AdjustmentDocumentModal = ({
@@ -37,11 +38,27 @@ const AdjustmentDocumentModal = ({
   products = [],
   editDocumentId = null
 }) => {
+  // 1. ALL USESTATE HOOKS
   const [loading, setLoading] = useState(false);
   const [docCode, setDocCode] = useState('');
   const [note, setNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
+  const [branchInventories, setBranchInventories] = useState([]);
+
+  // 2. ALL USEEFFECT HOOKS
+  useEffect(() => {
+    if (open && branchId) {
+      getBInventories(branchId)
+        .then((res) => {
+          const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+          setBranchInventories(list);
+        })
+        .catch((err) => {
+          console.error('Lỗi khi tải kho hàng chi nhánh:', err);
+        });
+    }
+  }, [open, branchId]);
 
   useEffect(() => {
     if (open) {
@@ -52,14 +69,26 @@ const AdjustmentDocumentModal = ({
             if (res) {
               setDocCode(res.code || '');
               setNote(res.note || '');
-              const mapDetails = (res.details || []).map((d) => ({
-                id: d.bInventoryId,
-                code: d.code || d.productCode || `SP${d.bInventoryId}`,
-                name: d.productName || d.bInventoryName || 'Sản phẩm',
-                currentCost: d.unitPrice || 0,
-                newAvgCost: d.newAvgCost || d.unitPrice || 0,
-                reason: d.note || ''
-              }));
+              const mapDetails = (res.details || []).map((d) => {
+                const stock = Number(d.currentStockQuantity ?? d.bInventory?.quantity ?? 0);
+                const newAvgCost = Number(d.newAvgCost ?? d.snapshotAvgCost ?? d.unitPrice ?? 0);
+                let currentCost = Number(d.bInventory?.avg || 0);
+
+                if (d.adjustedCostDelta != null && stock > 0) {
+                  currentCost = newAvgCost - (Number(d.adjustedCostDelta) / stock);
+                }
+
+                return {
+                  id: d.bInventoryId,
+                  code: d.productCode || d.snapshotProductCode || d.currentProductCode || `SP${d.bInventoryId}`,
+                  name: d.productName || d.snapshotProductName || d.currentProductName || 'Sản phẩm',
+                  unitName: d.unitName || d.snapshotUnitName || d.currentUnitName || 'Đơn vị',
+                  stock,
+                  currentCost: Math.max(0, currentCost),
+                  newAvgCost,
+                  reason: d.note || ''
+                };
+              });
               setItems(mapDetails);
             }
           })
@@ -69,26 +98,107 @@ const AdjustmentDocumentModal = ({
           })
           .finally(() => setLoading(false));
       } else {
-        setDocCode(`PDC${Date.now().toString().slice(-6)}`);
+        setDocCode('');
         setNote('');
         setSearchQuery('');
         setItems([]);
       }
+    } else {
+      // Dọn dẹp sạch sẽ toàn bộ dữ liệu tạm khi đóng modal
+      setDocCode('');
+      setNote('');
+      setSearchQuery('');
+      setItems([]);
+      setBranchInventories([]);
+      setLoading(false);
     }
   }, [open, editDocumentId]);
 
-  if (!open) return null;
+  // 3. ALL USEMEMO HOOKS
+  const availableProductSuggestions = useMemo(() => {
+    const list = [];
+    const seen = new Set();
 
+    branchInventories.forEach((inv) => {
+      if (!inv) return;
+      const bInvId = inv.id || inv.bInventoryId;
+      if (!bInvId || seen.has(bInvId)) return;
+      seen.add(bInvId);
+
+      const pType = inv.product?.type ?? inv.productType;
+      if (pType === 1 || String(pType).toLowerCase() === 'processed') return; // Skip Processed
+
+      list.push({
+        bInventoryId: bInvId,
+        code: inv.product?.skuCode || inv.productCode || inv.code || `SP${bInvId}`,
+        name: inv.product?.name || inv.productName || inv.name || 'Sản phẩm',
+        unitName: inv.product?.unitConversions?.find(uc => !uc.baseId)?.unit?.name || inv.unitName || 'Đơn vị',
+        stock: Number(inv.quantity ?? 0),
+        avgCost: Number(inv.avg ?? 0)
+      });
+    });
+
+    // Fallback search from props if branchInventories is empty
+    if (list.length === 0 && products.length > 0) {
+      products.forEach((p) => {
+        if (!p) return;
+        const bInvId = p.bInventoryId || p.id;
+        if (!bInvId || seen.has(bInvId)) return;
+        seen.add(bInvId);
+
+        const rawType = p.type ?? p.productType ?? p.product?.type;
+        if (rawType === 1 || String(rawType).toLowerCase() === 'processed') return;
+
+        list.push({
+          bInventoryId: bInvId,
+          code: p.code || p.skuCode || `SP${bInvId}`,
+          name: p.name || p.title || 'Sản phẩm',
+          unitName: p.unitName || p.unit?.name || 'Đơn vị',
+          stock: Number(p.stock ?? p.quantity ?? 0),
+          avgCost: Number(p.costPrice ?? p.avgCost ?? p.avg ?? 0)
+        });
+      });
+    }
+
+    return list;
+  }, [branchInventories, products]);
+
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return availableProductSuggestions.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+    );
+  }, [availableProductSuggestions, searchQuery]);
+
+  const totalAdjustmentDelta = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const delta = (item.newAvgCost - item.currentCost) * item.stock;
+      return sum + delta;
+    }, 0);
+  }, [items]);
+
+  // 4. HELPER HANDLERS
   const handleAddItem = (prod) => {
-    if (items.some((i) => i.id === prod.id)) return;
+    if (items.some((i) => i.id === prod.bInventoryId)) {
+      showToast(`Sản phẩm '${prod.name}' đã có trong phiếu điều chỉnh.`, 'error');
+      return;
+    }
+
+    if (prod.stock <= 0) {
+      showToast(`Sản phẩm '${prod.name}' có tồn kho bằng 0. Không thể điều chỉnh giá vốn cho sản phẩm không có tồn kho.`, 'error');
+    }
+
     setItems((prev) => [
       ...prev,
       {
-        id: prod.id,
-        code: prod.code || `SP${prod.id}`,
-        name: prod.name || prod.title,
-        currentCost: prod.costPrice || prod.avgCost || 0,
-        newAvgCost: prod.costPrice || prod.avgCost || 0,
+        id: prod.bInventoryId,
+        code: prod.code,
+        name: prod.name,
+        unitName: prod.unitName,
+        stock: prod.stock,
+        currentCost: prod.avgCost,
+        newAvgCost: prod.avgCost,
         reason: 'Điều chỉnh giá vốn'
       }
     ]);
@@ -99,14 +209,30 @@ const AdjustmentDocumentModal = ({
   };
 
   const handleCostChange = (id, newCost) => {
+    const parsed = parseFloat(newCost);
+    const val = isNaN(parsed) ? 0 : Math.max(0, parsed);
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, newAvgCost: Math.max(0, Number(newCost) || 0) } : item))
+      prev.map((item) => (item.id === id ? { ...item, newAvgCost: val } : item))
     );
   };
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
-      showToast('Vui lòng chọn ít nhất 1 sản phẩm để điều chỉnh giá vốn.', 'error');
+      showToast('Vui lòng chọn ít nhất 1 mặt hàng để điều chỉnh giá vốn.', 'error');
+      return;
+    }
+
+    // Validate stock > 0
+    const zeroStockItem = items.find((i) => Number(i.stock) <= 0);
+    if (zeroStockItem) {
+      showToast(`Mặt hàng '${zeroStockItem.name}' có tồn kho = ${zeroStockItem.stock}. Hệ thống chỉ cho phép điều chỉnh giá vốn khi tồn kho > 0.`, 'error');
+      return;
+    }
+
+    // Validate newAvgCost >= 0
+    const negativeCostItem = items.find((i) => Number(i.newAvgCost) < 0);
+    if (negativeCostItem) {
+      showToast(`Giá vốn mới của sản phẩm '${negativeCostItem.name}' không được nhỏ hơn 0.`, 'error');
       return;
     }
 
@@ -114,6 +240,7 @@ const AdjustmentDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
+        code: docCode.trim() || undefined,
         orderDate: new Date().toISOString(),
         note: note || '',
         details: items.map((item) => ({
@@ -170,19 +297,8 @@ const AdjustmentDocumentModal = ({
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    if (!p) return false;
-    const rawType = p.type ?? p.productType ?? p.product?.type;
-    const typeStr = String(rawType ?? '').toLowerCase();
-    if (typeStr === 'processed' || rawType === 1) return false;
-
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      p.name?.toLowerCase().includes(q) ||
-      p.code?.toLowerCase().includes(q)
-    );
-  });
+  // 5. CONDITIONAL EARLY RETURN MUST BE AFTER ALL HOOKS
+  if (!open) return null;
 
   return (
     <div
@@ -204,14 +320,14 @@ const AdjustmentDocumentModal = ({
       <div
         style={{
           width: '100%',
-          maxWidth: 780,
+          maxWidth: 900,
           background: '#ffffff',
           borderRadius: 10,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '90vh'
+          maxHeight: '92vh'
         }}
       >
         {/* MODAL HEADER */}
@@ -225,7 +341,14 @@ const AdjustmentDocumentModal = ({
             background: '#ffffff'
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Tạo phiếu điều chỉnh giá vốn</div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+              {editDocumentId ? `Cập nhật phiếu điều chỉnh giá vốn: ${docCode}` : 'Tạo phiếu điều chỉnh giá vốn mới'}
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+              Nhập giá vốn trung bình mới cho từng mặt hàng để hệ thống tính chênh lệch tổng giá trị tài sản kho.
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -236,10 +359,10 @@ const AdjustmentDocumentModal = ({
         </div>
 
         {/* MODAL BODY */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <form onSubmit={(e) => { e.preventDefault(); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
             {/* FORM META FIELDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 14, marginBottom: 16 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
                   Mã phiếu điều chỉnh
@@ -248,7 +371,7 @@ const AdjustmentDocumentModal = ({
                   type="text"
                   value={docCode}
                   onChange={(e) => setDocCode(e.target.value)}
-                  placeholder="Mã tự động"
+                  placeholder="Mã tự động (DC...)"
                   style={{
                     width: '100%',
                     height: 34,
@@ -256,20 +379,22 @@ const AdjustmentDocumentModal = ({
                     fontSize: 12,
                     borderRadius: 6,
                     border: '1px solid #cbd5e1',
-                    outline: 'none'
+                    outline: 'none',
+                    background: '#f8fafc',
+                    fontWeight: 600
                   }}
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
-                  Ghi chú
+                  Ghi chú chứng từ
                 </label>
                 <input
                   type="text"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Nhập ghi chú điều chỉnh..."
+                  placeholder="Nhập lý do điều chỉnh giá vốn..."
                   style={{
                     width: '100%',
                     height: 34,
@@ -286,7 +411,7 @@ const AdjustmentDocumentModal = ({
             {/* PRODUCT SEARCH & SELECTION */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
-                Chọn mặt hàng / nguyên liệu cần điều chỉnh
+                Chọn mặt hàng cần điều chỉnh giá vốn
               </label>
               <div style={{ position: 'relative' }}>
                 <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
@@ -294,7 +419,7 @@ const AdjustmentDocumentModal = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm kiếm sản phẩm để thêm vào phiếu..."
+                  placeholder="Nhập tên hoặc mã sản phẩm để tìm kiếm..."
                   style={{
                     width: '100%',
                     height: 34,
@@ -309,69 +434,110 @@ const AdjustmentDocumentModal = ({
               </div>
 
               {/* SEARCH DROPDOWN SUGGESTIONS */}
-              {searchQuery && filteredProducts.length > 0 && (
+              {searchQuery && (
                 <div
                   style={{
                     border: '1px solid #cbd5e1',
                     borderRadius: 6,
                     background: '#ffffff',
-                    maxHeight: 140,
+                    maxHeight: 160,
                     overflowY: 'auto',
                     marginTop: 4,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                    zIndex: 10
                   }}
                 >
-                  {filteredProducts.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => {
-                        handleAddItem(p);
-                        setSearchQuery('');
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justify: 'space-between',
-                        borderBottom: '1px solid #f1f5f9'
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{p.name} ({p.code})</span>
-                      <span style={{ color: '#2563eb' }}>Tồn: {p.stock || 0}</span>
+                  {filteredProducts.length === 0 ? (
+                    <div style={{ padding: '10px 14px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+                      Không tìm thấy sản phẩm phù hợp
                     </div>
-                  ))}
+                  ) : (
+                    filteredProducts.map((p) => {
+                      const isZeroStock = p.stock <= 0;
+                      return (
+                        <div
+                          key={p.bInventoryId}
+                          onClick={() => {
+                            handleAddItem(p);
+                            setSearchQuery('');
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderBottom: '1px solid #f1f5f9',
+                            background: isZeroStock ? '#fef2f2' : '#ffffff'
+                          }}
+                        >
+                          <div>
+                            <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
+                            <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b' }}>({p.code})</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11 }}>
+                            <span style={{ color: isZeroStock ? '#ef4444' : '#2563eb', fontWeight: 600 }}>
+                              Tồn: {p.stock} {p.unitName} {isZeroStock && '(Cấm điều chỉnh)'}
+                            </span>
+                            <span style={{ color: '#475569' }}>
+                              Giá hiện tại: <strong>{Math.round(p.avgCost).toLocaleString('vi-VN')} đ</strong>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
 
             {/* ADJUSTMENT ITEMS TABLE */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textAlign: 'left', textTransform: 'uppercase', fontSize: 10 }}>
+                    <th style={{ padding: '8px 10px' }}>Mã SP</th>
                     <th style={{ padding: '8px 10px' }}>Tên mặt hàng</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn hiện tại (đ)</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Giá vốn mới (đ)</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch (đ)</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}></th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>ĐVT</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn hiện tại</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá hiện tại (đ)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 140 }}>Giá mới (đ)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch đ/vị</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tổng thay đổi (đ)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 36 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: 16, color: '#94a3b8', fontSize: 11.5 }}>
-                        Chưa chọn mặt hàng nào để điều chỉnh giá vốn
+                      <td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 12 }}>
+                        Vui lòng tìm kiếm và chọn ít nhất 1 sản phẩm phía trên để điều chỉnh giá vốn
                       </td>
                     </tr>
                   ) : (
                     items.map((item) => {
-                      const diff = Number(item.newAvgCost) - Number(item.currentCost);
+                      const isZeroStock = Number(item.stock) <= 0;
+                      const unitDelta = Number(item.newAvgCost) - Number(item.currentCost);
+                      const totalDelta = unitDelta * Number(item.stock);
+
                       return (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1e293b' }}>{item.name}</td>
+                        <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: isZeroStock ? '#fff5f5' : 'transparent' }}>
+                          <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{item.code}</td>
+                          <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1e293b' }}>
+                            {item.name}
+                            {isZeroStock && (
+                              <div style={{ color: '#ef4444', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                                <WarningOutlined /> Tồn kho = 0 (Bị cấm chốt)
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{item.unitName}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: isZeroStock ? '#ef4444' : '#334155' }}>
+                            {Number(item.stock).toLocaleString('vi-VN')}
+                          </td>
                           <td style={{ padding: '8px 10px', textAlign: 'right', color: '#64748b' }}>
-                            {Number(item.currentCost || 0).toLocaleString('vi-VN')}
+                            {Math.round(item.currentCost).toLocaleString('vi-VN')} đ
                           </td>
                           <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                             <input
@@ -380,25 +546,31 @@ const AdjustmentDocumentModal = ({
                               value={item.newAvgCost}
                               onChange={(e) => handleCostChange(item.id, e.target.value)}
                               style={{
-                                width: 110,
+                                width: 120,
                                 height: 28,
-                                padding: '0 6px',
+                                padding: '0 8px',
                                 fontSize: 12,
+                                fontWeight: 700,
                                 textAlign: 'right',
                                 borderRadius: 4,
                                 border: '1px solid #cbd5e1',
-                                outline: 'none'
+                                outline: 'none',
+                                background: '#ffffff',
+                                color: '#0f172a'
                               }}
                             />
                           </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: diff < 0 ? '#ef4444' : (diff > 0 ? '#10b981' : '#64748b') }}>
-                            {diff > 0 ? `+${diff.toLocaleString('vi-VN')}` : diff.toLocaleString('vi-VN')}
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: unitDelta > 0 ? '#059669' : (unitDelta < 0 ? '#dc2626' : '#64748b') }}>
+                            {unitDelta > 0 ? `+${Math.round(unitDelta).toLocaleString('vi-VN')}` : Math.round(unitDelta).toLocaleString('vi-VN')} đ
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalDelta > 0 ? '#059669' : (totalDelta < 0 ? '#dc2626' : '#64748b') }}>
+                            {totalDelta > 0 ? `+${Math.round(totalDelta).toLocaleString('vi-VN')}` : Math.round(totalDelta).toLocaleString('vi-VN')} đ
                           </td>
                           <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(item.id)}
-                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}
+                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}
                             >
                               <DeleteOutlined />
                             </button>
@@ -410,6 +582,34 @@ const AdjustmentDocumentModal = ({
                 </tbody>
               </table>
             </div>
+
+            {/* SUMMARY STATS BAR */}
+            {items.length > 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '10px 14px',
+                  borderRadius: 6,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justify: 'space-between',
+                  alignItems: 'center',
+                  fontSize: 12
+                }}
+              >
+                <div style={{ color: '#475569', fontWeight: 600 }}>
+                  Tổng số mặt hàng: <strong style={{ color: '#0f172a' }}>{items.length}</strong>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Tổng giá trị thay đổi tài sản kho:</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: totalAdjustmentDelta > 0 ? '#059669' : (totalAdjustmentDelta < 0 ? '#dc2626' : '#64748b') }}>
+                    {totalAdjustmentDelta > 0 ? `+${Math.round(totalAdjustmentDelta).toLocaleString('vi-VN')}` : Math.round(totalAdjustmentDelta).toLocaleString('vi-VN')} VNĐ
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* MODAL FOOTER */}
@@ -418,7 +618,7 @@ const AdjustmentDocumentModal = ({
               padding: '12px 20px',
               borderTop: '1px solid #e2e8f0',
               display: 'flex',
-              justify: 'flex-end',
+              justifyContent: 'flex-end',
               gap: 8,
               background: '#f8fafc'
             }}
@@ -467,7 +667,7 @@ const AdjustmentDocumentModal = ({
               onClick={() => handleSubmit(false)}
               style={{
                 height: 32,
-                padding: '0 16px',
+                padding: '0 18px',
                 fontSize: 12,
                 fontWeight: 700,
                 borderRadius: 6,

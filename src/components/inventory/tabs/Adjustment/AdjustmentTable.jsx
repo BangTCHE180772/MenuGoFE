@@ -330,19 +330,32 @@ const AdjustmentTable = ({
                                       {getStatusBadge(activeDoc.status ?? doc.status)}
                                     </div>
                                     <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
-                                      Người tạo: <strong style={{ color: '#334155' }}>{activeDoc.creator || activeDoc.creatorName || doc.creator || 'Quản lý'}</strong> &nbsp;|&nbsp; Thời gian: <strong style={{ color: '#334155' }}>{dayjs(activeDoc.createdDate || activeDoc.businessDate || doc.createdDate || doc.businessDate).format('DD/MM/YYYY HH:mm')}</strong>
+                                      Người tạo: <strong style={{ color: '#334155' }}>{activeDoc.creatorName || activeDoc.snapshotCreatedByName || activeDoc.creator || 'Quản lý'}</strong>
+                                      &nbsp;|&nbsp; Ngày lập: <strong style={{ color: '#334155' }}>{dayjs(activeDoc.orderDate || activeDoc.createdDate || activeDoc.createdAt || doc.createdDate).format('DD/MM/YYYY HH:mm')}</strong>
+                                      {activeDoc.snapshotPostedByName && (
+                                        <> &nbsp;|&nbsp; Người chốt: <strong style={{ color: '#059669' }}>{activeDoc.snapshotPostedByName}</strong> ({dayjs(activeDoc.postedAt).format('DD/MM/YYYY HH:mm')})</>
+                                      )}
+                                      {activeDoc.snapshotDeletedByName && (
+                                        <> &nbsp;|&nbsp; Người hủy: <strong style={{ color: '#dc2626' }}>{activeDoc.snapshotDeletedByName}</strong> ({dayjs(activeDoc.deletedAt).format('DD/MM/YYYY HH:mm')})</>
+                                      )}
                                     </div>
                                   </div>
 
                                   <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <EnvironmentOutlined style={{ color: '#e8442a' }} />
-                                    <span>{activeDoc.branchName || doc.branchName || 'Chi nhánh trung tâm'}</span>
+                                    <span>{activeDoc.branchName || activeDoc.snapshotBranchName || doc.branchName || 'Chi nhánh trung tâm'}</span>
                                   </div>
                                 </div>
 
                                 {activeDoc.note && (
-                                  <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', fontSize: 11 }}>
+                                  <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 6, background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', fontSize: 11 }}>
                                     <strong>Ghi chú:</strong> {activeDoc.note}
+                                  </div>
+                                )}
+
+                                {activeDoc.deleteNote && (
+                                  <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 6, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: 11 }}>
+                                    <strong>Lý do hủy phiếu:</strong> {activeDoc.deleteNote}
                                   </div>
                                 )}
 
@@ -350,44 +363,89 @@ const AdjustmentTable = ({
                                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
                                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                                     <thead>
-                                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
-                                        <th style={{ padding: '8px 10px' }}>Mã sản phẩm</th>
+                                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textAlign: 'left', textTransform: 'uppercase', fontSize: 10 }}>
+                                        <th style={{ padding: '8px 10px' }}>Mã SP</th>
                                         <th style={{ padding: '8px 10px' }}>Tên sản phẩm</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Đơn vị tính</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>ĐVT</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn hiện tại</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn cũ (đ)</th>
                                         <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn mới (đ)</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch (đ)</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch đ/vị</th>
+                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tổng giá trị thay đổi (đ)</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {detailsList.length === 0 ? (
                                         <tr>
-                                          <td colSpan={6} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
+                                          <td colSpan={8} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
                                             Chưa có thông tin sản phẩm chi tiết
                                           </td>
                                         </tr>
                                       ) : (
-                                        detailsList.map((dt, idx) => {
-                                          const pCode = dt.snapshotProductCode || dt.currentProductCode || dt.code || `SP${idx + 1}`;
-                                          const pName = dt.snapshotProductName || dt.currentProductName || dt.productName || dt.name || 'Sản phẩm';
-                                          const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
-                                          const oldPrice = Number(dt.oldCost || dt.unitPrice || 0);
-                                          const newPrice = Number(dt.newCost || dt.adjustedPrice || 0);
-                                          const diffPrice = newPrice - oldPrice;
+                                        (() => {
+                                          let grandTotalDelta = 0;
+                                          const rows = detailsList.map((dt, idx) => {
+                                            const pCode = dt.productCode || dt.snapshotProductCode || dt.currentProductCode || dt.code || `SP${idx + 1}`;
+                                            const pName = dt.productName || dt.snapshotProductName || dt.currentProductName || dt.name || 'Sản phẩm';
+                                            const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
+                                            
+                                            const stockQty = Number(dt.currentStockQuantity ?? dt.bInventory?.quantity ?? dt.systemQuantity ?? 0);
+                                            const newPrice = Number(dt.newAvgCost ?? dt.snapshotAvgCost ?? dt.unitPrice ?? 0);
+                                            
+                                            let totalDelta = 0;
+                                            let oldPrice = 0;
+                                            let unitDelta = 0;
+
+                                            if (dt.adjustedCostDelta != null && dt.adjustedCostDelta !== undefined) {
+                                              totalDelta = Number(dt.adjustedCostDelta);
+                                              unitDelta = stockQty > 0 ? (totalDelta / stockQty) : 0;
+                                              oldPrice = newPrice - unitDelta;
+                                            } else {
+                                              oldPrice = Number(dt.oldCost || dt.bInventory?.avg || 0);
+                                              unitDelta = newPrice - oldPrice;
+                                              totalDelta = unitDelta * stockQty;
+                                            }
+
+                                            grandTotalDelta += totalDelta;
+
+                                            return (
+                                              <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
+                                                <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>{uName}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: stockQty <= 0 ? '#ef4444' : '#334155' }}>
+                                                  {stockQty.toLocaleString('vi-VN')}
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', color: '#64748b' }}>
+                                                  {Math.round(oldPrice).toLocaleString('vi-VN')} đ
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                                                  {Math.round(newPrice).toLocaleString('vi-VN')} đ
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: unitDelta > 0 ? '#059669' : (unitDelta < 0 ? '#dc2626' : '#64748b') }}>
+                                                  {unitDelta > 0 ? `+${Math.round(unitDelta).toLocaleString('vi-VN')}` : Math.round(unitDelta).toLocaleString('vi-VN')} đ
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalDelta > 0 ? '#059669' : (totalDelta < 0 ? '#dc2626' : '#64748b') }}>
+                                                  {totalDelta > 0 ? `+${Math.round(totalDelta).toLocaleString('vi-VN')}` : Math.round(totalDelta).toLocaleString('vi-VN')} đ
+                                                </td>
+                                              </tr>
+                                            );
+                                          });
 
                                           return (
-                                            <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                              <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
-                                              <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>{uName}</td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right', color: '#64748b' }}>{Math.round(oldPrice).toLocaleString('vi-VN')} đ</td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{Math.round(newPrice).toLocaleString('vi-VN')} đ</td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: diffPrice > 0 ? '#059669' : (diffPrice < 0 ? '#dc2626' : '#64748b') }}>
-                                                {diffPrice > 0 ? `+${Math.round(diffPrice).toLocaleString('vi-VN')}` : Math.round(diffPrice).toLocaleString('vi-VN')} đ
-                                              </td>
-                                            </tr>
+                                            <>
+                                              {rows}
+                                              <tr style={{ background: '#f8fafc', fontWeight: 700, borderTop: '2px solid #e2e8f0' }}>
+                                                <td colSpan={7} style={{ padding: '8px 10px', textAlign: 'right', color: '#334155' }}>
+                                                  TỔNG GIÁ TRỊ THAY ĐỔI TỒN KHO:
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 12, fontWeight: 800, color: grandTotalDelta > 0 ? '#059669' : (grandTotalDelta < 0 ? '#dc2626' : '#64748b') }}>
+                                                  {grandTotalDelta > 0 ? `+${Math.round(grandTotalDelta).toLocaleString('vi-VN')}` : Math.round(grandTotalDelta).toLocaleString('vi-VN')} đ
+                                                </td>
+                                              </tr>
+                                            </>
                                           );
-                                        })
+                                        })()
                                       )}
                                     </tbody>
                                   </table>

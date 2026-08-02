@@ -70,7 +70,7 @@ export const deleteImportDocument = async (id) => {
 
 export const getImportReturnDetails = async (id) => {
   if (!id || id <= 0) return null;
-  const response = await axiosInstance.get(`/api/Document/import/${id}/return-details`);
+  const response = await axiosInstance.get(`/api/ImportDocument/${id}/return-details`);
   return response.data;
 };
 
@@ -212,12 +212,12 @@ export const getReturnDocuments = async (branchId) => {
 
 export const getReturnDocumentById = async (id) => {
   if (!id || id <= 0) return null;
-  const response = await axiosInstance.get(`/api/Document/return/${id}`);
+  const response = await axiosInstance.get(`/api/ReturnDocument/${id}`);
   return response.data;
 };
 
 export const createReturnDocument = async (dto) => {
-  const response = await axiosInstance.post('/api/Document/return', dto);
+  const response = await axiosInstance.post('/api/ReturnDocument/completed', dto);
   return response.data;
 };
 
