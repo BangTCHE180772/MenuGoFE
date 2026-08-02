@@ -60,6 +60,40 @@ img {
   max-width: 100%;
 }
 
+/* ─── Global Scrollbars ──────────────────────────────────────────────────── */
+/* Ẩn thanh cuộn dọc (vertical scrollbar) cho toàn bộ ứng dụng */
+html::-webkit-scrollbar:vertical,
+body::-webkit-scrollbar:vertical,
+*::-webkit-scrollbar:vertical {
+  width: 0 !important;
+  display: none !important;
+}
+
+/* Giữ hiển thị thanh cuộn ngang (horizontal scrollbar) */
+html::-webkit-scrollbar:horizontal,
+body::-webkit-scrollbar:horizontal,
+*::-webkit-scrollbar:horizontal {
+  height: 6px !important;
+  display: block !important;
+}
+
+::-webkit-scrollbar-thumb:horizontal,
+*::-webkit-scrollbar-thumb:horizontal {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 4px !important;
+}
+
+::-webkit-scrollbar-thumb:horizontal:hover,
+*::-webkit-scrollbar-thumb:horizontal:hover {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+::-webkit-scrollbar-track:horizontal,
+*::-webkit-scrollbar-track:horizontal {
+  background: transparent !important;
+}
+
+
 /* ─── Layouts ────────────────────────────────────────────────────────────── */
 .auth-layout {
   min-height: 100vh;

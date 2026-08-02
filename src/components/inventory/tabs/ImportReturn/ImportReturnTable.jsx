@@ -56,7 +56,7 @@ const ImportReturnTable = ({
       centered: true,
       maskClosable: true,
       onOk() {
-        handleDeleteDocument(doc.id);
+        handleDeleteDocument(doc.id, doc.type || 4);
       }
     });
   };

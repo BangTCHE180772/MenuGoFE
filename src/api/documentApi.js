@@ -18,8 +18,48 @@ export const getImportDocuments = async (branchId) => {
   return response.data;
 };
 
+export const getImportById = async (id) => {
+  if (!id || id <= 0) return null;
+  const response = await axiosInstance.get(`/api/ImportDocument/${id}`);
+  return response.data;
+};
+
 export const createImportDocument = async (dto) => {
   const response = await axiosInstance.post('/api/Document/import', dto);
+  return response.data;
+};
+
+export const createImportPending = async (dto) => {
+  const response = await axiosInstance.post('/api/ImportDocument/pending', dto);
+  return response.data;
+};
+
+export const createImportCompleted = async (dto) => {
+  const response = await axiosInstance.post('/api/ImportDocument/completed', dto);
+  return response.data;
+};
+
+export const updateImportPending = async (id, dto) => {
+  const response = await axiosInstance.put(`/api/ImportDocument/pending/${id}`, dto);
+  return response.data;
+};
+
+export const completeImportDocument = async (id) => {
+  const response = await axiosInstance.post(`/api/ImportDocument/${id}/complete`);
+  return response.data;
+};
+
+export const deleteImportPendingDocument = async (id, deleteNote = 'Xóa phiếu tạm') => {
+  const response = await axiosInstance.delete(`/api/ImportDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
+  return response.data;
+};
+
+export const updateImportDocument = async (id, dto, branchId) => {
+  const response = await axiosInstance.put(`/api/Document/import/${id}`, dto, {
+    params: { branchId }
+  });
   return response.data;
 };
 
@@ -73,8 +113,20 @@ export const createTransferDocument = async (dto) => {
   return response.data;
 };
 
+export const updateTransferDocument = async (id, dto, branchId) => {
+  const response = await axiosInstance.put(`/api/Document/transfer/${id}`, dto, {
+    params: { branchId }
+  });
+  return response.data;
+};
+
 export const receiveTransferDocument = async (dto) => {
   const response = await axiosInstance.post('/api/Document/transfer/receive', dto);
+  return response.data;
+};
+
+export const rejectTransferDocument = async (dto) => {
+  const response = await axiosInstance.post('/api/Document/transfer/reject', dto);
   return response.data;
 };
 

@@ -1,6 +1,7 @@
-// import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import ImportReturnSidebar from './ImportReturnSidebar';
 import ImportReturnTable from './ImportReturnTable';
+import ImportReturnDocumentModal from './ImportReturnDocumentModal';
 
 const ImportReturnTab = ({
   documents = [],
@@ -41,7 +42,7 @@ const ImportReturnTab = ({
         handleDeleteDocument={handleDeleteDocument}
       />
 
-      <ReturnDocumentModal
+      <ImportReturnDocumentModal
         open={modalReturnOpen}
         onClose={() => setModalReturnOpen(false)}
         onSuccess={() => {

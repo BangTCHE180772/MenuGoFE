@@ -275,9 +275,9 @@ const TopBar = () => {
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
         >
-          {menuItems.map((item) => (
+          {menuItems.map((item, index) => (
             <Link
-              key={item.path}
+              key={`${item.path}-${item.label}-${index}`}
               to={item.path}
               className={`topbar-nav-item ${location.pathname === item.path ? "active" : ""}`}
             >

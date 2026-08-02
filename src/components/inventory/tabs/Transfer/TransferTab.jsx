@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import TransferSidebar from './TransferSidebar';
 import TransferTable from './TransferTable';
 import TransferDocumentModal from './TransferDocumentModal';
-import { receiveTransferDocument } from '../../../../api/documentApi';
+import ReceiveTransferDocumentModal from './ReceiveTransferDocumentModal';
 
 const TransferTab = ({
   documents = [],
@@ -16,10 +16,13 @@ const TransferTab = ({
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalTransferOpen, setModalTransferOpen] = useState(false);
+  const [modalReceiveOpen, setModalReceiveOpen] = useState(false);
+  const [selectedTransferDoc, setSelectedTransferDoc] = useState(null);
 
   const transferDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      if (doc.type !== 3) return false;
+      // Include both Transfer (Type 3) and ReceiveTransfer (Type 7)
+      if (doc.type !== 3 && doc.type !== 7) return false;
       if (statusFilter !== 'ALL') {
         if (statusFilter === 'Pending' && doc.transferStatus !== 'Pending') return false;
         if (statusFilter === 'Completed' && doc.status !== 'Completed') return false;
@@ -34,15 +37,9 @@ const TransferTab = ({
     });
   }, [documents, statusFilter, searchText]);
 
-  const handleReceiveTransfer = async (doc) => {
-    if (!window.confirm(`Xác nhận nhận hàng chuyển cho mã phiếu ${doc.code}?`)) return;
-    try {
-      await receiveTransferDocument({ documentId: doc.id });
-      alert('Đã nhận hàng chuyển thành công!');
-      fetchDocuments(selectedBranchId);
-    } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Lỗi nhận hàng chuyển.');
-    }
+  const handleOpenReceiveModal = (doc = null) => {
+    setSelectedTransferDoc(doc);
+    setModalReceiveOpen(true);
   };
 
   return (
@@ -54,10 +51,11 @@ const TransferTab = ({
         setSearchText={setSearchText}
         loading={loading}
         setModalTransferOpen={setModalTransferOpen}
-        handleReceiveTransfer={handleReceiveTransfer}
+        handleReceiveTransfer={handleOpenReceiveModal}
         handleDeleteDocument={handleDeleteDocument}
       />
 
+      {/* MODAL 1: CHUYỂN HÀNG */}
       <TransferDocumentModal
         open={modalTransferOpen}
         onClose={() => setModalTransferOpen(false)}
@@ -67,6 +65,16 @@ const TransferTab = ({
         branchId={selectedBranchId}
         branches={branches}
         products={products}
+      />
+
+      {/* MODAL 2: NHẬN HÀNG */}
+      <ReceiveTransferDocumentModal
+        open={modalReceiveOpen}
+        onClose={() => setModalReceiveOpen(false)}
+        onSuccess={() => {
+          fetchDocuments(selectedBranchId);
+        }}
+        documentData={selectedTransferDoc}
       />
     </div>
   );

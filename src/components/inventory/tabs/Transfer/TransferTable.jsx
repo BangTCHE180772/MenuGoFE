@@ -98,35 +98,58 @@ const TransferTable = ({
               </tr>
             ) : (
               currentData.map((doc) => {
-                const isPending = doc.transferStatus === 'Pending';
+                const isCancelled = doc.status === 'Cancelled' || doc.status === 3;
+                const isDraft = doc.status === 'Pending' || doc.status === 1;
+                const transferStatus = doc.transferStatus;
+                const isInTransit = transferStatus === 'InTransit' || transferStatus === 2 || transferStatus === 'Pending';
+                const isReceived = transferStatus === 'Received' || transferStatus === 3;
+                const isPartial = transferStatus === 'PartialReceived' || transferStatus === 4;
+                const isRejected = transferStatus === 'Rejected' || transferStatus === 5;
+
                 return (
                   <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0891b2' }}>{doc.code}</td>
                     <td style={{ padding: '8px 10px' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc', fontSize: 10, fontWeight: 600 }}>
-                        Chuyển hàng
+                      <span style={{ padding: '2px 6px', borderRadius: 4, background: doc.type === 7 ? '#f0fdf4' : '#ecfeff', color: doc.type === 7 ? '#15803d' : '#0891b2', border: doc.type === 7 ? '1px solid #bbf7d0' : '1px solid #a5f3fc', fontSize: 10, fontWeight: 600 }}>
+                        {doc.type === 7 ? 'Nhận chuyển hàng' : 'Chuyển hàng'}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName}</td>
+                    <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || doc.fromBranch?.name || 'Chi nhánh'}</td>
                     <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.businessDate).format('DD/MM/YYYY HH:mm')}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      {doc.totalAmount ? doc.totalAmount.toLocaleString() : 0} đ
+                      {doc.totalAmount ? doc.totalAmount.toLocaleString('vi-VN') : 0} đ
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      {isPending ? (
-                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7', fontSize: 10, fontWeight: 600 }}>
-                          Chờ nhận kho
+                      {isCancelled ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
+                          Đã hủy
+                        </span>
+                      ) : isDraft ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fefce8', color: '#ca8a04', border: '1px solid #fef08a', fontSize: 10, fontWeight: 600 }}>
+                          Lưu tạm
+                        </span>
+                      ) : isReceived ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
+                          Đã nhận đủ
+                        </span>
+                      ) : isPartial ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontSize: 10, fontWeight: 600 }}>
+                          Nhận 1 phần
+                        </span>
+                      ) : isRejected ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
+                          Bị từ chối
                         </span>
                       ) : (
-                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
-                          Hoàn thành
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7', fontSize: 10, fontWeight: 600 }}>
+                          Đang vận chuyển
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator}</td>
+                    <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator?.name || doc.creator?.email || doc.creator || 'Admin'}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        {isPending && (
+                        {!isCancelled && !isDraft && isInTransit && (
                           <button
                             onClick={() => handleReceiveTransfer(doc)}
                             style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
@@ -134,16 +157,18 @@ const TransferTable = ({
                             Nhận
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Bạn có chắc chắn muốn xóa chứng từ này?')) {
-                              handleDeleteDocument(doc.id);
-                            }
-                          }}
-                          style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
-                        >
-                          Xóa
-                        </button>
+                        {!isCancelled && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Bạn có chắc chắn muốn xóa chứng từ chuyển hàng này?')) {
+                                handleDeleteDocument(doc.id);
+                              }
+                            }}
+                            style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
+                          >
+                            Xóa
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

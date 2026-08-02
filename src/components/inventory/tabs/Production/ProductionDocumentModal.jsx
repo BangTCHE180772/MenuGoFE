@@ -1,22 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { message } from 'antd';
 import {
-  Input,
-  Select,
-  InputNumber,
-  DatePicker,
-  Button,
-  Checkbox,
-  Tabs,
-  Table,
-  Row,
-  Col,
-  Modal,
-  message
-} from 'antd';
+  CloseOutlined,
+  SearchOutlined,
+  CalendarOutlined
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getBInventories } from '../../../../api/binventoryApi';
+import { getProductsByDate } from '../../../../api/binventoryApi';
 import { createProductionDocument } from '../../../../api/documentApi';
+import KiotDateTimePicker from '../Import/KiotDateTimePicker';
+import { useAuth } from '../../../../context/AuthContext';
 
 const ProductionDocumentModal = ({
   open,
@@ -25,129 +19,145 @@ const ProductionDocumentModal = ({
   branchId,
   products = []
 }) => {
+  const auth = useAuth ? useAuth() : {};
+  const user = auth?.user;
+
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('1');
-  const [manufacturedBInvs, setManufacturedBInvs] = useState([]);
+  const [activeTab, setActiveTab] = useState('info'); // 'info' | 'materials'
+
+  const [selectedDateTime, setSelectedDateTime] = useState(dayjs());
+  const [openTimeFormatted, setOpenTimeFormatted] = useState('');
+  const [openTimeISO, setOpenTimeISO] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Search list for Manufactured products ONLY
+  const [manufacturedList, setManufacturedList] = useState([]);
+  const [manufacturedQuery, setManufacturedQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedManufactured, setSelectedManufactured] = useState(null);
+  const [finishedQuantity, setFinishedQuantity] = useState(1);
 
   const [formData, setFormData] = useState({
-    productId: undefined,
-    quantity: 1,
-    createdDate: null,
-    autoDeductSecondary: true,
     docCode: '',
-    note: ''
+    note: '',
+    autoDeductSecondary: true
   });
+
+  // Fetch Manufactured products ONLY
+  const fetchManufacturedProducts = useCallback((bId, date, query = '') => {
+    if (!bId) return;
+    getProductsByDate(bId, date, query, 'Manufactured')
+      .then((res) => {
+        const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        setManufacturedList(data);
+      })
+      .catch((err) => {
+        console.error('Failed to load Manufactured products:', err);
+        setManufacturedList([]);
+      });
+  }, []);
 
   useEffect(() => {
     if (open) {
+      const now = dayjs();
+      setSelectedDateTime(now);
+      setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
+      setOpenTimeISO(now.toISOString());
+      setShowDatePicker(false);
+      setActiveTab('info');
+
+      setManufacturedQuery('');
+      setShowDropdown(false);
+      setSelectedManufactured(null);
+      setFinishedQuantity(1);
+
       setFormData({
-        productId: undefined,
-        quantity: 1,
-        createdDate: dayjs(),
-        autoDeductSecondary: true,
         docCode: '',
-        note: ''
+        note: '',
+        autoDeductSecondary: true
       });
-      setActiveTab('1');
 
       if (branchId) {
-        getBInventories(branchId, '', 'PRODUCTION', 3)
-          .then((res) => {
-            const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-            setManufacturedBInvs(data);
-          })
-          .catch((err) => {
-            console.error('Failed to load manufactured BInventories:', err);
-            setManufacturedBInvs([]);
-          });
+        fetchManufacturedProducts(branchId, now.toISOString(), '');
       }
     }
-  }, [open, branchId]);
+  }, [open, branchId, fetchManufacturedProducts]);
 
-  if (!open) return null;
+  // Dynamic search on user typing for Manufactured products
+  useEffect(() => {
+    if (!open || !branchId) return;
+    const timer = setTimeout(() => {
+      fetchManufacturedProducts(branchId, openTimeISO || new Date().toISOString(), manufacturedQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [manufacturedQuery, open, branchId, openTimeISO, fetchManufacturedProducts]);
 
-  const manufacturedProductsList = manufacturedBInvs.length > 0
-    ? manufacturedBInvs
-    : products.filter((p) => p.type === 'Manufactured');
+  const handleDateChange = (newDate) => {
+    setSelectedDateTime(newDate);
+    setOpenTimeFormatted(newDate.format('DD/MM/YYYY HH:mm'));
+    setOpenTimeISO(newDate.toISOString());
 
-  const selectedProduct = products.find((p) => p.id === formData.productId);
-
-  const ingredients = selectedProduct?.ingredients || [
-    { id: 101, code: 'NL001', name: 'Đường cát trắng', unitName: 'kg', normQty: 0.1, stockQty: 50 },
-    { id: 102, code: 'NL002', name: 'Sữa tươi không đường', unitName: 'lít', normQty: 0.2, stockQty: 30 },
-    { id: 103, code: 'NL003', name: 'Hương liệu cốt', unitName: 'chai', normQty: 0.05, stockQty: 10 }
-  ];
-
-  const ingredientColumns = [
-    {
-      title: 'STT',
-      key: 'stt',
-      width: 50,
-      align: 'center',
-      render: (_, __, idx) => idx + 1
-    },
-    {
-      title: 'Mã nguyên liệu',
-      dataIndex: 'code',
-      key: 'code',
-      width: 120
-    },
-    {
-      title: 'Tên nguyên liệu',
-      dataIndex: 'name',
-      key: 'name'
-    },
-    {
-      title: 'Định lượng',
-      dataIndex: 'normQty',
-      key: 'normQty',
-      width: 100,
-      align: 'right',
-      render: (val, record) => `${val} ${record.unitName}`
-    },
-    {
-      title: 'Số lượng cần dùng',
-      key: 'requiredQty',
-      width: 130,
-      align: 'right',
-      render: (_, record) => (
-        <span style={{ fontWeight: 700, color: '#2563eb' }}>
-          {(record.normQty * (formData.quantity || 1)).toFixed(2)} {record.unitName}
-        </span>
-      )
-    },
-    {
-      title: 'Tồn kho hiện tại',
-      dataIndex: 'stockQty',
-      key: 'stockQty',
-      width: 120,
-      align: 'right',
-      render: (val, record) => `${val} ${record.unitName}`
+    if (branchId) {
+      fetchManufacturedProducts(branchId, newDate.toISOString(), manufacturedQuery);
     }
-  ];
+  };
+
+  const manufacturedOptions = useMemo(() => {
+    const raw = manufacturedList.length > 0 ? manufacturedList : products.filter((p) => p.type === 'Manufactured');
+    return raw
+      .filter((b) => b && (b.id != null || b.bInventoryId != null))
+      .map((b) => ({
+        id: b.id ?? b.bInventoryId,
+        code: b.code || b.skuCode || `SP${b.id}`,
+        name: b.name || 'Thành phẩm sản xuất',
+        unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || '',
+        ingredients: b.recipeItems || b.ingredients || []
+      }));
+  }, [manufacturedList, products]);
+
+  const filteredOptions = useMemo(() => {
+    if (!manufacturedQuery.trim()) return manufacturedOptions;
+    const q = manufacturedQuery.toLowerCase();
+    return manufacturedOptions.filter(
+      (opt) => opt.code.toLowerCase().includes(q) || opt.name.toLowerCase().includes(q)
+    );
+  }, [manufacturedOptions, manufacturedQuery]);
+
+  const handleSelectManufactured = (opt) => {
+    setSelectedManufactured(opt);
+    setManufacturedQuery('');
+    setShowDropdown(false);
+  };
+
+  // Preview ingredients list for Tab 2
+  const ingredientsList = useMemo(() => {
+    if (!selectedManufactured || !Array.isArray(selectedManufactured.ingredients)) return [];
+    return selectedManufactured.ingredients.map((ing) => ({
+      id: ing.id || ing.ingredientProductId,
+      code: ing.code || ing.ingredientProduct?.skuCode || `NL${ing.ingredientProductId || ing.id}`,
+      name: ing.name || ing.ingredientProduct?.name || 'Nguyên liệu',
+      quantity: (Number(ing.quantity || ing.normQty) || 0) * (Number(finishedQuantity) || 1),
+      unitName: ing.unitName || ''
+    }));
+  }, [selectedManufactured, finishedQuantity]);
 
   const handleSubmit = async (isDraft = false) => {
-    if (!formData.productId) {
-      message.error('Vui lòng chọn sản phẩm sản xuất.');
+    if (!selectedManufactured) {
+      message.error('Vui lòng chọn 1 mặt hàng sản xuất.');
       return;
     }
-    if (formData.quantity == null || formData.quantity < 1) {
-      message.error('Số lượng sản xuất tối thiểu là 1.');
-      return;
-    }
+
+    const qty = Math.min(1000000000, Math.max(0.001, Number(finishedQuantity) || 1));
 
     setLoading(true);
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: formData.createdDate ? formData.createdDate.toISOString() : new Date().toISOString(),
-        details: [
-          {
-            bInventoryId: Number(formData.productId),
-            quantity: Number(formData.quantity),
-            note: formData.note || ''
-          }
-        ]
+        businessDate: openTimeISO || new Date().toISOString(),
+        createdByAccountId: Number(user?.id || user?.accountId || 1),
+        finishedBInventoryId: Number(selectedManufactured.id),
+        finishedQuantity: qty,
+        note: formData.note || ''
       };
 
       await createProductionDocument(dto);
@@ -156,155 +166,392 @@ const ProductionDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      message.error(err.response?.data?.message || err.message || 'Lỗi tạo phiếu sản xuất.');
+      const errMsg =
+        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu sản xuất.';
+      message.error(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
+  if (!open) return null;
+
   return (
-    <Modal
-      title={
-        <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-          Tạo phiếu sản xuất
-        </span>
-      }
-      open={open}
-      onCancel={onClose}
-      width={720}
-      style={{ top: 40 }}
-      styles={{ body: { padding: '12px 24px 24px' } }}
-      footer={[
-        <Button key="ghost" type="text" onClick={onClose} style={{ color: '#475569', fontWeight: 500 }}>
-          Bỏ qua
-        </Button>,
-        <Button
-          key="draft"
-          style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 600, borderRadius: 8, padding: '0 20px' }}
-          loading={loading}
-          onClick={() => handleSubmit(true)}
-        >
-          Lưu tạm
-        </Button>,
-        <Button
-          key="submit"
-          type="primary"
-          style={{ background: '#e8442a', borderColor: '#e8442a', fontWeight: 700, borderRadius: 8, padding: '0 24px' }}
-          loading={loading}
-          onClick={() => handleSubmit(false)}
-        >
-          Hoàn thành
-        </Button>
-      ]}
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1000,
+        background: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }}
+      onClick={onClose}
     >
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={[
-          {
-            key: '1',
-            label: 'Thông tin chung',
-            children: (
-              <div style={{ paddingTop: 8 }}>
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <div style={{ marginBottom: 4, fontWeight: 500, color: '#334155' }}>
-                      Mặt hàng sản xuất <span style={{ color: '#ef4444' }}>*</span>
-                    </div>
-                    <Select
-                      value={formData.productId}
-                      onChange={(val) => setFormData({ ...formData, productId: val ? Number(val) : undefined })}
-                      placeholder="Chọn sản phẩm sản xuất"
-                      options={manufacturedProductsList.map((p) => ({
-                        value: p.id || p.bInventoryId,
-                        label: `${p.code || `SP${p.id}`} - ${p.name}`
-                      }))}
-                      style={{ width: '100%', borderRadius: 6 }}
-                    />
-                  </Col>
+      {/* DIALOG POPUP BOX */}
+      <div
+        style={{
+          width: 720,
+          maxWidth: '100%',
+          background: '#ffffff',
+          borderRadius: 16,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          overflow: 'visible',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: 12
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* MODAL HEADER WITH TABS */}
+        <div style={{ padding: '16px 24px 0 24px', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
+              Tạo phiếu sản xuất
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                fontSize: 16,
+                padding: 4
+              }}
+            >
+              <CloseOutlined />
+            </button>
+          </div>
 
-                  <Col span={12}>
-                    <div style={{ marginBottom: 4, fontWeight: 500, color: '#334155' }}>
-                      Số lượng <span style={{ color: '#ef4444' }}>*</span>
-                    </div>
-                    <InputNumber
-                      min={1}
-                      value={formData.quantity}
-                      onChange={(val) => setFormData({ ...formData, quantity: val != null ? Math.max(1, Number(val) || 1) : 1 })}
-                      style={{ width: '100%', borderRadius: 6 }}
-                    />
-                  </Col>
-                </Row>
+          {/* TABS NAVIGATION */}
+          <div style={{ display: 'flex', gap: 24, fontSize: 13, fontWeight: 600 }}>
+            <div
+              onClick={() => setActiveTab('info')}
+              style={{
+                paddingBottom: 8,
+                cursor: 'pointer',
+                color: activeTab === 'info' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'info' ? '2px solid #e8442a' : '2px solid transparent',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Thông tin
+            </div>
+            <div
+              onClick={() => setActiveTab('materials')}
+              style={{
+                paddingBottom: 8,
+                cursor: 'pointer',
+                color: activeTab === 'materials' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'materials' ? '2px solid #e8442a' : '2px solid transparent',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Bảng dự tính sử dụng nguyên liệu
+            </div>
+          </div>
+        </div>
 
-                <Row gutter={16} style={{ marginTop: 12 }}>
-                  <Col span={12}>
-                    <div style={{ marginBottom: 4, fontWeight: 500, color: '#334155' }}>Mã sản xuất</div>
-                    <Input
-                      value={formData.docCode}
-                      onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
-                      placeholder="Tự động"
-                      style={{ borderRadius: 6 }}
+        {/* MODAL BODY */}
+        <div style={{ padding: '20px 24px', minHeight: 280, display: 'flex', flexDirection: 'column' }}>
+          {activeTab === 'info' ? (
+            /* TAB 1: THÔNG TIN FORM */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* ROW 1: SẢN XUẤT MẶT HÀNG & SỐ LƯỢNG */}
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>
+                    Sản xuất mặt hàng
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#ffffff',
+                      borderRadius: 18,
+                      padding: '6px 14px',
+                      border: '1px solid #cbd5e1'
+                    }}
+                  >
+                    <SearchOutlined style={{ color: '#94a3b8', marginRight: 8 }} />
+                    <input
+                      type="text"
+                      placeholder="Chọn mặt hàng sản xuất"
+                      value={selectedManufactured ? `${selectedManufactured.code} - ${selectedManufactured.name}` : manufacturedQuery}
+                      onFocus={() => {
+                        if (selectedManufactured) {
+                          setSelectedManufactured(null);
+                          setManufacturedQuery('');
+                        }
+                        setShowDropdown(true);
+                      }}
+                      onChange={(e) => {
+                        setSelectedManufactured(null);
+                        setManufacturedQuery(e.target.value);
+                        setShowDropdown(true);
+                      }}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: 12,
+                        background: 'transparent',
+                        color: '#0f172a',
+                        fontWeight: selectedManufactured ? 600 : 400
+                      }}
                     />
-                  </Col>
+                  </div>
 
-                  <Col span={12}>
-                    <div style={{ marginBottom: 4, fontWeight: 500, color: '#334155' }}>Thời gian tạo</div>
-                    <DatePicker
-                      value={formData.createdDate ? dayjs(formData.createdDate) : undefined}
-                      onChange={(date) => setFormData({ ...formData, createdDate: date })}
-                      showTime
-                      format="DD/MM/YYYY HH:mm"
-                      style={{ width: '100%', borderRadius: 6 }}
-                    />
-                  </Col>
-                </Row>
-
-                <Row gutter={16} style={{ marginTop: 12 }}>
-                  <Col span={24}>
-                    <Checkbox
-                      checked={formData.autoDeductSecondary}
-                      onChange={(e) => setFormData({ ...formData, autoDeductSecondary: e.target.checked })}
-                      style={{ color: '#475569', fontSize: 12 }}
+                  {showDropdown && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 60,
+                        left: 0,
+                        right: 0,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 8,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        maxHeight: 200,
+                        overflowY: 'auto',
+                        zIndex: 2000
+                      }}
                     >
-                      Tự động trừ tồn kho thành phần (Nguyên liệu) khi hoàn thành sản xuất
-                    </Checkbox>
-                  </Col>
-                </Row>
+                      {filteredOptions.length === 0 ? (
+                        <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
+                          Không tìm thấy mặt hàng sản xuất
+                        </div>
+                      ) : (
+                        filteredOptions.map((opt) => (
+                          <div
+                            key={opt.id}
+                            onClick={() => handleSelectManufactured(opt)}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
+                              <div style={{ fontSize: 10, color: '#64748b' }}>{opt.code}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                <Row gutter={16} style={{ marginTop: 12 }}>
-                  <Col span={24}>
-                    <div style={{ marginBottom: 4, fontWeight: 500, color: '#334155' }}>Ghi chú</div>
-                    <Input.TextArea
-                      value={formData.note}
-                      onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                      rows={3}
-                      placeholder="Ghi chú quy trình sản xuất..."
-                      style={{ borderRadius: 6 }}
-                    />
-                  </Col>
-                </Row>
+                <div style={{ width: 200 }}>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Số lượng</div>
+                  <input
+                    type="number"
+                    min={0.001}
+                    max={1000000000}
+                    step="any"
+                    value={finishedQuantity}
+                    onChange={(e) => setFinishedQuantity(Math.min(1000000000, Math.max(0.001, Number(e.target.value) || 1)))}
+                    style={{
+                      width: '100%',
+                      textAlign: 'center',
+                      borderRadius: 18,
+                      border: '1px solid #cbd5e1',
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               </div>
-            )
-          },
-          {
-            key: '2',
-            label: 'Thành phần nguyên liệu (BOM)',
-            children: (
-              <div style={{ paddingTop: 8 }}>
-                <Table
-                  dataSource={ingredients}
-                  columns={ingredientColumns}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  bordered
+
+              {/* ROW 2: MÃ SẢN XUẤT & NGÀY TẠO */}
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã sản xuất</div>
+                  <input
+                    type="text"
+                    value={formData.docCode}
+                    onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
+                    placeholder="Tự động"
+                    style={{
+                      width: '100%',
+                      borderRadius: 18,
+                      padding: '6px 14px',
+                      border: '1px solid #cbd5e1',
+                      outline: 'none',
+                      fontSize: 12
+                    }}
+                  />
+                </div>
+
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Ngày tạo</div>
+                  <div
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: '#ffffff',
+                      borderRadius: 18,
+                      padding: '6px 14px',
+                      border: '1px solid #cbd5e1',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: '#0f172a'
+                    }}
+                  >
+                    <span>{openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm')}</span>
+                    <CalendarOutlined style={{ color: '#94a3b8' }} />
+                  </div>
+
+                  {showDatePicker && (
+                    <KiotDateTimePicker
+                      value={selectedDateTime}
+                      onChange={handleDateChange}
+                      onClose={() => setShowDatePicker(false)}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* ROW 3: GHI CHÚ */}
+              <div>
+                <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Ghi chú</div>
+                <textarea
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                  rows={3}
+                  placeholder="Nhập ghi chú"
+                  style={{
+                    width: '100%',
+                    borderRadius: 12,
+                    padding: '8px 14px',
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    fontSize: 12,
+                    resize: 'none'
+                  }}
                 />
               </div>
-            )
-          }
-        ]}
-      />
-    </Modal>
+            </div>
+          ) : (
+            /* TAB 2: BẢNG DỰ TÍNH SỬ DỤNG NGUYÊN LIỆU (KHÔNG CÓ TỒN KHO) */
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#334155', fontWeight: 600, fontSize: 11 }}>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', width: 140 }}>Mã thành phần</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tên thành phần</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right', width: 120 }}>Sử dụng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingredientsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8', fontSize: 12 }}>
+                        Chưa có dữ liệu nguyên liệu
+                      </td>
+                    </tr>
+                  ) : (
+                    ingredientsList.map((item, idx) => (
+                      <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 14px', fontWeight: 600, color: '#334155' }}>{item.code}</td>
+                        <td style={{ padding: '8px 14px', color: '#0f172a', fontWeight: 500 }}>{item.name}</td>
+                        <td style={{ padding: '8px 14px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                          {item.quantity.toLocaleString('vi-VN')} {item.unitName}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* MODAL FOOTER */}
+        <div
+          style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #f1f5f9',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 12
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#475569',
+              fontWeight: 600,
+              padding: '8px 18px',
+              borderRadius: 20,
+              cursor: 'pointer',
+              fontSize: 12
+            }}
+          >
+            Bỏ qua
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleSubmit(true)}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              fontWeight: 600,
+              borderRadius: 20,
+              padding: '8px 22px',
+              cursor: 'pointer',
+              fontSize: 12
+            }}
+          >
+            Lưu tạm
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleSubmit(false)}
+            style={{
+              background: '#e8442a',
+              border: '1px solid #e8442a',
+              color: '#ffffff',
+              fontWeight: 700,
+              borderRadius: 20,
+              padding: '8px 24px',
+              cursor: 'pointer',
+              fontSize: 12,
+              boxShadow: '0 2px 6px rgba(232, 68, 42, 0.25)'
+            }}
+          >
+            Hoàn thành
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
