@@ -1,42 +1,30 @@
-// ─── Dashboard Utility Helpers ─────────────────────────────────────────────
-export const formatVND = (value) => {
-  if (value === null || value === undefined) return '—';
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000) {
-    return (value / 1_000_000_000).toFixed(1) + ' tỷ';
+/**
+ * Common formatting and calculation utilities used across dashboards
+ */
+
+export const formatVND = (val) => {
+  if (val === null || val === undefined) return "0 ₫";
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(val);
+};
+
+export const formatVNDFull = (val) => formatVND(val);
+
+export const formatPercent = (val, decimals = 1) => {
+  if (val === null || val === undefined || isNaN(val)) return "0%";
+  return `${Number(val).toFixed(decimals)}%`;
+};
+
+export const calcGrowth = (current, previous) => {
+  if (!previous || previous === 0) {
+    return current > 0 ? 100 : 0;
   }
-  if (abs >= 1_000_000) {
-    return (value / 1_000_000).toFixed(1) + ' tr';
-  }
-  if (abs >= 1_000) {
-    return (value / 1_000).toFixed(0) + 'k';
-  }
-  return value.toLocaleString('vi-VN') + 'đ';
+  return Number((((current - previous) / previous) * 100).toFixed(1));
 };
 
-export const formatVNDFull = (value) => {
-  if (value === null || value === undefined) return '—';
-  return value.toLocaleString('vi-VN') + 'đ';
-};
-
-// Format plain number (count) — no currency suffix
-export const formatNumber = (value) => {
-  if (value === null || value === undefined) return '—';
-  return Math.round(value).toLocaleString('vi-VN');
-};
-
-export const formatPercent = (value) => {
-  return (value * 100).toFixed(1) + '%';
-};
-
-export const calcGrowth = (current, prev) => {
-  if (!prev || prev === 0) return null;
-  return ((current - prev) / prev) * 100;
-};
-
-export const growthLabel = (growth) => {
-  if (growth === null) return null;
-  const isPos = growth >= 0;
-  const label = `${isPos ? '▲' : '▼'} ${Math.abs(growth).toFixed(1)}%`;
-  return { label, isPos };
+export const formatNumber = (val) => {
+  if (val === null || val === undefined) return "0";
+  return new Intl.NumberFormat("vi-VN").format(val);
 };
