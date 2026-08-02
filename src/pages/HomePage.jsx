@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Typography, Segmented, message, Space, Tag } from "antd";
 import {
   DashboardOutlined,
@@ -9,7 +9,10 @@ import dayjs from "dayjs";
 import HomeFilter from "../components/homePage/HomeFilter";
 import HomeDashboard from "../components/homePage/HomeDashboard";
 import HomeReport from "../components/homePage/HomeReport";
-import { MOCK_DAILY_REPORT, generateFilteredReportData } from "../components/homePage/homeMockData";
+import {
+  MOCK_DAILY_REPORT,
+  generateFilteredReportData,
+} from "../components/homePage/homeMockData";
 
 const { Title, Text } = Typography;
 
@@ -20,7 +23,7 @@ const { Title, Text } = Typography;
 const HomePage = () => {
   // ─── Filter State ──────────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(
-    dayjs().format("DD/MM/YYYY")
+    dayjs().format("DD/MM/YYYY"),
   );
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [filterLoading, setFilterLoading] = useState(false);
@@ -35,7 +38,10 @@ const HomePage = () => {
   const handleApplyFilter = () => {
     setFilterLoading(true);
     setTimeout(() => {
-      const updatedData = generateFilteredReportData(selectedDate, selectedEmployee);
+      const updatedData = generateFilteredReportData(
+        selectedDate,
+        selectedEmployee,
+      );
       setReportData(updatedData);
       setFilterLoading(false);
       message.success(`Đã cập nhật dữ liệu báo cáo ngày ${selectedDate}`);

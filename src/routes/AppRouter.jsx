@@ -43,6 +43,9 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import RevenueReportPage from '../pages/reports/RevenueReportPage';
+import ExpenseReportPage from '../pages/reports/ExpenseReportPage';
+import ProfitReportPage from '../pages/reports/ProfitReportPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 import FinanceDashboardPage from '../pages/FinanceDashboardPage';
@@ -137,6 +140,9 @@ const AppRouter = () => {
                 <Route path="/reservations" element={<ReservationPage />} />
                 <Route path="/financedashboard" element={<FinanceDashboardPage />} />
                 <Route path="/orderdashboard" element={<OrderDashboard />} />
+                <Route path="/reports/revenue" element={<RevenueReportPage />} />
+                <Route path="/reports/expense" element={<ExpenseReportPage />} />
+                <Route path="/reports/profit" element={<ProfitReportPage />} />
               </Route>
 
               {/* Owner, Admin */}
