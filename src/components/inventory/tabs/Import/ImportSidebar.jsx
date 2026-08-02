@@ -12,20 +12,18 @@ const ImportSidebar = ({ statusFilter, setStatusFilter }) => {
         display: 'flex',
         flexDirection: 'column',
         fontSize: 11,
-        padding: '10px 12px',
+        padding: '14px 12px',
         userSelect: 'none'
       }}
     >
-      <div style={{ paddingBottom: 6, marginBottom: 10, borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 11, color: '#e8442a' }}>
-        NHẬP HÀNG
-      </div>
-
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontWeight: 600, marginBottom: 6, color: '#1e293b' }}>Trạng thái:</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
             { key: 'ALL', label: 'Tất cả' },
-            { key: 'Completed', label: 'Hoàn thành' }
+            { key: 'Pending', label: 'Lưu tạm' },
+            { key: 'Completed', label: 'Hoàn thành' },
+            { key: 'Cancelled', label: 'Đã hủy' }
           ].map((item) => (
             <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 10.5 }}>
               <input

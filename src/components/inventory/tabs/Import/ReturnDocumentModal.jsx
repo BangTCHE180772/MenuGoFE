@@ -37,7 +37,6 @@ const ReturnDocumentModal = ({
   const [formData, setFormData] = useState({
     supplierId: undefined,
     docCode: '',
-    discount: 0,
     paidAmount: 0,
     note: ''
   });
@@ -67,7 +66,6 @@ const ReturnDocumentModal = ({
         setFormData({
           supplierId: suppId ? Number(suppId) : undefined,
           docCode: '',
-          discount: 0,
           paidAmount: 0,
           note: `Trả hàng nhập theo phiếu ${importDocument.code}`
         });
@@ -143,7 +141,6 @@ const ReturnDocumentModal = ({
         setFormData({
           supplierId: undefined,
           docCode: '',
-          discount: 0,
           paidAmount: 0,
           note: ''
         });
@@ -184,7 +181,7 @@ const ReturnDocumentModal = ({
     return items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.returnPrice) || 0), 0);
   }, [items]);
 
-  const netAmount = Math.max(0, Math.round(totalGoodsAmount - (Number(formData.discount) || 0)));
+  const netAmount = Math.round(totalGoodsAmount);
   const paidAmount = Number(formData.paidAmount) || 0;
   const debtAmount = Math.max(0, netAmount - paidAmount);
 
@@ -220,7 +217,7 @@ const ReturnDocumentModal = ({
         businessDate: openTimeISO || new Date().toISOString(),
         createdByAccountId: Number(currentAccountId),
         paidAmount: Math.round(Number(formData.paidAmount || 0)),
-        paymentMethod: 1, // Cash
+        paymentMethod: 0, // Cash (0: Tiền mặt, 1: Chuyển khoản)
         note: formData.note || `Trả hàng nhập theo phiếu ${importDocument.code}`,
         details: activeItems.map((i) => ({
           importDocumentDetailId: Number(i.id || i.documentDetailId),
@@ -236,11 +233,21 @@ const ReturnDocumentModal = ({
       onClose();
     } catch (err) {
       console.error('Lỗi khi tạo phiếu trả hàng nhập:', err);
-      const errMsg =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        err.message ||
-        'Đã xảy ra lỗi khi tạo phiếu trả hàng nhập.';
+      let errMsg = err.response?.data?.message;
+      if (!errMsg && err.response?.data?.errors) {
+        const errs = err.response.data.errors;
+        if (typeof errs === 'string') errMsg = errs;
+        else if (Array.isArray(errs)) errMsg = errs.join('; ');
+        else if (typeof errs === 'object') {
+          const msgs = [];
+          Object.values(errs).forEach((val) => {
+            if (Array.isArray(val)) msgs.push(...val);
+            else if (typeof val === 'string') msgs.push(val);
+          });
+          if (msgs.length > 0) errMsg = msgs.join('; ');
+        }
+      }
+      if (!errMsg) errMsg = err.response?.data?.title || err.message || 'Đã xảy ra lỗi khi tạo phiếu trả hàng nhập.';
       message.error(errMsg);
     } finally {
       setLoading(false);
@@ -574,17 +581,6 @@ const ReturnDocumentModal = ({
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
                     {totalGoodsAmount.toLocaleString('vi-VN')}
                   </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Giảm giá</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.discount}
-                    onChange={(e) => setFormData({ ...formData, discount: Math.max(0, Number(e.target.value) || 0) })}
-                    style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
-                  />
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

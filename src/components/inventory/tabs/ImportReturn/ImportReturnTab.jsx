@@ -1,6 +1,6 @@
-// import React, { useState, useMemo } from 'react';
-import ImportReturnSidebar from './ImportReturnSidebar';
+import React, { useState, useMemo } from 'react';
 import ImportReturnTable from './ImportReturnTable';
+import ImportReturnDocumentModal from './ImportReturnDocumentModal';
 
 const ImportReturnTab = ({
   documents = [],
@@ -31,17 +31,18 @@ const ImportReturnTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <ImportReturnSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <ImportReturnTable
         documents={importReturnDocuments}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         setModalReturnOpen={setModalReturnOpen}
         handleDeleteDocument={handleDeleteDocument}
       />
 
-      <ReturnDocumentModal
+      <ImportReturnDocumentModal
         open={modalReturnOpen}
         onClose={() => setModalReturnOpen(false)}
         onSuccess={() => {

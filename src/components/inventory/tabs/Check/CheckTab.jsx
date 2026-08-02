@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import CheckSidebar from './CheckSidebar';
 import CheckTable from './CheckTable';
 import CheckDocumentModal from './CheckDocumentModal';
 
@@ -31,11 +30,12 @@ const CheckTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <CheckSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <CheckTable
         documents={checkDocuments}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         setModalCheckOpen={setModalCheckOpen}
         handleDeleteDocument={handleDeleteDocument}

@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
+import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const TransferTable = ({
   documents = [],
   searchText,
   setSearchText,
+  statusFilter = 'ALL',
+  setStatusFilter,
   loading,
   setModalTransferOpen,
   handleReceiveTransfer,
@@ -17,58 +20,110 @@ const TransferTable = ({
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <input
-          type="text"
-          placeholder="Theo mã phiếu chuyển hàng..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            width: 240,
-            height: 26,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#1e293b',
-            borderRadius: 16,
-            border: '1px solid #cbd5e1',
-            outline: 'none'
-          }}
-        />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
+      {/* TOP ACTION TOOLBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              placeholder="Theo mã phiếu chuyển hàng, người tạo..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '4px 10px 4px 30px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1e293b',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                transition: 'border 0.2s ease'
+              }}
+            />
+          </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+          {/* STATUS FILTER PILLS */}
+          {setStatusFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'Pending', label: 'Lưu tạm' },
+                { key: 'Completed', label: 'Hoàn thành' }
+              ].map((st) => {
+                const active = statusFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStatusFilter(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
+            type="button"
             onClick={() => setModalTransferOpen(true)}
             style={{
-              background: '#e8442a',
+              background: 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            + Chuyển hàng
+            <PlusOutlined /> Chuyển hàng
           </button>
           <button
+            type="button"
             onClick={() => alert('Đã làm mới dữ liệu')}
             style={{
               background: '#ffffff',
               color: '#334155',
               border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            Làm mới
+            <ReloadOutlined /> Làm mới
           </button>
         </div>
       </div>
@@ -98,35 +153,58 @@ const TransferTable = ({
               </tr>
             ) : (
               currentData.map((doc) => {
-                const isPending = doc.transferStatus === 'Pending';
+                const isCancelled = doc.status === 'Cancelled' || doc.status === 3;
+                const isDraft = doc.status === 'Pending' || doc.status === 1;
+                const transferStatus = doc.transferStatus;
+                const isInTransit = transferStatus === 'InTransit' || transferStatus === 2 || transferStatus === 'Pending';
+                const isReceived = transferStatus === 'Received' || transferStatus === 3;
+                const isPartial = transferStatus === 'PartialReceived' || transferStatus === 4;
+                const isRejected = transferStatus === 'Rejected' || transferStatus === 5;
+
                 return (
                   <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0891b2' }}>{doc.code}</td>
                     <td style={{ padding: '8px 10px' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc', fontSize: 10, fontWeight: 600 }}>
-                        Chuyển hàng
+                      <span style={{ padding: '2px 6px', borderRadius: 4, background: doc.type === 7 ? '#f0fdf4' : '#ecfeff', color: doc.type === 7 ? '#15803d' : '#0891b2', border: doc.type === 7 ? '1px solid #bbf7d0' : '1px solid #a5f3fc', fontSize: 10, fontWeight: 600 }}>
+                        {doc.type === 7 ? 'Nhận chuyển hàng' : 'Chuyển hàng'}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName}</td>
+                    <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || doc.fromBranch?.name || 'Chi nhánh'}</td>
                     <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.businessDate).format('DD/MM/YYYY HH:mm')}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      {doc.totalAmount ? doc.totalAmount.toLocaleString() : 0} đ
+                      {doc.totalAmount ? doc.totalAmount.toLocaleString('vi-VN') : 0} đ
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      {isPending ? (
-                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7', fontSize: 10, fontWeight: 600 }}>
-                          Chờ nhận kho
+                      {isCancelled ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
+                          Đã hủy
+                        </span>
+                      ) : isDraft ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fefce8', color: '#ca8a04', border: '1px solid #fef08a', fontSize: 10, fontWeight: 600 }}>
+                          Lưu tạm
+                        </span>
+                      ) : isReceived ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
+                          Đã nhận đủ
+                        </span>
+                      ) : isPartial ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontSize: 10, fontWeight: 600 }}>
+                          Nhận 1 phần
+                        </span>
+                      ) : isRejected ? (
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
+                          Bị từ chối
                         </span>
                       ) : (
-                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
-                          Hoàn thành
+                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7', fontSize: 10, fontWeight: 600 }}>
+                          Đang vận chuyển
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator}</td>
+                    <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator?.name || doc.creator?.email || doc.creator || 'Admin'}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        {isPending && (
+                        {!isCancelled && !isDraft && isInTransit && (
                           <button
                             onClick={() => handleReceiveTransfer(doc)}
                             style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
@@ -134,16 +212,18 @@ const TransferTable = ({
                             Nhận
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Bạn có chắc chắn muốn xóa chứng từ này?')) {
-                              handleDeleteDocument(doc.id);
-                            }
-                          }}
-                          style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
-                        >
-                          Xóa
-                        </button>
+                        {!isCancelled && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Bạn có chắc chắn muốn xóa chứng từ chuyển hàng này?')) {
+                                handleDeleteDocument(doc.id);
+                              }
+                            }}
+                            style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
+                          >
+                            Xóa
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

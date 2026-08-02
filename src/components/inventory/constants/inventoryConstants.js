@@ -8,18 +8,14 @@ export const DOC_TYPE_CONFIG = {
 };
 
 export const SIDEBAR_HEADER_TITLES = {
-  Report: 'TỔNG QUAN',
   Import: 'NHẬP HÀNG',
   ImportReturn: 'TRẢ HÀNG NHẬP',
+  Invoice: 'HÓA ĐƠN',
+  ExportDelete: 'XUẤT HỦY',
   Production: 'SẢN XUẤT',
   Transfer: 'CHUYỂN HÀNG',
   Check: 'KIỂM KHO',
-  ExportDelete: 'XUẤT HỦY',
-  Partner: 'NHÀ CUNG CẤP / ĐỐI TÁC',
-  Product: 'MÓN ĂN',
-  GroupListing: 'NHÓM MÓN',
-  MenuListing: 'THỰC ĐƠN',
-  Invoice: 'HÓA ĐƠN',
-  Return: 'TRẢ HÀNG',
-  Cash: 'SỔ QUỶ'
+  Adjustment: 'ĐIỀU CHỈNH GIÁ VỐN',
+  Partner: 'ĐỐI TÁC',
+  Product: 'DANH SÁCH NGUYÊN LIỆU, MẶT HÀNG'
 };
