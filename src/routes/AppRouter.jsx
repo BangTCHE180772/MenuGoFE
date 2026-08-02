@@ -48,8 +48,6 @@ import ExpenseReportPage from '../pages/reports/ExpenseReportPage';
 import ProfitReportPage from '../pages/reports/ProfitReportPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
-import FinanceDashboardPage from '../pages/FinanceDashboardPage';
-import OrderDashboard from '../pages/OrderDashboard';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -138,8 +136,6 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
-                <Route path="/orderdashboard" element={<OrderDashboard />} />
                 <Route path="/reports/revenue" element={<RevenueReportPage />} />
                 <Route path="/reports/expense" element={<ExpenseReportPage />} />
                 <Route path="/reports/profit" element={<ProfitReportPage />} />

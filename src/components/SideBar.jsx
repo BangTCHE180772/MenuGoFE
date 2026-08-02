@@ -58,8 +58,6 @@ const ROLE_MENUS = {
   [ROLES.ADMIN]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
-    { label: "Hiệu quả Kinh Doanh", path: "/financedashboard", icon: <BarChartOutlined /> },
-    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
@@ -84,8 +82,6 @@ const ROLE_MENUS = {
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
-    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
-    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -104,8 +100,6 @@ const ROLE_MENUS = {
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
-    { label: "Hiệu quả KD", path: "/financedashboard", icon: <BarChartOutlined /> },
-    { label: "Hiệu quả Vận hành", path: "/orderdashboard", icon: <BarChartOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
