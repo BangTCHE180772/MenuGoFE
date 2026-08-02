@@ -23,16 +23,28 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!token;
-  // BE trả về user.roles (mảng), lấy phần tử đầu làm role chính
-  const roles = user?.roles ?? [];
+
+  // BE trả về user.roles (mảng) hoặc user.role (chuỗi)
+  const roles = (() => {
+    if (!user) return [];
+    if (Array.isArray(user.roles)) return user.roles;
+    if (typeof user.role === 'string') return [user.role];
+    if (typeof user.roleName === 'string') return [user.roleName];
+    return [];
+  })();
+
   const role = roles.length > 0 ? roles[0] : null;
 
   /**
-   * Kiểm tra user có role được phép không
+   * Kiểm tra user có role được phép không (không phân biệt hoa/thường)
    * @param {...string} allowedRoles - Danh sách roles cho phép
    */
-  const hasRole = useCallback((...allowedRoles) =>
-    roles.some(r => allowedRoles.includes(r)), [roles]);
+  const hasRole = useCallback((...allowedRoles) => {
+    if (!roles || roles.length === 0) return false;
+    const normalizeRole = (r) => String(r || '').toLowerCase().trim();
+    const normAllowed = allowedRoles.map(normalizeRole);
+    return roles.some((r) => normAllowed.includes(normalizeRole(r)));
+  }, [roles]);
 
   // Khi app khởi động: kiểm tra token còn hợp lệ không
   useEffect(() => {
