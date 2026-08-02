@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { message } from 'antd';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -12,16 +11,44 @@ import {
 import dayjs from 'dayjs';
 
 import { getProductsByDate, getPreviousLedgerSnapshots } from '../../../../api/binventoryApi';
-import { createCheckDocument } from '../../../../api/documentApi';
+import {
+  createCheckPending,
+  createCheckCompleted,
+  updateCheckPending,
+  completeCheckDocument,
+  deleteCheckPendingDocument,
+  getCheckById
+} from '../../../../api/documentApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
+
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2200);
+};
 
 const CheckDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = []
+  products = [],
+  editDocumentId = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
@@ -44,10 +71,10 @@ const CheckDocumentModal = ({
   const [items, setItems] = useState([]);
   const [recentChecks, setRecentChecks] = useState([]);
 
-  // Fetch BInventories by branch, date & searchQuery as user types
+  // Fetch BInventories by branch, date & searchQuery as user types (Mode 2: Exclude Processed)
   const fetchBInventories = useCallback((bId, date, query = '') => {
     if (!bId) return;
-    getProductsByDate(bId, date, query)
+    getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
         setBInventoryList(data);
@@ -60,26 +87,86 @@ const CheckDocumentModal = ({
 
   useEffect(() => {
     if (open) {
-      const now = dayjs();
-      setSelectedDateTime(now);
-      setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
-      setOpenTimeISO(now.toISOString());
-      setShowDatePicker(false);
-      setSearchQuery('');
-      setShowDropdown(false);
+      if (editDocumentId) {
+        setLoading(true);
+        Promise.all([
+          getCheckById(editDocumentId),
+          branchId ? getProductsByDate(branchId, new Date().toISOString(), '', null, 2) : Promise.resolve([])
+        ])
+          .then(([res, bInvRes]) => {
+            if (res) {
+              const dt = res.businessDate ? dayjs(res.businessDate) : dayjs();
+              setSelectedDateTime(dt);
+              setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
+              setOpenTimeISO(dt.toISOString());
+              setFormData({
+                docCode: res.code || '',
+                note: res.note || ''
+              });
 
-      setFormData({
-        docCode: '',
-        note: ''
-      });
-      setItems([]);
-      setRecentChecks([]);
+              const fetchedInventories = Array.isArray(bInvRes?.data) ? bInvRes.data : (Array.isArray(bInvRes) ? bInvRes : []);
+              if (fetchedInventories.length > 0) {
+                setBInventoryList(fetchedInventories);
+              }
 
-      if (branchId) {
-        fetchBInventories(branchId, now.toISOString(), '');
+              const inventoryOptions = fetchedInventories.length > 0 ? fetchedInventories : (products || []);
+              const mapDetails = (res.details || []).map((d) => {
+                const matchP = (inventoryOptions || []).find((b) => Number(b.id ?? b.bInventoryId) === Number(d.bInventoryId))
+                  || (products || []).find((p) => Number(p.id ?? p.bInventoryId) === Number(d.bInventoryId));
+                const conversions = matchP?.unitConversions || d.unitConversions || [];
+                const selectedUc = conversions.find((uc) => Number(uc.id) === Number(d.unitConversionId))
+                  || conversions.find((uc) => (uc.unitName || uc.name) === (d.currentUnitName || d.unitName))
+                  || (conversions.length > 0 ? conversions[0] : null);
+                const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : (d.conversionRate > 0 ? d.conversionRate : 1);
+                const costPriceVal = d.snapshotAvgCost || d.unitPrice || matchP?.runningAverageCost || matchP?.avg || matchP?.purchasePrice || 0;
+
+                return {
+                  rowId: `${d.bInventoryId}-${Date.now()}-${Math.random()}`,
+                  bInventoryId: d.bInventoryId,
+                  code: d.snapshotProductCode || d.currentProductCode || d.code || matchP?.code || `SP${d.bInventoryId}`,
+                  name: d.snapshotProductName || d.currentProductName || d.productName || d.bInventoryName || matchP?.name || 'Sản phẩm',
+                  baseStock: d.currentStockQuantity ?? d.systemQuantity ?? d.currentStock ?? matchP?.runningQuantity ?? matchP?.quantity ?? 0,
+                  systemStock: d.currentStockQuantity ?? d.systemQuantity ?? d.currentStock ?? matchP?.runningQuantity ?? matchP?.quantity ?? 0,
+                  baseAvgCost: costPriceVal,
+                  costPrice: costPriceVal,
+                  unitConversionId: selectedUc ? Number(selectedUc.id) : (d.unitConversionId ? Number(d.unitConversionId) : null),
+                  unitName: selectedUc ? (selectedUc.unitName || selectedUc.name) : (d.currentUnitName || d.unitName || matchP?.unitName || 'Đơn vị'),
+                  unitConversions: conversions,
+                  conversionPoint: conversionPoint,
+                  actualQuantity: d.quantity ?? (conversionPoint > 0 ? (d.actualQuantity / conversionPoint) : d.actualQuantity) ?? 0,
+                  note: d.note || ''
+                };
+              });
+              setItems(mapDetails);
+            }
+          })
+          .catch((err) => {
+            console.error('Lỗi khi tải chi tiết kiểm kho:', err);
+            showToast('Không thể tải chi tiết phiếu kiểm kho', 'error');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        const now = dayjs();
+        setSelectedDateTime(now);
+        setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
+        setOpenTimeISO(now.toISOString());
+        setShowDatePicker(false);
+        setSearchQuery('');
+        setShowDropdown(false);
+
+        setFormData({
+          docCode: '',
+          note: ''
+        });
+        setItems([]);
+        setRecentChecks([]);
+
+        if (branchId) {
+          fetchBInventories(branchId, now.toISOString(), '');
+        }
       }
     }
-  }, [open, branchId, fetchBInventories]);
+  }, [open, editDocumentId, branchId, fetchBInventories]);
 
   // Trigger search on user typing
   useEffect(() => {
@@ -101,47 +188,35 @@ const CheckDocumentModal = ({
     if (branchId) {
       fetchBInventories(branchId, isoStr, searchQuery);
     }
-
-    if (items.length > 0) {
-      try {
-        const bInvIds = items.map((i) => Number(i.bInventoryId)).filter(Boolean);
-        const snapshots = await getPreviousLedgerSnapshots(isoStr, bInvIds);
-        const snapshotMap = new Map();
-        if (Array.isArray(snapshots)) {
-          snapshots.forEach((s) => snapshotMap.set(Number(s.bInventoryId || s.binventoryId), s));
-        }
-
-        setItems((prevItems) =>
-          prevItems.map((item) => {
-            const snap = snapshotMap.get(Number(item.bInventoryId));
-            const newStock = snap ? Number(snap.runningQuantity || 0) : 0;
-            const newCost = snap ? Number(snap.runningAverageCost || 0) : 0;
-            return {
-              ...item,
-              systemStock: newStock,
-              costPrice: newCost
-            };
-          })
-        );
-        message.info(`Đã cập nhật tồn kho & giá vốn hệ thống theo mốc thời gian ${formattedStr}`);
-      } catch (err) {
-        console.error('Failed to update ledger snapshots on date change:', err);
-      }
-    }
   };
 
   const searchOptions = useMemo(() => {
     const rawList = bInventoryList.length > 0 ? bInventoryList : products;
     return rawList
-      .filter((b) => b && (b.id != null || b.bInventoryId != null || b.productId != null))
-      .map((b) => ({
-        id: b.id ?? b.bInventoryId ?? b.productId,
-        code: b.code || b.skuCode || `SP${b.id ?? b.productId}`,
-        name: b.name || 'Sản phẩm',
-        systemStock: b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0,
-        costPrice: b.runningAverageCost ?? b.purchasePrice ?? b.avg ?? b.sellPrice ?? 0,
-        unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || ''
-      }));
+      .filter((b) => {
+        if (!b || (b.id == null && b.bInventoryId == null && b.productId == null)) return false;
+        const rawType = b.type ?? b.productType ?? b.product?.type;
+        const typeStr = String(rawType ?? '').toLowerCase();
+        if (typeStr === 'processed' || rawType === 1) return false;
+        return true;
+      })
+      .map((b) => {
+        const conversions = b.unitConversions || b.product?.unitConversions || [];
+        const baseUnitName = b.baseUnit?.unitName || b.unitName || conversions[0]?.unitName || 'Đơn vị';
+        const stockVal = b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0;
+        const avgVal = (b.runningAverageCost > 0 ? b.runningAverageCost : (b.avg > 0 ? b.avg : (b.purchasePrice > 0 ? b.purchasePrice : (b.sellPrice || 0))));
+        return {
+          id: b.id ?? b.bInventoryId ?? b.productId,
+          code: b.code || b.skuCode || `SP${b.id ?? b.productId}`,
+          name: b.name || 'Sản phẩm',
+          baseStock: stockVal,
+          baseAvgCost: avgVal,
+          systemStock: stockVal,
+          costPrice: avgVal,
+          unitName: baseUnitName,
+          unitConversions: conversions
+        };
+      });
   }, [bInventoryList, products]);
 
   // Filter options strictly following search query AND EXCLUDING ALREADY ADDED ITEMS (No duplicates!)
@@ -165,21 +240,49 @@ const CheckDocumentModal = ({
       return;
     }
 
+    const conversions = opt.unitConversions || [];
+    const defaultUc = conversions.length > 0 ? conversions[0] : null;
+    const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
+    const convertedStock = (opt.baseStock || 0) / conversionPoint;
+
     const newItem = {
       rowId: `${opt.id}-${Date.now()}`,
       bInventoryId: opt.id,
       code: opt.code,
       name: opt.name,
-      unitName: opt.unitName,
-      systemStock: opt.systemStock,
-      actualQuantity: opt.systemStock,
-      costPrice: opt.costPrice
+      baseStock: opt.baseStock,
+      baseAvgCost: opt.baseAvgCost,
+      unitConversionId: defaultUc ? defaultUc.id : null,
+      unitName: defaultUc ? defaultUc.unitName : opt.unitName,
+      unitConversions: conversions,
+      conversionPoint: conversionPoint,
+      actualQuantity: convertedStock
     };
     setItems((prev) => [...prev, newItem]);
-    addRecentCheck(opt.name, opt.systemStock);
+    addRecentCheck(opt.name, convertedStock);
 
     setSearchQuery('');
     setShowDropdown(false);
+  };
+
+  const handleUnitChange = (index, ucId) => {
+    const updated = [...items];
+    const item = updated[index];
+    const conversions = item.unitConversions || [];
+    const selectedUc = conversions.find((c) => Number(c.id) === Number(ucId));
+    const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : 1;
+    const unitName = selectedUc ? selectedUc.unitName : item.unitName;
+
+    const convertedStock = (item.baseStock || 0) / conversionPoint;
+
+    updated[index] = {
+      ...item,
+      unitConversionId: selectedUc ? Number(selectedUc.id) : null,
+      unitName: unitName,
+      conversionPoint: conversionPoint,
+      actualQuantity: convertedStock
+    };
+    setItems(updated);
   };
 
   const addRecentCheck = (itemName, actualQty) => {
@@ -200,13 +303,19 @@ const CheckDocumentModal = ({
     addRecentCheck(updated[index].name, qty);
   };
 
-  const totalActualQuantity = useMemo(() => {
-    return items.reduce((sum, i) => sum + (Number(i.actualQuantity) || 0), 0);
+  const totalDiffValue = useMemo(() => {
+    return items.reduce((sum, i) => {
+      const conversionPoint = i.conversionPoint || 1;
+      const convertedSystemStock = (i.baseStock ?? i.systemStock ?? 0) / conversionPoint;
+      const convertedUnitPrice = conversionPoint * (i.baseAvgCost ?? i.costPrice ?? 0);
+      const diffQty = (i.actualQuantity || 0) - convertedSystemStock;
+      return sum + diffQty * convertedUnitPrice;
+    }, 0);
   }, [items]);
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
-      message.error('Vui lòng chọn ít nhất 1 sản phẩm để kiểm kho.');
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm để kiểm kho.', 'error');
       return;
     }
 
@@ -214,25 +323,59 @@ const CheckDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: openTimeISO || new Date().toISOString(),
-        createdByAccountId: Number(user?.id || user?.accountId || 1),
+        orderDate: openTimeISO || new Date().toISOString(),
         note: formData.note || '',
         details: items.map((i) => ({
           bInventoryId: Number(i.bInventoryId),
+          unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
           actualQuantity: Number(i.actualQuantity),
-          unitPrice: i.costPrice && Number(i.costPrice) >= 1 ? Math.floor(Number(i.costPrice)) : null,
           note: ''
         }))
       };
-      await createCheckDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Kiểm kho thành công!`);
+
+      if (editDocumentId) {
+        if (isDraft) {
+          await updateCheckPending(editDocumentId, dto);
+          showToast('Cập nhật phiếu kiểm kho nháp thành công!');
+        } else {
+          await updateCheckPending(editDocumentId, dto);
+          await completeCheckDocument(editDocumentId);
+          showToast('Hoàn thành phiếu kiểm kho thành công!');
+        }
+      } else {
+        if (isDraft) {
+          await createCheckPending(dto);
+          showToast('Lưu tạm phiếu kiểm kho thành công!');
+        } else {
+          await createCheckCompleted(dto);
+          showToast('Tạo và Hoàn thành phiếu kiểm kho thành công!');
+        }
+      }
+
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
       const errMsg =
-        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu kiểm kho.';
-      message.error(errMsg);
+        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi lưu phiếu kiểm kho.';
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelPending = async () => {
+    if (!editDocumentId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiếu kiểm kho nháp này?')) return;
+    setLoading(true);
+    try {
+      await deleteCheckPendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
+      showToast('Đã chuyển phiếu kiểm kho sang trạng thái Canceled!');
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể hủy phiếu nháp', 'error');
     } finally {
       setLoading(false);
     }
@@ -271,7 +414,7 @@ const CheckDocumentModal = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
-            Kiểm kho
+            {editDocumentId ? `Chỉnh sửa phiếu kiểm kho (${formData.docCode || ''})` : 'Tạo phiếu kiểm kho'}
           </span>
 
           {/* SEARCH PRODUCT DROPDOWN CONTAINER */}
@@ -350,7 +493,7 @@ const CheckDocumentModal = ({
                         </div>
                       </div>
                       <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Tồn: {opt.systemStock}
+                        Tồn: {Number(opt.systemStock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')}
                       </span>
                     </div>
                   ))
@@ -427,27 +570,31 @@ const CheckDocumentModal = ({
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
                   <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
-                  <th style={{ padding: '8px 8px', width: 40, textAlign: 'center' }}>STT</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 140 }}>MÃ HÀNG HÓA</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 110 }}>TỒN KHO</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 130 }}>THỰC TẾ</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 110 }}>SL LỆCH</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>GIÁ TRỊ LỆCH</th>
+                  <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG HÓA</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐVT</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>THỰC TẾ</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>SL LỆCH</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 110 }}>GIÁ TRỊ LỆCH</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
                       Chưa có sản phẩm nào được chọn để kiểm kho.
                     </td>
                   </tr>
                 ) : (
                   items.map((record, index) => {
-                    const diff = (record.actualQuantity || 0) - (record.systemStock || 0);
+                    const conversionPoint = record.conversionPoint || 1;
+                    const convertedSystemStock = (record.baseStock ?? record.systemStock ?? 0) / conversionPoint;
+                    const convertedUnitPrice = conversionPoint * (record.baseAvgCost ?? record.costPrice ?? 0);
+                    const diff = (record.actualQuantity || 0) - convertedSystemStock;
                     const diffColor = diff > 0 ? '#059669' : diff < 0 ? '#dc2626' : '#64748b';
-                    const diffVal = diff * (record.costPrice || 0);
+                    const diffVal = diff * convertedUnitPrice;
                     const diffValColor = diffVal > 0 ? '#059669' : diffVal < 0 ? '#dc2626' : '#64748b';
 
                     return (
@@ -467,26 +614,46 @@ const CheckDocumentModal = ({
                           </button>
                         </td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
-                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 10px' }}>{record.code}</td>
-                        <td style={{ padding: '6px 10px' }}>
+                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 8px' }}>{record.code}</td>
+                        <td style={{ padding: '6px 8px' }}>
                           <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
-                          {record.unitName && (
-                            <span style={{ fontSize: 10, color: '#64748b', marginLeft: 6 }}>
-                              ({record.unitName})
-                            </span>
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                          {record.unitConversions && record.unitConversions.length > 0 ? (
+                            <select
+                              value={record.unitConversionId || ''}
+                              onChange={(e) => handleUnitChange(index, e.target.value)}
+                              style={{
+                                height: 26,
+                                padding: '0 4px',
+                                fontSize: 11,
+                                borderRadius: 4,
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                outline: 'none'
+                              }}
+                            >
+                              {record.unitConversions.map((uc) => (
+                                <option key={uc.id} value={uc.id}>
+                                  {uc.unitName || uc.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span style={{ color: '#475569' }}>{record.unitName || 'Đơn vị'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', color: '#64748b' }}>
-                          {(record.systemStock != null ? record.systemStock : 0).toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', color: '#64748b' }}>
+                          {convertedSystemStock.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px 10px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
                           <input
                             type="number"
                             min={0}
                             value={record.actualQuantity ?? 0}
                             onChange={(e) => handleActualQtyChange(index, e.target.value)}
                             style={{
-                              width: 80,
+                              width: 75,
                               textAlign: 'center',
                               borderRadius: 16,
                               border: '1px solid #cbd5e1',
@@ -496,11 +663,11 @@ const CheckDocumentModal = ({
                             }}
                           />
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 700, color: diffColor }}>
-                          {diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: diffColor }}>
+                          {diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: diffValColor }}>
-                          {diffVal > 0 ? '+' : ''}{diffVal.toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 600, color: diffValColor }}>
+                          {diffVal > 0 ? '+' : ''}{Math.round(diffVal).toLocaleString('vi-VN')} đ
                         </td>
                       </tr>
                     );
@@ -598,10 +765,17 @@ const CheckDocumentModal = ({
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6 }}>
-              <span style={{ color: '#475569', fontSize: 11 }}>Tổng Sl. thực tế</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
+              <span style={{ color: '#475569', fontSize: 11, fontWeight: 600 }}>Tổng Sl. thực tế:</span>
               <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                {totalActualQuantity.toLocaleString('vi-VN')}
+                {items.reduce((sum, i) => sum + (Number(i.actualQuantity) || 0), 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#334155', fontSize: 11.5, fontWeight: 700 }}>Chênh lệch giá trị:</span>
+              <span style={{ fontWeight: 700, fontSize: 13, color: totalDiffValue > 0 ? '#059669' : totalDiffValue < 0 ? '#dc2626' : '#64748b' }}>
+                {totalDiffValue > 0 ? '+' : ''}{Math.round(totalDiffValue).toLocaleString('vi-VN')} đ
               </span>
             </div>
 
@@ -658,41 +832,45 @@ const CheckDocumentModal = ({
             </div>
           </div>
 
-          {/* ACTION BUTTONS */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+          {/* ACTION BUTTONS AT SIDEBAR FOOTER ([LƯU TẠM] & [HOÀN THÀNH]) */}
+          <div style={{ padding: 16, borderTop: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', gap: 10 }}>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || items.length === 0}
               onClick={() => handleSubmit(true)}
               style={{
                 flex: 1,
-                background: '#ffffff',
-                border: '1px solid #e8442a',
-                color: '#e8442a',
-                fontWeight: 600,
+                height: 38,
+                fontSize: 12,
+                fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
-                cursor: 'pointer'
+                border: '1px solid #fde68a',
+                background: loading || items.length === 0 ? '#fef3c7' : '#f59e0b',
+                color: '#ffffff',
+                cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer'
               }}
             >
-              Lưu tạm
+              {loading ? 'Đang lưu...' : 'Lưu tạm'}
             </button>
+
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || items.length === 0}
               onClick={() => handleSubmit(false)}
               style={{
                 flex: 1,
-                background: '#e8442a',
-                border: '1px solid #e8442a',
-                color: '#ffffff',
+                height: 38,
+                fontSize: 12,
                 fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
-                cursor: 'pointer'
+                border: 'none',
+                background: loading || items.length === 0 ? '#cbd5e1' : '#e8442a',
+                color: '#ffffff',
+                cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
               }}
             >
-              HOÀN THÀNH
+              {loading ? 'Đang xử lý...' : 'Hoàn thành'}
             </button>
           </div>
         </div>

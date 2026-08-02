@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { message } from 'antd';
 import {
   CloseOutlined,
   SearchOutlined,
@@ -8,16 +7,44 @@ import {
 import dayjs from 'dayjs';
 
 import { getProductsByDate } from '../../../../api/binventoryApi';
-import { createProductionDocument } from '../../../../api/documentApi';
+import {
+  createProductionPending,
+  createProductionCompleted,
+  updateProductionPending,
+  completeProductionDocument,
+  deleteProductionPendingDocument,
+  getProductionById
+} from '../../../../api/documentApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
+
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2200);
+};
 
 const ProductionDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = []
+  products = [],
+  editDocumentId = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
@@ -43,10 +70,10 @@ const ProductionDocumentModal = ({
     autoDeductSecondary: true
   });
 
-  // Fetch Manufactured products ONLY
+  // Fetch Manufactured products ONLY (Mode 3)
   const fetchManufacturedProducts = useCallback((bId, date, query = '') => {
     if (!bId) return;
-    getProductsByDate(bId, date, query, 'Manufactured')
+    getProductsByDate(bId, date, query, 'Manufactured', 3)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
         setManufacturedList(data);
@@ -59,29 +86,62 @@ const ProductionDocumentModal = ({
 
   useEffect(() => {
     if (open) {
-      const now = dayjs();
-      setSelectedDateTime(now);
-      setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
-      setOpenTimeISO(now.toISOString());
-      setShowDatePicker(false);
-      setActiveTab('info');
+      if (editDocumentId) {
+        setLoading(true);
+        getProductionById(editDocumentId)
+          .then((res) => {
+            if (res) {
+              const dt = res.businessDate ? dayjs(res.businessDate) : dayjs();
+              setSelectedDateTime(dt);
+              setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
+              setOpenTimeISO(dt.toISOString());
+              setFormData({
+                docCode: res.code || '',
+                note: res.note || '',
+                autoDeductSecondary: true
+              });
+              const finishedDetail = (res.details || []).find((d) => d.isFinishedProduct || d.fatherId == null) || res.details?.[0];
+              if (finishedDetail) {
+                setSelectedManufactured({
+                  id: finishedDetail.bInventoryId,
+                  name: finishedDetail.productName || finishedDetail.bInventoryName || 'Thành phẩm',
+                  code: finishedDetail.code || '',
+                  unitName: finishedDetail.unitName || 'Đơn vị'
+                });
+                setFinishedQuantity(finishedDetail.quantity || 1);
+              }
+            }
+          })
+          .catch((err) => {
+            console.error('Lỗi khi tải chi tiết sản xuất:', err);
+            showToast('Không thể tải chi tiết phiếu sản xuất', 'error');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        const now = dayjs();
+        setSelectedDateTime(now);
+        setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
+        setOpenTimeISO(now.toISOString());
+        setShowDatePicker(false);
+        setActiveTab('info');
 
-      setManufacturedQuery('');
-      setShowDropdown(false);
-      setSelectedManufactured(null);
-      setFinishedQuantity(1);
+        setManufacturedQuery('');
+        setShowDropdown(false);
+        setSelectedManufactured(null);
+        setFinishedQuantity(1);
 
-      setFormData({
-        docCode: '',
-        note: '',
-        autoDeductSecondary: true
-      });
+        setFormData({
+          docCode: '',
+          note: '',
+          autoDeductSecondary: true
+        });
 
-      if (branchId) {
-        fetchManufacturedProducts(branchId, now.toISOString(), '');
+        if (branchId) {
+          fetchManufacturedProducts(branchId, now.toISOString(), '');
+        }
       }
     }
-  }, [open, branchId, fetchManufacturedProducts]);
+  }, [open, editDocumentId, branchId, fetchManufacturedProducts]);
 
   // Dynamic search on user typing for Manufactured products
   useEffect(() => {
@@ -103,9 +163,14 @@ const ProductionDocumentModal = ({
   };
 
   const manufacturedOptions = useMemo(() => {
-    const raw = manufacturedList.length > 0 ? manufacturedList : products.filter((p) => p.type === 'Manufactured');
+    const raw = manufacturedList.length > 0 ? manufacturedList : products;
     return raw
-      .filter((b) => b && (b.id != null || b.bInventoryId != null))
+      .filter((b) => {
+        if (!b || (b.id == null && b.bInventoryId == null)) return false;
+        const rawType = b.type ?? b.productType ?? b.product?.type;
+        const typeStr = String(rawType ?? '').toLowerCase();
+        return typeStr === 'manufactured' || rawType === 2;
+      })
       .map((b) => ({
         id: b.id ?? b.bInventoryId,
         code: b.code || b.skuCode || `SP${b.id}`,
@@ -143,32 +208,71 @@ const ProductionDocumentModal = ({
 
   const handleSubmit = async (isDraft = false) => {
     if (!selectedManufactured) {
-      message.error('Vui lòng chọn 1 mặt hàng sản xuất.');
+      showToast('Vui lòng chọn 1 mặt hàng sản xuất.', 'error');
       return;
     }
 
-    const qty = Math.min(1000000000, Math.max(0.001, Number(finishedQuantity) || 1));
+    const qty = Math.min(10000000000, Math.max(0.001, Number(finishedQuantity) || 1));
 
     setLoading(true);
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: openTimeISO || new Date().toISOString(),
-        createdByAccountId: Number(user?.id || user?.accountId || 1),
-        finishedBInventoryId: Number(selectedManufactured.id),
-        finishedQuantity: qty,
-        note: formData.note || ''
+        orderDate: new Date().toISOString(),
+        note: formData.note || '',
+        details: [
+          {
+            bInventoryId: Number(selectedManufactured.id),
+            quantity: qty,
+            fatherId: null,
+            unitConversionId: null
+          }
+        ]
       };
 
-      await createProductionDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} tạo phiếu sản xuất thành công!`);
+      if (editDocumentId) {
+        if (isDraft) {
+          await updateProductionPending(editDocumentId, dto);
+          showToast('Cập nhật phiếu sản xuất nháp thành công!');
+        } else {
+          await updateProductionPending(editDocumentId, dto);
+          await completeProductionDocument(editDocumentId);
+          showToast('Hoàn thành phiếu sản xuất thành công!');
+        }
+      } else {
+        if (isDraft) {
+          await createProductionPending(dto);
+          showToast('Lưu tạm phiếu sản xuất thành công!');
+        } else {
+          await createProductionCompleted(dto);
+          showToast('Tạo và Hoàn thành phiếu sản xuất thành công!');
+        }
+      }
+
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
       const errMsg =
-        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu sản xuất.';
-      message.error(errMsg);
+        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi lưu phiếu sản xuất.';
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelPending = async () => {
+    if (!editDocumentId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiếu sản xuất nháp này?')) return;
+    setLoading(true);
+    try {
+      await deleteProductionPendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
+      showToast('Đã chuyển phiếu sản xuất sang trạng thái Canceled!');
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể hủy phiếu nháp', 'error');
     } finally {
       setLoading(false);
     }
@@ -362,10 +466,10 @@ const ProductionDocumentModal = ({
                   <input
                     type="number"
                     min={0.001}
-                    max={1000000000}
+                    max={10000000000}
                     step="any"
                     value={finishedQuantity}
-                    onChange={(e) => setFinishedQuantity(Math.min(1000000000, Math.max(0.001, Number(e.target.value) || 1)))}
+                    onChange={(e) => setFinishedQuantity(Math.min(10000000000, Math.max(0.001, Number(e.target.value) || 1)))}
                     style={{
                       width: '100%',
                       textAlign: 'center',
@@ -381,55 +485,23 @@ const ProductionDocumentModal = ({
                 </div>
               </div>
 
-              {/* ROW 2: MÃ SẢN XUẤT & NGÀY TẠO */}
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã sản xuất</div>
-                  <input
-                    type="text"
-                    value={formData.docCode}
-                    onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
-                    placeholder="Tự động"
-                    style={{
-                      width: '100%',
-                      borderRadius: 18,
-                      padding: '6px 14px',
-                      border: '1px solid #cbd5e1',
-                      outline: 'none',
-                      fontSize: 12
-                    }}
-                  />
-                </div>
-
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Ngày tạo</div>
-                  <div
-                    onClick={() => setShowDatePicker(!showDatePicker)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: '#ffffff',
-                      borderRadius: 18,
-                      padding: '6px 14px',
-                      border: '1px solid #cbd5e1',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      color: '#0f172a'
-                    }}
-                  >
-                    <span>{openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm')}</span>
-                    <CalendarOutlined style={{ color: '#94a3b8' }} />
-                  </div>
-
-                  {showDatePicker && (
-                    <KiotDateTimePicker
-                      value={selectedDateTime}
-                      onChange={handleDateChange}
-                      onClose={() => setShowDatePicker(false)}
-                    />
-                  )}
-                </div>
+              {/* ROW 2: MÃ SẢN XUẤT */}
+              <div>
+                <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã sản xuất</div>
+                <input
+                  type="text"
+                  value={formData.docCode}
+                  onChange={(e) => setFormData({ ...formData, docCode: e.target.value })}
+                  placeholder="Tự động"
+                  style={{
+                    width: '100%',
+                    borderRadius: 18,
+                    padding: '6px 14px',
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    fontSize: 12
+                  }}
+                />
               </div>
 
               {/* ROW 3: GHI CHÚ */}
@@ -514,6 +586,25 @@ const ProductionDocumentModal = ({
           >
             Bỏ qua
           </button>
+          {editDocumentId && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleCancelPending}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #dc2626',
+                color: '#dc2626',
+                fontWeight: 600,
+                padding: '8px 18px',
+                borderRadius: 20,
+                cursor: 'pointer',
+                fontSize: 12
+              }}
+            >
+              Hủy phiếu nháp
+            </button>
+          )}
           <button
             type="button"
             disabled={loading}

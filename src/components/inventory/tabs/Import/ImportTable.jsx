@@ -260,8 +260,9 @@ const ImportTable = ({
                 const supplierPartner = (loadedDoc.partners || []).find((p) => p.partnerType === 1 || p.partnerType === 'Supplier') || loadedDoc.partner || loadedDoc.partners?.[0];
                 const supplierName = loadedDoc.partnerName || supplierPartner?.partnerName || loadedDoc.partner?.name || '---';
 
-                const supplierAmountDue = Math.round(Number(loadedDoc.amountDue ?? supplierPartner?.amountDue ?? (loadedDoc.totalAmount || 0)));
+                const totalInvoiceAmount = Math.round(Number(loadedDoc.totalAmount || 0));
                 const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? cashFlowsList.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
+                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (totalInvoiceAmount - supplierAmountPaid)));
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -479,9 +480,9 @@ const ImportTable = ({
                                         Nhà cung cấp: <span style={{ color: '#2563eb' }}>{supplierName}</span>
                                       </div>
                                       <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#475569' }}>
-                                        <div>Cần trả NCC: <strong>{supplierAmountDue.toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Tổng tiền đơn: <strong>{totalInvoiceAmount.toLocaleString('vi-VN')} đ</strong></div>
                                         <div>Đã trả NCC: <strong style={{ color: '#059669' }}>{supplierAmountPaid.toLocaleString('vi-VN')} đ</strong></div>
-                                        <div>Còn nợ: <strong style={{ color: '#ef4444' }}>{Math.max(0, supplierAmountDue - supplierAmountPaid).toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Còn nợ NCC: <strong style={{ color: '#ef4444' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
                                       </div>
                                     </div>
 

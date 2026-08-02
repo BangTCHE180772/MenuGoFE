@@ -131,21 +131,31 @@ const ImportDocumentModal = ({
                               matchedInv?.conversions ||
                               matchedInv?.product?.unitConversions || [];
 
+          const selectedUc = d.unitConversionId ? conversions.find((c) => Number(c.id) === Number(d.unitConversionId)) : (conversions.length > 0 ? conversions[0] : null);
+          const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : (d.conversionRate > 0 ? d.conversionRate : 1);
+
           const pCode = d.productCode || d.currentProductCode || d.snapshotProductCode || d.code || matchedInv?.code || 'SP';
           const pName = d.productName || d.currentProductName || d.snapshotProductName || d.name || matchedInv?.name || 'Sản phẩm';
-          const uName = d.unitName || d.currentUnitName || d.snapshotUnitName || (conversions.length > 0 ? conversions[0].unitName : '') || 'Đơn vị';
+          const uName = selectedUc ? (selectedUc.unitName || selectedUc.name) : (d.unitName || d.currentUnitName || d.snapshotUnitName || 'Đơn vị');
+
+          const baseStock = d.currentStockQuantity ?? d.systemQuantity ?? d.bInventory?.quantity ?? matchedInv?.stock ?? matchedInv?.quantity ?? 0;
+          const convertedStock = baseStock / conversionPoint;
+          const unitPriceVal = Math.floor(Number(d.unitPrice || 0));
 
           return {
             rowId: `${bInvId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             bInventoryId: bInvId,
             code: pCode,
             name: pName,
-            stock: d.currentStockQuantity ?? d.bInventory?.quantity ?? matchedInv?.stock ?? 0,
+            baseStock: baseStock,
+            stock: convertedStock,
             quantity: Number(d.quantity || 1),
-            unitPrice: Math.floor(Number(d.unitPrice || 0)),
-            unitConversionId: d.unitConversionId ? Number(d.unitConversionId) : (conversions.length > 0 ? Number(conversions[0].id) : null),
+            baseUnitPrice: conversionPoint > 0 ? unitPriceVal / conversionPoint : unitPriceVal,
+            unitPrice: unitPriceVal,
+            unitConversionId: selectedUc ? Number(selectedUc.id) : null,
             unitName: uName,
-            unitConversions: conversions
+            unitConversions: conversions,
+            conversionPoint: conversionPoint
           };
         });
         setItems(mappedItems);
@@ -183,7 +193,7 @@ const ImportDocumentModal = ({
   useEffect(() => {
     if (!open || !branchId || !searchQuery) return;
     const timer = setTimeout(() => {
-      getProductsByDate(branchId, null, searchQuery)
+      getProductsByDate(branchId, null, searchQuery, null, 1)
         .then((res) => {
           const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
           if (data.length > 0) setBInventoryList(data);
@@ -232,6 +242,12 @@ const ImportDocumentModal = ({
       }
 
       const conversions = prod.unitConversions || prod.conversions || prod.product?.unitConversions || [];
+      const defaultUc = conversions.length > 0 ? conversions[0] : null;
+      const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
+      const baseStock = prod.quantity ?? prod.stockQuantity ?? prod.stock ?? prod.baseStock ?? 0;
+      const convertedStock = baseStock / conversionPoint;
+      const basePrice = Math.floor(Number(prod.purchasePrice || prod.avg || prod.sellPrice || 0));
+
       return [
         ...prevItems,
         {
@@ -239,17 +255,44 @@ const ImportDocumentModal = ({
           bInventoryId: bInvId,
           code: prod.code || prod.skuCode || `SP${bInvId}`,
           name: prod.name || 'Sản phẩm',
-          stock: prod.quantity ?? prod.stockQuantity ?? 0,
+          baseStock: baseStock,
+          stock: convertedStock,
           quantity: 1,
-          unitPrice: Math.floor(Number(prod.purchasePrice || prod.avg || prod.sellPrice || 0)),
-          unitConversionId: conversions.length > 0 ? Number(conversions[0].id) : null,
-          unitName: conversions.length > 0 ? conversions[0].unitName || conversions[0].name : (prod.unitName || 'Đơn vị'),
-          unitConversions: conversions
+          baseUnitPrice: basePrice,
+          unitPrice: Math.floor(basePrice * conversionPoint),
+          unitConversionId: defaultUc ? Number(defaultUc.id) : null,
+          unitName: defaultUc ? (defaultUc.unitName || defaultUc.name) : (prod.unitName || 'Đơn vị'),
+          unitConversions: conversions,
+          conversionPoint: conversionPoint
         }
       ];
     });
     setSearchQuery('');
     setShowDropdown(false);
+  };
+
+  const handleUnitChange = (rowId, ucId) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.rowId !== rowId) return item;
+        const conversions = item.unitConversions || [];
+        const selectedUc = conversions.find((c) => Number(c.id) === Number(ucId));
+        const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : 1;
+        const unitName = selectedUc ? (selectedUc.unitName || selectedUc.name) : item.unitName;
+        const baseStock = item.baseStock ?? item.stock ?? 0;
+        const convertedStock = baseStock / conversionPoint;
+        const baseUnitPrice = item.baseUnitPrice ?? (item.conversionPoint > 0 ? item.unitPrice / item.conversionPoint : item.unitPrice);
+
+        return {
+          ...item,
+          unitConversionId: selectedUc ? Number(selectedUc.id) : null,
+          unitName: unitName,
+          conversionPoint: conversionPoint,
+          stock: convertedStock,
+          unitPrice: Math.floor(baseUnitPrice * conversionPoint)
+        };
+      })
+    );
   };
 
   const handleRemoveItem = (rowId) => {
@@ -582,7 +625,7 @@ const ImportDocumentModal = ({
                           {item.unitConversions && item.unitConversions.length > 0 ? (
                             <select
                               value={item.unitConversionId || ''}
-                              onChange={(e) => handleItemChange(item.rowId, 'unitConversionId', e.target.value ? Number(e.target.value) : null)}
+                              onChange={(e) => handleUnitChange(item.rowId, e.target.value)}
                               style={{
                                 height: 26,
                                 padding: '0 4px',
@@ -600,10 +643,12 @@ const ImportDocumentModal = ({
                               ))}
                             </select>
                           ) : (
-                            <span style={{ color: '#475569' }}>{item.unitName || 'Cái'}</span>
+                            <span style={{ color: '#475569' }}>{item.unitName || 'Đơn vị'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px 8px' }}>{item.stock}</td>
+                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px 8px' }}>
+                          {item.stock != null ? Number(item.stock).toLocaleString('vi-VN', { maximumFractionDigits: 3 }) : 0}
+                        </td>
                         <td style={{ textAlign: 'center', padding: '6px 8px' }}>
                           <input
                             type="number"

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { message } from 'antd';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -13,16 +12,44 @@ import {
 import dayjs from 'dayjs';
 
 import { getProductsByDate, getPreviousLedgerSnapshots } from '../../../../api/binventoryApi';
-import { createExportDeleteDocument } from '../../../../api/documentApi';
+import {
+  createExportDeletePending,
+  createExportDeleteCompleted,
+  updateExportDeletePending,
+  completeExportDeleteDocument,
+  deleteExportDeletePendingDocument,
+  getExportDeleteById
+} from '../../../../api/documentApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
+
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2200);
+};
 
 const DisposalDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = []
+  products = [],
+  editDocumentId = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
@@ -44,10 +71,10 @@ const DisposalDocumentModal = ({
   });
   const [items, setItems] = useState([]);
 
-  // Fetch BInventories by branch, date & searchQuery as user types
+  // Fetch BInventories by branch, date & searchQuery as user types (Mode 2: Exclude Processed)
   const fetchBInventories = useCallback((bId, date, query = '') => {
     if (!bId) return;
-    getProductsByDate(bId, date, query)
+    getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
         setBInventoryList(data);
@@ -60,25 +87,88 @@ const DisposalDocumentModal = ({
 
   useEffect(() => {
     if (open) {
-      const now = dayjs();
-      setSelectedDateTime(now);
-      setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
-      setOpenTimeISO(now.toISOString());
-      setShowDatePicker(false);
-      setSearchQuery('');
-      setShowDropdown(false);
+      if (editDocumentId) {
+        setLoading(true);
+        Promise.all([
+          getExportDeleteById(editDocumentId),
+          branchId ? getProductsByDate(branchId, new Date().toISOString(), '', null, 2) : Promise.resolve([])
+        ])
+          .then(([res, bInvRes]) => {
+            if (res) {
+              const dt = res.businessDate ? dayjs(res.businessDate) : dayjs();
+              setSelectedDateTime(dt);
+              setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
+              setOpenTimeISO(dt.toISOString());
+              setFormData({
+                docCode: res.code || '',
+                note: res.note || ''
+              });
 
-      setFormData({
-        docCode: '',
-        note: ''
-      });
-      setItems([]);
+              const fetchedInventories = Array.isArray(bInvRes?.data) ? bInvRes.data : (Array.isArray(bInvRes) ? bInvRes : []);
+              if (fetchedInventories.length > 0) {
+                setBInventoryList(fetchedInventories);
+              }
 
-      if (branchId) {
-        fetchBInventories(branchId, now.toISOString(), '');
+              const inventoryOptions = fetchedInventories.length > 0 ? fetchedInventories : (products || []);
+              const mapDetails = (res.details || []).map((d) => {
+                const matchP = (inventoryOptions || []).find((b) => Number(b.id ?? b.bInventoryId) === Number(d.bInventoryId))
+                  || (products || []).find((p) => Number(p.id ?? p.bInventoryId) === Number(d.bInventoryId));
+                const conversions = matchP?.unitConversions || d.unitConversions || [];
+                const selectedUc = conversions.find((uc) => Number(uc.id) === Number(d.unitConversionId))
+                  || conversions.find((uc) => (uc.unitName || uc.name) === (d.currentUnitName || d.unitName))
+                  || (conversions.length > 0 ? conversions[0] : null);
+                const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : (d.conversionRate > 0 ? d.conversionRate : 1);
+                const baseAvgCostVal = d.snapshotAvgCost > 0
+                  ? d.snapshotAvgCost
+                  : (d.unitPrice > 0 && conversionPoint > 0 ? d.unitPrice / conversionPoint : (matchP?.runningAverageCost || matchP?.avg || matchP?.purchasePrice || 0));
+
+                return {
+                  rowId: `${d.bInventoryId}-${Date.now()}-${Math.random()}`,
+                  bInventoryId: d.bInventoryId,
+                  code: d.snapshotProductCode || d.currentProductCode || d.code || matchP?.code || `SP${d.bInventoryId}`,
+                  name: d.snapshotProductName || d.currentProductName || d.productName || d.bInventoryName || matchP?.name || 'Sản phẩm',
+                  baseStock: d.currentStockQuantity ?? d.systemQuantity ?? d.currentStock ?? matchP?.runningQuantity ?? matchP?.quantity ?? 0,
+                  stock: d.currentStockQuantity ?? d.systemQuantity ?? d.currentStock ?? matchP?.runningQuantity ?? matchP?.quantity ?? 0,
+                  baseAvgCost: baseAvgCostVal,
+                  costPrice: baseAvgCostVal,
+                  unitConversionId: selectedUc ? Number(selectedUc.id) : (d.unitConversionId ? Number(d.unitConversionId) : null),
+                  unitName: selectedUc ? (selectedUc.unitName || selectedUc.name) : (d.currentUnitName || d.unitName || matchP?.unitName || 'Đơn vị'),
+                  unitConversions: conversions,
+                  conversionPoint: conversionPoint,
+                  quantity: d.quantity || 1,
+                  note: d.note || '',
+                  editingNote: false
+                };
+              });
+              setItems(mapDetails);
+            }
+          })
+          .catch((err) => {
+            console.error('Lỗi khi tải chi tiết xuất hủy:', err);
+            showToast('Không thể tải chi tiết phiếu xuất hủy', 'error');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        const now = dayjs();
+        setSelectedDateTime(now);
+        setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
+        setOpenTimeISO(now.toISOString());
+        setShowDatePicker(false);
+        setSearchQuery('');
+        setShowDropdown(false);
+
+        setFormData({
+          docCode: '',
+          note: ''
+        });
+        setItems([]);
+
+        if (branchId) {
+          fetchBInventories(branchId, now.toISOString(), '');
+        }
       }
     }
-  }, [open, branchId, fetchBInventories]);
+  }, [open, editDocumentId, branchId, fetchBInventories]);
 
   // Trigger search on user typing
   useEffect(() => {
@@ -100,47 +190,35 @@ const DisposalDocumentModal = ({
     if (branchId) {
       fetchBInventories(branchId, isoStr, searchQuery);
     }
-
-    if (items.length > 0) {
-      try {
-        const bInvIds = items.map((i) => Number(i.bInventoryId)).filter(Boolean);
-        const snapshots = await getPreviousLedgerSnapshots(isoStr, bInvIds);
-        const snapshotMap = new Map();
-        if (Array.isArray(snapshots)) {
-          snapshots.forEach((s) => snapshotMap.set(Number(s.bInventoryId || s.binventoryId), s));
-        }
-
-        setItems((prevItems) =>
-          prevItems.map((item) => {
-            const snap = snapshotMap.get(Number(item.bInventoryId));
-            const newCost = snap ? Number(snap.runningAverageCost || 0) : 0;
-            const newStock = snap ? Number(snap.runningQuantity || 0) : 0;
-            return {
-              ...item,
-              costPrice: newCost,
-              stock: newStock
-            };
-          })
-        );
-        message.info(`Đã cập nhật giá vốn & tồn kho hệ thống theo mốc thời gian ${formattedStr}`);
-      } catch (err) {
-        console.error('Failed to update ledger snapshots on date change:', err);
-      }
-    }
   };
 
   const searchOptions = useMemo(() => {
     const rawList = bInventoryList.length > 0 ? bInventoryList : products;
     return rawList
-      .filter((b) => b && (b.id != null || b.bInventoryId != null || b.productId != null))
-      .map((b) => ({
-        id: b.id ?? b.bInventoryId ?? b.productId,
-        code: b.code || b.skuCode || `SP${b.id ?? b.productId}`,
-        name: b.name || 'Sản phẩm',
-        stock: b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0,
-        costPrice: b.runningAverageCost ?? b.purchasePrice ?? b.avg ?? b.sellPrice ?? 0,
-        unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || ''
-      }));
+      .filter((b) => {
+        if (!b || (b.id == null && b.bInventoryId == null && b.productId == null)) return false;
+        const rawType = b.type ?? b.productType ?? b.product?.type;
+        const typeStr = String(rawType ?? '').toLowerCase();
+        if (typeStr === 'processed' || rawType === 1) return false;
+        return true;
+      })
+      .map((b) => {
+        const conversions = b.unitConversions || b.product?.unitConversions || [];
+        const baseUnitName = b.baseUnit?.unitName || b.unitName || conversions[0]?.unitName || 'Đơn vị';
+        const stockVal = b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0;
+        const avgVal = (b.runningAverageCost > 0 ? b.runningAverageCost : (b.avg > 0 ? b.avg : (b.purchasePrice > 0 ? b.purchasePrice : (b.sellPrice || 0))));
+        return {
+          id: b.id ?? b.bInventoryId ?? b.productId,
+          code: b.code || b.skuCode || `SP${b.id ?? b.productId}`,
+          name: b.name || 'Sản phẩm',
+          baseStock: stockVal,
+          baseAvgCost: avgVal,
+          stock: stockVal,
+          costPrice: avgVal,
+          unitName: baseUnitName,
+          unitConversions: conversions
+        };
+      });
   }, [bInventoryList, products]);
 
   // Filter options strictly following search query AND EXCLUDING ALREADY ADDED ITEMS (No duplicates!)
@@ -160,11 +238,15 @@ const DisposalDocumentModal = ({
     // Double check duplicate prevention
     const existingIndex = items.findIndex((i) => Number(i.bInventoryId) === Number(opt.id));
     if (existingIndex >= 0) {
-      message.warning(`${opt.name} đã có trong danh sách xuất hủy.`);
+      showToast(`${opt.name} đã có trong danh sách xuất hủy.`, 'warning');
       setShowDropdown(false);
       setSearchQuery('');
       return;
     }
+
+    const conversions = opt.unitConversions || [];
+    const defaultUc = conversions.length > 0 ? conversions[0] : null;
+    const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
 
     setItems((prev) => [
       ...prev,
@@ -173,16 +255,38 @@ const DisposalDocumentModal = ({
         bInventoryId: opt.id,
         code: opt.code,
         name: opt.name,
-        unitName: opt.unitName,
+        baseStock: opt.baseStock,
+        baseAvgCost: opt.baseAvgCost,
         stock: opt.stock,
-        quantity: 1,
         costPrice: opt.costPrice,
+        unitConversionId: defaultUc ? defaultUc.id : null,
+        unitName: defaultUc ? defaultUc.unitName : opt.unitName,
+        unitConversions: conversions,
+        conversionPoint: conversionPoint,
+        quantity: 1,
         note: '',
         editingNote: false
       }
     ]);
     setSearchQuery('');
     setShowDropdown(false);
+  };
+
+  const handleUnitChange = (index, ucId) => {
+    const updated = [...items];
+    const item = updated[index];
+    const conversions = item.unitConversions || [];
+    const selectedUc = conversions.find((c) => Number(c.id) === Number(ucId));
+    const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : 1;
+    const unitName = selectedUc ? selectedUc.unitName : item.unitName;
+
+    updated[index] = {
+      ...item,
+      unitConversionId: selectedUc ? Number(selectedUc.id) : null,
+      unitName: unitName,
+      conversionPoint: conversionPoint
+    };
+    setItems(updated);
   };
 
   const handleQtyChange = (index, val) => {
@@ -192,27 +296,34 @@ const DisposalDocumentModal = ({
     updated[index] = { ...item, quantity: qty };
     setItems(updated);
 
-    if (qty > (item.stock || 0)) {
-      message.warning(
-        `Cảnh báo: Số lượng hủy (${qty}) vượt quá tồn kho hệ thống (${item.stock || 0}) tại mốc thời gian này.`
+    const conversionPoint = item.conversionPoint || 1;
+    const convertedStock = (item.baseStock ?? item.stock ?? 0) / conversionPoint;
+    if (qty > convertedStock) {
+      showToast(
+        `Cảnh báo: Số lượng hủy (${qty}) vượt quá tồn kho hiện tại (${convertedStock.toLocaleString('vi-VN')}) tại kho.`,
+        'warning'
       );
     }
   };
 
   const totalDisposalAmount = useMemo(() => {
-    return items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.costPrice) || 0), 0);
+    return items.reduce((sum, i) => {
+      const conversionPoint = i.conversionPoint || 1;
+      const convertedCostPrice = conversionPoint * (i.baseAvgCost ?? i.costPrice ?? 0);
+      return sum + (Number(i.quantity) || 0) * convertedCostPrice;
+    }, 0);
   }, [items]);
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
-      message.error('Vui lòng chọn ít nhất 1 sản phẩm để xuất hủy.');
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm để xuất hủy.', 'error');
       return;
     }
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!item.quantity || item.quantity <= 0) {
-        message.error(`Số lượng sản phẩm ${item.name} không hợp lệ.`);
+        showToast(`Số lượng sản phẩm ${item.name} không hợp lệ.`, 'error');
         return;
       }
     }
@@ -221,25 +332,59 @@ const DisposalDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
-        businessDate: openTimeISO || new Date().toISOString(),
-        createdByAccountId: Number(user?.id || user?.accountId || 1),
-        code: formData.docCode || null,
-        reason: formData.note || 'Xuất hủy hàng hóa',
+        orderDate: openTimeISO || new Date().toISOString(),
+        note: formData.note || 'Xuất hủy hàng hóa',
         details: items.map((i) => ({
           bInventoryId: Number(i.bInventoryId),
+          unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
           quantity: Number(i.quantity),
           note: i.note || ''
         }))
       };
-      await createExportDeleteDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} Xuất hủy thành công!`);
+
+      if (editDocumentId) {
+        if (isDraft) {
+          await updateExportDeletePending(editDocumentId, dto);
+          showToast('Cập nhật phiếu xuất hủy nháp thành công!');
+        } else {
+          await updateExportDeletePending(editDocumentId, dto);
+          await completeExportDeleteDocument(editDocumentId);
+          showToast('Hoàn thành phiếu xuất hủy thành công!');
+        }
+      } else {
+        if (isDraft) {
+          await createExportDeletePending(dto);
+          showToast('Lưu tạm phiếu xuất hủy thành công!');
+        } else {
+          await createExportDeleteCompleted(dto);
+          showToast('Tạo và Hoàn thành phiếu xuất hủy thành công!');
+        }
+      }
+
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
       const errMsg =
-        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi tạo phiếu xuất hủy.';
-      message.error(errMsg);
+        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi lưu phiếu xuất hủy.';
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelPending = async () => {
+    if (!editDocumentId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiếu xuất hủy nháp này?')) return;
+    setLoading(true);
+    try {
+      await deleteExportDeletePendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
+      showToast('Đã chuyển phiếu xuất hủy sang trạng thái Canceled!');
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể hủy phiếu nháp', 'error');
     } finally {
       setLoading(false);
     }
@@ -278,7 +423,7 @@ const DisposalDocumentModal = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
-            Xuất hủy
+            {editDocumentId ? `Chỉnh sửa phiếu xuất hủy (${formData.docCode || ''})` : 'Tạo phiếu xuất hủy'}
           </span>
 
           {/* SEARCH PRODUCT DROPDOWN CONTAINER - FOLLOWS TYPING & NO DUPLICATES */}
@@ -357,7 +502,7 @@ const DisposalDocumentModal = ({
                         </div>
                       </div>
                       <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Giá vốn: {opt.costPrice.toLocaleString('vi-VN')}
+                        Giá vốn: {Number(opt.costPrice ?? opt.baseAvgCost ?? 0).toLocaleString('vi-VN')} đ
                       </span>
                     </div>
                   ))
@@ -434,25 +579,29 @@ const DisposalDocumentModal = ({
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
                   <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
-                  <th style={{ padding: '8px 8px', width: 40, textAlign: 'center' }}>STT</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 140 }}>MÃ HÀNG HÓA</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 140 }}>SL HỦY</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>GIÁ VỐN</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 140 }}>GIÁ TRỊ HỦY</th>
+                  <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG HÓA</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐVT</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>SL HỦY</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 110 }}>GIÁ VỐN HỦY</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 120 }}>THÀNH TIỀN HỦY</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
                       Chưa có sản phẩm nào được chọn để xuất hủy.
                     </td>
                   </tr>
                 ) : (
                   items.map((record, index) => {
-                    const isExceed = (record.quantity || 0) > (record.stock || 0);
-                    const total = (Number(record.quantity) || 0) * (Number(record.costPrice) || 0);
+                    const conversionPoint = record.conversionPoint || 1;
+                    const convertedStock = (record.baseStock ?? record.stock ?? 0) / conversionPoint;
+                    const convertedCostPrice = conversionPoint * (record.baseAvgCost ?? record.costPrice ?? 0);
+                    const isExceed = (record.quantity || 0) > convertedStock;
+                    const total = (Number(record.quantity) || 0) * convertedCostPrice;
 
                     return (
                       <tr key={record.rowId || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -471,15 +620,10 @@ const DisposalDocumentModal = ({
                           </button>
                         </td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
-                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 10px' }}>{record.code}</td>
-                        <td style={{ padding: '6px 10px' }}>
+                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 8px' }}>{record.code}</td>
+                        <td style={{ padding: '6px 8px' }}>
                           <div>
                             <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
-                            {record.unitName && (
-                              <span style={{ fontSize: 10, color: '#64748b', marginLeft: 6 }}>
-                                ({record.unitName})
-                              </span>
-                            )}
                           </div>
                           <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <EditOutlined style={{ fontSize: 11, color: '#94a3b8' }} />
@@ -526,7 +670,32 @@ const DisposalDocumentModal = ({
                             )}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px 10px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                          {record.unitConversions && record.unitConversions.length > 0 ? (
+                            <select
+                              value={record.unitConversionId || ''}
+                              onChange={(e) => handleUnitChange(index, e.target.value)}
+                              style={{
+                                height: 26,
+                                padding: '0 4px',
+                                fontSize: 11,
+                                borderRadius: 4,
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                outline: 'none'
+                              }}
+                            >
+                              {record.unitConversions.map((uc) => (
+                                <option key={uc.id} value={uc.id}>
+                                  {uc.unitName || uc.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span style={{ color: '#475569' }}>{record.unitName || 'Đơn vị'}</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <input
                               type="number"
@@ -535,7 +704,7 @@ const DisposalDocumentModal = ({
                               value={record.quantity ?? 1}
                               onChange={(e) => handleQtyChange(index, e.target.value)}
                               style={{
-                                width: 80,
+                                width: 75,
                                 textAlign: 'center',
                                 borderRadius: 16,
                                 border: isExceed ? '1px solid #f59e0b' : '1px solid #cbd5e1',
@@ -545,17 +714,17 @@ const DisposalDocumentModal = ({
                               }}
                             />
                             {isExceed && (
-                              <span title={`Số lượng xuất hủy (${record.quantity}) vượt quá tồn kho hệ thống tại thời điểm này (${record.stock || 0})`}>
+                              <span title={`Số lượng xuất hủy (${record.quantity}) vượt quá tồn kho hiện tại trong kho (${convertedStock.toLocaleString('vi-VN')})`}>
                                 <WarningOutlined style={{ color: '#f59e0b', fontSize: 14, cursor: 'pointer' }} />
                               </span>
                             )}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', color: '#475569' }}>
-                          {(record.costPrice != null ? record.costPrice : 0).toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', color: '#475569' }}>
+                          {Math.round(convertedCostPrice).toLocaleString('vi-VN')} đ
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: '#0f172a' }}>
-                          {total.toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 600, color: '#dc2626' }}>
+                          {Math.round(total).toLocaleString('vi-VN')} đ
                         </td>
                       </tr>
                     );
@@ -581,7 +750,7 @@ const DisposalDocumentModal = ({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
-            {/* KIOTVIET TIME & CREATOR HEADER */}
+            {/* TIME & CREATOR HEADER */}
             <div
               style={{
                 position: 'relative',
@@ -606,7 +775,7 @@ const DisposalDocumentModal = ({
                 }}
               >
                 <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                  {creatorName} {openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm')}
+                  {creatorName}-{openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm')}
                 </span>
                 <RightOutlined style={{ fontSize: 10, color: '#64748b' }} />
               </div>
@@ -653,12 +822,10 @@ const DisposalDocumentModal = ({
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6 }}>
-              <span style={{ color: '#475569', fontSize: 11 }}>
-                Tổng giá trị hủy <span style={{ fontWeight: 600, color: '#0f172a' }}>{items.length}</span>
-              </span>
-              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                {totalDisposalAmount.toLocaleString('vi-VN')}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: 10, borderRadius: 6, border: '1px solid #fecaca' }}>
+              <span style={{ color: '#991b1b', fontSize: 11.5, fontWeight: 700 }}>Tổng tiền tổn thất / hủy:</span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: '#dc2626' }}>
+                {Math.round(totalDisposalAmount).toLocaleString('vi-VN')} đ
               </span>
             </div>
 
@@ -681,41 +848,45 @@ const DisposalDocumentModal = ({
             </div>
           </div>
 
-          {/* ACTION BUTTONS - HTML BUTTONS */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+          {/* ACTION BUTTONS AT SIDEBAR FOOTER ([LƯU TẠM] & [HOÀN THÀNH]) */}
+          <div style={{ padding: 16, borderTop: '1px solid #cbd5e1', background: '#ffffff', display: 'flex', gap: 10 }}>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || items.length === 0}
               onClick={() => handleSubmit(true)}
               style={{
                 flex: 1,
-                background: '#ffffff',
-                border: '1px solid #e8442a',
-                color: '#e8442a',
-                fontWeight: 600,
+                height: 38,
+                fontSize: 12,
+                fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
-                cursor: 'pointer'
+                border: '1px solid #fde68a',
+                background: loading || items.length === 0 ? '#fef3c7' : '#f59e0b',
+                color: '#ffffff',
+                cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer'
               }}
             >
-              Lưu tạm
+              {loading ? 'Đang lưu...' : 'Lưu tạm'}
             </button>
+
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || items.length === 0}
               onClick={() => handleSubmit(false)}
               style={{
                 flex: 1,
-                background: '#e8442a',
-                border: '1px solid #e8442a',
-                color: '#ffffff',
+                height: 38,
+                fontSize: 12,
                 fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
-                cursor: 'pointer'
+                border: 'none',
+                background: loading || items.length === 0 ? '#cbd5e1' : '#e8442a',
+                color: '#ffffff',
+                cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
               }}
             >
-              HOÀN THÀNH
+              {loading ? 'Đang xử lý...' : 'Hoàn thành'}
             </button>
           </div>
         </div>

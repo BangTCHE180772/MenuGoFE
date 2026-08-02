@@ -9,7 +9,6 @@ import {
   RightOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { message } from 'antd';
 
 import { createReturnDocument, getImportReturnDetails } from '../../../../api/documentApi';
 import KiotDateTimePicker from './KiotDateTimePicker';

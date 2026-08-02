@@ -1,13 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { CloseOutlined, SearchOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { createCheckDocument } from '../../../../api/documentApi';
+import {
+  createCostAdjustmentPending,
+  createCostAdjustmentCompleted,
+  updateCostAdjustmentPending,
+  completeCostAdjustmentDocument,
+  deleteCostAdjustmentPendingDocument,
+  getCostAdjustmentById
+} from '../../../../api/documentApi';
+
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2200);
+};
 
 const AdjustmentDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = []
+  products = [],
+  editDocumentId = null
 }) => {
   const [loading, setLoading] = useState(false);
   const [docCode, setDocCode] = useState('');
@@ -17,12 +45,37 @@ const AdjustmentDocumentModal = ({
 
   useEffect(() => {
     if (open) {
-      setDocCode(`PDC${Date.now().toString().slice(-6)}`);
-      setNote('');
-      setSearchQuery('');
-      setItems([]);
+      if (editDocumentId) {
+        setLoading(true);
+        getCostAdjustmentById(editDocumentId)
+          .then((res) => {
+            if (res) {
+              setDocCode(res.code || '');
+              setNote(res.note || '');
+              const mapDetails = (res.details || []).map((d) => ({
+                id: d.bInventoryId,
+                code: d.code || d.productCode || `SP${d.bInventoryId}`,
+                name: d.productName || d.bInventoryName || 'Sản phẩm',
+                currentCost: d.unitPrice || 0,
+                newAvgCost: d.newAvgCost || d.unitPrice || 0,
+                reason: d.note || ''
+              }));
+              setItems(mapDetails);
+            }
+          })
+          .catch((err) => {
+            console.error('Lỗi khi tải chi tiết điều chỉnh giá vốn:', err);
+            showToast('Không thể tải chi tiết phiếu điều chỉnh giá vốn', 'error');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setDocCode(`PDC${Date.now().toString().slice(-6)}`);
+        setNote('');
+        setSearchQuery('');
+        setItems([]);
+      }
     }
-  }, [open]);
+  }, [open, editDocumentId]);
 
   if (!open) return null;
 
@@ -34,9 +87,9 @@ const AdjustmentDocumentModal = ({
         id: prod.id,
         code: prod.code || `SP${prod.id}`,
         name: prod.name || prod.title,
-        currentStock: prod.stock || 10,
-        adjustedStock: prod.stock || 10,
-        reason: 'Điều chỉnh kiểm kê'
+        currentCost: prod.costPrice || prod.avgCost || 0,
+        newAvgCost: prod.costPrice || prod.avgCost || 0,
+        reason: 'Điều chỉnh giá vốn'
       }
     ]);
   };
@@ -45,44 +98,91 @@ const AdjustmentDocumentModal = ({
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
-  const handleStockChange = (id, newQty) => {
+  const handleCostChange = (id, newCost) => {
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, adjustedStock: Math.max(0, newQty) } : item))
+      prev.map((item) => (item.id === id ? { ...item, newAvgCost: Math.max(0, Number(newCost) || 0) } : item))
     );
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (isDraft = false) => {
+    if (items.length === 0) {
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm để điều chỉnh giá vốn.', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = {
+      const dto = {
         branchId: Number(branchId),
-        code: docCode,
-        note: note || 'Phiếu điều chỉnh kho',
-        type: 5,
+        orderDate: new Date().toISOString(),
+        note: note || '',
         details: items.map((item) => ({
-          bInventoryId: item.id,
-          systemQuantity: item.currentStock,
-          actualQuantity: item.adjustedStock,
-          note: item.reason
+          bInventoryId: Number(item.id),
+          newAvgCost: Number(item.newAvgCost),
+          note: item.reason || ''
         }))
       };
-      await createCheckDocument(payload);
+
+      if (editDocumentId) {
+        if (isDraft) {
+          await updateCostAdjustmentPending(editDocumentId, dto);
+          showToast('Cập nhật phiếu điều chỉnh giá vốn nháp thành công!');
+        } else {
+          await updateCostAdjustmentPending(editDocumentId, dto);
+          await completeCostAdjustmentDocument(editDocumentId);
+          showToast('Hoàn thành phiếu điều chỉnh giá vốn thành công!');
+        }
+      } else {
+        if (isDraft) {
+          await createCostAdjustmentPending(dto);
+          showToast('Lưu tạm phiếu điều chỉnh giá vốn thành công!');
+        } else {
+          await createCostAdjustmentCompleted(dto);
+          showToast('Tạo và Hoàn thành phiếu điều chỉnh giá vốn thành công!');
+        }
+      }
+
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      console.error('Lỗi khi tạo phiếu điều chỉnh:', err);
+      console.error('Lỗi khi lưu phiếu điều chỉnh giá vốn:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi lưu phiếu.';
+      showToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredProducts = products.filter(
-    (p) =>
-      !searchQuery ||
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.code?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleCancelPending = async () => {
+    if (!editDocumentId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiếu điều chỉnh giá vốn nháp này?')) return;
+    setLoading(true);
+    try {
+      await deleteCostAdjustmentPendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
+      showToast('Đã chuyển phiếu điều chỉnh giá vốn sang trạng thái Canceled!');
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể hủy phiếu nháp', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = products.filter((p) => {
+    if (!p) return false;
+    const rawType = p.type ?? p.productType ?? p.product?.type;
+    const typeStr = String(rawType ?? '').toLowerCase();
+    if (typeStr === 'processed' || rawType === 1) return false;
+
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.code?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div
@@ -251,9 +351,9 @@ const AdjustmentDocumentModal = ({
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
                     <th style={{ padding: '8px 10px' }}>Tên mặt hàng</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Tồn hiện tại</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Tồn thực tế mới</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Chênh lệch</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn hiện tại (đ)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Giá vốn mới (đ)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch (đ)</th>
                     <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}></th>
                   </tr>
                 </thead>
@@ -261,36 +361,38 @@ const AdjustmentDocumentModal = ({
                   {items.length === 0 ? (
                     <tr>
                       <td colSpan={5} style={{ textAlign: 'center', padding: 16, color: '#94a3b8', fontSize: 11.5 }}>
-                        Chưa chọn mặt hàng nào để điều chỉnh
+                        Chưa chọn mặt hàng nào để điều chỉnh giá vốn
                       </td>
                     </tr>
                   ) : (
                     items.map((item) => {
-                      const diff = Number(item.adjustedStock) - Number(item.currentStock);
+                      const diff = Number(item.newAvgCost) - Number(item.currentCost);
                       return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1e293b' }}>{item.name}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{item.currentStock}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', color: '#64748b' }}>
+                            {Number(item.currentCost || 0).toLocaleString('vi-VN')}
+                          </td>
                           <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                             <input
                               type="number"
                               min={0}
-                              value={item.adjustedStock}
-                              onChange={(e) => handleStockChange(item.id, Number(e.target.value))}
+                              value={item.newAvgCost}
+                              onChange={(e) => handleCostChange(item.id, e.target.value)}
                               style={{
-                                width: 70,
+                                width: 110,
                                 height: 28,
                                 padding: '0 6px',
                                 fontSize: 12,
-                                textAlign: 'center',
+                                textAlign: 'right',
                                 borderRadius: 4,
                                 border: '1px solid #cbd5e1',
                                 outline: 'none'
                               }}
                             />
                           </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: diff < 0 ? '#ef4444' : (diff > 0 ? '#10b981' : '#64748b') }}>
-                            {diff > 0 ? `+${diff}` : diff}
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: diff < 0 ? '#ef4444' : (diff > 0 ? '#10b981' : '#64748b') }}>
+                            {diff > 0 ? `+${diff.toLocaleString('vi-VN')}` : diff.toLocaleString('vi-VN')}
                           </td>
                           <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                             <button
@@ -321,30 +423,53 @@ const AdjustmentDocumentModal = ({
               background: '#f8fafc'
             }}
           >
+            {editDocumentId && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleCancelPending}
+                style={{
+                  height: 32,
+                  padding: '0 14px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: '1px solid #dc2626',
+                  background: '#ffffff',
+                  color: '#dc2626',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy phiếu nháp
+              </button>
+            )}
             <button
               type="button"
-              onClick={onClose}
+              disabled={loading || items.length === 0}
+              onClick={() => handleSubmit(true)}
               style={{
                 height: 32,
                 padding: '0 14px',
                 fontSize: 12,
+                fontWeight: 600,
                 borderRadius: 6,
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e8442a',
                 background: '#ffffff',
-                color: '#334155',
-                cursor: 'pointer'
+                color: '#e8442a',
+                cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer'
               }}
             >
-              Hủy
+              Lưu tạm
             </button>
             <button
-              type="submit"
+              type="button"
               disabled={loading || items.length === 0}
+              onClick={() => handleSubmit(false)}
               style={{
                 height: 32,
                 padding: '0 16px',
                 fontSize: 12,
-                fontWeight: 600,
+                fontWeight: 700,
                 borderRadius: 6,
                 border: 'none',
                 background: loading || items.length === 0 ? '#cbd5e1' : '#e8442a',
@@ -352,7 +477,7 @@ const AdjustmentDocumentModal = ({
                 cursor: loading || items.length === 0 ? 'not-allowed' : 'pointer'
               }}
             >
-              {loading ? 'Đang lưu...' : 'Lưu phiếu điều chỉnh giá vốn'}
+              HOÀN THÀNH
             </button>
           </div>
         </form>

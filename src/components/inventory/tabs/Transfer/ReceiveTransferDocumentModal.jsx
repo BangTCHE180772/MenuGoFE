@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { message } from 'antd';
 import {
   CloseOutlined,
   FullscreenOutlined,

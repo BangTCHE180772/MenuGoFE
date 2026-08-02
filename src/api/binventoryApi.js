@@ -1,18 +1,12 @@
 import axiosInstance from './axiosInstance';
 
 export const getBInventories = async (branchId, search = '', docType = '', mode = null) => {
-  try {
-    const response = await axiosInstance.get(`/api/BInventory/${branchId}`);
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return response.data;
+  const response = await axiosInstance.get(`/api/BInventory/branch/${branchId}`, {
+    params: {
+      search: search || undefined,
+      mode: mode || undefined
     }
-  } catch (e) {
-    console.warn('Fallback to branch query endpoint:', e);
-  }
-
-  const response = await axiosInstance.get(
-    `/api/BInventory/branch/${branchId}?search=${encodeURIComponent(search || '')}`
-  );
+  });
   return response.data;
 };
 
@@ -23,14 +17,15 @@ export const getBInventoryLedger = async (binventoryId, page = 1, pageSize = 20)
   return response.data;
 };
 
-export const getProductsByDate = async (branchId, date, search = '', productType = null) => {
+export const getProductsByDate = async (branchId, date, search = '', productType = null, mode = null) => {
   const response = await axiosInstance.get(
     `/api/BInventory/branch/${branchId}/products-by-date`,
     {
       params: {
         date: date ? new Date(date).toISOString() : undefined,
-        search,
-        productType: productType || undefined
+        search: search || undefined,
+        productType: productType || undefined,
+        mode: mode || undefined
       }
     }
   );

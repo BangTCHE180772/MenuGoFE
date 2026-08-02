@@ -13,6 +13,9 @@ const RecipeBuilder = ({
   const [searchText, setSearchText] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // Ensure recipe is always an array
+  const safeRecipe = Array.isArray(recipe) ? recipe : [];
+
   // Map units for quick lookup
   const unitMap = new Map(units.map(u => [u.id, u.name]));
 
@@ -28,7 +31,7 @@ const RecipeBuilder = ({
     }
 
     // Exclude already added ingredients
-    if (recipe.some(r => r.productId === p.id)) return false;
+    if (safeRecipe.some(r => r && r.productId === p.id)) return false;
 
     // Filter by search text
     if (searchText.trim()) {
@@ -42,24 +45,30 @@ const RecipeBuilder = ({
   });
 
   const handleAddIngredient = (item) => {
-    setRecipe(prev => [
-      ...prev,
+    const updated = [
+      ...safeRecipe,
       { productId: item.id, quantity: 1 }
-    ]);
+    ];
+    if (typeof setRecipe === 'function') {
+      setRecipe(updated);
+    }
     setSearchText('');
     setIsDropdownOpen(false);
   };
 
   const handleQuantityChange = (index, val) => {
-    setRecipe(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], quantity: val };
-      return updated;
-    });
+    const updated = [...safeRecipe];
+    updated[index] = { ...updated[index], quantity: val };
+    if (typeof setRecipe === 'function') {
+      setRecipe(updated);
+    }
   };
 
   const handleRemoveItem = (index) => {
-    setRecipe(prev => prev.filter((_, i) => i !== index));
+    const updated = safeRecipe.filter((_, i) => i !== index);
+    if (typeof setRecipe === 'function') {
+      setRecipe(updated);
+    }
   };
 
   return (
@@ -189,7 +198,7 @@ const RecipeBuilder = ({
       )}
 
       {/* RECIPE TABLE */}
-      {recipe.length === 0 ? (
+      {safeRecipe.length === 0 ? (
         <div
           style={{
             padding: '24px 16px',
@@ -216,7 +225,7 @@ const RecipeBuilder = ({
               </tr>
             </thead>
             <tbody>
-              {recipe.map((item, idx) => {
+              {safeRecipe.map((item, idx) => {
                 const prod = products.find(p => p.id === item.productId);
                 const prodName = prod?.name || `Sản phẩm #${item.productId}`;
                 const baseUnitName = prod?.baseUnitName || unitMap.get(prod?.baseUnitId) || '—';

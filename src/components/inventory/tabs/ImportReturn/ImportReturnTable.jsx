@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
-import { Modal } from 'antd';
 import {
   EnvironmentOutlined,
   DeleteOutlined,
   PrinterOutlined,
   ExclamationCircleOutlined,
-  SearchOutlined
+  SearchOutlined,
+  PlusOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 
 const ImportReturnTable = ({
@@ -16,11 +17,13 @@ const ImportReturnTable = ({
   statusFilter = 'ALL',
   setStatusFilter,
   loading,
+  setModalReturnOpen,
   handleDeleteDocument
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' }
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(null);
 
   const pageSize = 20;
 
@@ -43,25 +46,7 @@ const ImportReturnTable = ({
   };
 
   const openDeleteConfirm = (doc) => {
-    Modal.confirm({
-      title: <span style={{ fontWeight: 700, fontSize: 14 }}>Xác nhận hủy phiếu trả hàng</span>,
-      icon: <ExclamationCircleOutlined style={{ color: '#ef4444' }} />,
-      content: (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#475569' }}>
-          Bạn có chắc chắn muốn hủy / xóa phiếu trả hàng nhập <strong style={{ color: '#e8442a' }}>{doc.code}</strong> không?
-          <br />
-          Thao tác này sẽ cập nhật lại số lượng tồn kho và không thể hoàn tác.
-        </div>
-      ),
-      okText: 'Xác nhận hủy',
-      okType: 'danger',
-      cancelText: 'Bỏ qua',
-      centered: true,
-      maskClosable: true,
-      onOk() {
-        handleDeleteDocument(doc.id, doc.type || 4);
-      }
-    });
+    setConfirmDeleteDoc(doc);
   };
 
   const handlePrint = (code) => {
@@ -130,12 +115,54 @@ const ImportReturnTable = ({
             </div>
           )}
         </div>
-      </div>
+
+        {/* ACTION BUTTONS */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {setModalReturnOpen && (
+            <button
+              type="button"
+              onClick={() => setModalReturnOpen(true)}
+              style={{
+                background: 'linear-gradient(135deg, #e8442a, #f97316)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '0 14px',
+                height: 32,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
+              }}
+            >
+              <PlusOutlined /> Trả hàng nhập
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (setSearchText) setSearchText('');
+              if (setStatusFilter) setStatusFilter('ALL');
+            }}
+            style={{
+              background: '#ffffff',
+              color: '#334155',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            Làm mới
+            <ReloadOutlined /> Làm mới
           </button>
         </div>
       </div>
@@ -529,6 +556,41 @@ const ImportReturnTable = ({
           </button>
         </div>
       </div>
+
+      {/* CONFIRM DELETE MODAL OVERLAY */}
+      {confirmDeleteDoc && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(2px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#ffffff', borderRadius: 8, padding: 20, width: '100%', maxWidth: 400, boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>
+              Xác nhận hủy phiếu trả hàng
+            </div>
+            <div style={{ fontSize: 12, color: '#475569', marginBottom: 16, lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn hủy / xóa phiếu trả hàng nhập <strong style={{ color: '#e8442a' }}>{confirmDeleteDoc.code}</strong> không?
+              <br />
+              Thao tác này sẽ cập nhật lại số lượng tồn kho và không thể hoàn tác.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteDoc(null)}
+                style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: 12, cursor: 'pointer' }}
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDeleteDocument(confirmDeleteDoc.id, confirmDeleteDoc.type || 4);
+                  setConfirmDeleteDoc(null);
+                }}
+                style={{ padding: '6px 14px', borderRadius: 4, border: 'none', background: '#ef4444', color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Xác nhận hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

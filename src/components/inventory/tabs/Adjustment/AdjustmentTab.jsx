@@ -13,10 +13,11 @@ const AdjustmentTab = ({
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editDocumentId, setEditDocumentId] = useState(null);
 
   const adjustmentDocs = useMemo(() => {
     return documents.filter((doc) => {
-      if (doc.type !== 5) return false;
+      if (doc.type !== 11 && doc.type !== 5) return false;
       if (statusFilter !== 'ALL' && doc.status !== statusFilter) return false;
       if (searchText) {
         const lower = searchText.toLowerCase().trim();
@@ -28,6 +29,16 @@ const AdjustmentTab = ({
       return true;
     });
   }, [documents, statusFilter, searchText]);
+
+  const handleOpenEdit = (docId) => {
+    setEditDocumentId(docId);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditDocumentId(null);
+  };
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
@@ -43,12 +54,14 @@ const AdjustmentTab = ({
         fetchDocuments={fetchDocuments}
         handleDeleteDocument={handleDeleteDocument}
         setModalOpen={setModalOpen}
+        onEditDocument={handleOpenEdit}
       />
 
       {/* CREATE ADJUSTMENT MODAL */}
       <AdjustmentDocumentModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        editDocumentId={editDocumentId}
+        onClose={handleCloseModal}
         onSuccess={() => fetchDocuments(selectedBranchId)}
         branchId={selectedBranchId}
         products={products}

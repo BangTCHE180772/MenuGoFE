@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { message } from 'antd';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -13,16 +12,44 @@ import dayjs from 'dayjs';
 
 import { getProductsByDate, getPreviousLedgerSnapshots } from '../../../../api/binventoryApi';
 import { getAllBranches } from '../../../../api/branchApi';
-import { createTransferDocument, updateTransferDocument } from '../../../../api/documentApi';
+import {
+  createTransferPending,
+  createTransferCompleted,
+  updateTransferPending,
+  completeTransferDocument,
+  deleteTransferPendingDocument,
+  getTransferById
+} from '../../../../api/documentApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
+
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2200);
+};
 
 const TransferDocumentModal = ({
   open,
   onClose,
   onSuccess,
   branchId,
-  products = []
+  products = [],
+  editDocumentId = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
@@ -66,10 +93,10 @@ const TransferDocumentModal = ({
     }
   }, [open, branchId]);
 
-  // Fetch products by date & searchQuery as user types (EXCLUDING Processed - manufactured downwards)
+  // Fetch products by date & searchQuery as user types (EXCLUDING Processed - Mode 2)
   const fetchBInventories = useCallback((bId, date, query = '') => {
     if (!bId) return;
-    getProductsByDate(bId, date, query)
+    getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
         setBInventoryList(data);
@@ -82,25 +109,79 @@ const TransferDocumentModal = ({
 
   useEffect(() => {
     if (open) {
-      const now = dayjs();
-      setSelectedDateTime(now);
-      setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
-      setOpenTimeISO(now.toISOString());
-      setShowDatePicker(false);
-      setSearchQuery('');
-      setShowDropdown(false);
+      if (editDocumentId) {
+        setLoading(true);
+        getTransferById(editDocumentId)
+          .then((res) => {
+            if (res) {
+              const dt = res.businessDate ? dayjs(res.businessDate) : dayjs();
+              setSelectedDateTime(dt);
+              setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
+              setOpenTimeISO(dt.toISOString());
+              setTargetBranchId(res.targetBranchId || '');
+              setFormData({
+                docCode: res.code || '',
+                note: res.note || ''
+              });
+              const mapDetails = (res.details || []).map((d) => {
+                const bInvId = Number(d.bInventoryId || d.fromBInventoryId);
+                const matchP = (bInventoryList || []).find((b) => Number(b.id) === bInvId) ||
+                               (products || []).find((p) => Number(p.id) === bInvId || Number(p.bInventoryId) === bInvId);
 
-      setFormData({
-        docCode: '',
-        note: ''
-      });
-      setItems([]);
+                const conversions = matchP?.unitConversions || d.unitConversions || d.conversions || [];
+                const selectedUc = d.unitConversionId ? conversions.find((c) => Number(c.id) === Number(d.unitConversionId)) : (conversions.length > 0 ? conversions[0] : null);
+                const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : (d.conversionRate > 0 ? d.conversionRate : 1);
+                const baseStock = d.currentStockQuantity ?? d.systemQuantity ?? d.currentStock ?? matchP?.stock ?? matchP?.quantity ?? 0;
+                const baseAvgCost = d.snapshotAvgCost || d.unitPrice || matchP?.runningAverageCost || matchP?.avg || 0;
 
-      if (branchId) {
-        fetchBInventories(branchId, now.toISOString(), '');
+                return {
+                  rowId: `${bInvId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                  bInventoryId: bInvId,
+                  code: d.snapshotProductCode || d.currentProductCode || d.code || matchP?.code || `SP${bInvId}`,
+                  name: d.snapshotProductName || d.currentProductName || d.productName || matchP?.name || 'Sản phẩm',
+                  baseStock: baseStock,
+                  baseAvgCost: baseAvgCost,
+                  stock: baseStock / conversionPoint,
+                  costPrice: baseAvgCost,
+                  baseUnitName: d.currentBaseUnitName || matchP?.baseUnitName || 'Đơn vị',
+                  unitConversionId: selectedUc ? Number(selectedUc.id) : (d.unitConversionId ? Number(d.unitConversionId) : null),
+                  unitName: selectedUc ? (selectedUc.unitName || selectedUc.name) : (d.currentUnitName || d.unitName || matchP?.unitName || 'Đơn vị'),
+                  unitConversions: conversions,
+                  conversionPoint: conversionPoint,
+                  transferQuantity: d.quantity || 1,
+                  transferPrice: d.unitPrice || (conversionPoint * baseAvgCost),
+                  note: d.note || ''
+                };
+              });
+              setItems(mapDetails);
+            }
+          })
+          .catch((err) => {
+            console.error('Lỗi khi tải chi tiết chuyển kho:', err);
+            showToast('Không thể tải chi tiết phiếu chuyển kho', 'error');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        const now = dayjs();
+        setSelectedDateTime(now);
+        setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm'));
+        setOpenTimeISO(now.toISOString());
+        setShowDatePicker(false);
+        setSearchQuery('');
+        setShowDropdown(false);
+
+        setFormData({
+          docCode: '',
+          note: ''
+        });
+        setItems([]);
+
+        if (branchId) {
+          fetchBInventories(branchId, now.toISOString(), '');
+        }
       }
     }
-  }, [open, branchId, fetchBInventories]);
+  }, [open, editDocumentId, branchId, fetchBInventories]);
 
   // Trigger search on user typing
   useEffect(() => {
@@ -120,30 +201,6 @@ const TransferDocumentModal = ({
 
     if (branchId) {
       fetchBInventories(branchId, isoStr, searchQuery);
-
-      if (items.length > 0) {
-        try {
-          const binvIds = items.map((i) => Number(i.bInventoryId)).filter(Boolean);
-          const snapshots = await getPreviousLedgerSnapshots(isoStr, binvIds);
-          const snapshotList = Array.isArray(snapshots?.data) ? snapshots.data : (Array.isArray(snapshots) ? snapshots : []);
-
-          setItems((prevItems) =>
-            prevItems.map((item) => {
-              const snap = snapshotList.find((s) => Number(s.bInventoryId) === Number(item.bInventoryId));
-              const newCost = snap?.runningAverageCost ?? item.transferPrice;
-              const newStock = snap?.runningQuantity ?? item.stock;
-              return {
-                ...item,
-                transferPrice: newCost,
-                stock: newStock
-              };
-            })
-          );
-          message.info(`Đã cập nhật giá vốn & tồn kho hệ thống theo mốc thời gian ${formattedStr}`);
-        } catch (err) {
-          console.error('Failed to update ledger snapshots on date change:', err);
-        }
-      }
     }
   };
 
@@ -152,21 +209,24 @@ const TransferDocumentModal = ({
     return rawList
       .filter((b) => {
         if (!b || (b.id == null && b.bInventoryId == null && b.productId == null)) return false;
-        // Filter out Processed (Type 3) - Only RawMaterial (0), Intermediate (1), Manufactured (2)
         const pType = b.product?.type ?? b.type ?? b.productType;
-        if (pType === 3 || pType === 'Processed') return false;
+        const typeStr = String(pType ?? '').toLowerCase();
+        if (typeStr === 'processed' || pType === 1) return false;
         return true;
       })
       .map((b) => {
         const conversions = b.unitConversions || b.product?.unitConversions || [];
         const baseUnitName = b.baseUnit?.unitName || b.product?.baseUnit?.unitName || conversions[0]?.unitName || 'Đơn vị';
+        const stockVal = b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0;
+        const avgVal = b.runningAverageCost ?? b.purchasePrice ?? b.avg ?? b.sellPrice ?? 0;
         return {
           id: b.id ?? b.bInventoryId ?? b.productId,
           code: b.code || b.skuCode || b.product?.skuCode || `SP${b.id ?? b.productId}`,
           name: b.name || b.product?.name || 'Sản phẩm',
-          stock: b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0,
-          targetStock: 0,
-          transferPrice: b.runningAverageCost ?? b.purchasePrice ?? b.avg ?? b.sellPrice ?? 0,
+          baseStock: stockVal,
+          baseAvgCost: avgVal,
+          stock: stockVal,
+          costPrice: avgVal,
           baseUnitName: baseUnitName,
           unitName: baseUnitName,
           unitConversions: conversions
@@ -195,6 +255,11 @@ const TransferDocumentModal = ({
       return;
     }
 
+    const conversions = opt.unitConversions || [];
+    const defaultUc = conversions.length > 0 ? conversions[0] : null;
+    const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
+    const defaultPrice = conversionPoint * (opt.baseAvgCost || 0);
+
     setItems((prev) => [
       ...prev,
       {
@@ -202,18 +267,38 @@ const TransferDocumentModal = ({
         bInventoryId: opt.id,
         code: opt.code,
         name: opt.name,
+        baseStock: opt.baseStock,
+        baseAvgCost: opt.baseAvgCost,
         baseUnitName: opt.baseUnitName,
-        unitName: opt.unitName,
-        unitConversionId: null,
-        unitConversions: opt.unitConversions || [],
-        stock: opt.stock,
-        targetStock: opt.targetStock || 0,
+        unitConversionId: defaultUc ? defaultUc.id : null,
+        unitName: defaultUc ? defaultUc.unitName : opt.unitName,
+        unitConversions: conversions,
+        conversionPoint: conversionPoint,
         transferQuantity: 1,
-        transferPrice: opt.transferPrice
+        transferPrice: defaultPrice
       }
     ]);
     setSearchQuery('');
     setShowDropdown(false);
+  };
+
+  const handleUnitChange = (index, ucId) => {
+    const updated = [...items];
+    const item = updated[index];
+    const conversions = item.unitConversions || [];
+    const selectedUc = conversions.find((c) => Number(c.id) === Number(ucId));
+    const conversionPoint = selectedUc?.conversionPoint > 0 ? selectedUc.conversionPoint : 1;
+    const unitName = selectedUc ? selectedUc.unitName : item.baseUnitName || item.unitName;
+    const defaultPrice = conversionPoint * (item.baseAvgCost || 0);
+
+    updated[index] = {
+      ...item,
+      unitConversionId: selectedUc ? Number(selectedUc.id) : null,
+      unitName: unitName,
+      conversionPoint: conversionPoint,
+      transferPrice: defaultPrice
+    };
+    setItems(updated);
   };
 
   const handleQtyChange = (index, val) => {
@@ -233,26 +318,23 @@ const TransferDocumentModal = ({
 
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
-      message.error('Vui lòng chọn ít nhất 1 sản phẩm để chuyển hàng.');
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm để chuyển hàng.', 'error');
       return;
     }
     if (!targetBranchId) {
-      message.error('Vui lòng chọn chi nhánh nhận.');
+      showToast('Vui lòng chọn chi nhánh nhận.', 'error');
       return;
     }
 
     setLoading(true);
     try {
       const dto = {
-        fromBranchId: Number(branchId),
-        toBranchId: Number(targetBranchId),
-        businessDate: openTimeISO || selectedDateTime.toISOString(),
-        status: isDraft ? 1 : 2, // 1 = Pending (Lưu tạm), 2 = Completed (Hoàn thành)
-        otherCost: Number(formData.otherCost) || 0,
+        branchId: Number(branchId),
+        targetBranchId: Number(targetBranchId),
+        orderDate: openTimeISO || selectedDateTime.toISOString(),
         note: formData.note || '',
-        createdByAccountId: user?.accountId || user?.id || 1,
         details: items.map((i) => ({
-          fromBInventoryId: Number(i.bInventoryId),
+          bInventoryId: Number(i.bInventoryId),
           unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
           quantity: Number(i.transferQuantity) || 1,
           unitPrice: Number(i.transferPrice) || 0,
@@ -260,14 +342,48 @@ const TransferDocumentModal = ({
         }))
       };
 
-      await createTransferDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} tạo phiếu chuyển hàng thành công!`);
+      if (editDocumentId) {
+        if (isDraft) {
+          await updateTransferPending(editDocumentId, dto);
+          showToast('Cập nhật phiếu chuyển kho nháp thành công!');
+        } else {
+          await updateTransferPending(editDocumentId, dto);
+          await completeTransferDocument(editDocumentId);
+          showToast('Hoàn thành phiếu chuyển kho thành công!');
+        }
+      } else {
+        if (isDraft) {
+          await createTransferPending(dto);
+          showToast('Lưu tạm phiếu chuyển kho thành công!');
+        } else {
+          await createTransferCompleted(dto);
+          showToast('Tạo và Hoàn thành phiếu chuyển kho thành công!');
+        }
+      }
+
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi tạo phiếu chuyển hàng.';
-      message.error(errMsg);
+      const errMsg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi lưu phiếu chuyển kho.';
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelPending = async () => {
+    if (!editDocumentId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiếu chuyển kho nháp này?')) return;
+    setLoading(true);
+    try {
+      await deleteTransferPendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
+      showToast('Đã chuyển phiếu chuyển kho sang trạng thái Canceled!');
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể hủy phiếu nháp', 'error');
     } finally {
       setLoading(false);
     }
@@ -385,7 +501,7 @@ const TransferDocumentModal = ({
                         </div>
                       </div>
                       <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Tồn: {opt.stock}
+                        Tồn: {Number(opt.stock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')}
                       </span>
                     </div>
                   ))
@@ -512,18 +628,20 @@ const TransferDocumentModal = ({
                 <thead>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
                     <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
-                    <th style={{ padding: '8px 8px', width: 40, textAlign: 'center' }}>STT</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', width: 130 }}>MÃ HÀNG</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'left', width: 120 }}>ĐƠN VỊ TÍNH</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center', width: 110 }}>SL CHUYỂN</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>GIÁ CHUYỂN (Đ/ĐVT)</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>THÀNH TIỀN</th>
+                    <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐƠN VỊ TÍNH</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>SL CHUYỂN</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 130 }}>GIÁ CHUYỂN (Đ/ĐVT)</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 120 }}>THÀNH TIỀN</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((record, index) => {
+                    const conversionPoint = record.conversionPoint || 1;
+                    const convertedStock = (record.baseStock ?? record.stock ?? 0) / conversionPoint;
                     const total = (Number(record.transferQuantity) || 0) * (Number(record.transferPrice) || 0);
 
                     return (
@@ -543,25 +661,15 @@ const TransferDocumentModal = ({
                           </button>
                         </td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
-                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 10px' }}>{record.code}</td>
-                        <td style={{ padding: '6px 10px' }}>
+                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 8px' }}>{record.code}</td>
+                        <td style={{ padding: '6px 8px' }}>
                           <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
                         </td>
-                        <td style={{ padding: '6px 10px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
                           {record.unitConversions && record.unitConversions.length > 0 ? (
                             <select
                               value={record.unitConversionId || ''}
-                              onChange={(e) => {
-                                const val = e.target.value ? Number(e.target.value) : null;
-                                const selectedUc = record.unitConversions.find((uc) => Number(uc.id) === val);
-                                const updated = [...items];
-                                updated[index] = {
-                                  ...updated[index],
-                                  unitConversionId: val,
-                                  unitName: selectedUc ? selectedUc.unitName : (record.baseUnitName || record.unitName)
-                                };
-                                setItems(updated);
-                              }}
+                              onChange={(e) => handleUnitChange(index, e.target.value)}
                               style={{
                                 fontSize: 11,
                                 padding: '2px 6px',
@@ -571,19 +679,18 @@ const TransferDocumentModal = ({
                                 background: '#fff'
                               }}
                             >
-                              <option value="">{record.baseUnitName || 'Đơn vị gốc'}</option>
                               {record.unitConversions.map((uc) => (
                                 <option key={uc.id} value={uc.id}>
-                                  {uc.unitName} (x{uc.conversionPoint})
+                                  {uc.unitName || uc.name}
                                 </option>
                               ))}
                             </select>
                           ) : (
-                            <span style={{ fontSize: 11, color: '#334155' }}>{record.unitName}</span>
+                            <span style={{ fontSize: 11, color: '#334155' }}>{record.unitName || 'Đơn vị'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', color: '#64748b' }}>
-                          {(record.stock != null ? record.stock : 0).toLocaleString('vi-VN')}
+                        <td style={{ textAlign: 'right', padding: '6px 8px', color: '#64748b' }}>
+                          {convertedStock.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
                         </td>
                         <td style={{ textAlign: 'center', padding: '6px 10px' }}>
                           <input
@@ -726,9 +833,16 @@ const TransferDocumentModal = ({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
-              <span style={{ color: '#475569', fontSize: 11 }}>Tổng số lượng</span>
+              <span style={{ color: '#475569', fontSize: 11, fontWeight: 600 }}>Tổng số lượng chuyển:</span>
               <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                {totalTransferQty.toLocaleString('vi-VN')}
+                {totalTransferQty.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0f9ff', padding: 10, borderRadius: 6, border: '1px solid #bae6fd' }}>
+              <span style={{ color: '#0369a1', fontSize: 11.5, fontWeight: 700 }}>Tổng giá trị chuyển:</span>
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#0284c7' }}>
+                {Math.round(items.reduce((sum, i) => sum + (Number(i.transferQuantity) || 0) * (Number(i.transferPrice) || 0), 0)).toLocaleString('vi-VN')} đ
               </span>
             </div>
 
@@ -781,6 +895,25 @@ const TransferDocumentModal = ({
 
           {/* ACTION BUTTONS */}
           <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+            {editDocumentId && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleCancelPending}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #dc2626',
+                  color: '#dc2626',
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontSize: 11
+                }}
+              >
+                Hủy phiếu nháp
+              </button>
+            )}
             <button
               type="button"
               disabled={loading}

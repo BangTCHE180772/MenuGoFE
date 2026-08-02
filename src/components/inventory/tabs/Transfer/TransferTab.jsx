@@ -15,17 +15,15 @@ const TransferTab = ({
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalTransferOpen, setModalTransferOpen] = useState(false);
+  const [editDocumentId, setEditDocumentId] = useState(null);
   const [modalReceiveOpen, setModalReceiveOpen] = useState(false);
   const [selectedTransferDoc, setSelectedTransferDoc] = useState(null);
 
   const transferDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      // Include both Transfer (Type 3) and ReceiveTransfer (Type 7)
-      if (doc.type !== 3 && doc.type !== 7) return false;
-      if (statusFilter !== 'ALL') {
-        if (statusFilter === 'Pending' && doc.transferStatus !== 'Pending') return false;
-        if (statusFilter === 'Completed' && doc.status !== 'Completed') return false;
-      }
+      // Include Transfer (Type 2 & 3) and ReceiveTransfer (Type 7)
+      if (doc.type !== 2 && doc.type !== 3 && doc.type !== 7) return false;
+      if (statusFilter !== 'ALL' && doc.status !== statusFilter) return false;
       if (searchText) {
         const lower = searchText.toLowerCase();
         const matchCode = doc.code?.toLowerCase().includes(lower);
@@ -35,6 +33,16 @@ const TransferTab = ({
       return true;
     });
   }, [documents, statusFilter, searchText]);
+
+  const handleOpenEdit = (docId) => {
+    setEditDocumentId(docId);
+    setModalTransferOpen(true);
+  };
+
+  const handleCloseTransferModal = () => {
+    setModalTransferOpen(false);
+    setEditDocumentId(null);
+  };
 
   const handleOpenReceiveModal = (doc = null) => {
     setSelectedTransferDoc(doc);
@@ -51,6 +59,7 @@ const TransferTab = ({
         setStatusFilter={setStatusFilter}
         loading={loading}
         setModalTransferOpen={setModalTransferOpen}
+        onEditDocument={handleOpenEdit}
         handleReceiveTransfer={handleOpenReceiveModal}
         handleDeleteDocument={handleDeleteDocument}
       />
@@ -58,7 +67,8 @@ const TransferTab = ({
       {/* MODAL 1: CHUYỂN HÀNG */}
       <TransferDocumentModal
         open={modalTransferOpen}
-        onClose={() => setModalTransferOpen(false)}
+        editDocumentId={editDocumentId}
+        onClose={handleCloseTransferModal}
         onSuccess={() => {
           fetchDocuments(selectedBranchId);
         }}

@@ -759,7 +759,7 @@ const ProductTable = ({
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mã chứng từ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Phương thức</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Thời gian</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn BQ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thay đổi tồn</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn tích lũy</th>
                                             </tr>
@@ -780,9 +780,9 @@ const ProductTable = ({
                                             ) : (
                                               lItems.map((ldg, ldgIdx) => {
                                                 const docCode = ldg.documentCode || ldg.docCode || ldg.code || `CT${ldgIdx + 1}`;
-                                                const method = ldg.method || ldg.note || ldg.type || 'Giao dịch kho';
-                                                const timeStr = ldg.createdDate ? new Date(ldg.createdDate).toLocaleString('vi-VN') : (ldg.time ? new Date(ldg.time).toLocaleString('vi-VN') : '---');
-                                                const rawCost = Number(ldg.unitPrice || ldg.costPrice || 0);
+                                                const method = ldg.methodName || ldg.method || ldg.note || ldg.type || 'Giao dịch kho';
+                                                const timeStr = ldg.businessDate ? new Date(ldg.businessDate).toLocaleString('vi-VN') : (ldg.createdDate ? new Date(ldg.createdDate).toLocaleString('vi-VN') : (ldg.time ? new Date(ldg.time).toLocaleString('vi-VN') : '---'));
+                                                const runAvgCost = Number(ldg.runningAverageCost ?? ldg.unitCost ?? ldg.unitPrice ?? 0);
                                                 const qDelta = Number(ldg.quantityDelta ?? ldg.quantity ?? 0);
                                                 const runQty = Number(ldg.runningQuantity ?? ldg.endingStock ?? 0);
 
@@ -798,10 +798,10 @@ const ProductTable = ({
                                                       {timeStr}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
-                                                      {rawCost.toLocaleString('vi-VN')} đ
+                                                      {runAvgCost.toLocaleString('vi-VN')} đ
                                                     </td>
-                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: qDelta < 0 ? '#ef4444' : '#059669' }}>
-                                                      {qDelta > 0 ? `+${qDelta}` : qDelta}
+                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: qDelta < 0 ? '#ef4444' : (qDelta > 0 ? '#059669' : '#475569') }}>
+                                                      {qDelta > 0 ? `+${qDelta.toLocaleString('vi-VN')}` : qDelta.toLocaleString('vi-VN')}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                                                       {runQty.toLocaleString('vi-VN')}
