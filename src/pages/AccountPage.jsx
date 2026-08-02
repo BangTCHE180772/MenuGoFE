@@ -15,6 +15,7 @@ import {
   Popconfirm,
   Avatar,
   message,
+  Upload,
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,6 +28,8 @@ import {
   PhoneOutlined,
   LockOutlined,
   BankOutlined,
+  UploadOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -36,6 +39,7 @@ import {
   deleteAccount,
 } from '../api/accountApi';
 import { getAllBranches } from '../api/branchApi';
+import { uploadImage } from '../api/imageApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 
@@ -86,6 +90,47 @@ const AccountPage = () => {
   const [editingRecord, setEditingRecord] = useState(null);
 
   const [form] = Form.useForm();
+  const avatarImageValue = Form.useWatch('avatarImage', form);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const beforeAvatarUpload = (file) => {
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg';
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const isValidExt = ['jpg', 'jpeg', 'png'].includes(ext);
+
+    if (!isJpgOrPng || !isValidExt) {
+      message.error('Chỉ chấp nhận file ảnh định dạng JPG, JPEG, PNG!');
+      return Upload.LIST_IGNORE;
+    }
+
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('Dung lượng file ảnh không được vượt quá 5MB!');
+      return Upload.LIST_IGNORE;
+    }
+
+    return true;
+  };
+
+  const handleAvatarUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingAvatar(true);
+    try {
+      const res = await uploadImage(file);
+      if (res.data) {
+        const imgUrl = res.data.imageLink || res.data.ImageLink;
+        form.setFieldsValue({ avatarImage: imgUrl });
+        form.validateFields(['avatarImage']);
+        message.success('Tải ảnh đại diện thành công!');
+        if (onSuccess) onSuccess(res.data);
+      }
+    } catch (err) {
+      console.error('Upload avatar error:', err);
+      message.error('Không thể tải ảnh đại diện lên!');
+      if (onError) onError(err);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Load data
   const loadData = useCallback(async () => {
@@ -646,10 +691,39 @@ const AccountPage = () => {
 
             <Form.Item
               name="avatarImage"
-              label="Link ảnh đại diện"
+              label="Ảnh đại diện"
+              rules={[{ required: true, message: 'Vui lòng chọn ảnh đại diện!' }]}
               style={{ width: 330 }}
             >
-              <Input placeholder="Nhập URL ảnh đại diện..." />
+              <Input style={{ display: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                <Avatar
+                  size={46}
+                  src={avatarImageValue || undefined}
+                  icon={!avatarImageValue ? <UserOutlined /> : undefined}
+                  style={{ backgroundColor: avatarImageValue ? undefined : '#e8442a', flexShrink: 0, border: '1px solid #d9d9d9' }}
+                />
+                <Upload
+                  name="avatarFile"
+                  showUploadList={false}
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  beforeUpload={beforeAvatarUpload}
+                  customRequest={handleAvatarUpload}
+                >
+                  <Button
+                    icon={uploadingAvatar ? <LoadingOutlined /> : <UploadOutlined />}
+                    loading={uploadingAvatar}
+                    style={{ borderRadius: '6px' }}
+                  >
+                    {avatarImageValue ? 'Thay đổi ảnh' : 'Chọn ảnh JPG/PNG'}
+                  </Button>
+                </Upload>
+              </div>
+              {avatarImageValue && (
+                <div style={{ fontSize: '12px', color: '#52c41a', marginTop: 4 }}>
+                  ✓ Đã chọn ảnh đại diện
+                </div>
+              )}
             </Form.Item>
           </Space>
 
