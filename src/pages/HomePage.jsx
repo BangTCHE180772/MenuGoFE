@@ -9,7 +9,7 @@ import dayjs from "dayjs";
 import HomeFilter from "../components/homePage/HomeFilter";
 import HomeDashboard from "../components/homePage/HomeDashboard";
 import HomeReport from "../components/homePage/HomeReport";
-import { MOCK_DAILY_REPORT } from "../components/homePage/homeMockData";
+import { MOCK_DAILY_REPORT, generateFilteredReportData } from "../components/homePage/homeMockData";
 
 const { Title, Text } = Typography;
 
@@ -35,23 +35,19 @@ const HomePage = () => {
   const handleApplyFilter = () => {
     setFilterLoading(true);
     setTimeout(() => {
-      setReportData({
-        ...MOCK_DAILY_REPORT,
-        dateStr: selectedDate,
-      });
+      const updatedData = generateFilteredReportData(selectedDate, selectedEmployee);
+      setReportData(updatedData);
       setFilterLoading(false);
       message.success(`Đã cập nhật dữ liệu báo cáo ngày ${selectedDate}`);
-    }, 400);
+    }, 300);
   };
 
   const handleResetFilter = () => {
     const todayStr = dayjs().format("DD/MM/YYYY");
     setSelectedDate(todayStr);
     setSelectedEmployee("all");
-    setReportData({
-      ...MOCK_DAILY_REPORT,
-      dateStr: todayStr,
-    });
+    const defaultData = generateFilteredReportData(todayStr, "all");
+    setReportData(defaultData);
     message.info("Đã đặt lại bộ lọc báo cáo về mặc định");
   };
 

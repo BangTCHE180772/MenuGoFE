@@ -9,12 +9,13 @@ import {
 import SalesReportTable from "./SalesReportTable";
 import CashFlowReportTable from "./CashFlowReportTable";
 import InventoryReportTable from "./InventoryReportTable";
+import SummaryReportCard from "./SummaryReportCard";
 
 const { Panel } = Collapse;
 
 /**
  * Component HomeReport - Chế độ xem báo cáo chi tiết với 4 Tabs:
- * 1. Tổng hợp (Collapse gập mở 3 bảng Bán hàng, Thu chi, Hàng hóa)
+ * 1. Tổng hợp (Card Bảng Tổng hợp 3 khối + Collapse gập mở 3 bảng Bán hàng, Thu chi, Hàng hóa)
  * 2. Bán hàng (Table Bán hàng)
  * 3. Thu chi (Table Thu chi)
  * 4. Hàng hóa (Table Hàng hóa)
@@ -32,12 +33,17 @@ const HomeReport = ({ data }) => {
         </Space>
       ),
       children: (
-        <Collapse
-          defaultActiveKey={["1"]}
-          bordered={false}
-          style={{ background: "transparent" }}
-          expandIconPosition="end"
-        >
+        <div>
+          {/* Bảng Tổng Hợp 3 Khối (Thu chi, Hóa đơn, Giao dịch) + Nút Xuất/In chung */}
+          <SummaryReportCard salesList={salesList} cashFlowList={cashFlowList} />
+
+          {/* Các bảng báo cáo chi tiết */}
+          <Collapse
+            defaultActiveKey={["1"]}
+            bordered={false}
+            style={{ background: "transparent" }}
+            expandIconPosition="end"
+          >
           <Panel
             header={
               <Space style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>
@@ -94,6 +100,7 @@ const HomeReport = ({ data }) => {
             <InventoryReportTable data={inventoryList} />
           </Panel>
         </Collapse>
+      </div>
       ),
     },
     {

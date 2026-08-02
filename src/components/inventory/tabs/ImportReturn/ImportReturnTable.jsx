@@ -131,14 +131,6 @@ const ImportReturnTable = ({
           )}
         </div>
       </div>
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            Làm mới
-          </button>
-        </div>
-      </div>
 
       {/* MAIN DATA TABLE */}
       <div style={{ flex: 1, overflow: 'auto', border: '1px solid #cbd5e1', borderRadius: 6 }}>

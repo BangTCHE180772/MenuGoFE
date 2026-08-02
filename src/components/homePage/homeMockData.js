@@ -541,3 +541,117 @@ export const MOCK_DAILY_REPORT = {
     },
   ],
 };
+
+/**
+ * Hàm lọc dữ liệu báo cáo động theo Ngày chọn và Nhân viên chọn
+ */
+export const generateFilteredReportData = (dateStr, employeeValue = "all") => {
+  const baseData = MOCK_DAILY_REPORT;
+
+  // 1. Lọc theo nhân viên (Employee Filter)
+  let empNameFilter = null;
+  if (employeeValue === "emp1") empNameFilter = "Nguyễn Văn An";
+  if (employeeValue === "emp2") empNameFilter = "Trần Thị Bình";
+  if (employeeValue === "emp3") empNameFilter = "Lê Hoàng Cường";
+  if (employeeValue === "emp4") empNameFilter = "Phạm Minh Đức";
+
+  let filteredSales = baseData.salesList;
+  if (empNameFilter) {
+    filteredSales = baseData.salesList.filter(
+      (item) => item.cashier.toLowerCase() === empNameFilter.toLowerCase()
+    );
+  }
+
+  // 2. Tạo hệ số phân hóa dữ liệu dựa trên Ngày báo cáo
+  let dateSeed = 1;
+  if (dateStr) {
+    let charSum = 0;
+    for (let i = 0; i < dateStr.length; i++) {
+      charSum += dateStr.charCodeAt(i);
+    }
+    dateSeed = 0.75 + (charSum % 6) * 0.1; // Hệ số từ 0.75 đến 1.25
+  }
+
+  // Điều chỉnh danh sách bán hàng theo Ngày nếu chọn ngày khác
+  if (dateSeed !== 1 && !empNameFilter) {
+    filteredSales = baseData.salesList.map((item) => {
+      const subtotal = Math.round((item.subtotal * dateSeed) / 10000) * 10000;
+      const discount = Math.round((item.discount * dateSeed) / 10000) * 10000;
+      const total = subtotal + item.surcharge - discount;
+      return {
+        ...item,
+        subtotal,
+        discount,
+        total,
+      };
+    });
+  }
+
+  // Tính toán lại Tổng doanh thu & KPIs
+  let totalRevenue = 0;
+  let totalOrders = filteredSales.length;
+  filteredSales.forEach((s) => {
+    totalRevenue += s.total;
+  });
+
+  const totalExpense = Math.round((totalRevenue * 0.38) / 10000) * 10000;
+  const totalProfit = totalRevenue - totalExpense;
+
+  const formatVND = (val) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
+
+  const kpis = {
+    revenue: {
+      value: totalRevenue,
+      formatted: formatVND(totalRevenue),
+      changePct: Number(((dateSeed * 12.5) % 25).toFixed(1)),
+      isPositive: true,
+    },
+    expense: {
+      value: totalExpense,
+      formatted: formatVND(totalExpense),
+      changePct: Number((((1 / dateSeed) * -4.2) % 15).toFixed(1)),
+      isPositive: true,
+    },
+    profit: {
+      value: totalProfit,
+      formatted: formatVND(totalProfit),
+      changePct: Number(((dateSeed * 18.2) % 30).toFixed(1)),
+      isPositive: true,
+    },
+    orders: {
+      value: totalOrders,
+      formatted: `${totalOrders} đơn`,
+      changePct: Number(((dateSeed * 8.4) % 15).toFixed(1)),
+      isPositive: true,
+    },
+  };
+
+  // Điều chỉnh Báo cáo Thu chi theo Ngày & Nhân viên
+  const filteredCashFlow = baseData.cashFlowList.map((item) => {
+    const amount = Math.round((item.amount * dateSeed) / 10000) * 10000;
+    return { ...item, amount };
+  });
+
+  // Điều chỉnh Báo cáo Hàng hóa theo Ngày & Nhân viên
+  const filteredInventory = baseData.inventoryList.map((item) => {
+    const qtySold = Math.max(1, Math.round(item.qtySold * dateSeed * (empNameFilter ? 0.6 : 1)));
+    const revenue = qtySold * item.unitPrice;
+    return { ...item, qtySold, revenue };
+  });
+
+  // Tính lại tỷ trọng % cho hàng hóa
+  const totalInvRev = filteredInventory.reduce((acc, curr) => acc + curr.revenue, 0);
+  filteredInventory.forEach((item) => {
+    item.sharePct = Number(((item.revenue / (totalInvRev || 1)) * 100).toFixed(1));
+  });
+
+  return {
+    ...baseData,
+    dateStr: dateStr || baseData.dateStr,
+    kpis,
+    salesList: filteredSales,
+    cashFlowList: filteredCashFlow,
+    inventoryList: filteredInventory,
+  };
+};

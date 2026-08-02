@@ -43,14 +43,16 @@ const HomeDashboard = ({ data }) => {
       title: "Doanh thu trong ngày",
       value: kpis.revenue.formatted,
       changePct: kpis.revenue.changePct,
-      icon: <DollarOutlined style={{ fontSize: 22, color: "#e8442a" }} />,
-      bgIcon: "#fff2f0",
-      borderColor: "#e8442a",
+      isGood: kpis.revenue.changePct >= 0,
+      icon: <DollarOutlined style={{ fontSize: 22, color: "#2563eb" }} />,
+      bgIcon: "#eff6ff",
+      borderColor: "#2563eb",
     },
     {
       title: "Chi phí phát sinh",
       value: kpis.expense.formatted,
       changePct: kpis.expense.changePct,
+      isGood: kpis.expense.changePct <= 0, // Giảm chi phí là tốt -> Màu xanh
       icon: <FallOutlined style={{ fontSize: 22, color: "#ef4444" }} />,
       bgIcon: "#fef2f2",
       borderColor: "#ef4444",
@@ -59,6 +61,7 @@ const HomeDashboard = ({ data }) => {
       title: "Lợi nhuận ròng",
       value: kpis.profit.formatted,
       changePct: kpis.profit.changePct,
+      isGood: kpis.profit.changePct >= 0,
       icon: <RiseOutlined style={{ fontSize: 22, color: "#10b981" }} />,
       bgIcon: "#ecfdf5",
       borderColor: "#10b981",
@@ -67,9 +70,10 @@ const HomeDashboard = ({ data }) => {
       title: "Tổng số đơn hàng",
       value: kpis.orders.formatted,
       changePct: kpis.orders.changePct,
-      icon: <ShoppingOutlined style={{ fontSize: 22, color: "#3b82f6" }} />,
-      bgIcon: "#eff6ff",
-      borderColor: "#3b82f6",
+      isGood: kpis.orders.changePct >= 0,
+      icon: <ShoppingOutlined style={{ fontSize: 22, color: "#ea580c" }} />,
+      bgIcon: "#fff7ed",
+      borderColor: "#ea580c",
     },
   ];
 
@@ -117,7 +121,7 @@ const HomeDashboard = ({ data }) => {
 
                 <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
                   <Tag
-                    color={isUp ? "success" : "error"}
+                    color={kpi.isGood ? "success" : "error"}
                     style={{ borderRadius: 6, fontWeight: 600, margin: 0, padding: "1px 6px" }}
                   >
                     {isUp ? <RiseOutlined /> : <FallOutlined />}{" "}
@@ -137,7 +141,7 @@ const HomeDashboard = ({ data }) => {
       <Card
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ThunderboltOutlined style={{ color: "var(--color-primary)" }} />
+            <ThunderboltOutlined style={{ color: "#2563eb" }} />
             <span style={{ fontWeight: 700, fontSize: 15 }}>
               Xu hướng Doanh thu, Chi phí & Lợi nhuận theo giờ
             </span>
@@ -156,8 +160,8 @@ const HomeDashboard = ({ data }) => {
             <AreaChart data={hourlyTrends} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#e8442a" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#e8442a" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gradProf" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
@@ -182,7 +186,7 @@ const HomeDashboard = ({ data }) => {
                 type="monotone"
                 dataKey="revenue"
                 name="Doanh thu"
-                stroke="#e8442a"
+                stroke="#2563eb"
                 strokeWidth={2.5}
                 fillOpacity={1}
                 fill="url(#gradRev)"
@@ -192,7 +196,7 @@ const HomeDashboard = ({ data }) => {
                 dataKey="expense"
                 name="Chi phí"
                 stroke="#ef4444"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 strokeDasharray="4 4"
                 dot={false}
               />
@@ -217,7 +221,7 @@ const HomeDashboard = ({ data }) => {
           <Card
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ShoppingOutlined style={{ color: "#3b82f6" }} />
+                <ShoppingOutlined style={{ color: "#ea580c" }} />
                 <span style={{ fontWeight: 700, fontSize: 15 }}>
                   Số lượng Đơn hàng theo giờ
                 </span>
@@ -242,7 +246,7 @@ const HomeDashboard = ({ data }) => {
                     formatter={(val) => [`${val} đơn`, "Số lượng đơn"]}
                     contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
                   />
-                  <Bar dataKey="orders" name="Số đơn" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="orders" name="Số đơn" fill="#ea580c" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
