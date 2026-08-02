@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import TransferSidebar from './TransferSidebar';
 import TransferTable from './TransferTable';
 import TransferDocumentModal from './TransferDocumentModal';
 import ReceiveTransferDocumentModal from './ReceiveTransferDocumentModal';
@@ -44,11 +43,12 @@ const TransferTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <TransferSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <TransferTable
         documents={transferDocuments}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         setModalTransferOpen={setModalTransferOpen}
         handleReceiveTransfer={handleOpenReceiveModal}

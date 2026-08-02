@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import ImportSidebar from './ImportSidebar';
 import ImportTable from './ImportTable';
 import ImportDocumentModal from './ImportDocumentModal';
 import ReturnDocumentModal from './ReturnDocumentModal';
@@ -40,12 +39,13 @@ const ImportTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <ImportSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <ImportTable
         documents={importDocuments}
         allDocuments={documents}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         onRefresh={() => fetchDocuments && fetchDocuments(selectedBranchId)}
         onOpenCreateModal={() => {

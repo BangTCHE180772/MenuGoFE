@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import ExportDeleteSidebar from './ExportDeleteSidebar';
 import ExportDeleteTable from './ExportDeleteTable';
 import DisposalDocumentModal from './DisposalDocumentModal';
 
@@ -31,11 +30,12 @@ const ExportDeleteTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <ExportDeleteSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <ExportDeleteTable
         documents={exportDeleteDocuments}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         setModalExportOpen={setModalExportOpen}
         handleDeleteDocument={handleDeleteDocument}

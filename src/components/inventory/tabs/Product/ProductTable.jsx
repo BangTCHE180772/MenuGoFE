@@ -6,7 +6,8 @@ import {
   InfoCircleOutlined,
   HistoryOutlined,
   SwapOutlined,
-  ProfileOutlined
+  ProfileOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { getBInventories, getBInventoryLedger } from '../../../../api/binventoryApi';
 
@@ -106,8 +107,11 @@ const ProductTable = ({
   dishes = [],
   selectedBranchId,
   searchText,
-  subTab,
-  statusFilter
+  setSearchText,
+  subTab = 'nguyenlieu',
+  setSubTab,
+  statusFilter = 'ALL',
+  setStatusFilter
 }) => {
   const [bInventories, setBInventories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -285,35 +289,128 @@ const ProductTable = ({
       <div
         style={{
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '10px 16px',
+          padding: '12px 16px',
           borderBottom: '1px solid #e2e8f0',
-          background: '#ffffff'
+          background: '#ffffff',
+          flexWrap: 'wrap',
+          gap: 10
         }}
       >
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
-          {subTab === 'nguyenlieu' ? 'Danh sách nguyên liệu' : 'Danh sách mặt hàng'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          {setSearchText && (
+            <div style={{ position: 'relative', width: 280 }}>
+              <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+              <input
+                type="text"
+                placeholder="Theo mã, tên nguyên liệu, mặt hàng..."
+                value={searchText || ''}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: 32,
+                  padding: '4px 10px 4px 30px',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#1e293b',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  transition: 'border 0.2s ease'
+                }}
+              />
+            </div>
+          )}
+
+          {/* SUBTAB PILLS (NGUYÊN LIỆU / MẶT HÀNG) */}
+          {setSubTab && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'nguyenlieu', label: 'Nguyên liệu' },
+                { key: 'mathang', label: 'Mặt hàng' }
+              ].map((st) => {
+                const active = subTab === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setSubTab(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* STATUS FILTER PILLS (TẤT CẢ / CÒN HÀNG / HẾT HÀNG) */}
+          {setStatusFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'IN_STOCK', label: 'Còn hàng' },
+                { key: 'OUT_OF_STOCK', label: 'Hết hàng' }
+              ].map((st) => {
+                const active = statusFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStatusFilter(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <button
           type="button"
           onClick={fetchInventoryList}
           style={{
-            height: 28,
+            height: 32,
             padding: '0 12px',
             border: '1px solid #cbd5e1',
-            borderRadius: 4,
+            borderRadius: 6,
             background: '#ffffff',
-            color: '#475569',
-            fontSize: 11,
+            color: '#334155',
+            fontSize: 12,
+            fontWeight: 500,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 4
           }}
         >
-          <ReloadOutlined /> Làm mới
+          <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
         </button>
       </div>
 

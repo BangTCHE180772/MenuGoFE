@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import InventoryHeaderNav from './InventoryHeaderNav';
 import { useBranch } from '../../context/BranchContext';
 import { deleteDocument, deleteImportDocument, deleteReturnDocument, getDocuments } from '../../api/documentApi';
@@ -16,12 +17,27 @@ import InvoiceTab from './tabs/Invoice/InvoiceTab';
 import AdjustmentTab from './tabs/Adjustment/AdjustmentTab';
 
 const InventoryManagementTab = () => {
-  // Use global BranchContext instead of local state
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentBranchId, branches } = useBranch();
   const [loading, setLoading] = useState(false);
 
-  // Active Tab state (default: 'Import')
-  const [activeTab, setActiveTab] = useState('Import');
+  // Read tab parameter from URL query parameter, fallback to 'Import'
+  const tabFromUrl = searchParams.get('tab') || 'Import';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
+  // Sync activeTab when URL searchParams change
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    if (currentTab && currentTab !== activeTab) {
+      setActiveTab(currentTab);
+    }
+  }, [searchParams]);
+
+  // Sync URL searchParams when activeTab is changed locally (e.g. via InventoryHeaderNav dropdown)
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab });
+  };
 
   // Real Data states
   const [documents, setDocuments] = useState([]);
@@ -73,10 +89,7 @@ const InventoryManagementTab = () => {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontSize: 12 }}>
       {/* TOP HEADER NAVIGATION BAR */}
-      <InventoryHeaderNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
+      <InventoryHeaderNav activeTab={activeTab} />
 
       {/* BODY CONTENT AREA */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

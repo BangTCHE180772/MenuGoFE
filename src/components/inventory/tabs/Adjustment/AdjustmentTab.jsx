@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import AdjustmentSidebar from './AdjustmentSidebar';
 import AdjustmentTable from './AdjustmentTable';
 import AdjustmentDocumentModal from './AdjustmentDocumentModal';
 
@@ -32,19 +31,15 @@ const AdjustmentTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      {/* LEFT SIDEBAR (SEARCH & FILTER, NO HEADER TITLE) */}
-      <AdjustmentSidebar
-        searchText={searchText}
-        setSearchText={setSearchText}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-      />
-
-      {/* RIGHT CONTENT TABLE */}
+      {/* CONTENT TABLE WITH TOP SEARCH TOOLBAR */}
       <AdjustmentTable
         documents={adjustmentDocs}
         loading={loading}
         selectedBranchId={selectedBranchId}
+        searchText={searchText}
+        setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         fetchDocuments={fetchDocuments}
         handleDeleteDocument={handleDeleteDocument}
         setModalOpen={setModalOpen}

@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import ProductionSidebar from './ProductionSidebar';
 import ProductionTable from './ProductionTable';
 import ProductionDocumentModal from './ProductionDocumentModal';
 
@@ -31,11 +30,12 @@ const ProductionTab = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <ProductionSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <ProductionTable
         documents={productionDocuments}
         searchText={searchText}
         setSearchText={setSearchText}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
         loading={loading}
         setModalProductionOpen={setModalProductionOpen}
         handleDeleteDocument={handleDeleteDocument}

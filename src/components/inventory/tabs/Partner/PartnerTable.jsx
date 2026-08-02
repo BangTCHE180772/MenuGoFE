@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 
 const PartnerTable = ({
   partners = [],
+  searchText,
+  setSearchText,
+  partnerType = 'ALL',
+  setPartnerType,
   setModalPartnerOpen
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -12,37 +16,91 @@ const PartnerTable = ({
   const currentData = partners.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden', width: '100%' }}>
-      {/* TOP ACTION TOOLBAR (RIGHT ALIGNED, CREATE BUTTON FIRST) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justify: 'flex-end',
-          width: '100%',
-          marginBottom: 8
-        }}
-      >
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden', width: '100%' }}>
+      {/* TOP ACTION TOOLBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          {setSearchText && (
+            <div style={{ position: 'relative', width: 280 }}>
+              <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+              <input
+                type="text"
+                placeholder="Theo tên đối tác, số điện thoại..."
+                value={searchText || ''}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: 32,
+                  padding: '4px 10px 4px 30px',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#1e293b',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  transition: 'border 0.2s ease'
+                }}
+              />
+            </div>
+          )}
+
+          {/* TYPE FILTER PILLS */}
+          {setPartnerType && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'NCC', label: 'Nhà cung cấp' },
+                { key: 'KH', label: 'Khách hàng' }
+              ].map((st) => {
+                const active = partnerType === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setPartnerType(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
             onClick={() => setModalPartnerOpen(true)}
             style={{
-              background: '#e8442a',
+              background: 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 4
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            <PlusOutlined style={{ fontSize: 11 }} /> Thêm đối tác
+            <PlusOutlined style={{ fontSize: 12 }} /> Thêm đối tác
           </button>
 
           <button
@@ -52,10 +110,10 @@ const PartnerTable = ({
               background: '#ffffff',
               color: '#334155',
               border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
               cursor: 'pointer',
               display: 'flex',
@@ -63,7 +121,7 @@ const PartnerTable = ({
               gap: 4
             }}
           >
-            <ReloadOutlined style={{ fontSize: 11 }} /> Làm mới
+            <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
           </button>
         </div>
       </div>

@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import PartnerSidebar from './PartnerSidebar';
 import PartnerTable from './PartnerTable';
 import PartnerModal from './PartnerModal';
 
@@ -28,9 +27,12 @@ const PartnerTab = ({ partners = [] }) => {
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <PartnerSidebar partnerType={partnerType} setPartnerType={setPartnerType} />
       <PartnerTable
         partners={filteredPartners}
+        searchText={searchText}
+        setSearchText={setSearchText}
+        partnerType={partnerType}
+        setPartnerType={setPartnerType}
         setModalPartnerOpen={setModalPartnerOpen}
       />
 

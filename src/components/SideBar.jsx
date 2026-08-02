@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
 import {
@@ -27,9 +27,25 @@ import {
   BarChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  DownOutlined,
+  RightOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
+
+// ─── Tùy chọn con của Quản Lý Kho ──────────────────────────────────────────
+const INVENTORY_SUB_MENU = [
+  { label: "Nhập hàng", path: "/inventory-management?tab=Import", tabKey: "Import" },
+  { label: "Trả hàng nhập", path: "/inventory-management?tab=ImportReturn", tabKey: "ImportReturn" },
+  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
+  { label: "Xuất hủy", path: "/inventory-management?tab=ExportDelete", tabKey: "ExportDelete" },
+  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
+  { label: "Chuyển hàng", path: "/inventory-management?tab=Transfer", tabKey: "Transfer" },
+  { label: "Kiểm kho", path: "/inventory-management?tab=Check", tabKey: "Check" },
+  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
+  { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
+  { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
+];
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
@@ -47,7 +63,7 @@ const ROLE_MENUS = {
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
-    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
@@ -67,7 +83,7 @@ const ROLE_MENUS = {
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
-    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
@@ -86,7 +102,7 @@ const ROLE_MENUS = {
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
-    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
@@ -137,7 +153,11 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [inventoryOpen, setInventoryOpen] = useState(true);
+
   const menuItems = ROLE_MENUS[role] ?? [];
+  const searchParams = new URLSearchParams(location.search);
+  const activeTabParam = searchParams.get("tab") || "Import";
 
   const handleLogout = async () => {
     await logout();
@@ -241,16 +261,83 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
       {/* Sidebar Nav List */}
       <nav className="sidebar-nav">
         {menuItems.map((item, idx) => {
-          const isActive =
+          const hasChildren = item.children && item.children.length > 0;
+          const isParentActive =
             location.pathname === item.path ||
             (item.path !== "/home" && location.pathname.startsWith(item.path));
 
+          // ── Parent Menu Item With Submenu (e.g., Quản lý kho) ───────────────
+          if (hasChildren) {
+            if (collapsed) {
+              const popupMenuItems = item.children.map((child) => {
+                const isChildActive = isParentActive && activeTabParam === child.tabKey;
+                return {
+                  key: child.tabKey,
+                  label: (
+                    <span style={{ color: isChildActive ? "var(--color-primary)" : "inherit", fontWeight: isChildActive ? 600 : 400 }}>
+                      {child.label}
+                    </span>
+                  ),
+                  onClick: () => navigate(child.path),
+                };
+              });
+
+              return (
+                <Dropdown
+                  key={idx}
+                  placement="rightTop"
+                  menu={{ items: popupMenuItems }}
+                  trigger={["hover", "click"]}
+                >
+                  <div className={`sidebar-nav-item ${isParentActive ? "active" : ""}`} style={{ cursor: "pointer" }}>
+                    <span className="sidebar-nav-icon">{item.icon}</span>
+                  </div>
+                </Dropdown>
+              );
+            }
+
+            return (
+              <div key={idx} className="sidebar-menu-group">
+                <div
+                  className={`sidebar-nav-item parent ${isParentActive ? "active" : ""}`}
+                  onClick={() => setInventoryOpen((prev) => !prev)}
+                >
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  <span className="sidebar-nav-label">{item.label}</span>
+                  <span className="sidebar-nav-arrow">
+                    {inventoryOpen ? <DownOutlined style={{ fontSize: 10 }} /> : <RightOutlined style={{ fontSize: 10 }} />}
+                  </span>
+                </div>
+
+                {inventoryOpen && (
+                  <div className="sidebar-submenu">
+                    {item.children.map((child, cIdx) => {
+                      const isChildActive = isParentActive && activeTabParam === child.tabKey;
+                      return (
+                        <Link
+                          key={cIdx}
+                          to={child.path}
+                          state={{ from: location }}
+                          className={`sidebar-submenu-item ${isChildActive ? "active" : ""}`}
+                        >
+                          <span className="sidebar-submenu-dot">•</span>
+                          <span className="sidebar-submenu-label">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // ── Standard Single Menu Item ──────────────────────────────────────
           const navLinkContent = (
             <Link
               key={idx}
               to={item.path}
               state={{ from: location }}
-              className={`sidebar-nav-item ${isActive ? "active" : ""}`}
+              className={`sidebar-nav-item ${isParentActive ? "active" : ""}`}
             >
               <span className="sidebar-nav-icon">{item.icon}</span>
               {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
@@ -303,3 +390,4 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
 };
 
 export default SideBar;
+

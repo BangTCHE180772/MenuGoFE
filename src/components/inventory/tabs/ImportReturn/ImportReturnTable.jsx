@@ -5,13 +5,16 @@ import {
   EnvironmentOutlined,
   DeleteOutlined,
   PrinterOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 
 const ImportReturnTable = ({
   documents = [],
   searchText,
   setSearchText,
+  statusFilter = 'ALL',
+  setStatusFilter,
   loading,
   handleDeleteDocument
 }) => {
@@ -66,38 +69,68 @@ const ImportReturnTable = ({
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
       {/* HEADER ACTION TOOLBAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <input
-          type="text"
-          placeholder="Theo mã phiếu trả nhập..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            width: 240,
-            height: 26,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#1e293b',
-            borderRadius: 16,
-            border: '1px solid #cbd5e1',
-            outline: 'none'
-          }}
-        />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              placeholder="Theo mã phiếu trả nhập, người tạo..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '4px 10px 4px 30px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1e293b',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                transition: 'border 0.2s ease'
+              }}
+            />
+          </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            onClick={() => alert('Đã làm mới dữ liệu')}
-            style={{
-              background: '#ffffff',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+          {/* STATUS FILTER PILLS */}
+          {setStatusFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'Completed', label: 'Hoàn thành' },
+                { key: 'Cancelled', label: 'Đã hủy' }
+              ].map((st) => {
+                const active = statusFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStatusFilter(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
               fontWeight: 500,
               cursor: 'pointer'
             }}

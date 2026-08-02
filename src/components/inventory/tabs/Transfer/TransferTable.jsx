@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
+import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const TransferTable = ({
   documents = [],
   searchText,
   setSearchText,
+  statusFilter = 'ALL',
+  setStatusFilter,
   loading,
   setModalTransferOpen,
   handleReceiveTransfer,
@@ -17,58 +20,110 @@ const TransferTable = ({
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <input
-          type="text"
-          placeholder="Theo mã phiếu chuyển hàng..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            width: 240,
-            height: 26,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#1e293b',
-            borderRadius: 16,
-            border: '1px solid #cbd5e1',
-            outline: 'none'
-          }}
-        />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
+      {/* TOP ACTION TOOLBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              placeholder="Theo mã phiếu chuyển hàng, người tạo..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '4px 10px 4px 30px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1e293b',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                transition: 'border 0.2s ease'
+              }}
+            />
+          </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+          {/* STATUS FILTER PILLS */}
+          {setStatusFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'Pending', label: 'Lưu tạm' },
+                { key: 'Completed', label: 'Hoàn thành' }
+              ].map((st) => {
+                const active = statusFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStatusFilter(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
+            type="button"
             onClick={() => setModalTransferOpen(true)}
             style={{
-              background: '#e8442a',
+              background: 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            + Chuyển hàng
+            <PlusOutlined /> Chuyển hàng
           </button>
           <button
+            type="button"
             onClick={() => alert('Đã làm mới dữ liệu')}
             style={{
               background: '#ffffff',
               color: '#334155',
               border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            Làm mới
+            <ReloadOutlined /> Làm mới
           </button>
         </div>
       </div>
