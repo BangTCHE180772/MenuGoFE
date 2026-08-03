@@ -152,7 +152,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
               title={canOrder ? `Thêm ${item.name}` : 'Chọn bàn Có khách để gọi món'}
             >
               {item.imageLink && (
-                <div style={{ height: '80px', width: '100%', marginBottom: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '60px', width: '60px', minWidth: '60px', borderRadius: '4px', overflow: 'hidden' }}>
                   <img src={item.imageLink} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               )}

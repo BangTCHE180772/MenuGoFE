@@ -19,7 +19,7 @@ import { FireOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
-import { createOrder, createOrderDetail } from '../api/orderApi';
+import { createOrder, createOrderDetail, updateCookingStatus } from '../api/orderApi';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { checkInReservation } from '../api/reservationApi';
 import { TABLE_STATUS } from '../data/tableConstants';
@@ -257,6 +257,20 @@ const OrderPage = ({ isWaiterMode }) => {
     }
   };
 
+  const handleMarkAsServed = async (orderDetailId) => {
+    try {
+      await updateCookingStatus(orderDetailId, { cookingStatus: 'Served' });
+      message.success('Đã xác nhận phục vụ món!');
+      if (selectedTable) {
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        setOrderSummary(summaryRes.data);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi xác nhận phục vụ món');
+    }
+  };
+
   const handlePaymentClick = () => {
     const activeItems = orderSummary?.items?.filter(i => i.status !== 'Cancelled') || [];
     const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
@@ -327,6 +341,7 @@ const OrderPage = ({ isWaiterMode }) => {
           onConfirm={handleConfirmOrder}
           onChangeStatus={handleChangeTableStatus}
           onPayment={handlePaymentClick}
+          onMarkAsServed={handleMarkAsServed}
           onMerge={() => setIsMergeModalVisible(true)}
           loading={orderLoading}
           isWaiterMode={isWaiterMode}
