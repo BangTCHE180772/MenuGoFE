@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { Breadcrumb, Typography, Skeleton, Empty, Select, Col, Input, Button, Tooltip, Space, Modal } from "antd";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Breadcrumb,
+  Typography,
+  Skeleton,
+  Empty,
+  Select,
+  Col,
+  Input,
+  Button,
+  Tooltip,
+  Space,
+  Modal,
+  message,
+} from "antd";
 import {
   HomeOutlined,
   BarChartOutlined,
@@ -21,152 +34,212 @@ import RevenueReportTable from "../components/reports/revenue/RevenueReportTable
 import BillDetailDrawer from "../components/reports/revenue/BillDetailDrawer";
 import RevenueCompareModal from "../components/reports/revenue/RevenueCompareModal";
 
+import { getBranchDashboardStats } from "../api/dashboardApi";
+
 const { Title, Text } = Typography;
 
-// Mock Generator cho Báo cáo Doanh thu
-const MOCK_REVENUE_BILLS = Array.from({ length: 45 }, (_, i) => {
-  const billNum = String(1001 + i).padStart(4, "0");
-  const dishTotal = Math.round((150000 + Math.random() * 850000) / 1000) * 1000;
-  const surcharge = i % 3 === 0 ? 20000 : 0;
-  const discount = i % 4 === 0 ? 30000 : 0;
-  const vat = Math.round(dishTotal * 0.08);
-  const total = dishTotal + surcharge - discount + vat;
+const formatVND = (val) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
-  const cashiers = ["Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường"];
-  const methods = ["Tiền mặt", "Chuyển khoản / QR", "Thẻ Visa/Master"];
+// ─── Map BE CashFlowList → Revenue bills table ─────────────────────────────
+// BE cashFlowList: [{ id, time:"yyyy-MM-dd HH:mm", type:"in"|"out", category, amount }]
+// RevenueReportTable expects: { id, billCode, date, time, customer, tableName, cashier,
+//   paymentMethod, dishTotal, surcharge, discount, vat, total, status }
+const mapCashFlowToBills = (cashFlowList = []) => {
+  return cashFlowList
+    .filter((cf) => cf.type === "in") // chỉ lấy Thu (Payment thành công)
+    .map((cf, idx) => {
+      const timeVal = cf.time || "";
+      const parsedTime = timeVal.length > 5 ? dayjs(timeVal) : null;
+      const dateStr = parsedTime ? parsedTime.format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY");
+      const timeStr = parsedTime ? parsedTime.format("HH:mm") : timeVal;
+      const amount  = Math.abs(cf.amount || 0);
 
-  return {
-    id: `BILL-${billNum}`,
-    billCode: `HD${billNum}`,
-    date: dayjs().subtract(i % 15, "day").format("DD/MM/YYYY"),
-    time: `${String(8 + (i % 14)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`,
-    customer: i % 5 === 0 ? `Khách VIP ${i}` : "Khách lẻ",
-    tableName: `Bàn ${(i % 16) + 1}`,
-    cashier: cashiers[i % cashiers.length],
-    paymentMethod: methods[i % methods.length],
-    dishTotal,
-    surcharge,
-    discount,
-    vat,
-    total,
-    status: "Completed",
-  };
-});
+      return {
+        id:            String(cf.id || idx + 1),
+        billCode:      `HD${String(cf.id || idx + 1).padStart(6, "0")}`,
+        date:          dateStr,
+        time:          timeStr,
+        customer:      "Khách lẻ",
+        tableName:     "—",
+        cashier:       cf.category === "Thanh toán hóa đơn" ? "Hệ thống" : cf.category,
+        paymentMethod: "Hệ thống",   // BE Payment không lưu method riêng trong cashFlow
+        dishTotal:     amount,
+        surcharge:     0,
+        discount:      0,
+        vat:           0,
+        total:         amount,
+        status:        "Completed",
+        _raw:          cf,           // giữ nguyên để debug
+      };
+    });
+};
 
 /**
- * Page: RevenueReportPage
- * Báo cáo Doanh thu chuyên sâu cho quản lý / chủ nhà hàng.
+ * Page: ReportRevenuePage
+ * Báo cáo Doanh thu — kết nối với BE qua GET /api/Dashboard/branch-stats
  * Đường dẫn: /reports/revenue
+ *
+ * Nguồn dữ liệu từ BE:
+ *  - KPI cards    ← beStats.revenue, completedBills, avgOrderValue
+ *  - Trend chart  ← beStats.dailyStats [{ date, revenue, expense, profit }]
+ *  - Pie chart    ← beStats.paymentMethods [{ name, value }]
+ *  - Bills table  ← beStats.cashFlowList lọc type=="in"
+ *  - SummaryFooter← beStats.revenue, expenses, profit
  */
 const ReportRevenuePage = () => {
-  const [loading, setLoading] = useState(true);
-  const [presetTime, setPresetTime] = useState("this_month");
-  const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
-  const [searchText, setSearchText] = useState("");
-  const [selectedCashier, setSelectedCashier] = useState("all");
-  const [selectedMethod, setSelectedMethod] = useState("all");
-
-  const [selectedBill, setSelectedBill] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [presetTime, setPresetTime]   = useState("this_month");
+  const [dateRange, setDateRange]     = useState([
+    dayjs().startOf("month"),
+    dayjs().endOf("month"),
+  ]);
+  const [searchText, setSearchText]           = useState("");
+  const [selectedMethod, setSelectedMethod]   = useState("all");
+  const [isFullscreen, setIsFullscreen]       = useState(false);
+  const [selectedBill, setSelectedBill]       = useState(null);
+  const [drawerVisible, setDrawerVisible]     = useState(false);
   const [compareModalVisible, setCompareModalVisible] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // TODO: API Fetch Revenue Report Data (GET /api/v1/reports/revenue)
+  // ── Raw data từ BE ──────────────────────────────────────────────────────
+  const [beStats, setBeStats]           = useState(null);
+  const [allBills, setAllBills]         = useState([]);   // toàn bộ bills từ BE
+  const [trendData, setTrendData]       = useState([]);   // dailyStats
+  const [paymentMethodData, setPaymentMethodData] = useState([]);
+  const [totalExpense, setTotalExpense] = useState(0);
+
+  // ── Fetch từ BE ─────────────────────────────────────────────────────────
+  const fetchReportData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [start, end] = dateRange;
+      const startStr = start.format("YYYY-MM-DD");
+      const endStr   = end.format("YYYY-MM-DD");
+
+      // Xác định range param
+      const today = dayjs().startOf("day");
+      const isToday = start.isSame(today, "day") && end.isSame(today, "day");
+
+      // Map preset key (snake_case từ ReportFilter) → range BE
+      const presetToRange = {
+        today:       "today",
+        yesterday:   "yesterday",
+        this_week:   "custom",
+        last_week:   "custom",
+        this_month:  "thisMonth",
+        last_month:  "lastMonth",
+        this_year:   "custom",
+        custom:      "custom",
+      };
+      let range = isToday ? "today" : (presetToRange[presetTime] || "custom");
+
+      const res = await getBranchDashboardStats(range, startStr, endStr, null);
+
+      if (res?.data) {
+        const data = res.data;
+        setBeStats(data);
+
+        // Bills table
+        const bills = mapCashFlowToBills(data.cashFlowList || []);
+        setAllBills(bills);
+
+        // Trend chart: dailyStats → { date, revenue }
+        if (data.dailyStats && data.dailyStats.length > 0) {
+          setTrendData(
+            data.dailyStats.map((s) => ({
+              date:    s.date,
+              revenue: s.revenue || 0,
+              expense: s.expense || 0,
+              profit:  s.profit  || 0,
+            }))
+          );
+        } else {
+          setTrendData([]);
+        }
+
+        // Pie chart: paymentMethods
+        setPaymentMethodData(
+          (data.paymentMethods || []).map((m) => ({
+            name:  m.name,
+            value: m.value || 0,
+          }))
+        );
+
+        setTotalExpense(data.expenses || 0);
+      }
+    } catch (err) {
+      console.error("[ReportRevenuePage] API error:", err);
+      message.warning("Không thể tải dữ liệu doanh thu. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange, presetTime]);
+
   useEffect(() => {
     fetchReportData();
-  }, [presetTime, dateRange, selectedCashier, selectedMethod]);
+  }, [fetchReportData]);
 
-  const fetchReportData = () => {
-    setLoading(true);
-    // TODO: Replace with real API call e.g. axios.get('/api/v1/reports/revenue', { params: { startDate, endDate, cashier, method } })
-    setTimeout(() => {
-      setLoading(false);
-    }, 450);
+  // ── Khi preset thay đổi → ReportFilter tự cập nhật dateRange (đã xử lý trong nó)
+  // handlePresetChange chỉ cần nhận value và cập nhật state tương ứng
+  const handlePresetChange = (val) => {
+    setPresetTime(val);
+    // ReportFilter tự gọi onDateRangeChange nên không cần set dateRange ở đây
   };
 
   const handleResetFilters = () => {
     setPresetTime("this_month");
     setDateRange([dayjs().startOf("month"), dayjs().endOf("month")]);
     setSearchText("");
-    setSelectedCashier("all");
     setSelectedMethod("all");
-    fetchReportData();
   };
 
-  // Client-side filtering
-  const filteredData = MOCK_REVENUE_BILLS.filter((item) => {
+  // ── Client-side filter trên bảng ─────────────────────────────────────────
+  const filteredData = allBills.filter((item) => {
     const matchSearch =
       !searchText ||
       item.billCode.toLowerCase().includes(searchText.toLowerCase()) ||
       item.customer.toLowerCase().includes(searchText.toLowerCase()) ||
       item.cashier.toLowerCase().includes(searchText.toLowerCase());
 
-    const matchCashier = selectedCashier === "all" || item.cashier === selectedCashier;
-    const matchMethod = selectedMethod === "all" || item.paymentMethod === selectedMethod;
+    const matchMethod =
+      selectedMethod === "all" || item.paymentMethod === selectedMethod;
 
-    return matchSearch && matchCashier && matchMethod;
+    return matchSearch && matchMethod;
   });
 
-  // Calculate Summary Totals
-  const totalRevenue = filteredData.reduce((acc, c) => acc + c.total, 0);
-  const totalOrders = filteredData.length;
-  const avgOrderValue = totalOrders ? Math.round(totalRevenue / totalOrders) : 0;
-  const avgPerDay = Math.round(totalRevenue / 30);
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.total), 0);
-  const lowestVal = filteredData.reduce((min, c) => Math.min(min, c.total), filteredData[0]?.total || 0);
+  // ── Summary tính từ filteredData ─────────────────────────────────────────
+  const totalRevenue   = beStats?.revenue || 0;
+  const totalOrders    = beStats?.completedBills || 0;
+  const avgOrderValue  = beStats?.avgOrderValue || 0;
+  const profit         = beStats?.profit || 0;
 
-  const columnDefs = [
-    { title: "Mã Bill", field: "billCode" },
-    { title: "Ngày", field: "date" },
-    { title: "Thời gian", field: "time" },
-    { title: "Khách hàng", field: "customer" },
-    { title: "Thu ngân", field: "cashier" },
-    { title: "Thanh toán", field: "paymentMethod" },
-    { title: "Tiền món", field: (r) => `${r.dishTotal.toLocaleString()} đ`, align: "right" },
-    { title: "Phụ thu", field: (r) => `${r.surcharge.toLocaleString()} đ`, align: "right" },
-    { title: "Giảm giá", field: (r) => `-${r.discount.toLocaleString()} đ`, align: "right" },
-    { title: "VAT", field: (r) => `${r.vat.toLocaleString()} đ`, align: "right" },
-    { title: "Tổng tiền", field: (r) => `${r.total.toLocaleString()} đ`, align: "right" },
+  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
+  const avgPerDay   = Math.round(totalRevenue / daysInRange);
+
+  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.total), 0);
+  const lowestVal  = filteredData.length
+    ? filteredData.reduce((min, c) => Math.min(min, c.total), filteredData[0].total)
+    : 0;
+
+  // Danh sách PTTT từ BE (dùng cho dropdown filter)
+  const methodOptions = [
+    { label: "Tất cả phương thức", value: "all" },
+    ...paymentMethodData.map((m) => ({ label: m.name, value: m.name })),
   ];
 
-  // Component bộ lọc riêng cho Báo cáo Doanh Thu (Thu ngân & PTTT)
-  const extraFilters = (
-    <>
-      <Col xs={24} sm={12} md={8} lg={6}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
-          Thu ngân thanh toán
-        </div>
-        <Select
-          value={selectedCashier}
-          onChange={setSelectedCashier}
-          style={{ width: "100%" }}
-          options={[
-            { label: "Tất cả thu ngân", value: "all" },
-            { label: "Nguyễn Văn An", value: "Nguyễn Văn An" },
-            { label: "Trần Thị Bình", value: "Trần Thị Bình" },
-            { label: "Lê Hoàng Cường", value: "Lê Hoàng Cường" },
-          ]}
-        />
-      </Col>
-
-      <Col xs={24} sm={12} md={8} lg={6}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>
-          Phương thức thanh toán
-        </div>
-        <Select
-          value={selectedMethod}
-          onChange={setSelectedMethod}
-          style={{ width: "100%" }}
-          options={[
-            { label: "Tất cả phương thức", value: "all" },
-            { label: "Tiền mặt", value: "Tiền mặt" },
-            { label: "Chuyển khoản / QR", value: "Chuyển khoản / QR" },
-            { label: "Thẻ Visa/Master", value: "Thẻ Visa/Master" },
-          ]}
-        />
-      </Col>
-    </>
-  );
+  const columnDefs = [
+    { title: "Mã Bill",    field: "billCode" },
+    { title: "Ngày",       field: "date" },
+    { title: "Thời gian",  field: "time" },
+    { title: "Khách hàng", field: "customer" },
+    { title: "Thu ngân",   field: "cashier" },
+    { title: "Thanh toán", field: "paymentMethod" },
+    { title: "Tiền món",   field: (r) => formatVND(r.dishTotal), align: "right" },
+    { title: "Phụ thu",    field: (r) => formatVND(r.surcharge), align: "right" },
+    { title: "Giảm giá",   field: (r) => formatVND(r.discount),  align: "right" },
+    { title: "VAT",        field: (r) => formatVND(r.vat),       align: "right" },
+    { title: "Tổng tiền",  field: (r) => formatVND(r.total),     align: "right" },
+  ];
 
   return (
     <div style={{ padding: "16px 24px", minHeight: "100vh", background: "#f8fafc" }}>
@@ -208,17 +281,8 @@ const ReportRevenuePage = () => {
           columnDefs={columnDefs}
           data={filteredData}
           summaryRow={[
-            "Tổng cộng",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            `${totalRevenue.toLocaleString()} đ`,
+            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+            formatVND(totalRevenue),
           ]}
         />
       </div>
@@ -226,7 +290,7 @@ const ReportRevenuePage = () => {
       {/* ── REPORT FILTER BAR ───────────────────────────────────────────────── */}
       <ReportFilter
         presetTime={presetTime}
-        onPresetChange={setPresetTime}
+        onPresetChange={handlePresetChange}
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         onRefresh={fetchReportData}
@@ -234,30 +298,38 @@ const ReportRevenuePage = () => {
         loading={loading}
       />
 
-      {/* ── LOADING SKELETON OR CONTENT ────────────────────────────────────── */}
+      {/* ── LOADING SKELETON OR CONTENT ─────────────────────────────────────── */}
       {loading ? (
         <Skeleton active paragraph={{ rows: 10 }} />
-      ) : filteredData.length === 0 ? (
-        <Empty description="Không tìm thấy dữ liệu hóa đơn doanh thu nào phù hợp với bộ lọc" />
       ) : (
         <>
-          {/* 1. Summary KPI Cards + Compare Button */}
+          {/* 1. Summary KPI Cards */}
           <RevenueSummaryCards
             data={{
               totalRevenue,
               totalOrders,
               avgOrderValue,
               avgRevenuePerDay: avgPerDay,
-              growthPct: 14.8,
+              growthPct: 0,   // BE chưa có so sánh kỳ trước
             }}
             onOpenCompare={() => setCompareModalVisible(true)}
           />
 
-          {/* 2. Revenue Charts (Xu hướng Line Chart + Tỷ trọng Pie Chart) */}
-          <RevenueCharts />
+          {/* 2. Revenue Charts (Trend + Pie PTTT) */}
+          <RevenueCharts
+            trendData={trendData}
+            paymentMethodData={paymentMethodData}
+          />
 
-          {/* 3. Report Data Table with Direct Toolbar Above Table */}
-          <div style={{ background: "#ffffff", padding: 18, borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+          {/* 3. Bills Table */}
+          <div
+            style={{
+              background: "#ffffff",
+              padding: 18,
+              borderRadius: 10,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -272,46 +344,32 @@ const ReportRevenuePage = () => {
                 Nhật Ký Hóa Đơn Doanh Thu Bán Hàng Chi Tiết ({filteredData.length} hóa đơn)
               </Title>
 
-              {/* Toolbar Tích Hợp Trực Tiếp Ngay Trên Bảng: Tìm kiếm, Thu ngân, PTTT, Làm mới, Đặt lại, Xuất/In */}
               <Space wrap size="small">
                 <Input
                   placeholder="Tìm kiếm mã bill, khách hàng, thu ngân..."
                   prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  style={{ width: 230, borderRadius: 6 }}
+                  style={{ width: 240, borderRadius: 6 }}
                   allowClear
-                />
-
-                <Select
-                  value={selectedCashier}
-                  onChange={setSelectedCashier}
-                  style={{ width: 160 }}
-                  options={[
-                    { label: "Tất cả thu ngân", value: "all" },
-                    { label: "Nguyễn Văn An", value: "Nguyễn Văn An" },
-                    { label: "Trần Thị Bình", value: "Trần Thị Bình" },
-                    { label: "Lê Hoàng Cường", value: "Lê Hoàng Cường" },
-                  ]}
                 />
 
                 <Select
                   value={selectedMethod}
                   onChange={setSelectedMethod}
-                  style={{ width: 170 }}
-                  options={[
-                    { label: "Tất cả PTTT", value: "all" },
-                    { label: "Tiền mặt", value: "Tiền mặt" },
-                    { label: "Chuyển khoản / QR", value: "Chuyển khoản / QR" },
-                    { label: "Thẻ Visa/Master", value: "Thẻ Visa/Master" },
-                  ]}
+                  style={{ width: 180 }}
+                  options={methodOptions}
                 />
 
-                <Tooltip title="Làm mới bảng dữ liệu">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
+                <Tooltip title="Làm mới dữ liệu từ máy chủ">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchReportData}
+                    style={{ borderRadius: 6 }}
+                  />
                 </Tooltip>
 
-                <Tooltip title="Xóa tất cả bộ lọc tìm kiếm">
+                <Tooltip title="Xóa tất cả bộ lọc">
                   <Button onClick={handleResetFilters} style={{ borderRadius: 6 }}>
                     Đặt lại
                   </Button>
@@ -322,17 +380,8 @@ const ReportRevenuePage = () => {
                   columnDefs={columnDefs}
                   data={filteredData}
                   summaryRow={[
-                    "Tổng cộng",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    `${totalRevenue.toLocaleString()} đ`,
+                    "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+                    formatVND(totalRevenue),
                   ]}
                 />
 
@@ -346,22 +395,33 @@ const ReportRevenuePage = () => {
               </Space>
             </div>
 
-            <RevenueReportTable
-              data={filteredData}
-              loading={loading}
-              onSelectBill={(bill) => {
-                setSelectedBill(bill);
-                setDrawerVisible(true);
-              }}
-            />
+            {filteredData.length === 0 ? (
+              <Empty description="Không có hóa đơn nào đã thanh toán trong kỳ được chọn" />
+            ) : (
+              <RevenueReportTable
+                data={filteredData}
+                loading={loading}
+                onSelectBill={(bill) => {
+                  setSelectedBill(bill);
+                  setDrawerVisible(true);
+                }}
+              />
+            )}
           </div>
 
-          {/* Fullscreen Table Modal */}
+          {/* Fullscreen Modal */}
           <Modal
             title={
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingRight: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingRight: 24,
+                }}
+              >
                 <span style={{ fontWeight: 800, fontSize: 16 }}>
-                  Nhật Ký Hóa Đơn Doanh Thu Bán Hàng Chi Tiết ({filteredData.length} hóa đơn)
+                  Nhật Ký Hóa Đơn Doanh Thu ({filteredData.length} hóa đơn)
                 </span>
                 <Button
                   icon={<FullscreenExitOutlined />}
@@ -392,12 +452,12 @@ const ReportRevenuePage = () => {
           {/* 4. Footer ERP Summary */}
           <SummaryFooter
             totalRevenue={totalRevenue}
-            totalExpense={112000000}
-            netProfit={totalRevenue - 112000000}
+            totalExpense={totalExpense}
+            netProfit={profit}
             avgPerDay={avgPerDay}
             highestVal={highestVal}
             lowestVal={lowestVal}
-            variance={14.8}
+            variance={0}
           />
         </>
       )}
@@ -409,7 +469,7 @@ const ReportRevenuePage = () => {
         billData={selectedBill}
       />
 
-      {/* So Sánh Hiệu Quả Vận Hành Modal */}
+      {/* So Sánh Modal */}
       <RevenueCompareModal
         visible={compareModalVisible}
         onClose={() => setCompareModalVisible(false)}
