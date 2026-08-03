@@ -216,10 +216,10 @@ const ReportRevenuePage = () => {
   const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
   const avgPerDay   = Math.round(totalRevenue / daysInRange);
 
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.total), 0);
-  const lowestVal  = filteredData.length
-    ? filteredData.reduce((min, c) => Math.min(min, c.total), filteredData[0].total)
-    : 0;
+  const dailyList = beStats?.dailyStats || [];
+  const revenueValues = dailyList.map((d) => d.revenue || 0);
+  const highestVal = revenueValues.length ? Math.max(...revenueValues) : totalRevenue;
+  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
 
   // Danh sách PTTT từ BE (dùng cho dropdown filter)
   const methodOptions = [

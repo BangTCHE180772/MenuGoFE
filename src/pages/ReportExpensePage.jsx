@@ -210,12 +210,12 @@ const ReportExpensePage = () => {
   const avgExpense   = filteredData.length ? Math.round(totalExpense / filteredData.length) : 0;
 
   const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
-  const avgPerDay   = Math.round(totalExpense / daysInRange);
+  const avgPerDay   = Math.round((beStats?.revenue || 0) / daysInRange);
 
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.amount), 0);
-  const lowestVal  = filteredData.length
-    ? filteredData.reduce((min, c) => Math.min(min, c.amount), filteredData[0].amount)
-    : 0;
+  const dailyList = beStats?.dailyStats || [];
+  const revenueValues = dailyList.map((d) => d.revenue || 0);
+  const highestVal = revenueValues.length ? Math.max(...revenueValues) : (beStats?.revenue || 0);
+  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
 
   // Lấy các option động cho category filter
   const categoryOptions = [

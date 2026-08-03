@@ -208,12 +208,12 @@ const ReportProfitPage = () => {
   const netProfit    = beStats?.profit || 0;
 
   const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
-  const avgPerDay   = Math.round(netProfit / daysInRange);
+  const avgPerDay   = Math.round(totalRevenue / daysInRange);
 
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.profit), 0);
-  const lowestVal  = filteredData.length
-    ? filteredData.reduce((min, c) => Math.min(min, c.profit), filteredData[0].profit)
-    : 0;
+  const dailyList = beStats?.dailyStats || [];
+  const revenueValues = dailyList.map((d) => d.revenue || 0);
+  const highestVal = revenueValues.length ? Math.max(...revenueValues) : totalRevenue;
+  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
 
   // Điểm hòa vốn ước tính
   const breakEvenTarget = 40000000; // mục tiêu điểm hòa vốn giả định
