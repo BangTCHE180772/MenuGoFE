@@ -1,14 +1,17 @@
 import React from "react";
-import { Card, Row, Col, Typography, Tag, Tooltip as AntTooltip } from "antd";
+import { Card, Row, Col, Typography, Tag, Alert, Progress, Tooltip as AntTooltip } from "antd";
 import {
   DollarOutlined,
   ShoppingOutlined,
   RiseOutlined,
   FallOutlined,
-  InfoCircleOutlined,
-  CheckCircleOutlined,
   ThunderboltOutlined,
   TrophyOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  CreditCardOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import {
   ResponsiveContainer,
@@ -25,75 +28,92 @@ import {
   Cell,
 } from "recharts";
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 // Helper format tiền VNĐ
 const formatVND = (val) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
 /**
  * Component HomeDashboard - Dashboard tổng quan trong ngày
- * Gồm: 4 KPI Cards + Chart Doanh Thu/Chi Phí/Lợi Nhuận + Chart Đơn Hàng + Top 5 Món bán chạy
+ * Hỗ trợ Data chuẩn Backend API (DashboardStatsDto):
+ * - KPIs (Doanh thu, Chi phí, Lợi nhuận, Đơn hàng)
+ * - Cảnh báo vận hành (Alerts)
+ * - Tổng hợp trạng thái Đơn hàng (OrderSummary: New, Paid, Unpaid, Cancelled)
+ * - Tỷ lệ Phương thức Thanh toán (PaymentMethods)
+ * - Biểu đồ xu hướng giờ (HourlyTrends / HourSlots)
+ * - Top 5 món bán chạy & Món bán chậm nhất
  */
 const HomeDashboard = ({ data }) => {
-  const { kpis, hourlyTrends, topDishes } = data;
+  const { kpis, hourlyTrends, topDishes, orderSummary, paymentMethods, alerts } = data;
 
   const kpiItems = [
     {
       title: "Doanh thu trong ngày",
       value: kpis.revenue.formatted,
-      changePct: kpis.revenue.changePct,
-      isGood: kpis.revenue.changePct >= 0,
+      changePct: kpis.revenue.changePct || 0,
+      isGood: (kpis.revenue.changePct || 0) >= 0,
       icon: <DollarOutlined style={{ fontSize: 22, color: "#2563eb" }} />,
       bgIcon: "#eff6ff",
-      borderColor: "#2563eb",
     },
     {
       title: "Chi phí phát sinh",
       value: kpis.expense.formatted,
-      changePct: kpis.expense.changePct,
-      isGood: kpis.expense.changePct <= 0, // Giảm chi phí là tốt -> Màu xanh
+      changePct: kpis.expense.changePct || 0,
+      isGood: (kpis.expense.changePct || 0) <= 0,
       icon: <FallOutlined style={{ fontSize: 22, color: "#ef4444" }} />,
       bgIcon: "#fef2f2",
-      borderColor: "#ef4444",
     },
     {
       title: "Lợi nhuận ròng",
       value: kpis.profit.formatted,
-      changePct: kpis.profit.changePct,
-      isGood: kpis.profit.changePct >= 0,
+      changePct: kpis.profit.changePct || 0,
+      isGood: (kpis.profit.changePct || 0) >= 0,
       icon: <RiseOutlined style={{ fontSize: 22, color: "#10b981" }} />,
       bgIcon: "#ecfdf5",
-      borderColor: "#10b981",
     },
     {
       title: "Tổng số đơn hàng",
       value: kpis.orders.formatted,
-      changePct: kpis.orders.changePct,
-      isGood: kpis.orders.changePct >= 0,
+      changePct: kpis.orders.changePct || 0,
+      isGood: (kpis.orders.changePct || 0) >= 0,
       icon: <ShoppingOutlined style={{ fontSize: 22, color: "#ea580c" }} />,
       bgIcon: "#fff7ed",
-      borderColor: "#ea580c",
     },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* ── 1. 4 KPI Cards ─────────────────────────────────────────────────── */}
+      {/* ── ALERTS FROM BACKEND ───────────────────────────────────────────── */}
+      {alerts && alerts.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {alerts.map((alert, idx) => (
+            <Alert
+              key={idx}
+              message={alert.message}
+              type={alert.level === "warning" ? "warning" : alert.level === "danger" ? "error" : "info"}
+              showIcon
+              style={{ borderRadius: 10 }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── 1. 4 CARD KPIs ────────────────────────────────────────────────── */}
       <Row gutter={[16, 16]}>
-        {kpiItems.map((kpi, idx) => {
+        {kpiItems.map((kpi, index) => {
           const isUp = kpi.changePct >= 0;
           return (
-            <Col xs={24} sm={12} lg={6} key={idx}>
+            <Col xs={24} sm={12} lg={6} key={index}>
               <Card
                 bordered={false}
                 style={{
                   borderRadius: "var(--border-radius)",
                   boxShadow: "var(--shadow-sm)",
                   background: "var(--color-surface)",
-                  borderTop: `3px solid ${kpi.borderColor}`,
+                  height: "100%",
                 }}
-                bodyStyle={{ padding: 18 }}
+                bodyStyle={{ padding: "18px 20px" }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
@@ -128,7 +148,7 @@ const HomeDashboard = ({ data }) => {
                     {Math.abs(kpi.changePct)}%
                   </Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    so với hôm trước
+                    so với kỳ trước
                   </Text>
                 </div>
               </Card>
@@ -137,13 +157,118 @@ const HomeDashboard = ({ data }) => {
         })}
       </Row>
 
-      {/* ── 2. Biểu đồ 3 Đường: Revenue, Expense, Profit Trend ─────────────── */}
+      {/* ── 2. ORDER SUMMARY & PAYMENT METHODS (BACKEND DATA) ─────────────── */}
+      {(orderSummary || (paymentMethods && paymentMethods.length > 0)) && (
+        <Row gutter={[16, 16]}>
+          {/* Order Status Breakdown Card */}
+          {orderSummary && (
+            <Col xs={24} lg={paymentMethods && paymentMethods.length > 0 ? 12 : 24}>
+              <Card
+                title={
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <ShoppingOutlined style={{ color: "#2563eb" }} />
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>
+                      Trạng thái Đơn hàng trong ngày ({orderSummary.total || 0} đơn)
+                    </span>
+                  </div>
+                }
+                bordered={false}
+                style={{
+                  borderRadius: "var(--border-radius)",
+                  boxShadow: "var(--shadow-sm)",
+                  background: "var(--color-surface)",
+                  height: "100%",
+                }}
+                bodyStyle={{ padding: "18px 20px" }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col xs={12} sm={6}>
+                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                      <ClockCircleOutlined style={{ fontSize: 22, color: "#2563eb", marginBottom: 6 }} />
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#1e40af" }}>{orderSummary.new || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Mới tạo</div>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                      <CheckCircleOutlined style={{ fontSize: 22, color: "#16a34a", marginBottom: 6 }} />
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#15803d" }}>{orderSummary.paid || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã thanh toán</div>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                      <ExclamationCircleOutlined style={{ fontSize: 22, color: "#d97706", marginBottom: 6 }} />
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#b45309" }}>{orderSummary.unpaid || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Chưa thanh toán</div>
+                    </div>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                      <CloseCircleOutlined style={{ fontSize: 22, color: "#dc2626", marginBottom: 6 }} />
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#b91c1c" }}>{orderSummary.cancelled || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã hủy</div>
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          )}
+
+          {/* Payment Methods Card */}
+          {paymentMethods && paymentMethods.length > 0 && (
+            <Col xs={24} lg={orderSummary ? 12 : 24}>
+              <Card
+                title={
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <CreditCardOutlined style={{ color: "#10b981" }} />
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>
+                      Phân bổ Phương thức Thanh toán
+                    </span>
+                  </div>
+                }
+                bordered={false}
+                style={{
+                  borderRadius: "var(--border-radius)",
+                  boxShadow: "var(--shadow-sm)",
+                  background: "var(--color-surface)",
+                  height: "100%",
+                }}
+                bodyStyle={{ padding: "16px 20px" }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {paymentMethods.map((method, idx) => {
+                    const totalVal = paymentMethods.reduce((acc, m) => acc + (m.value || 0), 0);
+                    const pct = totalVal ? Math.round((method.value / totalVal) * 100) : 0;
+                    return (
+                      <div key={idx}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                          <span style={{ fontWeight: 600, color: "#334155" }}>{method.name}</span>
+                          <strong>{formatVND(method.value)} ({pct}%)</strong>
+                        </div>
+                        <Progress
+                          percent={pct}
+                          showInfo={false}
+                          strokeColor={idx === 0 ? "#16a34a" : idx === 1 ? "#2563eb" : "#7c3aed"}
+                          style={{ margin: 0 }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </Col>
+          )}
+        </Row>
+      )}
+
+      {/* ── 3. Biểu đồ 3 Đường: Revenue, Expense, Profit Trend ─────────────── */}
       <Card
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <ThunderboltOutlined style={{ color: "#2563eb" }} />
             <span style={{ fontWeight: 700, fontSize: 15 }}>
-              Xu hướng Doanh thu, Chi phí & Lợi nhuận theo giờ
+              Xu hướng Doanh thu, Chi phí & Lợi nhuận
             </span>
           </div>
         }
@@ -174,7 +299,7 @@ const HomeDashboard = ({ data }) => {
                 tickLine={false}
                 stroke="#94a3b8"
                 fontSize={12}
-                tickFormatter={(val) => `${val / 1000000}M`}
+                tickFormatter={(val) => `${val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val}`}
               />
               <Tooltip
                 formatter={(value, name) => [formatVND(value), name]}
@@ -214,7 +339,7 @@ const HomeDashboard = ({ data }) => {
         </div>
       </Card>
 
-      {/* ── 3 & 4. Order Trend + Top 5 Best Selling Dishes ────────────────── */}
+      {/* ── 4 & 5. Order Trend + Top 5 Best Selling Dishes ────────────────── */}
       <Row gutter={[16, 16]}>
         {/* Order Trend Column Chart */}
         <Col xs={24} lg={12}>
@@ -223,7 +348,7 @@ const HomeDashboard = ({ data }) => {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ShoppingOutlined style={{ color: "#ea580c" }} />
                 <span style={{ fontWeight: 700, fontSize: 15 }}>
-                  Số lượng Đơn hàng theo giờ
+                  Số lượng Đơn hàng theo khung giờ
                 </span>
               </div>
             }
@@ -260,7 +385,7 @@ const HomeDashboard = ({ data }) => {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <TrophyOutlined style={{ color: "#f59e0b" }} />
                 <span style={{ fontWeight: 700, fontSize: 15 }}>
-                  Top 5 Món ăn bán chạy nhất
+                  Top Món ăn bán chạy nhất
                 </span>
               </div>
             }
@@ -285,7 +410,7 @@ const HomeDashboard = ({ data }) => {
                   <YAxis dataKey="name" type="category" tickLine={false} stroke="#475569" fontSize={12} width={130} />
                   <Tooltip
                     formatter={(val, name, item) => [
-                      `${val} phần (${formatVND(item.payload.revenue)})`,
+                      `${val} phần ${item.payload.revenue ? `(${formatVND(item.payload.revenue)})` : ""}`,
                       "Số lượng bán",
                     ]}
                     contentStyle={{ borderRadius: 10, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
