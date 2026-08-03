@@ -8,14 +8,24 @@ const UnitConversionBuilder = ({
   onOpenAddUnit,
   notifyError,
 }) => {
+  // Ensure unitConversions is always an array
+  const conversionsList = Array.isArray(unitConversions) ? unitConversions : [];
+
   // Find current base unit in unitConversions list
-  const baseConversion = unitConversions.find(u => u.isBase);
+  const baseConversion = conversionsList.find(u => u.isBase);
   const baseUnitId = baseConversion ? Number(baseConversion.unitId) : null;
   const baseUnitObj = units.find(u => u.id === baseUnitId);
   const baseUnitName = baseUnitObj ? baseUnitObj.name : '—';
 
   // Selected unit IDs array
-  const selectedUnitIds = unitConversions.map(u => Number(u.unitId));
+  const selectedUnitIds = conversionsList.map(u => Number(u.unitId));
+
+  // Helper to safely invoke setUnitConversions
+  const updateConversions = (newArray) => {
+    if (typeof setUnitConversions === 'function') {
+      setUnitConversions(newArray);
+    }
+  };
 
   // Toggle unit pill selection
   const handleToggleUnitPill = (unitId) => {
@@ -23,18 +33,17 @@ const UnitConversionBuilder = ({
 
     if (isSelected) {
       // Remove unit
-      const updated = unitConversions.filter(u => Number(u.unitId) !== unitId);
+      const updated = conversionsList.filter(u => Number(u.unitId) !== unitId);
       if (updated.length > 0 && !updated.some(u => u.isBase)) {
         // If base unit was removed, make the first remaining unit the new base
-        updated[0].isBase = true;
-        updated[0].conversionPoint = 1;
+        updated[0] = { ...updated[0], isBase: true, conversionPoint: 1 };
       }
-      setUnitConversions(updated);
+      updateConversions(updated);
     } else {
       // Add unit
-      const isFirst = unitConversions.length === 0;
-      setUnitConversions([
-        ...unitConversions,
+      const isFirst = conversionsList.length === 0;
+      updateConversions([
+        ...conversionsList,
         {
           unitId: unitId,
           conversionPoint: isFirst ? 1 : 10,
@@ -46,28 +55,27 @@ const UnitConversionBuilder = ({
 
   // Change Base Unit from Dropdown
   const handleSelectBaseUnit = (newBaseUnitId) => {
-    setUnitConversions(prev => {
-      return prev.map(u => {
-        const isCurrentBase = Number(u.unitId) === newBaseUnitId;
-        return {
-          ...u,
-          isBase: isCurrentBase,
-          conversionPoint: isCurrentBase ? 1 : (u.conversionPoint === 1 ? 10 : u.conversionPoint),
-        };
-      });
+    const updated = conversionsList.map(u => {
+      const isCurrentBase = Number(u.unitId) === newBaseUnitId;
+      return {
+        ...u,
+        isBase: isCurrentBase,
+        conversionPoint: isCurrentBase ? 1 : (u.conversionPoint === 1 ? 10 : u.conversionPoint),
+      };
     });
+    updateConversions(updated);
   };
 
   // Change Conversion Point for a non-base unit
   const handleConversionPointChange = (unitId, val) => {
-    setUnitConversions(prev => {
-      return prev.map(u => {
-        if (Number(u.unitId) === unitId) {
-          return { ...u, conversionPoint: val };
-        }
-        return u;
-      });
+    const numericVal = Number(val) || 1;
+    const updated = conversionsList.map(u => {
+      if (Number(u.unitId) === unitId) {
+        return { ...u, conversionPoint: numericVal };
+      }
+      return u;
     });
+    updateConversions(updated);
   };
 
   // Remove unit conversion item from table
@@ -76,7 +84,7 @@ const UnitConversionBuilder = ({
   };
 
   // Non-base conversions to show in table
-  const nonBaseConversions = unitConversions.filter(u => !u.isBase);
+  const nonBaseConversions = conversionsList.filter(u => !u.isBase);
 
   return (
     <div style={{ background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16 }}>
@@ -174,7 +182,7 @@ const UnitConversionBuilder = ({
               cursor: 'pointer',
             }}
           >
-            {unitConversions.map(uc => {
+            {conversionsList.map(uc => {
               const uObj = units.find(u => u.id === Number(uc.unitId));
               return (
                 <option key={uc.unitId} value={uc.unitId}>

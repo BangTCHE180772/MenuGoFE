@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CatalogHeaderNav from './CatalogHeaderNav';
 import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
 import ProductPagination from './ProductPagination';
 import PriceManagementTab from './PriceManagementTab';
-import MenuManagementTab from './MenuManagementTab';
 
 // Modals
 import ProductTypeSelectModal from './modals/ProductTypeSelectModal';
@@ -28,8 +28,17 @@ import { getAllMenus, createMenu } from '../../api/menuApi';
 import { getAllUnits, createUnit } from '../../api/unitApi';
 
 const ProductCatalogView = () => {
-  // Top Active Tab ('ProductCatalog', 'Menu', 'Price')
-  const [activeTab, setActiveTab] = useState('ProductCatalog');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') || 'ProductCatalog';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
+  // Sync activeTab when searchParams change in URL
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    if (currentTab && currentTab !== activeTab) {
+      handleTabChange(currentTab, false);
+    }
+  }, [searchParams]);
 
   // Master Data States
   const [products, setProducts] = useState([]);
@@ -95,6 +104,34 @@ const ProductCatalogView = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Switch Tab with Complete State Cleanup
+  const handleTabChange = (newTab, updateUrl = true) => {
+    // 1. Clear search & filter states
+    setSearchText('');
+    setSelectedGroupIds([]);
+    setSelectedTypes([]);
+    setSelectedMenuIds([]);
+    setSelectedSellableFilter('all');
+    setSelectedRowKeys([]);
+
+    // 2. Reset pagination
+    setCurrentPage(1);
+
+    // 3. Reset & close active modals and editing draft states
+    setIsTypeSelectModalOpen(false);
+    setIsFormModalOpen(false);
+    setEditingProduct(null);
+    setIsAddGroupOpen(false);
+    setIsAddMenuOpen(false);
+    setIsAddUnitOpen(false);
+
+    // 4. Update tab state and sync URL
+    setActiveTab(newTab);
+    if (updateUrl) {
+      setSearchParams({ tab: newTab });
+    }
+  };
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -261,7 +298,7 @@ const ProductCatalogView = () => {
       {/* TOP HEADER NAV BAR */}
       <CatalogHeaderNav
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onOpenCreateTypeModal={() => setIsTypeSelectModalOpen(true)}
         onRefreshData={fetchData}
         totalProducts={products.length}
@@ -314,12 +351,6 @@ const ProductCatalogView = () => {
               />
             </div>
           </>
-        )}
-
-        {activeTab === 'Menu' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-            <MenuManagementTab />
-          </div>
         )}
 
         {activeTab === 'Price' && (

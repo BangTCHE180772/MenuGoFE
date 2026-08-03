@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   AppstoreOutlined,
-  BookOutlined,
   DollarOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -15,8 +14,7 @@ const CatalogHeaderNav = ({
   totalProducts = 0,
 }) => {
   const tabs = [
-    { key: 'ProductCatalog', label: 'Danh mục sản phẩm', icon: <AppstoreOutlined /> },
-    { key: 'Menu', label: 'Thực đơn', icon: <BookOutlined /> },
+    { key: 'ProductCatalog', label: 'Sản phẩm', icon: <AppstoreOutlined /> },
     { key: 'Price', label: 'Quản lý giá bán', icon: <DollarOutlined /> },
   ];
 

@@ -479,7 +479,10 @@ const ManufacturedProductModal = ({
             {/* ĐƠN VỊ QUY ĐỔI */}
             <UnitConversionBuilder
               unitConversions={formData.unitConversions}
-              setUnitConversions={ucs => setFormData({ ...formData, unitConversions: ucs })}
+              setUnitConversions={ucs => setFormData(prev => ({
+                ...prev,
+                unitConversions: typeof ucs === 'function' ? ucs(prev.unitConversions || []) : ucs
+              }))}
               units={units}
               onOpenAddUnit={onOpenAddUnit}
               notifyError={notifyError}

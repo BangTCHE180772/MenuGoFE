@@ -141,6 +141,17 @@ const ProductionDocumentModal = ({
           fetchManufacturedProducts(branchId, now.toISOString(), '');
         }
       }
+    } else {
+      setSelectedManufactured(null);
+      setManufacturedQuery('');
+      setFinishedQuantity(1);
+      setFormData({
+        docCode: '',
+        note: '',
+        autoDeductSecondary: true
+      });
+      setShowDropdown(false);
+      setLoading(false);
     }
   }, [open, editDocumentId, branchId, fetchManufacturedProducts]);
 
@@ -500,7 +511,6 @@ const ProductionDocumentModal = ({
                 />
               </div>
             </div>
-          ) : null}
         </div>
 
         {/* MODAL FOOTER */}

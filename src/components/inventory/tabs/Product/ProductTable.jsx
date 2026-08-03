@@ -34,24 +34,13 @@ const renderTruncatedText = (value, maxLength = 25, style = {}) => {
   );
 };
 
-// CRITICAL RULE: Check classification strictly based on PRODUCT TYPE (NEVER binventory type)
-const checkIsMaterial = (item) => {
+// Check if product is PROCESSED (Món ăn / Món chế biến)
+const checkIsProcessed = (item) => {
   const pType = String(
     item.productType || item.product?.type || item.type || ''
-  ).toLowerCase();
-  if (
-    pType === 'ingredient' ||
-    pType === 'material' ||
-    pType === 'tool' ||
-    pType === 'manufactured' ||
-    pType === '2' ||
-    pType === '4' ||
-    pType === '5' ||
-    item.isMaterial === true
-  ) {
-    return true;
-  }
-  return false;
+  ).toLowerCase().trim();
+
+  return pType === 'processed' || pType === '1';
 };
 
 // Badge helper for rendering ProductType on the un-expanded main row
@@ -128,12 +117,14 @@ const ProductTable = ({
   // { [itemId]: { loading, items: [], page: 1, totalPages: 1, totalCount: 0 } }
   const [ledgerDataMap, setLedgerDataMap] = useState({});
 
-  // Fetch BInventories from API when selectedBranchId changes
+  // Fetch BInventories from API when selectedBranchId or subTab changes
   const fetchInventoryList = async () => {
     if (!selectedBranchId) return;
     setLoading(true);
     try {
-      const data = await getBInventories(selectedBranchId);
+      // mode = 4 for 'monan' (only Processed), mode = 2 for 'nguyenlieu' (all non-Processed)
+      const modeParam = subTab === 'monan' ? 4 : 2;
+      const data = await getBInventories(selectedBranchId, '', '', modeParam);
       if (Array.isArray(data)) {
         setBInventories(data);
       } else {
@@ -149,7 +140,7 @@ const ProductTable = ({
 
   useEffect(() => {
     fetchInventoryList();
-  }, [selectedBranchId]);
+  }, [selectedBranchId, subTab]);
 
   // Combine fetched BInventories with dishes fallback if needed
   const rawList = useMemo(() => {
@@ -174,9 +165,9 @@ const ProductTable = ({
   // Filter list based strictly on Product Type (subTab), search text & status filter
   const filteredData = useMemo(() => {
     return rawList.filter((item) => {
-      const isMaterialItem = checkIsMaterial(item);
-      if (subTab === 'nguyenlieu' && !isMaterialItem) return false;
-      if (subTab === 'mathang' && isMaterialItem) return false;
+      const isProcessed = checkIsProcessed(item);
+      if (subTab === 'nguyenlieu' && isProcessed) return false;
+      if ((subTab === 'monan' || subTab === 'mathang') && !isProcessed) return false;
 
       // Status filter
       const qty = Number(item.stockQuantity ?? item.quantity ?? 0);
@@ -329,7 +320,7 @@ const ProductTable = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
               {[
                 { key: 'nguyenlieu', label: 'Nguyên liệu' },
-                { key: 'mathang', label: 'Mặt hàng' }
+                { key: 'monan', label: 'Món ăn' }
               ].map((st) => {
                 const active = subTab === st.key;
                 return (
@@ -426,7 +417,7 @@ const ProductTable = ({
                   checked={currentData.length > 0 && currentData.every((item) => selectedIds.includes(item.bInventoryId || item.id))}
                 />
               </th>
-              <th style={{ padding: '10px 8px' }}>{subTab === 'nguyenlieu' ? 'Tên nguyên liệu' : 'Tên mặt hàng'}</th>
+              <th style={{ padding: '10px 8px' }}>{subTab === 'nguyenlieu' ? 'Tên nguyên liệu' : 'Tên món ăn'}</th>
               <th style={{ padding: '10px 8px', textAlign: 'center' }}>Loại sản phẩm</th>
               <th style={{ padding: '10px 8px' }}>Đơn vị</th>
               <th style={{ padding: '10px 8px', textAlign: 'right' }}>SL tối thiểu</th>

@@ -44,3 +44,11 @@ export const createToolProduct = (data) =>
   axiosInstance.post('/api/ToolProduct', data);
 export const updateToolProduct = (data) =>
   axiosInstance.put('/api/ToolProduct', data);
+
+/**
+ * Cập nhật giá bán hàng loạt.
+ * Chỉ hỗ trợ sản phẩm loại Regular, Manufactured, Processed.
+ * @param {Array<{id: number, sellPrice: number}>} items
+ */
+export const bulkUpdateSellPrice = (items) =>
+  axiosInstance.patch('/api/Product/sell-price', items);

@@ -1,65 +1,97 @@
 import React, { useState } from 'react';
 import { SearchOutlined, SaveOutlined } from '@ant-design/icons';
-import { updateProduct } from '../../api/productApi';
+import { bulkUpdateSellPrice } from '../../api/productApi';
+
+// Chỉ hỗ trợ 3 loại được phép chỉnh giá bán
+const ALLOWED_PRICE_TYPES = ['regular', 'manufactured', 'processed'];
+
+const isAllowedPriceType = (p) => {
+  const pType = String(p.type || p.productType || '').toLowerCase().trim();
+  return ALLOWED_PRICE_TYPES.includes(pType);
+};
+
+const TYPE_LABELS = {
+  processed: { label: 'Chế biến', bg: '#f5f3ff', color: '#7c3aed', border: '#ddd6fe' },
+  manufactured: { label: 'Sản xuất', bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+  regular: { label: 'Hàng hóa', bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
+};
+
+const getTypeBadge = (p) => {
+  const pType = String(p.type || p.productType || '').toLowerCase().trim();
+  const cfg = TYPE_LABELS[pType];
+  if (!cfg) return null;
+  return (
+    <span
+      style={{
+        padding: '2px 8px',
+        borderRadius: 4,
+        fontSize: 11,
+        fontWeight: 600,
+        background: cfg.bg,
+        color: cfg.color,
+        border: `1px solid ${cfg.border}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {cfg.label}
+    </span>
+  );
+};
 
 const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifySuccess, notifyError }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
-  const [editedPrices, setEditedPrices] = useState({}); // { productId: { basePrice, costPrice } }
+  const [selectedType, setSelectedType] = useState(''); // '' = tất cả
+  const [editedPrices, setEditedPrices] = useState({}); // { productId: sellPrice }
   const [saving, setSaving] = useState(false);
 
   const groupMap = new Map(groups.map((g) => [g.id, g.name]));
 
-  // Filter products
+  // Lọc sản phẩm: chỉ Regular, Manufactured, Processed
   const filteredProducts = products.filter((p) => {
+    if (!isAllowedPriceType(p)) return false;
+
+    const pType = String(p.type || p.productType || '').toLowerCase().trim();
+
+    const matchesType = !selectedType || pType === selectedType;
+
     const matchesSearch =
       searchTerm.trim() === '' ||
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.skuCode && p.skuCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (p.code && p.code.toLowerCase().includes(searchTerm.toLowerCase()));
+
     const matchesGroup = !selectedGroupId || p.groupId === Number(selectedGroupId);
-    return matchesSearch && matchesGroup;
+
+    return matchesType && matchesSearch && matchesGroup;
   });
 
-  const handlePriceChange = (productId, field, value) => {
-    const p = products.find((x) => x.id === productId);
-    if (!p) return;
-    const currentEdit = editedPrices[productId] || {
-      basePrice: p.basePrice || 0,
-      costPrice: p.costPrice || 0,
-    };
-    setEditedPrices({
-      ...editedPrices,
-      [productId]: {
-        ...currentEdit,
-        [field]: Number(value),
-      },
-    });
+  const handlePriceChange = (productId, value) => {
+    setEditedPrices((prev) => ({
+      ...prev,
+      [productId]: Number(value) >= 0 ? Number(value) : 0,
+    }));
   };
 
   const handleSavePrices = async () => {
-    const changedProductIds = Object.keys(editedPrices);
-    if (changedProductIds.length === 0) return;
+    const changedEntries = Object.entries(editedPrices);
+    if (changedEntries.length === 0) return;
 
     setSaving(true);
     try {
-      for (const idStr of changedProductIds) {
-        const id = Number(idStr);
-        const orig = products.find((p) => p.id === id);
-        if (orig) {
-          const edits = editedPrices[id];
-          await updateProduct({
-            ...orig,
-            basePrice: edits.basePrice !== undefined ? edits.basePrice : orig.basePrice,
-            costPrice: edits.costPrice !== undefined ? edits.costPrice : orig.costPrice,
-          });
-        }
-      }
-      if (notifySuccess) notifySuccess('Cập nhật bảng giá thành công!');
+      const payload = changedEntries.map(([idStr, sellPrice]) => ({
+        id: Number(idStr),
+        sellPrice,
+      }));
+
+      await bulkUpdateSellPrice(payload);
+
+      if (notifySuccess) notifySuccess(`Cập nhật bảng giá bán thành công (${payload.length} sản phẩm)!`);
       setEditedPrices({});
       if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Lỗi khi cập nhật giá:', err);
-      if (notifyError) notifyError('Không thể cập nhật bảng giá.');
+      if (notifyError) notifyError(err?.response?.data?.message || 'Không thể cập nhật bảng giá.');
     } finally {
       setSaving(false);
     }
@@ -67,23 +99,50 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
 
   const hasChanges = Object.keys(editedPrices).length > 0;
 
+  // Đếm theo loại trong danh sách đã lọc nhóm+tìm kiếm (chưa lọc loại)
+  const allAllowed = products.filter((p) => {
+    if (!isAllowedPriceType(p)) return false;
+    const matchesSearch =
+      searchTerm.trim() === '' ||
+      (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.skuCode && p.skuCode.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesGroup = !selectedGroupId || p.groupId === Number(selectedGroupId);
+    return matchesSearch && matchesGroup;
+  });
+
+  const countByType = {
+    '': allAllowed.length,
+    processed: allAllowed.filter((p) => String(p.type || p.productType || '').toLowerCase() === 'processed').length,
+    manufactured: allAllowed.filter((p) => String(p.type || p.productType || '').toLowerCase() === 'manufactured').length,
+    regular: allAllowed.filter((p) => String(p.type || p.productType || '').toLowerCase() === 'regular').length,
+  };
+
+  const typeFilters = [
+    { key: '', label: 'Tất cả' },
+    { key: 'processed', label: 'Chế biến', color: '#7c3aed' },
+    { key: 'manufactured', label: 'Sản xuất', color: '#2563eb' },
+    { key: 'regular', label: 'Hàng hóa', color: '#16a34a' },
+  ];
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff', overflow: 'hidden' }}>
       {/* FILTER & TOOLBAR */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: '10px 16px',
           borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           background: '#f8fafc',
+          gap: 12,
+          flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* SEARCH */}
           <div style={{ position: 'relative', width: 240 }}>
-            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 12 }} />
             <input
               type="text"
               placeholder="Tìm mã hoặc tên sản phẩm..."
@@ -97,6 +156,7 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
                 borderRadius: 6,
                 outline: 'none',
                 background: '#ffffff',
+                boxSizing: 'border-box',
               }}
             />
           </div>
@@ -121,13 +181,67 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
               </option>
             ))}
           </select>
+
+          {/* TYPE FILTER CAPSULE */}
+          <div
+            style={{
+              display: 'inline-flex',
+              background: '#f1f5f9',
+              padding: '2px',
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
+              gap: 2,
+            }}
+          >
+            {typeFilters.map((tf) => {
+              const isActive = selectedType === tf.key;
+              return (
+                <button
+                  key={tf.key}
+                  onClick={() => setSelectedType(tf.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    fontWeight: isActive ? 700 : 600,
+                    color: isActive ? (tf.color || '#0f172a') : '#64748b',
+                    background: isActive ? '#ffffff' : 'transparent',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    transition: 'all 0.12s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tf.label}
+                  <span
+                    style={{
+                      background: isActive ? (tf.color ? `${tf.color}18` : '#e2e8f0') : '#e2e8f0',
+                      color: isActive ? (tf.color || '#475569') : '#64748b',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 8,
+                      minWidth: 18,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {countByType[tf.key] ?? 0}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* SAVE BUTTON */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {hasChanges && (
             <span style={{ fontSize: 12, fontWeight: 600, color: '#ea580c' }}>
-              Có {Object.keys(editedPrices).length} sản phẩm thay đổi giá
+              {Object.keys(editedPrices).length} sản phẩm thay đổi giá
             </span>
           )}
           <button
@@ -146,6 +260,7 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
               borderRadius: 6,
               cursor: !hasChanges || saving ? 'not-allowed' : 'pointer',
               boxShadow: hasChanges ? '0 1px 3px rgba(21, 128, 61, 0.3)' : 'none',
+              transition: 'all 0.15s ease',
             }}
           >
             <SaveOutlined style={{ fontSize: 12 }} />
@@ -171,92 +286,93 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
                 zIndex: 5,
               }}
             >
-              <th style={{ padding: '10px 14px', textAlign: 'left', width: 110 }}>Mã hàng</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left', width: 120 }}>Mã hàng</th>
               <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tên sản phẩm</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left', width: 140 }}>Nhóm hàng</th>
-              <th style={{ padding: '10px 14px', textAlign: 'right', width: 160 }}>Giá bán niêm yết (₫)</th>
-              <th style={{ padding: '10px 14px', textAlign: 'right', width: 160 }}>Giá vốn nhập (₫)</th>
-              <th style={{ padding: '10px 14px', textAlign: 'center', width: 100 }}>Trạng thái</th>
+              <th style={{ padding: '10px 14px', textAlign: 'center', width: 110 }}>Loại</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left', width: 150 }}>Nhóm hàng</th>
+              <th style={{ padding: '10px 14px', textAlign: 'right', width: 180 }}>Giá bán niêm yết (₫)</th>
+              <th style={{ padding: '10px 14px', textAlign: 'center', width: 90 }}>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '40px 16px', color: '#94a3b8' }}>
-                  Không tìm thấy sản phẩm nào trong danh sách giá
+                <td colSpan={6} style={{ textAlign: 'center', padding: '48px 16px', color: '#94a3b8' }}>
+                  Không tìm thấy sản phẩm nào
                 </td>
               </tr>
             ) : (
               filteredProducts.map((p, idx) => {
-                const edits = editedPrices[p.id] || {};
-                const currentBasePrice = edits.basePrice !== undefined ? edits.basePrice : (p.basePrice || 0);
-                const currentCostPrice = edits.costPrice !== undefined ? edits.costPrice : (p.costPrice || 0);
-                const isModified = edits.basePrice !== undefined || edits.costPrice !== undefined;
+                const isEdited = editedPrices[p.id] !== undefined;
+                const currentPrice = isEdited ? editedPrices[p.id] : (p.sellPrice || p.basePrice || 0);
 
                 return (
                   <tr
                     key={p.id}
                     style={{
                       borderBottom: '1px solid #f1f5f9',
-                      background: isModified ? '#fffbe7' : idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                      background: isEdited ? '#fffbe7' : idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                      transition: 'background 0.1s',
                     }}
                   >
-                    <td style={{ padding: '8px 14px', fontWeight: 600, color: '#0284c7' }}>
-                      {p.code || `SP${String(p.id).padStart(4, '0')}`}
+                    {/* MÃ HÀNG */}
+                    <td style={{ padding: '8px 14px', fontWeight: 600, color: '#0284c7', fontFamily: 'monospace' }}>
+                      {p.skuCode || p.code || `SP${String(p.id).padStart(4, '0')}`}
                     </td>
+
+                    {/* TÊN SẢN PHẨM */}
                     <td style={{ padding: '8px 14px', fontWeight: 700, color: '#0f172a' }}>{p.name}</td>
+
+                    {/* LOẠI SẢN PHẨM */}
+                    <td style={{ padding: '8px 14px', textAlign: 'center' }}>{getTypeBadge(p)}</td>
+
+                    {/* NHÓM HÀNG */}
                     <td style={{ padding: '8px 14px', color: '#475569' }}>
                       {groupMap.get(p.groupId) || '—'}
                     </td>
 
-                    {/* BASE PRICE INPUT */}
+                    {/* GIÁ BÁN INPUT */}
                     <td style={{ padding: '8px 14px', textAlign: 'right' }}>
                       <input
                         type="number"
                         min={0}
                         step={500}
-                        value={currentBasePrice}
-                        onChange={(e) => handlePriceChange(p.id, 'basePrice', e.target.value)}
+                        value={currentPrice}
+                        onChange={(e) => handlePriceChange(p.id, e.target.value)}
                         style={{
-                          width: 130,
-                          padding: '4px 8px',
+                          width: 140,
+                          padding: '5px 10px',
                           fontSize: 12,
                           fontWeight: 700,
                           color: '#15803d',
-                          border: isModified ? '1.5px solid #eab308' : '1px solid #cbd5e1',
-                          borderRadius: 4,
+                          border: isEdited ? '1.5px solid #eab308' : '1px solid #cbd5e1',
+                          borderRadius: 6,
                           outline: 'none',
                           textAlign: 'right',
+                          background: isEdited ? '#fefce8' : '#ffffff',
+                          transition: 'border-color 0.15s, background 0.15s',
                         }}
                       />
                     </td>
 
-                    {/* COST PRICE INPUT */}
-                    <td style={{ padding: '8px 14px', textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        min={0}
-                        step={500}
-                        value={currentCostPrice}
-                        onChange={(e) => handlePriceChange(p.id, 'costPrice', e.target.value)}
-                        style={{
-                          width: 130,
-                          padding: '4px 8px',
-                          fontSize: 12,
-                          color: '#475569',
-                          border: isModified ? '1.5px solid #eab308' : '1px solid #cbd5e1',
-                          borderRadius: 4,
-                          outline: 'none',
-                          textAlign: 'right',
-                        }}
-                      />
-                    </td>
-
+                    {/* TRẠNG THÁI */}
                     <td style={{ padding: '8px 14px', textAlign: 'center' }}>
-                      {isModified ? (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#d97706' }}>Đã sửa</span>
+                      {isEdited ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#d97706',
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          Đã sửa
+                        </span>
                       ) : (
-                        <span style={{ fontSize: 11, color: '#166534' }}>Chuẩn</span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>—</span>
                       )}
                     </td>
                   </tr>
