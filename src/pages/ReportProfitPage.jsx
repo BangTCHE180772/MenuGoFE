@@ -11,14 +11,14 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
-import ReportFilter from "../../components/reports/common/ReportFilter";
-import ExportToolbar from "../../components/reports/common/ExportToolbar";
-import SummaryFooter from "../../components/reports/common/SummaryFooter";
+import ReportFilter from "../components/reports/common/ReportFilter";
+import ExportToolbar from "../components/reports/common/ExportToolbar";
+import SummaryFooter from "../components/reports/common/SummaryFooter";
 
-import ProfitSummaryCards from "../../components/reports/profit/ProfitSummaryCards";
-import ProfitCharts from "../../components/reports/profit/ProfitCharts";
-import ProfitReportTable from "../../components/reports/profit/ProfitReportTable";
-import ProfitCompareModal from "../../components/reports/profit/ProfitCompareModal";
+import ProfitSummaryCards from "../components/reports/profit/ProfitSummaryCards";
+import ProfitCharts from "../components/reports/profit/ProfitCharts";
+import ProfitReportTable from "../components/reports/profit/ProfitReportTable";
+import ProfitCompareModal from "../components/reports/profit/ProfitCompareModal";
 
 const { Title, Text } = Typography;
 
@@ -73,7 +73,7 @@ const generateProfitReportData = (presetTime) => {
  * Báo cáo Lợi nhuận chuyên sâu cho quản lý / chủ nhà hàng.
  * Đường dẫn: /reports/profit
  */
-const ProfitReportPage = () => {
+const ReportProfitPage = () => {
   const [loading, setLoading] = useState(true);
   const [presetTime, setPresetTime] = useState("this_month");
   const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
@@ -244,13 +244,11 @@ const ProfitReportPage = () => {
                 />
 
                 <Tooltip title="Làm mới dữ liệu lợi nhuận">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }}>
-                    Làm mới
-                  </Button>
+                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
                 </Tooltip>
 
                 <Tooltip title="Xóa bộ lọc tìm kiếm">
-                  <Button danger onClick={handleResetFilters} style={{ borderRadius: 6 }}>
+                  <Button onClick={handleResetFilters} style={{ borderRadius: 6 }}>
                     Đặt lại
                   </Button>
                 </Tooltip>
@@ -338,4 +336,4 @@ const ProfitReportPage = () => {
   );
 };
 
-export default ProfitReportPage;
+export default ReportProfitPage;

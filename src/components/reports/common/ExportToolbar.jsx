@@ -62,7 +62,7 @@ const ExportToolbar = ({
         icon={<DownloadOutlined />}
         style={{ borderRadius: 6 }}
       >
-        Xuất / In báo cáo <DownOutlined />
+        Xuất/In <DownOutlined />
       </Button>
     </Dropdown>
   );

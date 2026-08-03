@@ -501,6 +501,7 @@ const ProductionDocumentModal = ({
                 />
               </div>
             </div>
+          ) : null}
         </div>
 
         {/* MODAL FOOTER */}

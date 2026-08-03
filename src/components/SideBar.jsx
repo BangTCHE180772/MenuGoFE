@@ -51,6 +51,7 @@ const REPORTS_SUB_MENU = [
   { label: "Báo cáo Doanh thu", path: "/reports/revenue" },
   { label: "Báo cáo Chi phí", path: "/reports/expense" },
   { label: "Báo cáo Lợi nhuận", path: "/reports/profit" },
+  { label: "Báo cáo Nguyên liệu", path: "/reports/inventory" },
 ];
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────

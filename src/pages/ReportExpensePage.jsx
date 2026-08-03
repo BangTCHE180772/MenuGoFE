@@ -11,15 +11,15 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
-import ReportFilter from "../../components/reports/common/ReportFilter";
-import ExportToolbar from "../../components/reports/common/ExportToolbar";
-import SummaryFooter from "../../components/reports/common/SummaryFooter";
+import ReportFilter from "../components/reports/common/ReportFilter";
+import ExportToolbar from "../components/reports/common/ExportToolbar";
+import SummaryFooter from "../components/reports/common/SummaryFooter";
 
-import ExpenseSummaryCards from "../../components/reports/expense/ExpenseSummaryCards";
-import ExpenseCharts from "../../components/reports/expense/ExpenseCharts";
-import ExpenseReportTable from "../../components/reports/expense/ExpenseReportTable";
-import ExpenseDetailDrawer from "../../components/reports/expense/ExpenseDetailDrawer";
-import ExpenseCompareModal from "../../components/reports/expense/ExpenseCompareModal";
+import ExpenseSummaryCards from "../components/reports/expense/ExpenseSummaryCards";
+import ExpenseCharts from "../components/reports/expense/ExpenseCharts";
+import ExpenseReportTable from "../components/reports/expense/ExpenseReportTable";
+import ExpenseDetailDrawer from "../components/reports/expense/ExpenseDetailDrawer";
+import ExpenseCompareModal from "../components/reports/expense/ExpenseCompareModal";
 
 const { Title, Text } = Typography;
 
@@ -67,7 +67,7 @@ const MOCK_EXPENSES = Array.from({ length: 35 }, (_, i) => {
  * Báo cáo Chi phí chuyên sâu cho quản lý / chủ nhà hàng.
  * Đường dẫn: /reports/expense
  */
-const ExpenseReportPage = () => {
+const ReportExpensePage = () => {
   const [loading, setLoading] = useState(true);
   const [presetTime, setPresetTime] = useState("this_month");
   const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
@@ -304,13 +304,11 @@ const ExpenseReportPage = () => {
                 />
 
                 <Tooltip title="Làm mới dữ liệu phiếu chi">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }}>
-                    Làm mới
-                  </Button>
+                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
                 </Tooltip>
 
                 <Tooltip title="Xóa tất cả bộ lọc phiếu chi">
-                  <Button danger onClick={handleResetFilters} style={{ borderRadius: 6 }}>
+                  <Button onClick={handleResetFilters} style={{ borderRadius: 6 }}>
                     Đặt lại
                   </Button>
                 </Tooltip>
@@ -413,4 +411,4 @@ const ExpenseReportPage = () => {
   );
 };
 
-export default ExpenseReportPage;
+export default ReportExpensePage;
