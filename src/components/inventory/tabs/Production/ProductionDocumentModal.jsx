@@ -335,32 +335,9 @@ const ProductionDocumentModal = ({
             </button>
           </div>
 
-          {/* TABS NAVIGATION */}
-          <div style={{ display: 'flex', gap: 24, fontSize: 13, fontWeight: 600 }}>
-            <div
-              onClick={() => setActiveTab('info')}
-              style={{
-                paddingBottom: 8,
-                cursor: 'pointer',
-                color: activeTab === 'info' ? '#e8442a' : '#64748b',
-                borderBottom: activeTab === 'info' ? '2px solid #e8442a' : '2px solid transparent',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Thông tin
-            </div>
-            <div
-              onClick={() => setActiveTab('materials')}
-              style={{
-                paddingBottom: 8,
-                cursor: 'pointer',
-                color: activeTab === 'materials' ? '#e8442a' : '#64748b',
-                borderBottom: activeTab === 'materials' ? '2px solid #e8442a' : '2px solid transparent',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Bảng dự tính sử dụng nguyên liệu
-            </div>
+          {/* HEADER TITLE */}
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e8442a', paddingBottom: 4 }}>
+            Thông tin sản xuất
           </div>
         </div>
 
@@ -524,39 +501,6 @@ const ProductionDocumentModal = ({
                 />
               </div>
             </div>
-          ) : (
-            /* TAB 2: BẢNG DỰ TÍNH SỬ DỤNG NGUYÊN LIỆU (KHÔNG CÓ TỒN KHO) */
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#334155', fontWeight: 600, fontSize: 11 }}>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', width: 140 }}>Mã thành phần</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tên thành phần</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right', width: 120 }}>Sử dụng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ingredientsList.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8', fontSize: 12 }}>
-                        Chưa có dữ liệu nguyên liệu
-                      </td>
-                    </tr>
-                  ) : (
-                    ingredientsList.map((item, idx) => (
-                      <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 14px', fontWeight: 600, color: '#334155' }}>{item.code}</td>
-                        <td style={{ padding: '8px 14px', color: '#0f172a', fontWeight: 500 }}>{item.name}</td>
-                        <td style={{ padding: '8px 14px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                          {item.quantity.toLocaleString('vi-VN')} {item.unitName}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
         {/* MODAL FOOTER */}
