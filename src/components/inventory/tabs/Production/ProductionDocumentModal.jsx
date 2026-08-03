@@ -343,9 +343,8 @@ const ProductionDocumentModal = ({
 
         {/* MODAL BODY */}
         <div style={{ padding: '20px 24px', minHeight: 280, display: 'flex', flexDirection: 'column' }}>
-          {activeTab === 'info' ? (
-            /* TAB 1: THÔNG TIN FORM */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* TAB 1: THÔNG TIN FORM */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* ROW 1: SẢN XUẤT MẶT HÀNG & SỐ LƯỢNG */}
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ flex: 1, position: 'relative' }}>
