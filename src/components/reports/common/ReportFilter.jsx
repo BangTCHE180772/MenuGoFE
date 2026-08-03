@@ -1,5 +1,5 @@
 import { Card, DatePicker, Button, Space, Tooltip } from "antd";
-import { ReloadOutlined, CalendarOutlined } from "@ant-design/icons";
+import { ReloadOutlined, CalendarOutlined, UndoOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 const ReportFilter = ({
@@ -123,21 +123,18 @@ const ReportFilter = ({
             />
           )}
 
-          <Tooltip title="Làm mới dữ liệu theo mốc thời gian">
+          <Tooltip title="Làm mới dữ liệu">
             <Button
               icon={<ReloadOutlined />}
               onClick={onRefresh}
               loading={loading}
               style={{ borderRadius: 6 }}
-            >
-              Làm mới
-            </Button>
+            />
           </Tooltip>
 
           {onResetFilters && (
             <Tooltip title="Đặt lại bộ lọc thời gian về mặc định">
               <Button
-                danger
                 onClick={onResetFilters}
                 style={{ borderRadius: 6 }}
               >

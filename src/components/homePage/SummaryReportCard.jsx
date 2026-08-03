@@ -417,7 +417,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
             getPopupContainer={(trigger) => trigger.parentElement}
           >
             <Button type="primary" icon={<DownloadOutlined />} style={{ borderRadius: 8 }}>
-              Xuất / In toàn bộ Tổng hợp <DownOutlined />
+              Xuất/In <DownOutlined />
             </Button>
           </Dropdown>
 

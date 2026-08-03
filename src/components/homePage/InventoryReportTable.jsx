@@ -247,6 +247,16 @@ const InventoryReportTable = ({ data = [] }) => {
             />
           </Tooltip>
 
+          {/* Reset Filters Button */}
+          <Button
+            onClick={() => {
+              setSearchText("");
+            }}
+            style={{ borderRadius: 8 }}
+          >
+            Đặt lại
+          </Button>
+
           {/* Export Dropdown Button */}
           <Dropdown
             menu={{ items: exportMenuItems }}
@@ -255,7 +265,7 @@ const InventoryReportTable = ({ data = [] }) => {
             getPopupContainer={(trigger) => trigger.parentElement}
           >
             <Button type="primary" icon={<DownloadOutlined />} style={{ borderRadius: 8 }}>
-              Xuất dữ liệu / In <DownOutlined />
+              Xuất/In <DownOutlined />
             </Button>
           </Dropdown>
 

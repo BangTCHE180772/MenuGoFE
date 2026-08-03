@@ -18,7 +18,7 @@ const { Title, Text } = Typography;
 
 /**
  * HomePage — Trang Báo Cáo Trong Ngày (Daily Report)
- * Layout 2 cột: Left Sidebar Filter + Right Content (Dashboard & Report Modes)
+ * Layout chuẩn mới: Top Header Card ➔ Horizontal HomeFilter Bar ➔ Tabs Content (Dashboard & Report)
  */
 const HomePage = () => {
   // ─── Filter State ──────────────────────────────────────────────────────────
@@ -26,7 +26,6 @@ const HomePage = () => {
     dayjs().format("DD/MM/YYYY"),
   );
   const [selectedEmployee, setSelectedEmployee] = useState("all");
-  const [filterLoading, setFilterLoading] = useState(false);
 
   // ─── Display Mode State ("dashboard" | "report") ───────────────────────────
   const [displayMode, setDisplayMode] = useState("dashboard");
@@ -34,18 +33,19 @@ const HomePage = () => {
   // ─── Report Data State ─────────────────────────────────────────────────────
   const [reportData, setReportData] = useState(MOCK_DAILY_REPORT);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
-  const handleApplyFilter = () => {
-    setFilterLoading(true);
-    setTimeout(() => {
-      const updatedData = generateFilteredReportData(
-        selectedDate,
-        selectedEmployee,
-      );
-      setReportData(updatedData);
-      setFilterLoading(false);
-      message.success(`Đã cập nhật dữ liệu báo cáo ngày ${selectedDate}`);
-    }, 300);
+  // ─── Instant Auto-Apply Handlers ───────────────────────────────────────────
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    const updatedData = generateFilteredReportData(newDate, selectedEmployee);
+    setReportData(updatedData);
+    message.success(`Đã cập nhật dữ liệu báo cáo ngày ${newDate}`);
+  };
+
+  const handleEmployeeChange = (newEmp) => {
+    setSelectedEmployee(newEmp);
+    const updatedData = generateFilteredReportData(selectedDate, newEmp);
+    setReportData(updatedData);
+    message.success("Đã cập nhật dữ liệu theo nhân viên");
   };
 
   const handleResetFilter = () => {
@@ -58,90 +58,83 @@ const HomePage = () => {
   };
 
   return (
-    <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-      {/* ─── LEFT SIDEBAR (~280px) ────────────────────────────────────────── */}
-      <div style={{ width: 280, flexShrink: 0 }}>
-        <HomeFilter
-          selectedDate={selectedDate}
-          onDateChange={setSelectedDate}
-          selectedEmployee={selectedEmployee}
-          onEmployeeChange={setSelectedEmployee}
-          onApply={handleApplyFilter}
-          onReset={handleResetFilter}
-          loading={filterLoading}
+    <div style={{ width: "100%", paddingBottom: 24 }}>
+      {/* ─── 1. TOP HEADER CARD ───────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 16,
+          marginBottom: 16,
+          background: "var(--color-surface)",
+          padding: "16px 20px",
+          borderRadius: "var(--border-radius)",
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
+        <div>
+          <Space align="center" size="small">
+            <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+              Báo cáo trong ngày
+            </Title>
+            <Tag
+              color="orange"
+              icon={<CalendarOutlined />}
+              style={{ borderRadius: 6, fontSize: 13, padding: "2px 8px" }}
+            >
+              {reportData.dateStr}
+            </Tag>
+          </Space>
+          <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+            Tổng hợp chỉ số và nhật ký hoạt động kinh doanh hàng ngày
+          </Text>
+        </div>
+
+        {/* Segmented Display Mode: Dashboard vs Report */}
+        <Segmented
+          value={displayMode}
+          onChange={setDisplayMode}
+          size="large"
+          options={[
+            {
+              label: (
+                <div style={{ padding: "4px 8px" }}>
+                  <DashboardOutlined style={{ marginRight: 6 }} />
+                  <span>Dashboard</span>
+                </div>
+              ),
+              value: "dashboard",
+            },
+            {
+              label: (
+                <div style={{ padding: "4px 8px" }}>
+                  <TableOutlined style={{ marginRight: 6 }} />
+                  <span>Report</span>
+                </div>
+              ),
+              value: "report",
+            },
+          ]}
         />
       </div>
 
-      {/* ─── RIGHT CONTENT AREA ───────────────────────────────────────────── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Header: Title & Segmented Display Mode Switcher */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 16,
-            marginBottom: 20,
-            background: "var(--color-surface)",
-            padding: "16px 20px",
-            borderRadius: "var(--border-radius)",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          <div>
-            <Space align="center" size="small">
-              <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
-                Báo cáo trong ngày
-              </Title>
-              <Tag
-                color="orange"
-                icon={<CalendarOutlined />}
-                style={{ borderRadius: 6, fontSize: 13, padding: "2px 8px" }}
-              >
-                {reportData.dateStr}
-              </Tag>
-            </Space>
-            <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
-              Tổng hợp chỉ số và nhật ký hoạt động kinh doanh hàng ngày
-            </Text>
-          </div>
+      {/* ─── 2. BỘ LỌC BÁO CÁO NGANG (NGAY DƯỚI HEADER & NGAY TRÊN TAB CONTENT) ─── */}
+      <HomeFilter
+        selectedDate={selectedDate}
+        onDateChange={handleDateChange}
+        selectedEmployee={selectedEmployee}
+        onEmployeeChange={handleEmployeeChange}
+        onReset={handleResetFilter}
+      />
 
-          {/* Segmented Display Mode: Dashboard vs Report */}
-          <Segmented
-            value={displayMode}
-            onChange={setDisplayMode}
-            size="large"
-            options={[
-              {
-                label: (
-                  <div style={{ padding: "4px 8px" }}>
-                    <DashboardOutlined style={{ marginRight: 6 }} />
-                    <span>Dashboard</span>
-                  </div>
-                ),
-                value: "dashboard",
-              },
-              {
-                label: (
-                  <div style={{ padding: "4px 8px" }}>
-                    <TableOutlined style={{ marginRight: 6 }} />
-                    <span>Report</span>
-                  </div>
-                ),
-                value: "report",
-              },
-            ]}
-          />
-        </div>
-
-        {/* Dynamic View Mode Content */}
-        {displayMode === "dashboard" ? (
-          <HomeDashboard data={reportData} />
-        ) : (
-          <HomeReport data={reportData} />
-        )}
-      </div>
+      {/* ─── 3. DYNAMIC VIEW MODE CONTENT (DASHBOARD / REPORT TABS) ──────── */}
+      {displayMode === "dashboard" ? (
+        <HomeDashboard data={reportData} />
+      ) : (
+        <HomeReport data={reportData} />
+      )}
     </div>
   );
 };

@@ -11,15 +11,15 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
-import ReportFilter from "../../components/reports/common/ReportFilter";
-import ExportToolbar from "../../components/reports/common/ExportToolbar";
-import SummaryFooter from "../../components/reports/common/SummaryFooter";
+import ReportFilter from "../components/reports/common/ReportFilter";
+import ExportToolbar from "../components/reports/common/ExportToolbar";
+import SummaryFooter from "../components/reports/common/SummaryFooter";
 
-import RevenueSummaryCards from "../../components/reports/revenue/RevenueSummaryCards";
-import RevenueCharts from "../../components/reports/revenue/RevenueCharts";
-import RevenueReportTable from "../../components/reports/revenue/RevenueReportTable";
-import BillDetailDrawer from "../../components/reports/revenue/BillDetailDrawer";
-import RevenueCompareModal from "../../components/reports/revenue/RevenueCompareModal";
+import RevenueSummaryCards from "../components/reports/revenue/RevenueSummaryCards";
+import RevenueCharts from "../components/reports/revenue/RevenueCharts";
+import RevenueReportTable from "../components/reports/revenue/RevenueReportTable";
+import BillDetailDrawer from "../components/reports/revenue/BillDetailDrawer";
+import RevenueCompareModal from "../components/reports/revenue/RevenueCompareModal";
 
 const { Title, Text } = Typography;
 
@@ -58,7 +58,7 @@ const MOCK_REVENUE_BILLS = Array.from({ length: 45 }, (_, i) => {
  * Báo cáo Doanh thu chuyên sâu cho quản lý / chủ nhà hàng.
  * Đường dẫn: /reports/revenue
  */
-const RevenueReportPage = () => {
+const ReportRevenuePage = () => {
   const [loading, setLoading] = useState(true);
   const [presetTime, setPresetTime] = useState("this_month");
   const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
@@ -308,13 +308,11 @@ const RevenueReportPage = () => {
                 />
 
                 <Tooltip title="Làm mới bảng dữ liệu">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }}>
-                    Làm mới
-                  </Button>
+                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
                 </Tooltip>
 
                 <Tooltip title="Xóa tất cả bộ lọc tìm kiếm">
-                  <Button danger onClick={handleResetFilters} style={{ borderRadius: 6 }}>
+                  <Button onClick={handleResetFilters} style={{ borderRadius: 6 }}>
                     Đặt lại
                   </Button>
                 </Tooltip>
@@ -420,4 +418,4 @@ const RevenueReportPage = () => {
   );
 };
 
-export default RevenueReportPage;
+export default ReportRevenuePage;

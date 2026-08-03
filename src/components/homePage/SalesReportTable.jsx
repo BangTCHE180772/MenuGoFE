@@ -310,6 +310,17 @@ const SalesReportTable = ({ data = [] }) => {
             />
           </Tooltip>
 
+          {/* Reset Filters Button */}
+          <Button
+            onClick={() => {
+              setSearchText("");
+              setPaymentFilter("all");
+            }}
+            style={{ borderRadius: 8 }}
+          >
+            Đặt lại
+          </Button>
+
           {/* Export & Print Dropdown Button */}
           <Dropdown
             menu={{ items: exportMenuItems }}
@@ -318,7 +329,7 @@ const SalesReportTable = ({ data = [] }) => {
             getPopupContainer={(trigger) => trigger.parentElement}
           >
             <Button type="primary" icon={<DownloadOutlined />} style={{ borderRadius: 8 }}>
-              Xuất dữ liệu / In <DownOutlined />
+              Xuất/In <DownOutlined />
             </Button>
           </Dropdown>
 

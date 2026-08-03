@@ -43,9 +43,10 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
-import RevenueReportPage from '../pages/reports/RevenueReportPage';
-import ExpenseReportPage from '../pages/reports/ExpenseReportPage';
-import ProfitReportPage from '../pages/reports/ProfitReportPage';
+import ReportRevenuePage from '../pages/ReportRevenuePage';
+import ReportExpensePage from '../pages/ReportExpensePage';
+import ReportProfitPage from '../pages/ReportProfitPage';
+import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 
@@ -136,9 +137,11 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/reports/revenue" element={<RevenueReportPage />} />
-                <Route path="/reports/expense" element={<ExpenseReportPage />} />
-                <Route path="/reports/profit" element={<ProfitReportPage />} />
+                <Route path="/reports/revenue" element={<ReportRevenuePage />} />
+                <Route path="/reports/expense" element={<ReportExpensePage />} />
+                <Route path="/reports/profit" element={<ReportProfitPage />} />
+                <Route path="/reports/inventory" element={<ReportInventoryPage />} />
+                <Route path="/inventoryreport" element={<ReportInventoryPage />} />
               </Route>
 
               {/* Owner, Admin */}
