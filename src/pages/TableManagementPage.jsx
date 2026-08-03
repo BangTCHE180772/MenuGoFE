@@ -41,10 +41,8 @@ const TableManagementPage = () => {
   const [tableForm] = Form.useForm();
 
   useEffect(() => {
-    if (role === ROLES.ADMIN || role === ROLES.OWNER) {
+    if (role) {
       fetchBranches();
-    } else if (role === ROLES.MANAGER) {
-      setSelectedBranch(user.branchId);
     }
   }, [role, user]);
 
@@ -65,9 +63,17 @@ const TableManagementPage = () => {
   const fetchBranches = async () => {
     try {
       const res = await getAllBranches();
-      setBranches(res.data);
-      if (res.data.length > 0 && !selectedBranch) {
-        setSelectedBranch(res.data[0].id);
+      let allBranches = res.data;
+      
+      if (role === ROLES.MANAGER && user?.branchIds?.length > 0) {
+        allBranches = allBranches.filter(b => user.branchIds.includes(b.id));
+      } else if (role === ROLES.MANAGER && user?.branchId) {
+        allBranches = allBranches.filter(b => b.id == user.branchId);
+      }
+      
+      setBranches(allBranches);
+      if (allBranches.length > 0 && !selectedBranch) {
+        setSelectedBranch(allBranches[0].id);
       }
     } catch (err) {
       message.error('Lỗi khi tải danh sách chi nhánh');
@@ -207,7 +213,7 @@ const TableManagementPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <Title level={3} style={{ margin: 0 }}>Quản Lý Bàn & Khu Vực</Title>
 
-        {(role === ROLES.ADMIN || role === ROLES.OWNER) && (
+        {branches.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Text strong>Chi nhánh:</Text>
             <Select

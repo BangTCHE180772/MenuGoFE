@@ -232,7 +232,7 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
         <div className="tablemap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h2>Sơ đồ Bàn</h2>
-            {branches.length > 0 && (
+            {branches.length > 1 && (
               <Select
                 style={{ width: 200 }}
                 value={selectedBranch}
