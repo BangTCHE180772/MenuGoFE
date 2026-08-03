@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { message, Modal, Button } from 'antd';
-import { FireOutlined } from '@ant-design/icons';
+import { FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -29,6 +29,7 @@ import OrderPanel from '../components/order/OrderPanel';
 import PaymentModal from '../components/payment/PaymentModal';
 import MergeTableModal from '../components/tablemap/MergeTableModal';
 import RequestRestockModal from '../components/order/RequestRestockModal';
+import InternalPickupModal from '../components/order/InternalPickupModal';
 
 const OrderPage = ({ isWaiterMode }) => {
   const [tables, setTables] = useState([]);
@@ -39,7 +40,7 @@ const OrderPage = ({ isWaiterMode }) => {
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
   const [isRestockModalVisible, setIsRestockModalVisible] = useState(false);
-
+  const [isInternalPickupModalVisible, setIsInternalPickupModalVisible] = useState(false);
   const [searchParams] = useSearchParams();
   const tableIdParam = searchParams.get('tableId');
 
@@ -304,6 +305,14 @@ const OrderPage = ({ isWaiterMode }) => {
           >
             Yêu cầu Bếp
           </Button>
+          <Button 
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            style={{ marginLeft: 16, backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 'bold' }}
+            onClick={() => setIsInternalPickupModalVisible(true)}
+          >
+            Nhận đồ nội bộ
+          </Button>
         </div>
         <div className="pos-top-bar-right">
           <span className="pos-top-bar-time" suppressHydrationWarning>
@@ -381,10 +390,16 @@ const OrderPage = ({ isWaiterMode }) => {
         />
       )}
 
-      <RequestRestockModal
-        visible={isRestockModalVisible}
-        onClose={() => setIsRestockModalVisible(false)}
-        branchId={deviceInfo?.branchId || user?.branchIds?.[0]}
+      <RequestRestockModal 
+        visible={isRestockModalVisible} 
+        onClose={() => setIsRestockModalVisible(false)} 
+        branchId={deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || user?.branchIds?.[0]}
+      />
+
+      <InternalPickupModal 
+        visible={isInternalPickupModalVisible} 
+        onClose={() => setIsInternalPickupModalVisible(false)} 
+        branchId={deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || user?.branchIds?.[0]}
       />
     </div>
   );

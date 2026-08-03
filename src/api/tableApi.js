@@ -3,11 +3,14 @@ import axiosInstance from './axiosInstance';
 export const getAllTables = () =>
   axiosInstance.get('/api/Table');
 
-export const getTablesByBranch = (branchIds, areaId = null) => {
+export const getTablesByBranch = (branchIds, areaId = null, includeInternal = false) => {
   const ids = Array.isArray(branchIds) ? branchIds : [branchIds];
   const params = { branchIds: ids.join(',') };
   if (areaId) {
     params['$filter'] = `areaId eq ${areaId}`;
+  }
+  if (includeInternal) {
+    params['includeInternal'] = true;
   }
   return axiosInstance.get('/api/Table', { params });
 };
