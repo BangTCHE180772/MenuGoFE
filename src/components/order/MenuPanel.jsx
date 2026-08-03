@@ -10,7 +10,7 @@ import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 const formatPrice = (price) =>
   Number(price).toLocaleString('vi-VN') + 'đ';
 
-const MenuPanel = ({ onAddItem, canOrder }) => {
+const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,7 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await getAllGroups();
+        const res = await getAllGroups(branchId);
         if (res.data) {
           const dynamic = res.data.map(g => ({
             id: String(g.id),
@@ -38,13 +38,13 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [branchId]);
 
   const fetchProducts = async (searchText, groupId) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await searchProductsOData(searchText, groupId);
+      const res = await searchProductsOData(searchText, groupId, branchId);
       if (res && res.value) {
         const mappedProducts = res.value.map(p => ({
           id: p.Id,
@@ -52,7 +52,8 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
           sellPrice: p.SellPrice,
           description: p.Description,
           groupId: p.GroupId,
-          groupName: p.Group ? p.Group.Name : 'Khác'
+          groupName: p.Group ? p.Group.Name : 'Khác',
+          imageLink: p.Image?.ImageLink || null
         }));
         setProducts(mappedProducts);
       } else {
@@ -150,7 +151,11 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
               disabled={!canOrder}
               title={canOrder ? `Thêm ${item.name}` : 'Chọn bàn Có khách để gọi món'}
             >
-              <div className="pos-menu-item-emoji"></div>
+              {item.imageLink && (
+                <div style={{ height: '80px', width: '100%', marginBottom: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                  <img src={item.imageLink} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
               <div className="pos-menu-item-info">
                 <div className="pos-menu-item-name">{item.name}</div>
                 <div className="pos-menu-item-desc">{item.description}</div>

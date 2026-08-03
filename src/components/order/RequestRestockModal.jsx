@@ -112,16 +112,9 @@ const RequestRestockModal = ({ visible, onClose, branchId }) => {
               ]}
             >
               <List.Item.Meta
-                avatar={
-                  <Avatar 
-                    src={item.image?.url} 
-                    icon={!item.image?.url && <FireOutlined />}
-                    style={{ backgroundColor: item.image?.url ? 'transparent' : '#fff1f0', color: '#f5222d' }} 
-                    size={48} 
-                  />
-                }
-                title={<span style={{ fontWeight: 500, fontSize: '15px' }}>{item.name}</span>}
-                description={item.description || "Mặt hàng nội bộ"}
+                avatar={<Avatar src={item.imageUrl} shape="square" size="large" />}
+                title={<span style={{ fontWeight: 500 }}>{item.name}</span>}
+                description={item.description || "Thực hiện tại bếp"}
               />
             </List.Item>
           )}
