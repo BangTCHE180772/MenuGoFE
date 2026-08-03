@@ -326,6 +326,19 @@ const TransferDocumentModal = ({
       return;
     }
 
+    for (const item of items) {
+      const q = Number(item.transferQuantity || 0);
+      const p = Number(item.transferPrice || 0);
+      if (q < 0.001 || q > 10000000000) {
+        showToast(`Số lượng chuyển mặt hàng '${item.name}' (${q}) không hợp lệ. Phải từ 0.001 đến 10 tỷ.`, 'error');
+        return;
+      }
+      if (p < 0 || p > 10000000000) {
+        showToast(`Đơn giá chuyển mặt hàng '${item.name}' (${p}) không hợp lệ. Phải từ 0 đến 10 tỷ VNĐ.`, 'error');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const dto = {

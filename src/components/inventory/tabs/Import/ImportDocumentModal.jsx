@@ -320,8 +320,11 @@ const ImportDocumentModal = ({
     }
   };
 
-  // Calculations
+  // Calculations & Rounding Rules
   const goodsAmount = items.reduce((sum, i) => sum + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+  const remainder = goodsAmount - Math.floor(goodsAmount);
+  const roundedGoodsAmount = remainder < 0.5 ? Math.floor(goodsAmount) : Math.floor(goodsAmount) + 1;
+  const roundingValue = goodsAmount - roundedGoodsAmount;
 
   // Build Payload (Matches ImportDocumentCreateDto and ImportDocumentUpdateDto schema)
   const buildPayload = () => {
@@ -348,6 +351,25 @@ const ImportDocumentModal = ({
       alert('Vui lòng chọn ít nhất 1 sản phẩm để nhập kho');
       return;
     }
+
+    for (const item of items) {
+      const q = Number(item.quantity || 0);
+      const p = Number(item.unitPrice || 0);
+      if (q < 0.001 || q > 10000000000) {
+        alert(`Số lượng mặt hàng '${item.name}' (${q}) không hợp lệ. Phải nằm trong khoảng từ 0.001 đến 10 tỷ.`);
+        return;
+      }
+      if (p < 0 || p > 10000000000) {
+        alert(`Đơn giá nhập mặt hàng '${item.name}' (${p}) không hợp lệ. Phải là số dương từ 0 đến 10 tỷ VNĐ.`);
+        return;
+      }
+    }
+
+    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > roundedGoodsAmount) {
+      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${roundedGoodsAmount.toLocaleString('vi-VN')} đ.`);
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = buildPayload();
@@ -383,6 +405,24 @@ const ImportDocumentModal = ({
     }
     if (!formData.supplierId || Number(formData.supplierId) <= 0) {
       alert('Vui lòng chọn Nhà cung cấp trước khi hoàn thành phiếu nhập kho.');
+      return;
+    }
+
+    for (const item of items) {
+      const q = Number(item.quantity || 0);
+      const p = Number(item.unitPrice || 0);
+      if (q < 0.001 || q > 10000000000) {
+        alert(`Số lượng mặt hàng '${item.name}' (${q}) không hợp lệ. Phải nằm trong khoảng từ 0.001 đến 10 tỷ.`);
+        return;
+      }
+      if (p < 0 || p > 10000000000) {
+        alert(`Đơn giá nhập mặt hàng '${item.name}' (${p}) không hợp lệ. Phải là số dương từ 0 đến 10 tỷ VNĐ.`);
+        return;
+      }
+    }
+
+    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > roundedGoodsAmount) {
+      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${roundedGoodsAmount.toLocaleString('vi-VN')} đ.`);
       return;
     }
     setLoading(true);
@@ -652,11 +692,12 @@ const ImportDocumentModal = ({
                         <td style={{ textAlign: 'center', padding: '6px 8px' }}>
                           <input
                             type="number"
-                            min={1}
+                            min={0.001}
+                            step="any"
                             value={item.quantity}
-                            onChange={(e) => handleItemChange(item.rowId, 'quantity', Math.max(1, Number(e.target.value)))}
+                            onChange={(e) => handleItemChange(item.rowId, 'quantity', Math.max(0.001, Number(e.target.value)))}
                             style={{
-                              width: 60,
+                              width: 65,
                               height: 26,
                               textAlign: 'center',
                               fontSize: 11,
@@ -834,15 +875,29 @@ const ImportDocumentModal = ({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                <span style={{ color: '#334155', fontWeight: 600 }}>Tổng tiền hàng:</span>
-                <strong style={{ color: '#e8442a', fontSize: 15 }}>{goodsAmount.toLocaleString('vi-VN')} đ</strong>
+                <span style={{ color: '#334155', fontWeight: 600 }}>Tổng tiền hàng (gốc):</span>
+                <strong style={{ color: '#e8442a', fontSize: 14 }}>{goodsAmount.toLocaleString('vi-VN')} đ</strong>
               </div>
+
+              {roundingValue !== 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11.5, color: '#d97706' }}>
+                    <span>ĐC Làm tròn (Rounding):</span>
+                    <strong>{roundingValue > 0 ? `-${roundingValue.toLocaleString('vi-VN')}` : `+${Math.abs(roundingValue).toLocaleString('vi-VN')}`} đ</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                    <span style={{ color: '#0f172a', fontWeight: 700 }}>Cần trả NCC (Đã làm tròn):</span>
+                    <strong style={{ color: '#059669', fontSize: 15 }}>{roundedGoodsAmount.toLocaleString('vi-VN')} đ</strong>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px dashed #cbd5e1' }}>
                 <span style={{ color: '#475569', fontSize: 11.5, fontWeight: 600 }}>Tiền trả NCC:</span>
                 <input
                   type="number"
                   min={0}
+                  max={roundedGoodsAmount}
                   value={formData.paidAmount}
                   onChange={(e) => setFormData((prev) => ({ ...prev, paidAmount: Math.max(0, Number(e.target.value)) }))}
                   style={{

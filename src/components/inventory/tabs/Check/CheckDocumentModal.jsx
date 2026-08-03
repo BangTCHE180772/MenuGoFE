@@ -650,6 +650,8 @@ const CheckDocumentModal = ({
                           <input
                             type="number"
                             min={0}
+                            max={10000000000}
+                            step="any"
                             value={record.actualQuantity ?? 0}
                             onChange={(e) => handleActualQtyChange(index, e.target.value)}
                             style={{

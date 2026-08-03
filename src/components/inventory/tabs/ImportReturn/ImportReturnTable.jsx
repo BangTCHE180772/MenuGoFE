@@ -273,7 +273,12 @@ const ImportReturnTable = ({
                                   const supplierName = d.partnerName || d.snapshotPartnerName || 'Nhà cung cấp';
                                   const branchName = d.branchName || d.snapshotBranchName || 'Chi nhánh';
                                   const creatorName = d.snapshotCreatedByName || d.createdByName || d.creator || 'Hệ thống';
-                                  const docTotalAmt = Math.round(Number(d.totalAmount || 0));
+                                  const docRawTotalAmt = Number(d.totalAmount || 0);
+                                  const cfs = d.cashFlows || [];
+                                  const roundingCF = cfs.find((cf) => cf.type === 5 || cf.type === 'Rounding');
+                                  const roundingAmt = Number(roundingCF?.totalAmount || 0);
+                                  const docEffectiveAmt = docRawTotalAmt - roundingAmt;
+                                  const docTotalAmt = docRawTotalAmt;
                                   const docPaidAmt = Math.round(Number(d.amountPaid || 0));
                                   const parentDocCode = d.parentDocumentCode || (d.parentDocumentId ? `#${d.parentDocumentId}` : '---');
 
@@ -381,8 +386,18 @@ const ImportReturnTable = ({
                                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         <div style={{ width: 340, background: '#fafafa', border: '1px solid #e2e8f0', borderRadius: 6, padding: 12 }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, paddingBottom: 6, borderBottom: '1px dashed #e2e8f0' }}>
-                                            <span style={{ color: '#64748b' }}>Tổng tiền cần thu từ NCC:</span>
-                                            <strong style={{ color: '#0f172a' }}>{docTotalAmt.toLocaleString('vi-VN')} ₫</strong>
+                                            <span style={{ color: '#64748b' }}>Tổng tiền hàng gốc:</span>
+                                            <strong style={{ color: '#0f172a' }}>{docRawTotalAmt.toLocaleString('vi-VN')} ₫</strong>
+                                          </div>
+                                          {roundingAmt !== 0 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#d97706', marginBottom: 6 }}>
+                                              <span>ĐC Làm tròn (Rounding):</span>
+                                              <strong>{roundingAmt > 0 ? `-${roundingAmt.toLocaleString('vi-VN')}` : `+${Math.abs(roundingAmt).toLocaleString('vi-VN')}`} ₫</strong>
+                                            </div>
+                                          )}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                                            <span style={{ color: '#64748b', fontWeight: 600 }}>Cần thu NCC (Đã làm tròn):</span>
+                                            <strong style={{ color: '#059669' }}>{docEffectiveAmt.toLocaleString('vi-VN')} ₫</strong>
                                           </div>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
                                             <span style={{ color: '#64748b' }}>NCC đã thanh toán:</span>
@@ -390,8 +405,8 @@ const ImportReturnTable = ({
                                           </div>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
                                             <span style={{ color: '#64748b', fontWeight: 600 }}>Còn lại phải thu:</span>
-                                            <strong style={{ color: docTotalAmt - docPaidAmt > 0 ? '#ef4444' : '#059669', fontSize: 13 }}>
-                                              {Math.max(0, docTotalAmt - docPaidAmt).toLocaleString('vi-VN')} ₫
+                                            <strong style={{ color: docEffectiveAmt - docPaidAmt > 0 ? '#ef4444' : '#059669', fontSize: 13 }}>
+                                              {Math.max(0, docEffectiveAmt - docPaidAmt).toLocaleString('vi-VN')} ₫
                                             </strong>
                                           </div>
                                         </div>
@@ -427,13 +442,16 @@ const ImportReturnTable = ({
                                             </thead>
                                             <tbody>
                                               {cashFlows.map((cf, idx) => {
-                                                const pm = cf.paymentMethod === 'BankTransfer' || cf.paymentMethod === 'Chuyển khoản'
-                                                  ? 'Chuyển khoản'
-                                                  : 'Tiền mặt';
+                                                const isRounding = cf.type === 5 || cf.type === 'Rounding';
+                                                const pm = isRounding
+                                                  ? 'Làm tròn (Rounding)'
+                                                  : (cf.paymentMethod === 'BankTransfer' || cf.paymentMethod === 'Chuyển khoản'
+                                                    ? 'Chuyển khoản'
+                                                    : 'Tiền mặt');
 
                                                 return (
-                                                  <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 600, color: '#e8442a' }}>
+                                                  <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: isRounding ? '#fffbeb' : 'transparent' }}>
+                                                    <td style={{ padding: '8px 10px', fontWeight: 600, color: isRounding ? '#d97706' : '#e8442a' }}>
                                                       {cf.code || `PTHU-${cf.id}`}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', color: '#334155' }}>
@@ -444,12 +462,12 @@ const ImportReturnTable = ({
                                                     <td style={{ padding: '8px 10px', color: '#334155' }}>
                                                       {pm}
                                                     </td>
-                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontSize: 12 }}>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: isRounding ? '#d97706' : '#16a34a', fontSize: 12 }}>
                                                       {Number(cf.totalAmount || cf.amount || 0).toLocaleString('vi-VN')} ₫
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                      <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
-                                                        Đã thu
+                                                      <span style={{ padding: '2px 6px', borderRadius: 4, background: isRounding ? '#fef3c7' : '#ecfdf5', color: isRounding ? '#b45309' : '#059669', border: isRounding ? '1px solid #fcd34d' : '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
+                                                        {isRounding ? 'Làm tròn' : 'Đã thu'}
                                                       </span>
                                                     </td>
                                                     <td style={{ padding: '8px 10px', color: '#64748b' }}>

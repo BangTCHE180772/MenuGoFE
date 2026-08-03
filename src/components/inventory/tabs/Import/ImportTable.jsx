@@ -260,9 +260,13 @@ const ImportTable = ({
                 const supplierPartner = (loadedDoc.partners || []).find((p) => p.partnerType === 1 || p.partnerType === 'Supplier') || loadedDoc.partner || loadedDoc.partners?.[0];
                 const supplierName = loadedDoc.partnerName || supplierPartner?.partnerName || loadedDoc.partner?.name || '---';
 
-                const totalInvoiceAmount = Math.round(Number(loadedDoc.totalAmount || 0));
-                const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? cashFlowsList.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
-                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (totalInvoiceAmount - supplierAmountPaid)));
+                const totalInvoiceAmount = Number(loadedDoc.totalAmount || 0);
+                const roundingCF = cashFlowsList.find((cf) => cf.type === 5 || cf.type === 'Rounding');
+                const roundingAmount = Number(roundingCF?.totalAmount || 0);
+                const effectivePayableAmount = totalInvoiceAmount - roundingAmount;
+                const paymentCashFlows = cashFlowsList.filter((cf) => cf.type !== 5 && cf.type !== 'Rounding');
+                const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? paymentCashFlows.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
+                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (effectivePayableAmount - supplierAmountPaid)));
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -479,8 +483,12 @@ const ImportTable = ({
                                       <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
                                         Nhà cung cấp: <span style={{ color: '#2563eb' }}>{supplierName}</span>
                                       </div>
-                                      <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#475569' }}>
-                                        <div>Tổng tiền đơn: <strong>{totalInvoiceAmount.toLocaleString('vi-VN')} đ</strong></div>
+                                      <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#475569', flexWrap: 'wrap' }}>
+                                        <div>Tổng tiền gốc: <strong>{totalInvoiceAmount.toLocaleString('vi-VN')} đ</strong></div>
+                                        {roundingAmount !== 0 && (
+                                          <div>ĐC Làm tròn (Rounding): <strong style={{ color: '#d97706' }}>{roundingAmount > 0 ? `-${roundingAmount.toLocaleString('vi-VN')}` : `+${Math.abs(roundingAmount).toLocaleString('vi-VN')}`} đ</strong></div>
+                                        )}
+                                        <div>Cần trả NCC: <strong style={{ color: '#0f172a' }}>{effectivePayableAmount.toLocaleString('vi-VN')} đ</strong></div>
                                         <div>Đã trả NCC: <strong style={{ color: '#059669' }}>{supplierAmountPaid.toLocaleString('vi-VN')} đ</strong></div>
                                         <div>Còn nợ NCC: <strong style={{ color: '#ef4444' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
                                       </div>
@@ -561,23 +569,28 @@ const ImportTable = ({
                                               </td>
                                             </tr>
                                           ) : (
-                                            cashFlowsList.map((cf, idx) => (
-                                              <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{cf.code || `CF${idx + 1}`}</td>
-                                                <td style={{ padding: '8px 10px', color: '#475569' }}>
-                                                  {cf.businessDate ? dayjs(cf.businessDate).format('DD/MM/YYYY HH:mm') : (cf.createdAt ? dayjs(cf.createdAt).format('DD/MM/YYYY HH:mm') : '---')}
-                                                </td>
-                                                <td style={{ padding: '8px 10px', color: '#334155' }}>{cf.paymentMethod || 'Tiền mặt'}</td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
-                                                  {Number(cf.totalAmount || 0).toLocaleString('vi-VN')} đ
-                                                </td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                  <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d', fontSize: 10, fontWeight: 600 }}>
-                                                    {cf.status || 'Hoàn thành'}
-                                                  </span>
-                                                </td>
-                                              </tr>
-                                            ))
+                                            cashFlowsList.map((cf, idx) => {
+                                              const isRounding = cf.type === 5 || cf.type === 'Rounding';
+                                              return (
+                                                <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: isRounding ? '#fffbeb' : 'transparent' }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: isRounding ? '#d97706' : '#2563eb' }}>{cf.code || `CF${idx + 1}`}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                    {cf.businessDate ? dayjs(cf.businessDate).format('DD/MM/YYYY HH:mm') : (cf.createdAt ? dayjs(cf.createdAt).format('DD/MM/YYYY HH:mm') : '---')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                    {isRounding ? 'Làm tròn (Rounding)' : (cf.paymentMethod || 'Tiền mặt')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: isRounding ? '#d97706' : '#059669' }}>
+                                                    {Number(cf.totalAmount || 0).toLocaleString('vi-VN')} đ
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                    <span style={{ padding: '2px 6px', borderRadius: 4, background: isRounding ? '#fef3c7' : '#dcfce7', color: isRounding ? '#b45309' : '#15803d', fontSize: 10, fontWeight: 600 }}>
+                                                      {isRounding ? 'Làm tròn' : (cf.status || 'Hoàn thành')}
+                                                    </span>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
                                           )}
                                         </tbody>
                                       </table>

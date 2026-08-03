@@ -229,10 +229,10 @@ const AdjustmentDocumentModal = ({
       return;
     }
 
-    // Validate newAvgCost >= 0
-    const negativeCostItem = items.find((i) => Number(i.newAvgCost) < 0);
-    if (negativeCostItem) {
-      showToast(`Giá vốn mới của sản phẩm '${negativeCostItem.name}' không được nhỏ hơn 0.`, 'error');
+    // Validate 0 <= newAvgCost <= 10,000,000,000
+    const invalidCostItem = items.find((i) => Number(i.newAvgCost) < 0 || Number(i.newAvgCost) > 10000000000);
+    if (invalidCostItem) {
+      showToast(`Giá vốn mới của sản phẩm '${invalidCostItem.name}' (${invalidCostItem.newAvgCost}) không hợp lệ. Phải nằm trong khoảng từ 0 đến 10 tỷ VNĐ.`, 'error');
       return;
     }
 

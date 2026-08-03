@@ -176,7 +176,9 @@ const ReturnDocumentModal = ({
     return items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.returnPrice) || 0), 0);
   }, [items]);
 
-  const netAmount = Math.round(totalGoodsAmount);
+  const remainder = totalGoodsAmount - Math.floor(totalGoodsAmount);
+  const netAmount = remainder < 0.5 ? Math.floor(totalGoodsAmount) : Math.floor(totalGoodsAmount) + 1;
+  const roundingValue = totalGoodsAmount - netAmount;
   const paidAmount = Number(formData.paidAmount) || 0;
   const debtAmount = Math.max(0, netAmount - paidAmount);
   const paidAmountExceedsTotal = paidAmount > netAmount && netAmount > 0;
@@ -600,16 +602,25 @@ const ReturnDocumentModal = ({
               {/* TOTALS & PAYMENT */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.filter(i => i.quantity > 0).length} sp)</span>
+                  <span style={{ color: '#475569' }}>Tổng tiền hàng gốc ({items.filter(i => i.quantity > 0).length} sp)</span>
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {totalGoodsAmount.toLocaleString('vi-VN')}
+                    {totalGoodsAmount.toLocaleString('vi-VN')} ₫
                   </span>
                 </div>
 
+                {roundingValue !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#d97706', fontSize: 11.5 }}>
+                    <span>ĐC Làm tròn (Rounding)</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {roundingValue > 0 ? `-${roundingValue.toLocaleString('vi-VN')}` : `+${Math.abs(roundingValue).toLocaleString('vi-VN')}`} ₫
+                    </span>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontWeight: 600 }}>Cần thu NCC</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {netAmount.toLocaleString('vi-VN')}
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Cần thu NCC (Đã làm tròn)</span>
+                  <span style={{ fontWeight: 700, color: '#059669', fontSize: 13 }}>
+                    {netAmount.toLocaleString('vi-VN')} ₫
                   </span>
                 </div>
 
