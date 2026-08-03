@@ -222,7 +222,10 @@ const TransferTable = ({
                           {doc.type === 7 ? 'Nhận chuyển hàng' : 'Chuyển hàng'}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || doc.fromBranch?.name || 'Chi nhánh'}</td>
+                      <td style={{ padding: '8px 10px', color: '#334155', fontWeight: 500 }}>
+                        {doc.branchName || doc.snapshotBranchName || 'Chi nhánh gửi'}
+                        {doc.toBranchName || doc.snapshotToBranchName ? ` → ${doc.toBranchName || doc.snapshotToBranchName}` : ''}
+                      </td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}</td>
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                         {doc.totalAmount ? doc.totalAmount.toLocaleString('vi-VN') : 0} đ

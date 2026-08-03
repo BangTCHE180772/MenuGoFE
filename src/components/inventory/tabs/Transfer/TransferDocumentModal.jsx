@@ -20,6 +20,7 @@ import {
   deleteTransferPendingDocument,
   getTransferById
 } from '../../../../api/documentApi';
+import { extractErrorMessage } from '../../utils/errorHelper';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 
@@ -378,7 +379,7 @@ const TransferDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi lưu phiếu chuyển kho.';
+      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu chuyển kho.');
       showToast(errMsg, 'error');
     } finally {
       setLoading(false);
@@ -396,7 +397,7 @@ const TransferDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      showToast('Không thể hủy phiếu nháp', 'error');
+      showToast(extractErrorMessage(err, 'Không thể hủy phiếu nháp.'), 'error');
     } finally {
       setLoading(false);
     }

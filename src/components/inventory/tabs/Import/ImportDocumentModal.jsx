@@ -22,6 +22,7 @@ import {
 } from '../../../../api/documentApi';
 import QuickCreatePartnerModal from './QuickCreatePartnerModal';
 import { useAuth } from '../../../../context/AuthContext';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 // Native Toast Helper (No antd UI components)
 const showToast = (text) => {
@@ -383,14 +384,7 @@ const ImportDocumentModal = ({
       onClose();
     } catch (err) {
       console.error('Lỗi khi lưu tạm phiếu nhập:', err);
-      const serverMsg =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        (err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat().join('\n')
-          : null) ||
-        err.message ||
-        'Không thể lưu tạm phiếu nhập.';
+      const serverMsg = extractErrorMessage(err, 'Không thể lưu tạm phiếu nhập.');
       alert(`Lỗi khi lưu tạm phiếu nhập:\n${serverMsg}`);
     } finally {
       setLoading(false);
@@ -439,14 +433,7 @@ const ImportDocumentModal = ({
       onClose();
     } catch (err) {
       console.error('Lỗi khi hoàn thành phiếu nhập:', err);
-      const serverMsg =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        (err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat().join('\n')
-          : null) ||
-        err.message ||
-        'Không thể hoàn thành phiếu nhập.';
+      const serverMsg = extractErrorMessage(err, 'Không thể hoàn thành phiếu nhập.');
       alert(`Lỗi khi hoàn thành phiếu nhập:\n${serverMsg}`);
     } finally {
       setLoading(false);

@@ -186,18 +186,40 @@ export const updateTransferDocument = async (id, dto, branchId) => {
   return response.data;
 };
 
+export const processTransferReceipt = async (id, dto) => {
+  const response = await axiosInstance.post(`/api/TransferDocument/${id}/receive`, dto);
+  return response.data;
+};
+
 export const receiveTransferDocument = async (dto) => {
-  const response = await axiosInstance.post('/api/Document/transfer/receive', dto);
+  const id = dto.transferDocumentId || dto.id;
+  const payload = {
+    status: dto.status || 'Received',
+    note: dto.note || dto.receivingNote || '',
+    receivedDetails: dto.receivedDetails || (dto.details ? dto.details.map(d => ({
+      detailId: d.detailId || d.id,
+      receivedQuantity: d.receivedQuantity ?? d.receiveQty ?? 0
+    })) : [])
+  };
+  const response = await axiosInstance.post(`/api/TransferDocument/${id}/receive`, payload);
   return response.data;
 };
 
 export const rejectTransferDocument = async (dto) => {
-  const response = await axiosInstance.post('/api/Document/transfer/reject', dto);
+  const id = dto.transferDocumentId || dto.id;
+  const payload = {
+    status: 'Rejected',
+    note: dto.reason || dto.note || 'Từ chối nhận hàng',
+    receivedDetails: []
+  };
+  const response = await axiosInstance.post(`/api/TransferDocument/${id}/receive`, payload);
   return response.data;
 };
 
 export const deleteTransferDocument = async (id) => {
-  const response = await axiosInstance.delete(`/api/Document/transfer/${id}`);
+  const response = await axiosInstance.delete(`/api/TransferDocument/${id}/soft-delete`, {
+    params: { deleteNote: 'Hủy phiếu chuyển kho' }
+  });
   return response.data;
 };
 

@@ -17,6 +17,7 @@ import {
 } from '../../../../api/documentApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 const showToast = (text, type = 'success') => {
   const toast = document.createElement('div');
@@ -253,8 +254,7 @@ const ProductionDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg =
-        err.response?.data?.message || err.response?.data?.title || err.message || 'Lỗi khi lưu phiếu sản xuất.';
+      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu sản xuất.');
       showToast(errMsg, 'error');
     } finally {
       setLoading(false);
@@ -272,7 +272,7 @@ const ProductionDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      showToast('Không thể hủy phiếu nháp', 'error');
+      showToast(extractErrorMessage(err, 'Không thể hủy phiếu nháp.'), 'error');
     } finally {
       setLoading(false);
     }

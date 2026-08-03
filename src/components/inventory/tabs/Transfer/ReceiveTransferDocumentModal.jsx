@@ -3,11 +3,14 @@ import {
   CloseOutlined,
   FullscreenOutlined,
   PrinterOutlined,
-  EditOutlined
+  EditOutlined,
+  AlertOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '../../../../context/AuthContext';
 import { receiveTransferDocument, rejectTransferDocument } from '../../../../api/documentApi';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 const ReceiveTransferDocumentModal = ({
   open,
@@ -22,49 +25,42 @@ const ReceiveTransferDocumentModal = ({
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
   const [receivingNote, setReceivingNote] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     if (open) {
       setReceivingNote('');
-      if (documentData && Array.isArray(documentData.documentDetails)) {
+      setErrorMessage('');
+      setSuccessMessage('');
+      const rawDetails = documentData?.details || documentData?.documentDetails || [];
+      if (Array.isArray(rawDetails) && rawDetails.length > 0) {
         setItems(
-          documentData.documentDetails.map((detail) => ({
+          rawDetails.map((detail) => ({
             id: detail.id,
             bInventoryId: detail.bInventoryId,
-            code: detail.bInventory?.product?.skuCode || `SP${detail.bInventory?.productId}`,
-            name: detail.bInventory?.product?.name || 'Sản phẩm',
-            unitName: detail.unitConversion?.unit?.name || '',
-            stock: detail.bInventory?.quantity || 0,
-            transferQty: detail.quantity || 1,
-            receiveQty: detail.quantity || 1,
+            code: detail.productCode || detail.snapshotProductCode || detail.currentProductCode || detail.bInventory?.product?.skuCode || `SP${detail.bInventory?.productId || detail.id}`,
+            name: detail.productName || detail.snapshotProductName || detail.currentProductName || detail.bInventory?.product?.name || 'Sản phẩm',
+            unitName: detail.unitName || detail.snapshotUnitName || detail.currentUnitName || detail.unitConversion?.unit?.name || '',
+            stock: detail.currentStockQuantity ?? detail.bInventory?.quantity ?? 0,
+            transferQty: detail.quantity || detail.baseQuantity || 1,
+            receiveQty: detail.receivedQuantity ?? detail.quantity ?? detail.baseQuantity ?? 1,
             unitPrice: detail.unitPrice || 0,
             note: detail.note || '',
             editingNote: false
           }))
         );
       } else {
-        // Fallback sample data if opening dummy receive modal
-        setItems([
-          {
-            id: 1,
-            bInventoryId: 101,
-            code: 'SP000021',
-            name: 'Bia Heineken',
-            unitName: 'Lon',
-            stock: 0,
-            transferQty: 1,
-            receiveQty: 1,
-            unitPrice: 20240,
-            note: '',
-            editingNote: false
-          }
-        ]);
+        setItems([]);
       }
     }
   }, [open, documentData]);
 
   const handleReceiveQtyChange = (index, val) => {
-    const qty = val !== '' && val != null ? Math.max(0, Number(val) || 0) : 0;
+    const rawQty = val !== '' && val != null ? Math.max(0, Number(val) || 0) : 0;
+    const targetItem = items[index];
+    const maxQty = Number(targetItem?.transferQty) || 0;
+    const qty = Math.min(rawQty, maxQty);
     const updated = [...items];
     updated[index] = { ...updated[index], receiveQty: qty };
     setItems(updated);
@@ -79,42 +75,61 @@ const ReceiveTransferDocumentModal = ({
   }, [items]);
 
   const handleSubmit = async () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+
     if (items.length === 0) {
-      message.error('Phiếu chuyển không có sản phẩm nào.');
+      setErrorMessage('Phiếu chuyển không có sản phẩm nào.');
       return;
     }
     if (!documentData?.id) {
-      message.error('Không tìm thấy thông tin phiếu chuyển kho.');
+      setErrorMessage('Không tìm thấy thông tin phiếu chuyển kho.');
       return;
     }
+    if (!receivingNote || !receivingNote.trim()) {
+      setErrorMessage('Bắt buộc phải nhập Ghi chú (Note) khi xác nhận nhận hàng.');
+      return;
+    }
+
+    const hasPartial = items.some((i) => (Number(i.receiveQty) || 0) < (Number(i.transferQty) || 0));
+    const targetStatus = hasPartial ? 'PartialReceived' : 'Received';
 
     setLoading(true);
     try {
       const dto = {
         transferDocumentId: documentData.id,
-        receivedDate: new Date().toISOString(),
-        createdByAccountId: user?.accountId || user?.id || 1,
+        status: targetStatus,
+        note: receivingNote.trim(),
         details: items.map((i) => ({
-          toBInventoryId: i.bInventoryId,
-          receivedQuantity: Number(i.receiveQty) || 0,
-          note: i.note
+          detailId: i.id,
+          receivedQuantity: Number(i.receiveQty) || 0
         }))
       };
       await receiveTransferDocument(dto);
-      message.success('Xác nhận nhận hàng chuyển kho thành công!');
-      onSuccess?.();
-      onClose();
+      setSuccessMessage('Xác nhận nhận hàng chuyển kho thành công!');
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 500);
     } catch (err) {
       console.error(err);
-      const errMsg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi xử lý nhận hàng.';
-      message.error(errMsg);
+      const errMsg = extractErrorMessage(err, 'Lỗi khi xử lý nhận hàng.');
+      setErrorMessage(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleReject = async () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+
     if (!documentData?.id) return;
+    if (!receivingNote || !receivingNote.trim()) {
+      setErrorMessage('Bắt buộc phải nhập Lý do / Ghi chú (Note) khi từ chối nhận hàng.');
+      return;
+    }
+
     if (!window.confirm('Bạn có chắc chắn muốn từ chối phiếu chuyển kho này? Hàng hóa sẽ được hoàn lại kho bên gửi.')) {
       return;
     }
@@ -123,16 +138,17 @@ const ReceiveTransferDocumentModal = ({
     try {
       await rejectTransferDocument({
         transferDocumentId: documentData.id,
-        createdByAccountId: user?.accountId || user?.id || 1,
-        reason: receivingNote || 'Từ chối nhận hàng'
+        reason: receivingNote.trim()
       });
-      message.success('Đã từ chối nhận hàng. Hàng hóa đã hoàn quay trở lại kho gửi.');
-      onSuccess?.();
-      onClose();
+      setSuccessMessage('Đã từ chối nhận hàng. Hàng hóa đã hoàn quay trở lại kho gửi.');
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 500);
     } catch (err) {
       console.error(err);
-      const errMsg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi từ chối nhận hàng.';
-      message.error(errMsg);
+      const errMsg = extractErrorMessage(err, 'Lỗi khi từ chối nhận hàng.');
+      setErrorMessage(errMsg);
     } finally {
       setLoading(false);
     }
@@ -242,6 +258,18 @@ const ReceiveTransferDocumentModal = ({
           </button>
         </div>
       </div>
+
+      {/* ERROR / SUCCESS NOTIFICATION BANNERS */}
+      {errorMessage && (
+        <div style={{ background: '#fef2f2', color: '#dc2626', borderBottom: '1px solid #fecdd3', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertOutlined /> {errorMessage}
+        </div>
+      )}
+      {successMessage && (
+        <div style={{ background: '#ecfdf5', color: '#059669', borderBottom: '1px solid #a7f3d0', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <CheckCircleOutlined /> {successMessage}
+        </div>
+      )}
 
       {/* BODY CONTENT */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
