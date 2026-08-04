@@ -9,7 +9,6 @@ import {
   RightOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { message } from 'antd';
 
 import { createReturnDocument, getImportReturnDetails } from '../../../../api/documentApi';
 import KiotDateTimePicker from './KiotDateTimePicker';
@@ -32,16 +31,16 @@ const ReturnDocumentModal = ({
   const [openTimeISO, setOpenTimeISO] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const [supplierInfo, setSupplierInfo] = useState({ partnerName: 'Nhà cung cấp mặc định', partnerId: undefined });
+  const [supplierInfo, setSupplierInfo] = useState({ partnerName: '', partnerId: undefined });
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const [formData, setFormData] = useState({
-    supplierId: undefined,
-    docCode: '',
-    discount: 0,
     paidAmount: 0,
     note: ''
   });
 
+  // items = dòng sản phẩm dựa vào snapshot phiếu nhập
   const [items, setItems] = useState([]);
 
   useEffect(() => {
@@ -51,62 +50,48 @@ const ReturnDocumentModal = ({
       setOpenTimeFormatted(now.format('DD/MM/YYYY HH:mm:ss'));
       setOpenTimeISO(now.toISOString());
       setShowDatePicker(false);
+      setErrorMsg('');
+      setSuccessMsg('');
 
       if (importDocument) {
-        const supplierPartner =
-          (importDocument.partners || []).find(
-            (p) => p.partnerType === 1 || p.partnerType === 'Supplier'
-          ) || importDocument.partners?.[0];
-        const suppId = supplierPartner?.partnerId || supplierPartner?.id;
-
-        setSupplierInfo({
-          partnerName: supplierPartner?.partnerName || 'Nhà cung cấp mặc định',
-          partnerId: suppId ? Number(suppId) : undefined
-        });
-
         setFormData({
-          supplierId: suppId ? Number(suppId) : undefined,
-          docCode: '',
-          discount: 0,
           paidAmount: 0,
           note: `Trả hàng nhập theo phiếu ${importDocument.code}`
         });
 
         const loadReturnDetails = async () => {
           try {
+            // Gọi API lấy snapshot + số lượng đã trả tích lũy
             const apiRes = await getImportReturnDetails(importDocument.id);
             if (apiRes && apiRes.details && apiRes.details.length > 0) {
-              const supplierPartner =
-                (apiRes.partners || []).find(
-                  (p) => p.partnerType === 1 || p.partnerType === 'Supplier'
-                ) || apiRes.partners?.[0];
+              // Lấy thông tin NCC từ response (snapshot phiếu nhập)
+              setSupplierInfo({
+                partnerName: apiRes.partnerName || 'Nhà cung cấp',
+                partnerId: apiRes.partnerId ? Number(apiRes.partnerId) : undefined
+              });
 
-              if (supplierPartner?.partnerName) {
-                setSupplierInfo({
-                  partnerName: supplierPartner.partnerName,
-                  partnerId: supplierPartner.partnerId ? Number(supplierPartner.partnerId) : suppId ? Number(suppId) : undefined
-                });
-              }
-
-              const mappedItems = apiRes.details.map((it, idx) => {
-                const maxQty = Number(it.maxReturnQuantity ?? it.quantity ?? 0);
-                const importQty = Number(it.quantity ?? 0);
-                const alreadyReturned = Number(it.alreadyReturnedQuantity ?? 0);
-                const price = Math.round(Number(it.unitPrice ?? 0));
+              const mappedItems = apiRes.details.map((it) => {
+                const importQtyDisplay = Number(it.quantity ?? 0);
+                const alreadyReturnedBase = Number(it.alreadyReturnedBaseQuantity ?? 0);
+                const maxReturnInUnit = Number(it.maxReturnQuantity ?? 0);
+                const importPrice = Math.round(Number(it.unitPrice ?? 0));
 
                 return {
-                  id: it.id || idx,
+                  // ID dòng chi tiết phiếu Nhập → dùng làm fatherId khi submit
+                  fatherId: it.id,
                   bInventoryId: it.bInventoryId,
                   unitConversionId: it.unitConversionId,
                   code: it.productCode || `SP${it.bInventoryId}`,
                   name: it.productName || 'Sản phẩm',
                   unitName: it.unitName || 'Cái',
-                  importQuantity: importQty,
-                  alreadyReturnedQuantity: alreadyReturned,
-                  maxQuantity: maxQty,
-                  quantity: maxQty > 0 ? maxQty : 0,
-                  importPrice: price,
-                  returnPrice: price
+                  // Hiển thị
+                  importQuantity: importQtyDisplay,
+                  alreadyReturnedBase: alreadyReturnedBase,
+                  maxQuantity: maxReturnInUnit,
+                  // Nhập liệu
+                  quantity: maxReturnInUnit > 0 ? maxReturnInUnit : 0,
+                  importPrice: importPrice,
+                  returnPrice: importPrice  // Mặc định = giá nhập, user có thể điều chỉnh
                 };
               });
               setItems(mappedItems);
@@ -116,37 +101,43 @@ const ReturnDocumentModal = ({
             console.warn('Lỗi lấy return details từ API:', err);
           }
 
-          const initialItems = (importDocument.details || []).map((d, index) => {
+          // Fallback: dùng dữ liệu local từ importDocument
+          const supplierPartner =
+            (importDocument.partners || []).find(
+              (p) => p.partnerType === 1 || p.partnerType === 'Supplier'
+            ) || importDocument.partners?.[0];
+          const suppId = supplierPartner?.partnerId || supplierPartner?.id;
+
+          setSupplierInfo({
+            partnerName: supplierPartner?.partnerName || 'Nhà cung cấp',
+            partnerId: suppId ? Number(suppId) : undefined
+          });
+
+          const fallbackItems = (importDocument.details || []).map((d) => {
             const qty = Number(d.quantity || 1);
             const price = Math.round(Number(d.unitPrice || 0));
             return {
-              id: d.id || index,
+              fatherId: d.id,
               bInventoryId: d.bInventoryId,
               unitConversionId: d.unitConversionId,
               code: d.productCode || d.code || `SP${d.bInventoryId}`,
               name: d.productName || d.name || 'Sản phẩm',
               unitName: d.unitName || 'Cái',
               importQuantity: qty,
-              alreadyReturnedQuantity: 0,
+              alreadyReturnedBase: 0,
               maxQuantity: qty,
               quantity: qty,
               importPrice: price,
               returnPrice: price
             };
           });
-          setItems(initialItems);
+          setItems(fallbackItems);
         };
 
         loadReturnDetails();
       } else {
-        setSupplierInfo({ partnerName: 'Nhà cung cấp mặc định', partnerId: undefined });
-        setFormData({
-          supplierId: undefined,
-          docCode: '',
-          discount: 0,
-          paidAmount: 0,
-          note: ''
-        });
+        setSupplierInfo({ partnerName: '', partnerId: undefined });
+        setFormData({ paidAmount: 0, note: '' });
         setItems([]);
       }
     }
@@ -161,7 +152,8 @@ const ReturnDocumentModal = ({
 
   const handleItemQuantityChange = (idx, val) => {
     const item = items[idx];
-    const newQty = Math.max(1, Math.min(item.maxQuantity || 999999, Number(val) || 1));
+    const maxQ = item.maxQuantity > 0 ? item.maxQuantity : 0;
+    const newQty = Math.max(0, Math.min(maxQ, Number(val) || 0));
     const updated = [...items];
     updated[idx] = { ...updated[idx], quantity: newQty };
     setItems(updated);
@@ -184,64 +176,91 @@ const ReturnDocumentModal = ({
     return items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.returnPrice) || 0), 0);
   }, [items]);
 
-  const netAmount = Math.max(0, Math.round(totalGoodsAmount - (Number(formData.discount) || 0)));
+  const remainder = totalGoodsAmount - Math.floor(totalGoodsAmount);
+  const netAmount = remainder < 0.5 ? Math.floor(totalGoodsAmount) : Math.floor(totalGoodsAmount) + 1;
+  const roundingValue = totalGoodsAmount - netAmount;
   const paidAmount = Number(formData.paidAmount) || 0;
   const debtAmount = Math.max(0, netAmount - paidAmount);
+  const paidAmountExceedsTotal = paidAmount > netAmount && netAmount > 0;
 
-  const handleSubmit = async (isDraft = false) => {
+  const handleSubmit = async () => {
     if (!importDocument || !importDocument.id) {
-      message.error('Không tìm thấy thông tin phiếu nhập kho gốc.');
+      setErrorMsg('Không tìm thấy thông tin phiếu nhập kho gốc.');
       return;
     }
 
     const activeItems = items.filter((item) => Number(item.quantity) > 0);
     if (activeItems.length === 0) {
-      message.error('Vui lòng chọn số lượng trả lớn hơn 0 cho ít nhất 1 sản phẩm.');
+      setErrorMsg('Vui lòng chọn số lượng trả lớn hơn 0 cho ít nhất 1 sản phẩm.');
       return;
     }
 
     for (let i = 0; i < activeItems.length; i++) {
       const item = activeItems[i];
       if (item.quantity > item.maxQuantity) {
-        message.error(`Số lượng trả ${item.name} không được vượt quá số lượng nhập còn được phép trả (${item.maxQuantity}).`);
+        setErrorMsg(`Số lượng trả "${item.name}" không được vượt quá số lượng tối đa còn trả được (${item.maxQuantity} ${item.unitName}).`);
         return;
       }
-      if (Number(item.returnPrice) < 1) {
-        message.error(`Đơn giá hoàn tiền của ${item.name} phải là số nguyên lớn hơn hoặc bằng 1.`);
+      if (Number(item.returnPrice) < 0) {
+        setErrorMsg(`Đơn giá hoàn tiền của "${item.name}" không được âm.`);
         return;
       }
     }
 
+    // Validate: tiền NCC đã trả không được vượt quá tổng tiền cần thu
+    if (paidAmount > netAmount) {
+      setErrorMsg(`Số tiền NCC đã trả (${paidAmount.toLocaleString('vi-VN')} ₫) không được vượt quá tổng tiền cần thu (${netAmount.toLocaleString('vi-VN')} ₫). Vui lòng kiểm tra lại.`);
+      return;
+    }
+
     setLoading(true);
+    setErrorMsg('');
     try {
-      const currentAccountId = user?.accountId || user?.id || 1;
+      // DTO đúng mapping với ReturnDocumentCreateDto của backend
       const dto = {
-        importDocumentId: Number(importDocument.id),
-        businessDate: openTimeISO || new Date().toISOString(),
-        createdByAccountId: Number(currentAccountId),
-        paidAmount: Math.round(Number(formData.paidAmount || 0)),
-        paymentMethod: 1, // Cash
+        branchId: Number(branchId),
+        // PartnerId & BranchId sẽ được service override từ phiếu Nhập gốc,
+        // nhưng vẫn truyền để controller không báo lỗi validation
+        partnerId: supplierInfo.partnerId || null,
+        parentDocumentId: Number(importDocument.id),  // Liên kết phiếu Nhập gốc
+        orderDate: openTimeISO || new Date().toISOString(),
         note: formData.note || `Trả hàng nhập theo phiếu ${importDocument.code}`,
+        amountPaid: Math.round(Number(formData.paidAmount || 0)),
+        paymentMethod: 'Cash',
         details: activeItems.map((i) => ({
-          importDocumentDetailId: Number(i.id || i.documentDetailId),
+          bInventoryId: Number(i.bInventoryId),
+          unitConversionId: i.unitConversionId || null,
+          fatherId: Number(i.fatherId),    // Quan trọng: trỏ về dòng chi tiết phiếu Nhập gốc
           quantity: Number(i.quantity),
           unitPrice: Math.round(Number(i.returnPrice || 0)),
-          note: i.note || ''
+          note: ''
         }))
       };
 
       await createReturnDocument(dto);
-      message.success(`${isDraft ? 'Lưu tạm' : 'Hoàn thành'} phiếu trả hàng nhập thành công!`);
+      setSuccessMsg('Tạo phiếu trả hàng thành công!');
       onSuccess?.();
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 800);
     } catch (err) {
       console.error('Lỗi khi tạo phiếu trả hàng nhập:', err);
-      const errMsg =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        err.message ||
-        'Đã xảy ra lỗi khi tạo phiếu trả hàng nhập.';
-      message.error(errMsg);
+      let errMsg = err.response?.data?.message;
+      if (!errMsg && err.response?.data?.errors) {
+        const errs = err.response.data.errors;
+        if (typeof errs === 'string') errMsg = errs;
+        else if (Array.isArray(errs)) errMsg = errs.join('; ');
+        else if (typeof errs === 'object') {
+          const msgs = [];
+          Object.values(errs).forEach((val) => {
+            if (Array.isArray(val)) msgs.push(...val);
+            else if (typeof val === 'string') msgs.push(val);
+          });
+          if (msgs.length > 0) errMsg = msgs.join('; ');
+        }
+      }
+      if (!errMsg) errMsg = err.response?.data?.title || err.message || 'Đã xảy ra lỗi khi tạo phiếu trả hàng nhập.';
+      setErrorMsg(errMsg);
     } finally {
       setLoading(false);
     }
@@ -265,7 +284,7 @@ const ReturnDocumentModal = ({
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       }}
     >
-      {/* HEADER BAR (FULL SCREEN MATCHING IMPORT MODAL BRAND ORANGE) */}
+      {/* HEADER BAR */}
       <div
         style={{
           height: 48,
@@ -273,7 +292,7 @@ const ReturnDocumentModal = ({
           color: '#ffffff',
           display: 'flex',
           alignItems: 'center',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           padding: '0 16px',
           boxShadow: '0 2px 8px rgba(232, 68, 42, 0.25)',
           flexShrink: 0
@@ -281,28 +300,11 @@ const ReturnDocumentModal = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
-            Trả hàng nhập {importDocument ? `(Phiếu nhập ${importDocument.code})` : ''}
+            Trả hàng nhập {importDocument ? `(Phiếu nhập: ${importDocument.code})` : ''}
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
-          <button
-            type="button"
-            title="Toàn màn hình"
-            style={{
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: 'none',
-              borderRadius: 6,
-              padding: '5px 8px',
-              color: '#ffffff',
-              cursor: 'pointer',
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <FullscreenOutlined />
-          </button>
           <button
             type="button"
             title="In phiếu"
@@ -343,7 +345,7 @@ const ReturnDocumentModal = ({
 
       {/* BODY (LEFT TABLE + RIGHT SIDEBAR) */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT SECTION (SELECTED PRODUCTS TABLE) */}
+        {/* LEFT SECTION */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* INFO BAR */}
           <div
@@ -355,19 +357,49 @@ const ReturnDocumentModal = ({
               padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               fontSize: 11
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontWeight: 600 }}>
               <InfoCircleOutlined style={{ color: '#3b82f6', fontSize: 13 }} />
-              <span>Danh sách sản phẩm hoàn trả từ phiếu nhập: </span>
+              <span>Sản phẩm hoàn trả từ phiếu nhập: </span>
               <strong style={{ color: '#e8442a' }}>{importDocument?.code || '---'}</strong>
             </div>
             <span style={{ color: '#64748b', fontSize: 10 }}>
-              (Điều chỉnh số lượng trả và giá trả hàng nếu cần)
+              (Điều chỉnh số lượng trả ≤ tối đa trả. Có thể đặt giá trả riêng.)
             </span>
           </div>
+
+          {/* ERROR / SUCCESS MESSAGE */}
+          {errorMsg && (
+            <div style={{
+              marginBottom: 8,
+              background: '#fef2f2',
+              border: '1px solid #fca5a5',
+              borderRadius: 6,
+              padding: '8px 12px',
+              color: '#dc2626',
+              fontSize: 11,
+              fontWeight: 600
+            }}>
+              ⚠ {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div style={{
+              marginBottom: 8,
+              background: '#f0fdf4',
+              border: '1px solid #86efac',
+              borderRadius: 6,
+              padding: '8px 12px',
+              color: '#16a34a',
+              fontSize: 11,
+              fontWeight: 600
+            }}>
+              ✓ {successMsg}
+            </div>
+          )}
 
           {/* PRODUCT RETURN TABLE */}
           <div
@@ -387,13 +419,12 @@ const ReturnDocumentModal = ({
                   <th style={{ width: 40, padding: '8px 6px', textAlign: 'center' }}>STT</th>
                   <th style={{ width: 100, padding: '8px 8px', textAlign: 'left' }}>MÃ HÀNG</th>
                   <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ width: 70, padding: '8px 8px', textAlign: 'center' }}>ĐVT</th>
+                  <th style={{ width: 60, padding: '8px 8px', textAlign: 'center' }}>ĐVT</th>
                   <th style={{ width: 80, padding: '8px 8px', textAlign: 'center' }}>SL NHẬP</th>
-                  <th style={{ width: 80, padding: '8px 8px', textAlign: 'center' }}>ĐÃ TRẢ</th>
-                  <th style={{ width: 90, padding: '8px 8px', textAlign: 'center' }}>TỐI ĐA TRẢ</th>
+                  <th style={{ width: 80, padding: '8px 8px', textAlign: 'center' }}>TỐI ĐA TRẢ</th>
                   <th style={{ width: 100, padding: '8px 8px', textAlign: 'center' }}>SL TRẢ</th>
-                  <th style={{ width: 100, padding: '8px 8px', textAlign: 'right' }}>GIÁ NHẬP</th>
-                  <th style={{ width: 110, padding: '8px 8px', textAlign: 'right' }}>GIÁ TRẢ HÀNG</th>
+                  <th style={{ width: 110, padding: '8px 8px', textAlign: 'right' }}>GIÁ NHẬP</th>
+                  <th style={{ width: 120, padding: '8px 8px', textAlign: 'right' }}>GIÁ TRẢ HÀNG</th>
                   <th style={{ width: 110, padding: '8px 8px', textAlign: 'right' }}>THÀNH TIỀN</th>
                   <th style={{ width: 36, padding: '8px 6px', textAlign: 'center' }}></th>
                 </tr>
@@ -401,8 +432,8 @@ const ReturnDocumentModal = ({
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-                      Không có sản phẩm nào trong danh sách trả hàng.
+                    <td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                      Đang tải danh sách sản phẩm...
                     </td>
                   </tr>
                 ) : (
@@ -411,7 +442,7 @@ const ReturnDocumentModal = ({
                     const isFullyReturned = (item.maxQuantity || 0) <= 0;
 
                     return (
-                      <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', opacity: isFullyReturned ? 0.6 : 1 }}>
+                      <tr key={item.fatherId || idx} style={{ borderBottom: '1px solid #f1f5f9', opacity: isFullyReturned ? 0.55 : 1 }}>
                         <td style={{ textAlign: 'center', color: '#64748b', padding: '6px' }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600, color: '#334155', padding: '6px 8px' }}>{item.code}</td>
                         <td style={{ fontWeight: 600, color: '#0f172a', padding: '6px 8px' }}>{item.name}</td>
@@ -421,10 +452,7 @@ const ReturnDocumentModal = ({
                           </span>
                         </td>
                         <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569', padding: '6px 8px' }}>
-                          {(item.importQuantity ?? item.maxQuantity ?? 0).toLocaleString('vi-VN')}
-                        </td>
-                        <td style={{ textAlign: 'center', fontWeight: 600, color: '#ea580c', padding: '6px 8px' }}>
-                          {(item.alreadyReturnedQuantity ?? 0).toLocaleString('vi-VN')}
+                          {(item.importQuantity ?? 0).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ textAlign: 'center', fontWeight: 700, color: isFullyReturned ? '#dc2626' : '#16a34a', padding: '6px 8px' }}>
                           {(item.maxQuantity ?? 0).toLocaleString('vi-VN')}
@@ -437,7 +465,7 @@ const ReturnDocumentModal = ({
                           ) : (
                             <input
                               type="number"
-                              min={1}
+                              min={0}
                               max={item.maxQuantity}
                               value={item.quantity}
                               onChange={(e) => handleItemQuantityChange(idx, e.target.value)}
@@ -446,10 +474,11 @@ const ReturnDocumentModal = ({
                                 textAlign: 'center',
                                 borderRadius: 4,
                                 padding: '3px 6px',
-                                border: '1px solid #cbd5e1',
+                                border: item.quantity > item.maxQuantity ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                                 fontSize: 11,
                                 fontWeight: 700,
-                                color: '#0f172a'
+                                color: '#0f172a',
+                                outline: 'none'
                               }}
                             />
                           )}
@@ -463,15 +492,18 @@ const ReturnDocumentModal = ({
                             min={0}
                             value={item.returnPrice}
                             onChange={(e) => handleItemReturnPriceChange(idx, e.target.value)}
+                            disabled={isFullyReturned}
                             style={{
-                              width: 95,
+                              width: 100,
                               textAlign: 'right',
                               borderRadius: 4,
                               padding: '3px 6px',
                               border: '1px solid #cbd5e1',
                               fontSize: 11,
                               fontWeight: 700,
-                              color: '#0f172a'
+                              color: '#0f172a',
+                              outline: 'none',
+                              background: isFullyReturned ? '#f8fafc' : '#ffffff'
                             }}
                           />
                         </td>
@@ -505,7 +537,7 @@ const ReturnDocumentModal = ({
             padding: 16,
             display: 'flex',
             flexDirection: 'column',
-            justify: 'space-between',
+            justifyContent: 'space-between',
             overflowY: 'auto'
           }}
         >
@@ -527,16 +559,16 @@ const ReturnDocumentModal = ({
                   }}
                 >
                   <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                    {creatorName} {openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm:ss')}
+                    {creatorName} · {openTimeFormatted || dayjs().format('DD/MM/YYYY HH:mm:ss')}
                   </span>
                   <RightOutlined style={{ fontSize: 10, color: '#64748b' }} />
                 </div>
 
                 <span style={{ background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', borderRadius: 12, padding: '1px 8px', fontSize: 10, fontWeight: 600 }}>
-                  Phiếu trả
+                  Phiếu trả NCC
                 </span>
 
-                {/* KIOTVIET DATE-TIME PICKER POPOVER */}
+                {/* DATE-TIME PICKER POPOVER */}
                 {showDatePicker && (
                   <KiotDateTimePicker
                     value={selectedDateTime}
@@ -546,7 +578,7 @@ const ReturnDocumentModal = ({
                 )}
               </div>
 
-              {/* DEFAULT SUPPLIER DISPLAY */}
+              {/* SUPPLIER DISPLAY */}
               <div
                 style={{
                   background: '#f8fafc',
@@ -560,67 +592,83 @@ const ReturnDocumentModal = ({
               >
                 <UserOutlined style={{ color: '#e8442a', fontSize: 16 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 10, color: '#64748b' }}>Nhà cung cấp</span>
+                  <span style={{ fontSize: 10, color: '#64748b' }}>Nhà cung cấp (từ phiếu nhập gốc)</span>
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {supplierInfo.partnerName}
+                    {supplierInfo.partnerName || 'Đang tải...'}
                   </span>
                 </div>
               </div>
 
-              {/* TOTALS & PAYMENT CALCULATIONS */}
+              {/* TOTALS & PAYMENT */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Tổng tiền hàng ({items.length})</span>
+                  <span style={{ color: '#475569' }}>Tổng tiền hàng gốc ({items.filter(i => i.quantity > 0).length} sp)</span>
                   <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {totalGoodsAmount.toLocaleString('vi-VN')}
+                    {totalGoodsAmount.toLocaleString('vi-VN')} ₫
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569' }}>Giảm giá</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.discount}
-                    onChange={(e) => setFormData({ ...formData, discount: Math.max(0, Number(e.target.value) || 0) })}
-                    style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11 }}
-                  />
-                </div>
+                {roundingValue !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#d97706', fontSize: 11.5 }}>
+                    <span>ĐC Làm tròn (Rounding)</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {roundingValue > 0 ? `-${roundingValue.toLocaleString('vi-VN')}` : `+${Math.abs(roundingValue).toLocaleString('vi-VN')}`} ₫
+                    </span>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontWeight: 600 }}>Cần thu NCC</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {netAmount.toLocaleString('vi-VN')}
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Cần thu NCC (Đã làm tròn)</span>
+                  <span style={{ fontWeight: 700, color: '#059669', fontSize: 13 }}>
+                    {netAmount.toLocaleString('vi-VN')} ₫
                   </span>
                 </div>
 
                 {/* SỐ TIỀN NHÀ CUNG CẤP ĐÃ TRẢ */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontWeight: 600 }}>Số tiền nhà cung cấp đã trả</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.paidAmount}
-                    onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
-                    style={{ width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px', border: '1px solid #cbd5e1', fontSize: 11, fontWeight: 700, color: '#16a34a' }}
-                  />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: '#475569', fontWeight: 600, flexShrink: 0 }}>NCC đã trả tiền</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={netAmount}
+                      value={formData.paidAmount}
+                      onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
+                      style={{
+                        width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px',
+                        border: paidAmountExceedsTotal ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        fontSize: 11, fontWeight: 700,
+                        color: paidAmountExceedsTotal ? '#ef4444' : '#16a34a',
+                        outline: 'none',
+                        background: paidAmountExceedsTotal ? '#fef2f2' : '#ffffff'
+                      }}
+                    />
+                  </div>
+                  {paidAmountExceedsTotal && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <span style={{ color: '#ef4444', fontSize: 10, fontWeight: 600 }}>
+                        ⚠ Vượt quá tổng cần thu ({netAmount.toLocaleString('vi-VN')} ₫)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#475569', fontWeight: 600 }}>Tính vào công nợ</span>
-                  <span style={{ fontWeight: 700, color: debtAmount > 0 ? '#ef4444' : '#0f172a', fontSize: 13 }}>
+                  <span style={{ fontWeight: 700, color: debtAmount > 0 ? '#ef4444' : '#16a34a', fontSize: 13 }}>
                     {debtAmount.toLocaleString('vi-VN')}
                   </span>
                 </div>
               </div>
 
+              {/* NOTE INPUT */}
               <div>
                 <input
                   type="text"
                   maxLength={250}
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  placeholder="Ghi chú phiếu trả hàng (tối đa 250 ký tự)"
+                  placeholder="Ghi chú phiếu trả hàng..."
                   style={{
                     width: '100%',
                     borderRadius: 6,
@@ -628,50 +676,50 @@ const ReturnDocumentModal = ({
                     border: '1px solid #cbd5e1',
                     outline: 'none',
                     fontSize: 11,
-                    height: 32,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                    height: 32
                   }}
                 />
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
+            {/* ACTION BUTTONS — chỉ "Hoàn thành" (không có Lưu tạm) */}
             <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleSubmit(true)}
+                onClick={onClose}
                 style={{
                   flex: 1,
                   background: '#ffffff',
-                  border: '1px solid #e8442a',
-                  color: '#e8442a',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
                   fontWeight: 600,
                   borderRadius: 6,
                   padding: '8px 0',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: 12
                 }}
               >
-                Lưu tạm
+                Đóng
               </button>
               <button
                 type="button"
-                disabled={loading}
-                onClick={() => handleSubmit(false)}
+                disabled={loading || items.filter(i => i.quantity > 0).length === 0}
+                onClick={handleSubmit}
                 style={{
-                  flex: 1,
-                  background: '#e8442a',
+                  flex: 2,
+                  background: loading ? '#cbd5e1' : 'linear-gradient(135deg, #e8442a, #d9381e)',
                   border: 'none',
                   color: '#ffffff',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   borderRadius: 6,
                   padding: '8px 0',
-                  cursor: 'pointer'
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: 12,
+                  boxShadow: loading ? 'none' : '0 2px 6px rgba(232,68,42,0.3)'
                 }}
               >
-                Hoàn thành
+                {loading ? 'Đang lưu...' : 'Hoàn thành phiếu trả'}
               </button>
             </div>
           </div>

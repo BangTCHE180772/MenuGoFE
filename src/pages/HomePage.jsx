@@ -1,144 +1,140 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { Divider } from "antd";
-import { useAuth } from "../context/AuthContext";
-import { useBranch } from "../context/BranchContext";
-import ExecutiveSummary from "../components/dashboard/ExecutiveSummary";
-import OverviewSection from "../components/dashboard/OverviewSection";
-import { getBranchDashboardStats } from "../api/dashboardApi";
-import "../styles/HomePage.css";
+import { useState } from "react";
+import { Typography, Segmented, message, Space, Tag } from "antd";
+import {
+  DashboardOutlined,
+  TableOutlined,
+  CalendarOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
+import HomeFilter from "../components/homePage/HomeFilter";
+import HomeDashboard from "../components/homePage/HomeDashboard";
+import HomeReport from "../components/homePage/HomeReport";
+import {
+  MOCK_DAILY_REPORT,
+  generateFilteredReportData,
+} from "../components/homePage/homeMockData";
 
+const { Title, Text } = Typography;
+
+/**
+ * HomePage — Trang Báo Cáo Trong Ngày (Daily Report)
+ * Layout chuẩn mới: Top Header Card ➔ Horizontal HomeFilter Bar ➔ Tabs Content (Dashboard & Report)
+ */
 const HomePage = () => {
-  const { user } = useAuth();
-  const { currentBranchId } = useBranch();
-
-  const [todayStats, setTodayStats] = useState(null);
-  const [yesterdayStats, setYesterdayStats] = useState(null);
-  const [todayLoading, setTodayLoading] = useState(true);
-
-  const [overviewStats, setOverviewStats] = useState(null);
-  const [overviewLoading, setOverviewLoading] = useState(true);
-  const [overviewRange, setOverviewRange] = useState("thisMonth");
-  const [overviewCustomDates, setOverviewCustomDates] = useState(null);
-
-  const fetchTodayData = useCallback(async () => {
-    setTodayLoading(true);
-    try {
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yyyymmdd = (d) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-      const [resToday, resYesterday] = await Promise.all([
-        getBranchDashboardStats("today", null, null, currentBranchId),
-        getBranchDashboardStats(
-          "custom",
-          yyyymmdd(yesterday),
-          yyyymmdd(yesterday),
-          currentBranchId,
-        ),
-      ]);
-
-      setTodayStats(resToday.data);
-      setYesterdayStats(resYesterday.data);
-    } catch (err) {
-      console.error("Lỗi khi lấy dữ liệu today:", err);
-      setTodayStats(null);
-      setYesterdayStats(null);
-    } finally {
-      setTodayLoading(false);
-    }
-  }, [currentBranchId]);
-
-  const fetchOverviewData = useCallback(
-    async (range, customDates) => {
-      setOverviewLoading(true);
-      try {
-        let startDateStr = null;
-        let endDateStr = null;
-
-        if (range === "custom" && customDates?.[0] && customDates?.[1]) {
-          const fmt = (d) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          startDateStr = fmt(
-            customDates[0].toDate
-              ? customDates[0].toDate()
-              : new Date(customDates[0]),
-          );
-          endDateStr = fmt(
-            customDates[1].toDate
-              ? customDates[1].toDate()
-              : new Date(customDates[1]),
-          );
-        }
-
-        const res = await getBranchDashboardStats(
-          range,
-          startDateStr,
-          endDateStr,
-          currentBranchId,
-        );
-        setOverviewStats(res.data);
-      } catch (err) {
-        console.error("Lỗi khi lấy dữ liệu overview:", err);
-        setOverviewStats(null);
-      } finally {
-        setOverviewLoading(false);
-      }
-    },
-    [currentBranchId],
+  // ─── Filter State ──────────────────────────────────────────────────────────
+  const [selectedDate, setSelectedDate] = useState(
+    dayjs().format("DD/MM/YYYY"),
   );
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTodayData();
-  }, [fetchTodayData]);
+  // ─── Display Mode State ("dashboard" | "report") ───────────────────────────
+  const [displayMode, setDisplayMode] = useState("dashboard");
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchOverviewData(overviewRange, overviewCustomDates);
-  }, [fetchOverviewData, overviewRange, overviewCustomDates]);
+  // ─── Report Data State ─────────────────────────────────────────────────────
+  const [reportData, setReportData] = useState(MOCK_DAILY_REPORT);
 
-  const handleOverviewRangeChange = useCallback((range) => {
-    setOverviewRange(range);
-  }, []);
+  // ─── Instant Auto-Apply Handlers ───────────────────────────────────────────
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    const updatedData = generateFilteredReportData(newDate, selectedEmployee);
+    setReportData(updatedData);
+    message.success(`Đã cập nhật dữ liệu báo cáo ngày ${newDate}`);
+  };
 
-  const handleOverviewCustomDatesChange = useCallback((dates) => {
-    setOverviewCustomDates(dates);
-    if (dates) setOverviewRange("custom");
-  }, []);
+  const handleEmployeeChange = (newEmp) => {
+    setSelectedEmployee(newEmp);
+    const updatedData = generateFilteredReportData(selectedDate, newEmp);
+    setReportData(updatedData);
+    message.success("Đã cập nhật dữ liệu theo nhân viên");
+  };
+
+  const handleResetFilter = () => {
+    const todayStr = dayjs().format("DD/MM/YYYY");
+    setSelectedDate(todayStr);
+    setSelectedEmployee("all");
+    const defaultData = generateFilteredReportData(todayStr, "all");
+    setReportData(defaultData);
+    message.info("Đã đặt lại bộ lọc báo cáo về mặc định");
+  };
 
   return (
-    <div className="dashboard-page">
-      <div className="dashboard-welcome-container">
+    <div style={{ width: "100%", paddingBottom: 24 }}>
+      {/* ─── 1. TOP HEADER CARD ───────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 16,
+          marginBottom: 16,
+          background: "var(--color-surface)",
+          padding: "16px 20px",
+          borderRadius: "var(--border-radius)",
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
         <div>
-          <h1 className="dashboard-welcome-title">
-            Xin chào, {user?.name ?? "bạn"} 👋
-          </h1>
-          <p className="dashboard-welcome-subtitle">
-            Dashboard chi nhánh — cập nhật dữ liệu hoạt động hôm nay
-          </p>
+          <Space align="center" size="small">
+            <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+              Báo cáo trong ngày
+            </Title>
+            <Tag
+              color="orange"
+              icon={<CalendarOutlined />}
+              style={{ borderRadius: 6, fontSize: 13, padding: "2px 8px" }}
+            >
+              {reportData.dateStr}
+            </Tag>
+          </Space>
+          <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+            Tổng hợp chỉ số và nhật ký hoạt động kinh doanh hàng ngày
+          </Text>
         </div>
+
+        {/* Segmented Display Mode: Dashboard vs Report */}
+        <Segmented
+          value={displayMode}
+          onChange={setDisplayMode}
+          size="large"
+          options={[
+            {
+              label: (
+                <div style={{ padding: "4px 8px" }}>
+                  <DashboardOutlined style={{ marginRight: 6 }} />
+                  <span>Dashboard</span>
+                </div>
+              ),
+              value: "dashboard",
+            },
+            {
+              label: (
+                <div style={{ padding: "4px 8px" }}>
+                  <TableOutlined style={{ marginRight: 6 }} />
+                  <span>Report</span>
+                </div>
+              ),
+              value: "report",
+            },
+          ]}
+        />
       </div>
 
-      <ExecutiveSummary
-        loading={todayLoading}
-        todayStats={todayStats}
-        yesterdayStats={yesterdayStats}
-        onRefresh={fetchTodayData}
+      {/* ─── 2. BỘ LỌC BÁO CÁO NGANG (NGAY DƯỚI HEADER & NGAY TRÊN TAB CONTENT) ─── */}
+      <HomeFilter
+        selectedDate={selectedDate}
+        onDateChange={handleDateChange}
+        selectedEmployee={selectedEmployee}
+        onEmployeeChange={handleEmployeeChange}
+        onReset={handleResetFilter}
       />
 
-      <Divider style={{ margin: "0", borderColor: "var(--color-border)" }} />
-
-      <OverviewSection
-        loading={overviewLoading}
-        overviewStats={overviewStats}
-        range={overviewRange}
-        customDates={overviewCustomDates}
-        onRangeChange={handleOverviewRangeChange}
-        onCustomDatesChange={handleOverviewCustomDatesChange}
-        onRefresh={() => fetchOverviewData(overviewRange, overviewCustomDates)}
-      />
+      {/* ─── 3. DYNAMIC VIEW MODE CONTENT (DASHBOARD / REPORT TABS) ──────── */}
+      {displayMode === "dashboard" ? (
+        <HomeDashboard data={reportData} />
+      ) : (
+        <HomeReport data={reportData} />
+      )}
     </div>
   );
 };

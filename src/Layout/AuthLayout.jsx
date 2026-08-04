@@ -2,7 +2,7 @@ import { Outlet } from 'react-router-dom';
 
 /**
  * Layout cho trang đăng nhập / đăng ký
- * Không có TopBar, không có gì cả - chỉ render nội dung trang
+ * Không có Sidebar, không có gì cả - chỉ render nội dung trang
  */
 const AuthLayout = () => {
   return (

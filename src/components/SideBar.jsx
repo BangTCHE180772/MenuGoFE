@@ -1,0 +1,426 @@
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
+import {
+  HomeOutlined,
+  ShoppingCartOutlined,
+  TeamOutlined,
+  CalendarOutlined,
+  ShopOutlined,
+  ApartmentOutlined,
+  TableOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  UserOutlined,
+  CrownOutlined,
+  DesktopOutlined,
+  BookOutlined,
+  FireOutlined,
+  GiftOutlined,
+  RocketOutlined,
+  FileProtectOutlined,
+  ClockCircleOutlined,
+  AppstoreOutlined,
+  InboxOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  BarChartOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  DownOutlined,
+  RightOutlined,
+  WalletOutlined,
+} from "@ant-design/icons";
+import { useAuth, ROLES } from "../context/AuthContext";
+import { useBranch } from "../context/BranchContext";
+
+// ─── Tùy chọn con của Quản Lý Kho ──────────────────────────────────────────
+const INVENTORY_SUB_MENU = [
+  { label: "Nhập hàng", path: "/inventory-management?tab=Import", tabKey: "Import" },
+  { label: "Trả hàng nhập", path: "/inventory-management?tab=ImportReturn", tabKey: "ImportReturn" },
+  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
+  { label: "Xuất hủy", path: "/inventory-management?tab=ExportDelete", tabKey: "ExportDelete" },
+  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
+  { label: "Chuyển hàng", path: "/inventory-management?tab=Transfer", tabKey: "Transfer" },
+  { label: "Kiểm kho", path: "/inventory-management?tab=Check", tabKey: "Check" },
+  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
+  { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
+  { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
+];
+
+const REPORTS_SUB_MENU = [
+  { label: "Báo cáo Doanh thu", path: "/reports/revenue" },
+  { label: "Báo cáo Chi phí", path: "/reports/expense" },
+  { label: "Báo cáo Lợi nhuận", path: "/reports/profit" },
+  { label: "Báo cáo Nguyên liệu", path: "/reports/inventory" },
+];
+
+// ─── Menu items theo từng role ─────────────────────────────────────────────
+const ROLE_MENUS = {
+  [ROLES.ADMIN]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
+    { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
+    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
+    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
+    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
+    { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
+    { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
+    { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
+    { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
+  ],
+  [ROLES.OWNER]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
+    { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
+    { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
+    { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
+    { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+  ],
+  [ROLES.MANAGER]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
+    { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
+    { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
+    { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
+    { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
+    { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
+    { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
+    { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+  ],
+  [ROLES.CASHIER]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+  ],
+  [ROLES.CHEF]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    {
+      label: "Lịch làm việc",
+      path: "/work-schedule",
+      icon: <CalendarOutlined />,
+    },
+    { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+  ],
+  [ROLES.WAITER]: [
+    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
+    { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
+    { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+  ],
+};
+
+// ─── Hiển thị role bằng tiếng Việt ───────────────────────────────────────
+const ROLE_LABELS = {
+  [ROLES.ADMIN]: "Quản trị viên",
+  [ROLES.OWNER]: "Chủ sở hữu",
+  [ROLES.MANAGER]: "Quản lý",
+  [ROLES.CASHIER]: "Thu ngân",
+  [ROLES.CHEF]: "Bếp trưởng",
+  [ROLES.WAITER]: "Phục vụ",
+};
+
+const SideBar = ({ collapsed, onToggleCollapse }) => {
+  const { user, role, logout } = useAuth();
+  const { currentBranchId, selectBranch, branches } = useBranch();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [openSubMenus, setOpenSubMenus] = useState({
+    "Quản lý kho": true,
+    "Báo cáo chuyên sâu": true,
+  });
+
+  const toggleSubMenu = (label) => {
+    setOpenSubMenus((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
+
+  const menuItems = ROLE_MENUS[role] ?? [];
+  const searchParams = new URLSearchParams(location.search);
+  const activeTabParam = searchParams.get("tab") || "Import";
+
+  const handleLogout = async () => {
+    await logout();
+    message.success("Đã đăng xuất");
+    navigate("/login");
+  };
+
+  const userMenuItems = [
+    {
+      key: "user-info",
+      label: (
+        <div style={{ padding: "4px 8px" }}>
+          <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+            {user?.name || user?.fullName || "Người dùng"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+            {user?.email || ""}
+          </div>
+        </div>
+      ),
+      disabled: true,
+    },
+    { type: "divider" },
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Thông tin tài khoản",
+    },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      danger: true,
+      label: "Đăng xuất",
+      onClick: handleLogout,
+    },
+  ];
+
+  return (
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      {/* Sidebar Header: Logo & Toggle Button */}
+      <div className="sidebar-header">
+        <Link to="/home" className="sidebar-logo">
+          <div className="sidebar-logo-icon">
+            <CrownOutlined style={{ fontSize: 22, color: "var(--color-primary)" }} />
+          </div>
+          {!collapsed && <span className="sidebar-logo-text">MenuGo</span>}
+        </Link>
+        <Button
+          type="text"
+          className="sidebar-toggle-btn"
+          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          onClick={onToggleCollapse}
+          title={collapsed ? "Mở rộng Sidebar" : "Thu gọn Sidebar"}
+        />
+      </div>
+
+      {/* Branch Selector */}
+      {branches && branches.length > 0 && (
+        <div className="sidebar-branch-wrapper">
+          {!collapsed ? (
+            <Select
+              className="sidebar-branch-select"
+              value={currentBranchId || undefined}
+              onChange={(value) => selectBranch(value)}
+              placeholder="Chọn chi nhánh"
+              options={branches.map((b) => ({
+                label: (
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>
+                    <ShopOutlined style={{ marginRight: 6, color: "var(--color-primary)" }} />
+                    {b.name}
+                  </span>
+                ),
+                value: b.id,
+              }))}
+            />
+          ) : (
+            <Tooltip title="Đổi chi nhánh" placement="right">
+              <Dropdown
+                trigger={["click"]}
+                menu={{
+                  items: branches.map((b) => ({
+                    key: b.id,
+                    label: b.name,
+                    icon: <ShopOutlined />,
+                    onClick: () => selectBranch(b.id),
+                  })),
+                  selectedKeys: [String(currentBranchId)],
+                }}
+              >
+                <Button
+                  type="text"
+                  className="sidebar-branch-collapsed-btn"
+                  icon={<ShopOutlined style={{ color: "var(--color-primary)", fontSize: 18 }} />}
+                />
+              </Dropdown>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {/* Sidebar Nav List */}
+      <nav className="sidebar-nav">
+        {menuItems.map((item, idx) => {
+          const hasChildren = item.children && item.children.length > 0;
+          const isParentActive = hasChildren
+            ? item.children.some((child) => {
+                const childBasePath = child.path.split("?")[0];
+                if (child.tabKey) {
+                  return location.pathname === childBasePath && activeTabParam === child.tabKey;
+                }
+                return location.pathname === childBasePath;
+              })
+            : location.pathname === item.path ||
+              (item.path !== "/home" && location.pathname.startsWith(item.path));
+
+          const isSubOpen = openSubMenus[item.label] ?? true;
+
+          // ── Parent Menu Item With Submenu (e.g., Quản lý kho, Báo cáo chuyên sâu) ───────────────
+          if (hasChildren) {
+            if (collapsed) {
+              const popupMenuItems = item.children.map((child) => {
+                const childBasePath = child.path.split("?")[0];
+                const isChildActive = child.tabKey
+                  ? location.pathname === childBasePath && activeTabParam === child.tabKey
+                  : location.pathname === childBasePath;
+                return {
+                  key: child.tabKey || child.path,
+                  label: (
+                    <span style={{ color: isChildActive ? "var(--color-primary)" : "inherit", fontWeight: isChildActive ? 600 : 400 }}>
+                      {child.label}
+                    </span>
+                  ),
+                  onClick: () => navigate(child.path),
+                };
+              });
+
+              return (
+                <Dropdown
+                  key={idx}
+                  placement="rightTop"
+                  menu={{ items: popupMenuItems }}
+                  trigger={["hover", "click"]}
+                >
+                  <div className={`sidebar-nav-item ${isParentActive ? "active" : ""}`} style={{ cursor: "pointer" }}>
+                    <span className="sidebar-nav-icon">{item.icon}</span>
+                  </div>
+                </Dropdown>
+              );
+            }
+
+            return (
+              <div key={idx} className="sidebar-menu-group">
+                <div
+                  className={`sidebar-nav-item parent ${isParentActive ? "active" : ""}`}
+                  onClick={() => toggleSubMenu(item.label)}
+                >
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  <span className="sidebar-nav-label">{item.label}</span>
+                  <span className="sidebar-nav-arrow">
+                    {isSubOpen ? <DownOutlined style={{ fontSize: 10 }} /> : <RightOutlined style={{ fontSize: 10 }} />}
+                  </span>
+                </div>
+
+                {isSubOpen && (
+                  <div className="sidebar-submenu">
+                    {item.children.map((child, cIdx) => {
+                      const childBasePath = child.path.split("?")[0];
+                      const isChildActive = child.tabKey
+                        ? location.pathname === childBasePath && activeTabParam === child.tabKey
+                        : location.pathname === childBasePath;
+                      return (
+                        <Link
+                          key={cIdx}
+                          to={child.path}
+                          state={{ from: location }}
+                          className={`sidebar-submenu-item ${isChildActive ? "active" : ""}`}
+                        >
+                          <span className="sidebar-submenu-dot">•</span>
+                          <span className="sidebar-submenu-label">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // ── Standard Single Menu Item ──────────────────────────────────────
+          const navLinkContent = (
+            <Link
+              key={idx}
+              to={item.path}
+              state={{ from: location }}
+              className={`sidebar-nav-item ${isParentActive ? "active" : ""}`}
+            >
+              <span className="sidebar-nav-icon">{item.icon}</span>
+              {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
+            </Link>
+          );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={idx} title={item.label} placement="right">
+                {navLinkContent}
+              </Tooltip>
+            );
+          }
+
+          return navLinkContent;
+        })}
+      </nav>
+
+      {/* Sidebar Footer: User Info & Logout */}
+      <div className="sidebar-footer">
+        <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="topRight">
+          <div className="sidebar-user">
+            <Avatar className="sidebar-avatar" icon={<UserOutlined />} />
+            {!collapsed && (
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name">
+                  {user?.name || user?.fullName || "Người dùng"}
+                </span>
+                <span className="sidebar-user-role">
+                  {ROLE_LABELS[role] || role || "Nhân viên"}
+                </span>
+              </div>
+            )}
+          </div>
+        </Dropdown>
+        {!collapsed && (
+          <Tooltip title="Đăng xuất" placement="right">
+            <Button
+              type="text"
+              danger
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+              className="sidebar-logout-btn"
+            />
+          </Tooltip>
+        )}
+      </div>
+    </aside>
+  );
+};
+
+export default SideBar;
+

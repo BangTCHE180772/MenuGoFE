@@ -20,6 +20,7 @@ import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
+import MyContractPage from '../pages/MyContractPage';
 import AccountPage from '../pages/AccountPage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
 import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
@@ -29,6 +30,7 @@ import KDSPage from '../pages/KDSPage';
 import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 import PayrollPage from '../pages/PayrollPage';
+import MyPayrollPage from '../pages/MyPayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
 
 
@@ -41,10 +43,13 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ReportRevenuePage from '../pages/ReportRevenuePage';
+import ReportExpensePage from '../pages/ReportExpensePage';
+import ReportProfitPage from '../pages/ReportProfitPage';
+import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
-import FinanceDashboardPage from '../pages/FinanceDashboardPage';
-import OrderDashboard from '../pages/OrderDashboard';
+import CashFlowPage from '../pages/CashFlowPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -103,12 +108,26 @@ const AppRouter = () => {
                 }
               />
               <Route path="/my-work-schedule" element={<MyWorkSchedulePage />} />
+              <Route
+                path="/contracts"
+                element={
+                  ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+                  [1, 2, 3].includes(user?.roleId) ? (
+                    <ContractPage />
+                  ) : (
+                    <MyContractPage />
+                  )
+                }
+              />
+              <Route path="/my-contract" element={<MyContractPage />} />
+              <Route path="/my-payroll" element={<MyPayrollPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
+                <Route path="/cashflow" element={<CashFlowPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
@@ -119,8 +138,12 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
-                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
-                <Route path="/orderdashboard" element={<OrderDashboard />} />
+                <Route path="/reservations" element={<ReservationPage />} />
+                <Route path="/reports/revenue" element={<ReportRevenuePage />} />
+                <Route path="/reports/expense" element={<ReportExpensePage />} />
+                <Route path="/reports/profit" element={<ReportProfitPage />} />
+                <Route path="/reports/inventory" element={<ReportInventoryPage />} />
+                <Route path="/inventoryreport" element={<ReportInventoryPage />} />
               </Route>
 
               {/* Owner, Admin */}
@@ -133,9 +156,8 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
                 <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
                 <Route path="/orders" element={<OrderPage />} />
-                <Route path="/table-map" element={<TableMapPage />} />
-                <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/cashier" element={<CashierPage />} />
+              <Route path="/table-map" element={<TableMapPage />} />
+              <Route path="/cashier" element={<CashierPage />} />
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>

@@ -136,8 +136,8 @@ const KiotDateTimePicker = ({ value, onChange, onClose }) => {
         background: '#ffffff',
         border: '1px solid #cbd5e1',
         borderRadius: 12,
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-        zIndex: 2000,
+        boxShadow: '0 12px 30px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15)',
+        zIndex: 9999,
         padding: 12,
         fontSize: 12,
         userSelect: 'none'

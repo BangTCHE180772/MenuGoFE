@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:5067';
+const BASE_URL = import.meta.env.DEV
+  ? 'http://localhost:5067'
+  : 'https://menugobe.onrender.com';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -83,18 +85,19 @@ axiosInstance.interceptors.response.use(
       error.message = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc máy chủ.';
     }
 
-    // Xử lý lỗi toàn cục: 401 → xóa token → về trang login
+    // Xử lý lỗi toàn cục
     if (error.response?.status === 401) {
       const token = localStorage.getItem('access_token');
-      // Chỉ redirect về login nếu user đang có token (tức là token hết hạn/không hợp lệ)
-      // Tránh redirect vòng lặp khi user không đăng nhập gọi API public
-      if (token) {
+      const errorMsg = String(error.response?.data?.message || error.response?.data?.detail || '').toLowerCase();
+      // Chỉ logout nếu token thực sự bị từ chối do hết hạn/không hợp lệ
+      if (token && (errorMsg.includes('expired') || errorMsg.includes('invalid') || errorMsg.includes('token'))) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
     } else if (error.response?.status === 403) {
-      window.location.href = '/unauthorized';
+      // 403 Forbidden: không xóa session và không redirect về login/unauthorized, chỉ từ chối promise
+      error.message = 'Bạn không có quyền thực hiện thao tác này (403).';
     }
     return Promise.reject(error);
   }

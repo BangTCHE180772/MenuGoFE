@@ -1,18 +1,35 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { notification } from 'antd';
 import { useSignalR } from '../context/SignalRContext';
-import TopBar from '../components/TopBar';
+import SideBar from '../components/SideBar';
 import ToTop from '../components/ToTop';
 
 /**
  * Layout chính của app sau khi đăng nhập
- * Bao gồm: TopBar cố định trên cùng + nội dung trang + nút ToTop
+ * Bao gồm: SideBar cố định bên trái (có thể thu gọn/mở rộng) + nội dung trang tự điều chỉnh kích thước + nút ToTop
  */
 const MainLayout = () => {
   const connection = useSignalR();
   const location = useLocation();
   const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
+
+  // Sidebar collapse state initialized from localStorage
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
+
+  const handleToggleCollapse = () => {
+    setCollapsed((prev) => {
+      const nextState = !prev;
+      localStorage.setItem('sidebar_collapsed', String(nextState));
+      // Dispatch resize event so Recharts & responsive containers auto-reflow cleanly
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 200);
+      return nextState;
+    });
+  };
 
   useEffect(() => {
     if (connection) {
@@ -47,11 +64,13 @@ const MainLayout = () => {
   }, [connection]);
 
   return (
-    <div className="main-layout">
-      <TopBar />
-      <main className={`main-content ${isFluid ? 'fluid' : ''}`}>
-        <Outlet />
-      </main>
+    <div className={`main-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
+      <SideBar collapsed={collapsed} onToggleCollapse={handleToggleCollapse} />
+      <div className="main-content-wrapper">
+        <main className={`main-content ${isFluid ? 'fluid' : ''}`}>
+          <Outlet />
+        </main>
+      </div>
       <ToTop />
     </div>
   );

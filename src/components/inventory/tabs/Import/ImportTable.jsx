@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
-import { Modal } from 'antd';
 import {
   EnvironmentOutlined,
   DeleteOutlined,
@@ -9,35 +8,61 @@ import {
   EditOutlined,
   InfoCircleOutlined,
   CreditCardOutlined,
-  ExclamationCircleOutlined
+  SearchOutlined,
+  PlusOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
+import { deleteImportPendingDocument, getImportById } from '../../../../api/documentApi';
 
 const ImportTable = ({
   documents = [],
   allDocuments = [],
   searchText,
   setSearchText,
+  statusFilter = 'ALL',
+  setStatusFilter,
   loading,
+  onRefresh,
   setModalImportOpen,
+  onOpenCreateModal,
   handleDeleteDocument,
-  onOpenReturnModal
+  onOpenReturnModal,
+  onEditDocument
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' }
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(null);
+  const [loadedDocMap, setLoadedDocMap] = useState({}); // Cache full document details
+  const [loadingDocId, setLoadingDocId] = useState(null);
 
   const pageSize = 20;
-
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const toggleExpand = (docId) => {
+  // Fetch full detail when row is expanded
+  const toggleExpand = async (docId) => {
     if (expandedDocId === docId) {
       setExpandedDocId(null);
     } else {
       setExpandedDocId(docId);
       if (!activeTabMap[docId]) {
         setActiveTabMap((prev) => ({ ...prev, [docId]: 'info' }));
+      }
+
+      // Fetch full document details if not cached yet
+      if (!loadedDocMap[docId]) {
+        setLoadingDocId(docId);
+        try {
+          const fullDoc = await getImportById(docId);
+          if (fullDoc) {
+            setLoadedDocMap((prev) => ({ ...prev, [docId]: fullDoc }));
+          }
+        } catch (err) {
+          console.error('Failed to load document details:', err);
+        } finally {
+          setLoadingDocId(null);
+        }
       }
     }
   };
@@ -46,109 +71,153 @@ const ImportTable = ({
     setActiveTabMap((prev) => ({ ...prev, [docId]: tabKey }));
   };
 
-  const openDeleteConfirm = (doc) => {
-    Modal.confirm({
-      title: <span style={{ fontWeight: 700, fontSize: 14 }}>Xác nhận hủy phiếu nhập</span>,
-      icon: <ExclamationCircleOutlined style={{ color: '#ef4444' }} />,
-      content: (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#475569' }}>
-          Bạn có chắc chắn muốn hủy / xóa phiếu nhập kho <strong style={{ color: '#e8442a' }}>{doc.code}</strong> không?
-          <br />
-          Thao tác này sẽ cập nhật lại số lượng tồn kho và không thể hoàn tác.
-        </div>
-      ),
-      okText: 'Xác nhận hủy',
-      okType: 'danger',
-      cancelText: 'Bỏ qua',
-      centered: true,
-      maskClosable: true,
-      onOk() {
-        handleDeleteDocument(doc.id);
-      }
-    });
-  };
-
-  const handleCopyCode = (code) => {
-    if (navigator.clipboard && code) {
-      navigator.clipboard.writeText(code);
-      alert(`Đã sao chép mã phiếu: ${code}`);
+  // Handle Edit Pending Document (Synchronous trigger to immediately open modal in edit mode)
+  const handleEditPending = (doc) => {
+    const fullDoc = loadedDocMap[doc.id] || doc;
+    if (onEditDocument) {
+      onEditDocument(fullDoc);
     }
   };
 
-  const handlePrint = (code) => {
-    alert(`Đang chuẩn bị in phiếu: ${code}`);
-  };
-
-  const handleExport = (code) => {
-    alert(`Đang xuất dữ liệu phiếu: ${code}`);
-  };
-
-  const handleSendEmail = (code) => {
-    alert(`Gửi email cho phiếu: ${code}`);
-  };
-
-  const handleReturn = (code) => {
-    alert(`Tạo phiếu trả hàng cho: ${code}`);
-  };
-
-  const handleBarcodePrint = (code) => {
-    alert(`In mã vạch cho sản phẩm thuộc phiếu: ${code}`);
+  const executeDelete = async (doc) => {
+    if (!doc) return;
+    const isPending = doc.status === 0 || doc.status === 'Pending';
+    try {
+      if (isPending) {
+        await deleteImportPendingDocument(doc.id);
+      }
+      if (handleDeleteDocument) {
+        handleDeleteDocument(doc.id, doc.type || 1);
+      }
+      setLoadedDocMap((prev) => {
+        const copy = { ...prev };
+        delete copy[doc.id];
+        return copy;
+      });
+    } catch (err) {
+      console.error('Lỗi khi xóa chứng từ:', err);
+      if (handleDeleteDocument) {
+        handleDeleteDocument(doc.id, doc.type || 1);
+      }
+    } finally {
+      setConfirmDeleteDoc(null);
+    }
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden' }}>
-      {/* HEADER ACTION TOOLBAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <input
-          type="text"
-          placeholder="Theo mã phiếu..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            width: 240,
-            height: 26,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#1e293b',
-            borderRadius: 16,
-            border: '1px solid #cbd5e1',
-            outline: 'none'
-          }}
-        />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden', width: '100%' }}>
+      {/* TOP ACTION TOOLBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              placeholder="Theo mã phiếu, người tạo..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '4px 10px 4px 30px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1e293b',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                transition: 'border 0.2s ease'
+              }}
+            />
+          </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+          {/* STATUS FILTER PILLS */}
+          {setStatusFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'Pending', label: 'Lưu tạm' },
+                { key: 'Completed', label: 'Hoàn thành' },
+                { key: 'Cancelled', label: 'Đã hủy' }
+              ].map((st) => {
+                const active = statusFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStatusFilter(st.key)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11.5,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? '#ea580c' : '#475569',
+                      background: active ? '#ffffff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
-            onClick={() => setModalImportOpen(true)}
+            type="button"
+            onClick={() => {
+              if (onOpenCreateModal) {
+                onOpenCreateModal();
+              } else if (onEditDocument) {
+                onEditDocument(null);
+              }
+            }}
             style={{
-              background: '#e8442a',
+              background: 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            + Nhập kho
+            <PlusOutlined /> Nhập kho
           </button>
           <button
-            onClick={() => alert('Đã làm mới dữ liệu')}
+            type="button"
+            onClick={() => {
+              if (onRefresh) onRefresh();
+            }}
             style={{
               background: '#ffffff',
               color: '#334155',
               border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            Làm mới
+            <ReloadOutlined /> Làm mới
           </button>
         </div>
       </div>
@@ -165,39 +234,39 @@ const ImportTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIÁ TRỊ (VNĐ)</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
                 const isExpanded = expandedDocId === doc.id;
                 const currentTab = activeTabMap[doc.id] || 'info';
+                const isPending = doc.status === 0 || doc.status === 'Pending';
+                const isCompleted = doc.status === 1 || doc.status === 'Completed';
 
-                // Details calculations
-                const detailsList = doc.details || [];
-                const supplierPartner = (doc.partners || []).find((p) => p.partnerType === 1 || p.partnerType === 'Supplier') || doc.partners?.[0];
-                const supplierName = supplierPartner?.partnerName || '---';
+                const loadedDoc = loadedDocMap[doc.id] || doc;
+                const detailsList = loadedDoc.details || loadedDoc.documentDetails || [];
+                const cashFlowsList = loadedDoc.cashFlows || [];
 
-                // Nợ gốc (DocumentPartner.cost)
-                const supplierRawCost = Number(supplierPartner?.cost ?? supplierPartner?.amountDue ?? 0);
+                const supplierPartner = (loadedDoc.partners || []).find((p) => p.partnerType === 1 || p.partnerType === 'Supplier') || loadedDoc.partner || loadedDoc.partners?.[0];
+                const supplierName = loadedDoc.partnerName || supplierPartner?.partnerName || loadedDoc.partner?.name || '---';
 
-                // Số tiền cần/phải trả NCC = Nợ gốc đã trừ bớt phần lẻ làm tròn (Rounding) -> Luôn là số nguyên
-                const supplierAmountDue = Math.round(supplierRawCost);
-
-                // Tiền đã trả NCC
-                const supplierAmountPaid = Number(supplierPartner?.amountPaid ?? 0);
-
-                const totalQuantity = detailsList.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
-                const totalItemsCount = detailsList.length;
-                const totalGoodsAmount = detailsList.reduce((sum, d) => sum + (Number(d.quantity || 0) * Number(d.unitPrice || 0)), 0);
+                const totalInvoiceAmount = Number(loadedDoc.totalAmount || 0);
+                const roundingCF = cashFlowsList.find((cf) => cf.type === 5 || cf.type === 'Rounding');
+                const roundingAmount = Number(roundingCF?.totalAmount || 0);
+                const effectivePayableAmount = totalInvoiceAmount - roundingAmount;
+                const paymentCashFlows = cashFlowsList.filter((cf) => cf.type !== 5 && cf.type !== 'Rounding');
+                const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? paymentCashFlows.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
+                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (effectivePayableAmount - supplierAmountPaid)));
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -218,22 +287,98 @@ const ImportTable = ({
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || 'Chi nhánh trung tâm'}</td>
-                      <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.businessDate).format('DD/MM/YYYY HH:mm')}</td>
+                      <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.orderDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}</td>
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                         {doc.totalAmount ? Math.round(Number(doc.totalAmount)).toLocaleString('vi-VN') : 0} đ
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
-                          Hoàn thành
-                        </span>
+                        {doc.status === 2 || doc.status === 'Cancelled' ? (
+                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', fontSize: 10, fontWeight: 600 }}>
+                            Đã hủy
+                          </span>
+                        ) : isPending ? (
+                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a', fontSize: 10, fontWeight: 600 }}>
+                            Lưu tạm
+                          </span>
+                        ) : (
+                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
+                            Hoàn thành
+                          </span>
+                        )}
                       </td>
-                      <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator || 'Hệ thống'}</td>
+                      <td style={{ padding: '8px 10px', color: '#64748b' }}>{doc.creator || doc.createdByName || 'Hệ thống'}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        {isPending ? (
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleEditPending(doc)}
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                borderRadius: 4,
+                                border: '1px solid #bfdbfe',
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 3
+                              }}
+                            >
+                              <EditOutlined /> Chỉnh sửa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteDoc(doc)}
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                borderRadius: 4,
+                                border: '1px solid #fecaca',
+                                background: '#fef2f2',
+                                color: '#dc2626',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 3
+                              }}
+                            >
+                              <DeleteOutlined /> Xóa
+                            </button>
+                          </div>
+                        ) : isCompleted ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
+                            style={{
+                              padding: '3px 8px',
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                              borderRadius: 4,
+                              border: '1px solid #fed7aa',
+                              background: '#fff7ed',
+                              color: '#ea580c',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3
+                            }}
+                          >
+                            <RollbackOutlined /> Trả hàng
+                          </button>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>---</span>
+                        )}
+                      </td>
                     </tr>
 
-                    {/* EXPANDED DETAIL BOX ROW */}
+                    {/* EXPANDED DETAIL DRAWER CONTAINER */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={7} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -246,8 +391,9 @@ const ImportTable = ({
                             }}
                           >
                             {/* TOP TAB NAVIGATION */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px' }}>
+                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
                               <button
+                                type="button"
                                 onClick={() => handleTabChange(doc.id, 'info')}
                                 style={{
                                   padding: '10px 16px',
@@ -260,24 +406,10 @@ const ImportTable = ({
                                   fontSize: 12
                                 }}
                               >
-                                Thông tin
+                                <InfoCircleOutlined /> Thông tin phiếu
                               </button>
                               <button
-                                onClick={() => handleTabChange(doc.id, 'service')}
-                                style={{
-                                  padding: '10px 16px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: currentTab === 'service' ? 700 : 500,
-                                  color: currentTab === 'service' ? '#e8442a' : '#64748b',
-                                  borderBottom: currentTab === 'service' ? '2px solid #e8442a' : '2px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12
-                                }}
-                              >
-                                Dịch vụ khác ({(doc.partners || []).filter(p => p.partnerType === 3 || p.partnerType === 4 || p.partnerType === 'Transporter' || p.partnerType === 'Other').length})
-                              </button>
-                              <button
+                                type="button"
                                 onClick={() => handleTabChange(doc.id, 'payment')}
                                 style={{
                                   padding: '10px 16px',
@@ -290,531 +422,184 @@ const ImportTable = ({
                                   fontSize: 12
                                 }}
                               >
-                                Lịch sử thanh toán
+                                <CreditCardOutlined /> Lịch sử thanh toán
                               </button>
-                              <button
-                                onClick={() => handleTabChange(doc.id, 'returnHistory')}
-                                style={{
-                                  padding: '10px 16px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: currentTab === 'returnHistory' ? 700 : 500,
-                                  color: currentTab === 'returnHistory' ? '#e8442a' : '#64748b',
-                                  borderBottom: currentTab === 'returnHistory' ? '2px solid #e8442a' : '2px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12
-                                }}
-                              >
-                                Lịch sử trả hàng nhập ({(allDocuments || []).filter(d => (d.type === 4 || d.type === 'Return') && (d.parentDocumentId === doc.id || d.parentDocumentId === Number(doc.id))).length})
-                              </button>
-                            </div>
 
-                            {/* TAB 1: THÔNG TIN */}
-                            {currentTab === 'info' && (
-                              <div style={{ padding: 16 }}>
-                                {/* HEADER INFO LINE */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                                  <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                      <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{doc.code}</span>
-                                      <span
-                                        style={{
-                                          padding: '2px 8px',
-                                          borderRadius: 4,
-                                          background: '#f1f5f9',
-                                          color: '#334155',
-                                          border: '1px solid #cbd5e1',
-                                          fontSize: 10,
-                                          fontWeight: 600
-                                        }}
-                                      >
-                                        Đã nhập hàng
-                                      </span>
-                                    </div>
-                                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
-                                      Người tạo: <strong style={{ color: '#334155' }}>{doc.creator || '---'}</strong> &nbsp;|&nbsp; Người nhập: <strong style={{ color: '#334155' }}>{doc.creator || '---'}</strong> &nbsp;|&nbsp; Thời gian: <strong style={{ color: '#334155' }}>{dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
-                                    </div>
-                                  </div>
-
-                                  <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <EnvironmentOutlined style={{ color: '#e8442a' }} />
-                                    <span>{doc.branchName || 'Chi nhánh trung tâm'}</span>
-                                  </div>
-                                </div>
-
-                                {/* SUPPLIER CARD BOX */}
-                                <div
+                              {/* EXTRA TRẢ HÀNG BUTTON ON COMPLETED EXPANDED TAB */}
+                              {isCompleted && (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
                                   style={{
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: 6,
-                                    padding: '10px 14px',
-                                    background: '#fafafa',
-                                    margin: '12px 0 16px 0'
+                                    marginLeft: 'auto',
+                                    padding: '4px 12px',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    borderRadius: 4,
+                                    border: '1px solid #fed7aa',
+                                    background: '#fff7ed',
+                                    color: '#ea580c',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4
                                   }}
                                 >
-                                  <div style={{ color: '#64748b', fontSize: 10, marginBottom: 2 }}>Nhà cung cấp</div>
-                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{supplierName}</div>
-                                </div>
+                                  <RollbackOutlined /> Trả hàng
+                                </button>
+                              )}
+                            </div>
 
-                                {/* ITEMS DETAILS TABLE */}
-                                <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', marginBottom: 16 }}>
-                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                    <thead>
-                                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ HÀNG HÓA</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>ĐVT</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>SỐ LƯỢNG</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>ĐƠN GIÁ</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIẢM GIÁ</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>GIÁ NHẬP</th>
-                                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>THÀNH TIỀN</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {detailsList.length === 0 ? (
-                                        <tr>
-                                          <td colSpan={8} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
-                                            Không có chi tiết hàng hóa nào
-                                          </td>
-                                        </tr>
-                                      ) : (
-                                        detailsList.map((item, idx) => {
-                                          const qty = Number(item.quantity || 0);
-                                          const price = Number(item.unitPrice || 0);
-                                          const discount = Number(item.discount || 0);
-                                          const importPrice = Math.round(price - discount);
-                                          const amount = Math.round(item.amount != null ? Number(item.amount) : qty * (price - discount));
-
-                                          return (
-                                            <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#334155' }}>
-                                                {item.productCode || item.code || `SP${item.bInventoryId || item.id}`}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
-                                                {item.productName || item.name || 'Sản phẩm'}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>
-                                                <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 10, border: '1px solid #cbd5e1', fontWeight: 600 }}>
-                                                  {item.unitName || 'Cái'}
-                                                </span>
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                {qty.toLocaleString('vi-VN')}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {Math.round(price).toLocaleString('vi-VN')}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {Math.round(discount).toLocaleString('vi-VN')}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                                                {Math.round(importPrice).toLocaleString('vi-VN')}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                                                {Math.round(amount).toLocaleString('vi-VN')}
-                                              </td>
-                                            </tr>
-                                          );
-                                        })
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-
-                                {/* BOTTOM SUMMARY AND NOTES */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20, marginBottom: 16 }}>
-                                  {/* LEFT: NOTE */}
-                                  <div style={{ flex: 1, minWidth: 240, color: '#475569', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <EditOutlined style={{ color: '#64748b' }} />
-                                    <span>{doc.note || 'Đây là ghi chú nếu có'}</span>
-                                  </div>
-
-                                  {/* RIGHT: TOTALS GRID */}
-                                  <div style={{ minWidth: 260, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>Tổng số lượng</span>
-                                      <strong style={{ color: '#0f172a' }}>{totalQuantity.toLocaleString('vi-VN')}</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>Tổng số mặt hàng</span>
-                                      <strong style={{ color: '#0f172a' }}>{totalItemsCount}</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>Tổng tiền hàng</span>
-                                      <strong style={{ color: '#0f172a' }}>{Math.round(totalGoodsAmount).toLocaleString('vi-VN')}</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>
-                                        Giảm giá phiếu nhập <InfoCircleOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-                                      </span>
-                                      <strong style={{ color: '#0f172a' }}>0</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>Cần trả NCC</span>
-                                      <strong style={{ color: '#0f172a' }}>{Math.round(supplierAmountDue).toLocaleString('vi-VN')}</strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                      <span>
-                                        Tiền đã trả NCC <CreditCardOutlined style={{ fontSize: 10, color: '#64748b' }} />
-                                      </span>
-                                      <strong style={{ color: '#16a34a', fontWeight: 800 }}>{Math.round(supplierAmountPaid).toLocaleString('vi-VN')}</strong>
-                                    </div>
-                                  </div>
-                                </div>
-                                 {/* BOTTOM ACTION BAR (SYMMETRICAL LAYOUT) */}
-                                 <div
-                                   style={{
-                                     display: 'flex',
-                                     justify: 'space-between',
-                                     alignItems: 'center',
-                                     borderTop: '1px solid #e2e8f0',
-                                     paddingTop: 12,
-                                     flexWrap: 'wrap',
-                                     gap: 8
-                                   }}
-                                 >
-                                   {/* LEFT SIDE: HỦY BỎ BUTTON */}
-                                   <div>
-                                     <button
-                                       onClick={() => openDeleteConfirm(doc)}
-                                       style={{
-                                         background: '#ffffff',
-                                         border: '1px solid #fca5a5',
-                                         borderRadius: 4,
-                                         padding: '4px 12px',
-                                         fontSize: 11,
-                                         fontWeight: 600,
-                                         color: '#dc2626',
-                                         cursor: 'pointer',
-                                         display: 'flex',
-                                         alignItems: 'center',
-                                         gap: 4
-                                       }}
-                                     >
-                                       <DeleteOutlined /> Hủy bỏ
-                                     </button>
-                                   </div>
-
-                                   {/* RIGHT SIDE: TRẢ HÀNG & IN BUTTONS */}
-                                   <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-                                     <button
-                                       onClick={() => {
-                                         if (onOpenReturnModal) {
-                                           onOpenReturnModal(doc);
-                                         } else {
-                                           handleReturn(doc.code);
-                                         }
-                                       }}
-                                       style={{
-                                         background: '#ffffff',
-                                         border: '1px solid #cbd5e1',
-                                         borderRadius: 4,
-                                         padding: '4px 12px',
-                                         fontSize: 11,
-                                         fontWeight: 600,
-                                         color: '#334155',
-                                         cursor: 'pointer',
-                                         display: 'flex',
-                                         alignItems: 'center',
-                                         gap: 4
-                                       }}
-                                     >
-                                       <RollbackOutlined /> Trả hàng
-                                     </button>
-                                     <button
-                                       onClick={() => handlePrint(doc.code)}
-                                       style={{
-                                         background: '#ffffff',
-                                         border: '1px solid #cbd5e1',
-                                         borderRadius: 4,
-                                         padding: '4px 12px',
-                                         fontSize: 11,
-                                         fontWeight: 600,
-                                         color: '#334155',
-                                         cursor: 'pointer',
-                                         display: 'flex',
-                                         alignItems: 'center',
-                                         gap: 4
-                                       }}
-                                     >
-                                       <PrinterOutlined /> In
-                                     </button>
-                                   </div>
-                                 </div>
+                            {loadingDocId === doc.id ? (
+                              <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                                Đang nạp chi tiết phiếu nhập...
                               </div>
-                            )}
-
-                            {/* TAB 2: DỊCH VỤ KHÁC */}
-                            {currentTab === 'service' && (
-                              <div style={{ padding: 16 }}>
-                                {(() => {
-                                  const extraPartnersList = (doc.partners || []).filter(
-                                    (p) =>
-                                      p.partnerType === 3 ||
-                                      p.partnerType === 4 ||
-                                      p.partnerType === 'Transporter' ||
-                                      p.partnerType === 'Other'
-                                  );
-
-                                  if (extraPartnersList.length === 0) {
-                                    return (
-                                      <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
-                                        Phiếu nhập kho này không sử dụng dịch vụ hoặc đối tác khác.
+                            ) : (
+                              <>
+                                {/* TAB 1: THÔNG TIN PHIẾU */}
+                                {currentTab === 'info' && (
+                                  <div style={{ padding: 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                                      <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                          <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{loadedDoc.code}</span>
+                                          <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', fontSize: 10, fontWeight: 600 }}>
+                                            {isCompleted ? 'Đã nhập hàng' : (isPending ? 'Phiếu nhập nháp' : 'Đã hủy')}
+                                          </span>
+                                        </div>
+                                        <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
+                                          Người tạo: <strong style={{ color: '#334155' }}>{loadedDoc.creator || loadedDoc.createdByName || 'Hệ thống'}</strong> &nbsp;|&nbsp; Thời gian: <strong style={{ color: '#334155' }}>{dayjs(loadedDoc.orderDate || loadedDoc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
+                                        </div>
                                       </div>
-                                    );
-                                  }
 
-                                  return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                      <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                          <thead>
-                                            <tr
-                                              style={{
-                                                background: '#f8fafc',
-                                                borderBottom: '1px solid #e2e8f0',
-                                                color: '#475569',
-                                                fontWeight: 700,
-                                                fontSize: 10,
-                                                textTransform: 'uppercase'
-                                              }}
-                                            >
-                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ / TÊN ĐỐI TÁC</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>LOẠI ĐỐI TÁC</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>GHI CHÚ</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>TIỀN PHẢI TRẢ</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>TIỀN ĐÃ TRẢ</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>CÒN NỢ</th>
+                                      <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <EnvironmentOutlined style={{ color: '#e8442a' }} />
+                                        <span>{loadedDoc.branchName || 'Chi nhánh trung tâm'}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* SUPPLIER INFO BOX */}
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 14px', background: '#fafafa', margin: '12px 0 16px 0' }}>
+                                      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>
+                                        Nhà cung cấp: <span style={{ color: '#2563eb' }}>{supplierName}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 20, fontSize: 11, color: '#475569', flexWrap: 'wrap' }}>
+                                        <div>Tổng tiền gốc: <strong>{totalInvoiceAmount.toLocaleString('vi-VN')} đ</strong></div>
+                                        {roundingAmount !== 0 && (
+                                          <div>ĐC Làm tròn (Rounding): <strong style={{ color: '#d97706' }}>{roundingAmount > 0 ? `-${roundingAmount.toLocaleString('vi-VN')}` : `+${Math.abs(roundingAmount).toLocaleString('vi-VN')}`} đ</strong></div>
+                                        )}
+                                        <div>Cần trả NCC: <strong style={{ color: '#0f172a' }}>{effectivePayableAmount.toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Đã trả NCC: <strong style={{ color: '#059669' }}>{supplierAmountPaid.toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Còn nợ NCC: <strong style={{ color: '#ef4444' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
+                                      </div>
+                                    </div>
+
+                                    {/* ITEMS TABLE */}
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                        <thead>
+                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
+                                            <th style={{ padding: '8px 10px' }}>Mã sản phẩm</th>
+                                            <th style={{ padding: '8px 10px' }}>Tên sản phẩm</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Đơn vị tính</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số lượng</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Đơn giá nhập</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thành tiền</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {detailsList.length === 0 ? (
+                                            <tr>
+                                              <td colSpan={6} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
+                                                Chưa có sản phẩm trong phiếu nhập
+                                              </td>
                                             </tr>
-                                          </thead>
-                                          <tbody>
-                                            {extraPartnersList.map((p, pIdx) => {
-                                              const due = Number(p.amountDue ?? p.cost ?? 0);
-                                              const paid = Number(p.amountPaid ?? 0);
-                                              const debt = Math.max(0, due - paid);
-                                              const typeLabel =
-                                                p.partnerType === 3 || p.partnerType === 'Transporter'
-                                                  ? 'Vận chuyển'
-                                                  : 'Khác';
+                                          ) : (
+                                            detailsList.map((dt, idx) => {
+                                              const pCode = dt.productCode || dt.snapshotProductCode || dt.currentProductCode || dt.code || `SP${idx + 1}`;
+                                              const pName = dt.productName || dt.snapshotProductName || dt.currentProductName || dt.name || 'Sản phẩm';
+                                              const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
+                                              const qty = Number(dt.quantity || 0);
+                                              const price = Number(dt.unitPrice || 0);
+                                              const total = qty * price;
 
                                               return (
-                                                <React.Fragment key={p.id || pIdx}>
-                                                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
-                                                      {p.partnerName || `Đối tác #${p.partnerId}`}
-                                                    </td>
-                                                    <td style={{ padding: '8px 10px' }}>
-                                                      <span
-                                                        style={{
-                                                          padding: '2px 6px',
-                                                          borderRadius: 4,
-                                                          background: typeLabel === 'Vận chuyển' ? '#eff6ff' : '#fdf4ff',
-                                                          color: typeLabel === 'Vận chuyển' ? '#2563eb' : '#c026d3',
-                                                          fontSize: 10,
-                                                          fontWeight: 600
-                                                        }}
-                                                      >
-                                                        {typeLabel}
-                                                      </span>
-                                                    </td>
-                                                    <td style={{ padding: '8px 10px', color: '#475569' }}>
-                                                      {p.note || '---'}
-                                                    </td>
-                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                                                      {due.toLocaleString('vi-VN')} đ
-                                                    </td>
-                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>
-                                                      {paid.toLocaleString('vi-VN')} đ
-                                                    </td>
-                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: debt > 0 ? '#ef4444' : '#64748b' }}>
-                                                      {debt.toLocaleString('vi-VN')} đ
-                                                    </td>
-                                                  </tr>
-
-                                                  {/* Render cashflow transactions for this extra partner */}
-                                                  {p.cashFlowDetails && p.cashFlowDetails.length > 0 && (
-                                                    <tr>
-                                                      <td colSpan={6} style={{ background: '#f8fafc', padding: '8px 14px' }}>
-                                                        <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>
-                                                          CHI TIẾT THU CHI CHO DỊCH VỤ NÀY:
-                                                        </div>
-                                                        <div style={{ border: '1px solid #cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
-                                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                                                            <thead>
-                                                              <tr style={{ background: '#e2e8f0', color: '#334155' }}>
-                                                                <th style={{ padding: '4px 8px', textAlign: 'left' }}>MÃ PHIẾU CHI</th>
-                                                                <th style={{ padding: '4px 8px', textAlign: 'left' }}>THỜI GIAN</th>
-                                                                <th style={{ padding: '4px 8px', textAlign: 'left' }}>PHƯƠNG THỨC</th>
-                                                                <th style={{ padding: '4px 8px', textAlign: 'right' }}>SỐ TIỀN</th>
-                                                                <th style={{ padding: '4px 8px', textAlign: 'left' }}>GHI CHÚ</th>
-                                                              </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                              {p.cashFlowDetails
-                                                                .filter((cfd) => cfd.type !== 5 && cfd.type !== 'Rounding')
-                                                                .map((cfd, cfdIdx) => (
-                                                                <tr key={cfd.id || cfdIdx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                                                  <td style={{ padding: '4px 8px', fontWeight: 600, color: '#e8442a' }}>
-                                                                    {cfd.cashFlowCode || `TT-${cfd.cashFlowId}`}
-                                                                  </td>
-                                                                  <td style={{ padding: '4px 8px' }}>
-                                                                    {cfd.businessDate ? dayjs(cfd.businessDate).format('DD/MM/YYYY HH:mm') : '---'}
-                                                                  </td>
-                                                                  <td style={{ padding: '4px 8px' }}>
-                                                                    {cfd.paymentMethod || 'Tiền mặt'}
-                                                                  </td>
-                                                                  <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                                                                    {Number(cfd.amount || 0).toLocaleString('vi-VN')} đ
-                                                                  </td>
-                                                                  <td style={{ padding: '4px 8px', color: '#64748b' }}>
-                                                                    {cfd.note || '---'}
-                                                                  </td>
-                                                                </tr>
-                                                              ))}
-                                                            </tbody>
-                                                          </table>
-                                                        </div>
-                                                      </td>
-                                                    </tr>
-                                                  )}
-                                                </React.Fragment>
+                                                <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>{uName}</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{qty.toLocaleString('vi-VN')}</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>{price.toLocaleString('vi-VN')} đ</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#e8442a' }}>{total.toLocaleString('vi-VN')} đ</td>
+                                                </tr>
                                               );
-                                            })}
-                                          </tbody>
-                                        </table>
-                                      </div>
+                                            })
+                                          )}
+                                        </tbody>
+                                      </table>
                                     </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
 
-                            {/* TAB 3: LỊCH SỬ THANH TOÁN */}
-                            {currentTab === 'payment' && (
-                              <div style={{ padding: 16 }}>
-                                {(() => {
-                                  const allCashFlows = (doc.partners || []).flatMap((p) =>
-                                    (p.cashFlowDetails || [])
-                                      .filter((cfd) => cfd.type !== 5 && cfd.type !== 'Rounding')
-                                      .map((cfd) => ({
-                                        ...cfd,
-                                        partnerName: p.partnerName
-                                      }))
-                                  );
-
-                                  if (allCashFlows.length === 0) {
-                                    return (
-                                      <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
-                                        Phiếu nhập kho này chưa phát sinh giao dịch thanh toán nào.
+                                    {loadedDoc.note && (
+                                      <div style={{ marginTop: 10, fontSize: 11, color: '#64748b' }}>
+                                        Ghi chú: <span style={{ color: '#334155', fontStyle: 'italic' }}>{loadedDoc.note}</span>
                                       </div>
-                                    );
-                                  }
+                                    )}
+                                  </div>
+                                )}
 
-                                  return (
+                                {/* TAB 2: LỊCH SỬ THANH TOÁN */}
+                                {currentTab === 'payment' && (
+                                  <div style={{ padding: 16 }}>
                                     <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
                                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                                         <thead>
-                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ CHỨNG TỪ</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>ĐỐI TÁC</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>THỜI GIAN</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>PHƯƠNG THỨC</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>SỐ TIỀN</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>GHI CHÚ</th>
+                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
+                                            <th style={{ padding: '8px 10px' }}>Mã phiếu thu/chi</th>
+                                            <th style={{ padding: '8px 10px' }}>Thời gian</th>
+                                            <th style={{ padding: '8px 10px' }}>Phương thức</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số tiền thanh toán</th>
+                                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Trạng thái</th>
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {allCashFlows.map((cfd, cfdIdx) => (
-                                            <tr key={cfd.id || cfdIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#e8442a' }}>
-                                                {cfd.cashFlowCode || `TT-${cfd.cashFlowId || doc.id}`}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
-                                                {cfd.partnerName || '---'}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                                {cfd.businessDate ? dayjs(cfd.businessDate).format('DD/MM/YYYY HH:mm') : dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                                {cfd.paymentMethod || 'Tiền mặt'}
-                                              </td>
-                                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                                                {Number(cfd.amount || 0).toLocaleString('vi-VN')} đ
-                                              </td>
-                                              <td style={{ padding: '8px 10px', color: '#64748b' }}>
-                                                {cfd.note || '---'}
+                                          {cashFlowsList.length === 0 ? (
+                                            <tr>
+                                              <td colSpan={5} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
+                                                Chưa có lịch sử giao dịch thanh toán
                                               </td>
                                             </tr>
-                                          ))}
+                                          ) : (
+                                            cashFlowsList.map((cf, idx) => {
+                                              const isRounding = cf.type === 5 || cf.type === 'Rounding';
+                                              return (
+                                                <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: isRounding ? '#fffbeb' : 'transparent' }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: isRounding ? '#d97706' : '#2563eb' }}>{cf.code || `CF${idx + 1}`}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                    {cf.businessDate ? dayjs(cf.businessDate).format('DD/MM/YYYY HH:mm') : (cf.createdAt ? dayjs(cf.createdAt).format('DD/MM/YYYY HH:mm') : '---')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: '#334155' }}>
+                                                    {isRounding ? 'Làm tròn (Rounding)' : (cf.paymentMethod || 'Tiền mặt')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: isRounding ? '#d97706' : '#059669' }}>
+                                                    {Number(cf.totalAmount || 0).toLocaleString('vi-VN')} đ
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                    <span style={{ padding: '2px 6px', borderRadius: 4, background: isRounding ? '#fef3c7' : '#dcfce7', color: isRounding ? '#b45309' : '#15803d', fontSize: 10, fontWeight: 600 }}>
+                                                      {isRounding ? 'Làm tròn' : (cf.status || 'Hoàn thành')}
+                                                    </span>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
+                                          )}
                                         </tbody>
                                       </table>
                                     </div>
-                                  );
-                                })()}
-                              </div>
+                                  </div>
+                                )}
+                              </>
                             )}
 
-                            {/* TAB 4: LỊCH SỬ TRẢ HÀNG NHẬP */}
-                            {currentTab === 'returnHistory' && (
-                              <div style={{ padding: 16 }}>
-                                {(() => {
-                                  const returnHistoryList = (allDocuments || []).filter(
-                                    (d) => (d.type === 4 || d.type === 'Return') && (d.parentDocumentId === doc.id || d.parentDocumentId === Number(doc.id))
-                                  );
-
-                                  if (returnHistoryList.length === 0) {
-                                    return (
-                                      <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
-                                        Chưa có giao dịch trả hàng nhập nào cho phiếu nhập kho này.
-                                      </div>
-                                    );
-                                  }
-
-                                  return (
-                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                        <thead>
-                                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                                            <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}>STT</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>MÃ PHIẾU TRẢ</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>THỜI GIAN TRẢ</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>TỔNG TIỀN HÀNG TRẢ</th>
-                                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>NCC ĐÃ TRẢ TIỀN</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {returnHistoryList.map((rd, rIdx) => {
-                                            const totalReturnAmt = Math.round(Number(rd.totalAmount || 0));
-                                            const paidAmt = Math.round(
-                                              (rd.partners || []).reduce((acc, p) => acc + Number(p.amountPaid || 0), 0)
-                                            );
-
-                                            return (
-                                              <tr key={rd.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{rIdx + 1}</td>
-                                                <td style={{ padding: '8px 10px', fontWeight: 700, color: '#e8442a' }}>{rd.code}</td>
-                                                <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                                  {dayjs(rd.businessDate || rd.createdAt).format('DD/MM/YYYY HH:mm')}
-                                                </td>
-                                                <td style={{ padding: '8px 10px', color: '#334155' }}>{rd.creator || 'Hệ thống'}</td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                                                  {totalReturnAmt.toLocaleString('vi-VN')} ₫
-                                                </td>
-                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                                                  {paidAmt.toLocaleString('vi-VN')} ₫
-                                                </td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -827,22 +612,84 @@ const ImportTable = ({
         </table>
       </div>
 
-      {/* CUSTOM PAGINATION */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 11, color: '#64748b' }}>
-        <div>Tổng số: <strong>{documents.length}</strong> phiếu</div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      {/* CONFIRM DELETE MODAL OVERLAY */}
+      {confirmDeleteDoc && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(2px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#ffffff', borderRadius: 8, padding: 20, width: '100%', maxWidth: 400, boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>
+              {confirmDeleteDoc.status === 0 || confirmDeleteDoc.status === 'Pending' ? 'Xác nhận xóa vĩnh viễn phiếu lưu tạm' : 'Xác nhận hủy phiếu nhập kho'}
+            </div>
+            <div style={{ fontSize: 12, color: '#475569', marginBottom: 16, lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn xóa phiếu <strong style={{ color: '#e8442a' }}>{confirmDeleteDoc.code}</strong> không?
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteDoc(null)}
+                style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: 12, cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => executeDelete(confirmDeleteDoc)}
+                style={{ padding: '6px 14px', borderRadius: 4, border: 'none', background: '#ef4444', color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOOTER PAGINATION */}
+      <div
+        style={{
+          padding: '8px 4px',
+          background: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: 11,
+          color: '#64748b',
+          marginTop: 6
+        }}
+      >
+        <div>
+          Hiển thị từ {documents.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
+          {Math.min(currentPage * pageSize, documents.length)} trên tổng {documents.length}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
+            type="button"
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            style={{
+              padding: '2px 6px',
+              borderRadius: 4,
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: currentPage === 1 ? '#cbd5e1' : '#334155',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+            }}
           >
             Trở lại
           </button>
-          <span>Trang {currentPage} / {totalPages}</span>
+          <span>
+            Trang {currentPage} / {totalPages}
+          </span>
           <button
+            type="button"
             disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            style={{
+              padding: '2px 6px',
+              borderRadius: 4,
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
+              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
+            }}
           >
             Tiếp
           </button>
@@ -853,4 +700,3 @@ const ImportTable = ({
 };
 
 export default ImportTable;
-
