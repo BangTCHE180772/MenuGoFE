@@ -35,6 +35,7 @@ import ExpenseDetailDrawer from "../components/reports/expense/ExpenseDetailDraw
 import ExpenseCompareModal from "../components/reports/expense/ExpenseCompareModal";
 
 import { getBranchDashboardStats } from "../api/dashboardApi";
+import { useBranch } from "../context/BranchContext";
 
 const { Title, Text } = Typography;
 
@@ -75,6 +76,7 @@ const mapCashFlowToExpenses = (cashFlowList = []) => {
  * Đường dẫn: /reports/expense
  */
 const ReportExpensePage = () => {
+  const { currentBranchId } = useBranch();
   const [loading, setLoading]         = useState(true);
   const [presetTime, setPresetTime]   = useState("this_month");
   const [dateRange, setDateRange]     = useState([
@@ -121,7 +123,7 @@ const ReportExpensePage = () => {
       };
       const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
 
-      const res = await getBranchDashboardStats(range, startStr, endStr, null);
+      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
 
       if (res?.data) {
         const data = res.data;
@@ -171,11 +173,11 @@ const ReportExpensePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, presetTime]);
+  }, [dateRange, presetTime, currentBranchId]);
 
   useEffect(() => {
     fetchReportData();
-  }, [fetchReportData]);
+  }, [currentBranchId, fetchReportData]);
 
   const handlePresetChange = (val) => {
     setPresetTime(val);

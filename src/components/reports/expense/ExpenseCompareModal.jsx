@@ -35,6 +35,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { getBranchDashboardStats } from "../../../api/dashboardApi";
+import { useBranch } from "../../../context/BranchContext";
 
 const { Title, Text } = Typography;
 
@@ -51,7 +52,7 @@ const EXPENSE_COLORS = [
 ];
 
 // Fetch data chi phí từ BE
-const fetchPeriodStats = async (date, pickerType) => {
+const fetchPeriodStats = async (date, pickerType, branchId) => {
   let start, end, range;
   const d = dayjs(date);
 
@@ -74,7 +75,7 @@ const fetchPeriodStats = async (date, pickerType) => {
     range = "custom";
   }
 
-  const res = await getBranchDashboardStats(range, start, end, null);
+  const res = await getBranchDashboardStats(range, start, end, branchId);
   return res?.data || null;
 };
 
@@ -150,6 +151,7 @@ const mapToPeriod = (beData, dateLabel) => {
  * So sánh hiệu quả chi phí vận hành từ dữ liệu thật
  */
 const ExpenseCompareModal = ({ visible, onClose }) => {
+  const { currentBranchId } = useBranch();
   const [hoveredPieIndexA, setHoveredPieIndexA] = useState(-1);
   const [hoveredPieIndexB, setHoveredPieIndexB] = useState(-1);
   const [pickerType, setPickerType] = useState("date");
@@ -172,20 +174,20 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
   const loadPeriodA = useCallback(async () => {
     setLoadingA(true);
     try {
-      const data = await fetchPeriodStats(dateA, pickerType);
+      const data = await fetchPeriodStats(dateA, pickerType, currentBranchId);
       setPeriodA(mapToPeriod(data, `Kỳ chọn: ${formatTitle(dateA, pickerType)}`));
     } finally { setLoadingA(false); }
-  }, [dateA, pickerType]);
+  }, [dateA, pickerType, currentBranchId]);
 
   const loadPeriodB = useCallback(async () => {
     setLoadingB(true);
     try {
-      const data = await fetchPeriodStats(dateB, pickerType);
+      const data = await fetchPeriodStats(dateB, pickerType, currentBranchId);
       setPeriodB(mapToPeriod(data, `Kỳ so sánh: ${formatTitle(dateB, pickerType)}`));
     } finally { setLoadingB(false); }
-  }, [dateB, pickerType]);
+  }, [dateB, pickerType, currentBranchId]);
 
-  useEffect(() => { if (visible) { loadPeriodA(); loadPeriodB(); } }, [visible, loadPeriodA, loadPeriodB]);
+  useEffect(() => { if (visible) { loadPeriodA(); loadPeriodB(); } }, [visible, loadPeriodA, loadPeriodB, currentBranchId]);
 
   const handlePickerTypeChange = (val) => {
     setPickerType(val);

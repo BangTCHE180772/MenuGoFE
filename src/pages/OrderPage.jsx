@@ -302,6 +302,7 @@ const OrderPage = ({ isWaiterMode }) => {
         <MenuPanel
           canOrder={isOccupied}
           onAddItem={handleAddItem}
+          branchId={deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || (user?.branchIds && user.branchIds[0]) || 1}
         />
 
         <OrderPanel

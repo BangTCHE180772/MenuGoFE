@@ -6,11 +6,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Spin, message } from 'antd';
 import { getAllGroups, searchProductsOData } from '../../api/menuApi';
+import { getBInventories } from '../../api/binventoryApi';
 
 const formatPrice = (price) =>
   Number(price).toLocaleString('vi-VN') + 'đ';
 
-const MenuPanel = ({ onAddItem, canOrder }) => {
+const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
   const [loading, setLoading] = useState(true);
@@ -44,22 +45,65 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await searchProductsOData(searchText, groupId);
-      if (res && res.value) {
-        const mappedProducts = res.value.map(p => ({
-          id: p.Id,
-          name: p.Name,
-          sellPrice: p.SellPrice,
-          description: p.Description,
-          groupId: p.GroupId,
-          groupName: p.Group ? p.Group.Name : 'Khác'
-        }));
-        setProducts(mappedProducts);
+      if (branchId) {
+        // Lấy theo BInventory chi nhánh
+        const rawBInventory = await getBInventories(branchId);
+        if (Array.isArray(rawBInventory)) {
+          const sellable = rawBInventory.filter(
+            p => p.type === 'Processed' || p.type === 'Manufactured' || p.type === 'Regular'
+          );
+          let mappedProducts = sellable.map(p => ({
+            id: p.productId, // ProductId
+            bInventoryId: p.bInventoryId,
+            name: p.name,
+            sellPrice: p.sellPrice || 0,
+            description: p.description || '',
+            groupId: null,
+            groupName: p.groupName || 'Khác'
+          }));
+
+          // Lọc tìm kiếm
+          if (searchText.trim()) {
+            const q = searchText.toLowerCase().trim();
+            mappedProducts = mappedProducts.filter(
+              p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+            );
+          }
+
+          // Lọc danh mục
+          if (groupId && groupId !== 'all') {
+            const selectedCat = categories.find(c => c.id === String(groupId));
+            if (selectedCat) {
+              const catName = selectedCat.name.toLowerCase();
+              mappedProducts = mappedProducts.filter(
+                p => p.groupName.toLowerCase() === catName
+              );
+            }
+          }
+
+          setProducts(mappedProducts);
+        } else {
+          setProducts([]);
+        }
       } else {
-        setProducts([]);
+        // Fallback sang OData cũ nếu chưa xác định được branchId
+        const res = await searchProductsOData(searchText, groupId);
+        if (res && res.value) {
+          const mappedProducts = res.value.map(p => ({
+            id: p.Id,
+            name: p.Name,
+            sellPrice: p.SellPrice,
+            description: p.Description,
+            groupId: p.GroupId,
+            groupName: p.Group ? p.Group.Name : 'Khác'
+          }));
+          setProducts(mappedProducts);
+        } else {
+          setProducts([]);
+        }
       }
     } catch (err) {
-      console.error('Lỗi tải thực đơn (OData):', err);
+      console.error('Lỗi tải thực đơn:', err);
       setError('Không thể tải thực đơn. Vui lòng thử lại.');
     } finally {
       setLoading(false);
@@ -76,7 +120,7 @@ const MenuPanel = ({ onAddItem, canOrder }) => {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [search, activeGroup]);
+  }, [search, activeGroup, branchId, categories]);
 
   /* ── Loading state ─────────────────────────────────────────────────────── */
   if (loading) {

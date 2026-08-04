@@ -11,6 +11,7 @@ import HomeDashboard from "../components/homePage/HomeDashboard";
 import HomeReport from "../components/homePage/HomeReport";
 import { getBranchDashboardStats } from "../api/dashboardApi";
 import { MOCK_DAILY_REPORT } from "../components/homePage/homeMockData";
+import { useBranch } from "../context/BranchContext";
 
 const { Title, Text } = Typography;
 
@@ -251,6 +252,7 @@ const mapBeToReportData = (beStats, dateStr) => {
 
 // ─── HomePage Component ──────────────────────────────────────────────────────
 const HomePage = () => {
+  const { currentBranchId } = useBranch();
   const [selectedDate, setSelectedDate] = useState(dayjs().format("DD/MM/YYYY"));
   const [loading, setLoading]           = useState(false);
   const [displayMode, setDisplayMode]   = useState("dashboard");
@@ -267,7 +269,7 @@ const HomePage = () => {
       const formattedStart = parsedDate.format("YYYY-MM-DD");
       const formattedEnd   = parsedDate.format("YYYY-MM-DD");
 
-      const res = await getBranchDashboardStats(range, formattedStart, formattedEnd, null);
+      const res = await getBranchDashboardStats(range, formattedStart, formattedEnd, currentBranchId);
 
       if (res?.data) {
         console.log("[HomePage] BE response:", JSON.stringify(res.data, null, 2));
@@ -281,11 +283,11 @@ const HomePage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     fetchDashboardData(selectedDate);
-  }, [selectedDate, fetchDashboardData]);
+  }, [selectedDate, currentBranchId, fetchDashboardData]);
 
   const handleDateChange = (newDate) => setSelectedDate(newDate);
 

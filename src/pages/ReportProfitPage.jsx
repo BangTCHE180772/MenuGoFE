@@ -32,6 +32,7 @@ import ProfitReportTable from "../components/reports/profit/ProfitReportTable";
 import ProfitCompareModal from "../components/reports/profit/ProfitCompareModal";
 
 import { getBranchDashboardStats } from "../api/dashboardApi";
+import { useBranch } from "../context/BranchContext";
 
 const { Title, Text } = Typography;
 
@@ -44,6 +45,7 @@ const formatVND = (val) =>
  * Đường dẫn: /reports/profit
  */
 const ReportProfitPage = () => {
+  const { currentBranchId } = useBranch();
   const [loading, setLoading]         = useState(true);
   const [presetTime, setPresetTime]   = useState("this_month");
   const [dateRange, setDateRange]     = useState([
@@ -83,7 +85,7 @@ const ReportProfitPage = () => {
       };
       const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
 
-      const res = await getBranchDashboardStats(range, startStr, endStr, null);
+      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
 
       if (res?.data) {
         const data = res.data;
@@ -159,13 +161,12 @@ const ReportProfitPage = () => {
         ];
         setWaterfallData(waterfall);
 
-        // 4. Phân bổ lợi nhuận (Distribution Histogram)
-        // Chia mốc lợi nhuận theo các nhóm
+        // 4. Phân bổ khoảng lợi nhuận
         const ranges = [
-          { range: "< 1M",      min: -Infinity, max: 1000000,   count: 0 },
-          { range: "1M - 5M",   min: 1000000,   max: 5000000,   count: 0 },
-          { range: "5M - 10M",  min: 5000000,   max: 10000000,  count: 0 },
-          { range: "10M - 50M", min: 10000000,  max: 50000000,  count: 0 },
+          { range: "< 0 ₫",      min: -Infinity, max: 0,         count: 0 },
+          { range: "0 - 10M",    min: 0,         max: 10000000,  count: 0 },
+          { range: "10M - 20M",  min: 10000000,  max: 20000000,  count: 0 },
+          { range: "20M - 50M",  min: 20000000,  max: 50000000,  count: 0 },
           { range: "> 50M",     min: 50000000,  max: Infinity,  count: 0 },
         ];
         list.forEach((item) => {
@@ -181,11 +182,11 @@ const ReportProfitPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, presetTime]);
+  }, [dateRange, presetTime, currentBranchId]);
 
   useEffect(() => {
     fetchReportData();
-  }, [fetchReportData]);
+  }, [currentBranchId, fetchReportData]);
 
   const handlePresetChange = (val) => {
     setPresetTime(val);
