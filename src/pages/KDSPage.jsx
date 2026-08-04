@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
 import { useSignalR } from '../context/SignalRContext';
+import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -39,12 +40,24 @@ const COOKING_STATUS = {
 };
 
 const KDSPage = () => {
+  const { user } = useAuth();
+  const currentBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const signalRConnection = useSignalR();
+
+  // Join branch-specific SignalR group
+  useEffect(() => {
+    if (signalRConnection && currentBranchId) {
+      signalRConnection
+        .invoke('JoinBranchGroup', Number(currentBranchId))
+        .catch((err) => console.log('JoinBranchGroup error:', err));
+    }
+  }, [signalRConnection, currentBranchId]);
 
   // Helper sound generator for EX-1 (Cancellation Warning & New Order Warning)
   const playAlertSound = useCallback((type = 'cancel') => {
@@ -104,6 +117,12 @@ const KDSPage = () => {
 
     const handleNotification = (notif) => {
       console.log('KDS Notification received:', notif);
+
+      // Branch isolation check: Bỏ qua nếu thông báo thuộc chi nhánh khác
+      if (notif.branchId && currentBranchId && Number(notif.branchId) !== Number(currentBranchId)) {
+        console.log('KDS Notification ignored due to branch mismatch:', notif.branchId, 'vs', currentBranchId);
+        return;
+      }
 
       if (notif.type === 'new-order' || notif.type === 'new-item') {
         playAlertSound('new');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -7,6 +7,7 @@ import {
   Form,
   Select,
   DatePicker,
+  Input,
   InputNumber,
   Space,
   Tag,
@@ -91,6 +92,9 @@ const WorkSchedulePage = () => {
   // Modal states - Bulk Assign
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkForm] = Form.useForm();
+
+  const selectedFormBranchId = Form.useWatch('branchId', form);
+  const selectedBulkBranchId = Form.useWatch('branchId', bulkForm);
 
   // Active view tab
   const [activeTab, setActiveTab] = useState('table');
@@ -814,12 +818,8 @@ const WorkSchedulePage = () => {
               <Select placeholder="Chọn nhân viên..." showSearch optionFilterProp="label">
                 {accounts
                   .filter((a) => {
-                    if (!a.contracts || a.contracts.length === 0) return false;
-                    return a.contracts.some((c) => {
-                      const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
-                      const isBranchMatch = !selectedFormBranchId || c.branchId === selectedFormBranchId;
-                      return isActive && isBranchMatch;
-                    });
+                    if (!a.roleIds || a.roleIds.length === 0) return false;
+                    return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
                   })
                   .map((a) => (
                     <Select.Option key={a.id} value={a.id} label={a.name}>
@@ -835,7 +835,7 @@ const WorkSchedulePage = () => {
               rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
               style={{ flex: 1 }}
             >
-              <Select placeholder="Chọn chi nhánh...">
+              <Select placeholder="Chọn chi nhánh..." disabled={isManager}>
                 {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
@@ -890,7 +890,7 @@ const WorkSchedulePage = () => {
           {/* Row 4: Actual Hours & Status */}
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item name="actualHours" label="Tổng giờ làm việc thực tế" style={{ flex: 1 }}>
-              <InputNumber min={0} max={24} step={0.5} style={{ width: '100%' }} placeholder="Nhập số giờ" />
+              <InputNumber min={0} max={24} step={0.5} style={{ width: '100%' }} placeholder="Tự động tính từ Check-in/out" disabled />
             </Form.Item>
 
             <Form.Item
@@ -911,8 +911,8 @@ const WorkSchedulePage = () => {
 
           {/* Code (optional/display) */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <Form.Item name="code" label="Mã phân ca (Hệ thống tự tạo nếu bỏ trống)" style={{ flex: 1 }}>
-              <input className="ant-input" placeholder="Ví dụ: WS-BRANCH-SHIFT-DATE" />
+            <Form.Item name="code" label="Mã phân ca (Tự động sinh)" style={{ flex: 1 }}>
+              <Input placeholder="Tự động sinh theo hệ thống" disabled />
             </Form.Item>
 
             <Form.Item name="managerApproved" label="Quản lý phê duyệt ngay" valuePropName="checked" style={{ width: 200, marginBottom: 0 }}>
@@ -964,12 +964,8 @@ const WorkSchedulePage = () => {
             >
               {accounts
                 .filter((a) => {
-                  if (!a.contracts || a.contracts.length === 0) return false;
-                  return a.contracts.some((c) => {
-                    const isActive = c.status === 'Active' || c.status === 1 || c.status === '1';
-                    const isBranchMatch = !selectedBulkBranchId || c.branchId === selectedBulkBranchId;
-                    return isActive && isBranchMatch;
-                  });
+                  if (!a.roleIds || a.roleIds.length === 0) return false;
+                  return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
                 })
                 .map((a) => (
                   <Select.Option key={a.id} value={a.id} label={a.name}>
@@ -986,7 +982,7 @@ const WorkSchedulePage = () => {
               rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
               style={{ flex: 1 }}
             >
-              <Select placeholder="Chọn chi nhánh...">
+              <Select placeholder="Chọn chi nhánh..." disabled={isManager}>
                 {allowedBranches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
