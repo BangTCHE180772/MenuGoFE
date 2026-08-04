@@ -10,8 +10,12 @@ export const SignalRProvider = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    const hubUrl = import.meta.env.DEV
+      ? 'http://localhost:5067/notificationHub'
+      : 'https://menugobe.onrender.com/notificationHub';
+
     const connect = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5067/notificationHub')
+      .withUrl(hubUrl)
       .withAutomaticReconnect()
       .build();
 

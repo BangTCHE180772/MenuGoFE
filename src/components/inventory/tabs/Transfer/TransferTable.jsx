@@ -13,6 +13,7 @@ import { getTransferById } from '../../../../api/documentApi';
 
 const TransferTable = ({
   documents = [],
+  selectedBranchId,
   searchText,
   setSearchText,
   statusFilter = 'ALL',
@@ -21,7 +22,8 @@ const TransferTable = ({
   setModalTransferOpen,
   onEditDocument,
   handleReceiveTransfer,
-  handleDeleteDocument
+  handleDeleteDocument,
+  onRefresh
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
@@ -147,6 +149,7 @@ const TransferTable = ({
             onClick={() => {
               if (setSearchText) setSearchText('');
               if (setStatusFilter) setStatusFilter('ALL');
+              if (onRefresh) onRefresh();
             }}
             style={{
               background: '#ffffff',
@@ -204,6 +207,8 @@ const TransferTable = ({
                 const isExpanded = expandedDocId === doc.id;
                 const activeDoc = isExpanded && loadedDoc?.id === doc.id ? loadedDoc : doc;
                 const detailsList = activeDoc.details || activeDoc.documentDetails || [];
+
+                const isReceiver = !selectedBranchId || Number(selectedBranchId) === Number(doc.toBranchId || doc.targetBranchId || doc.toBranch?.id);
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -269,13 +274,13 @@ const TransferTable = ({
                               Sửa
                             </button>
                           )}
-                          {!isCancelled && !isDraft && isInTransit && handleReceiveTransfer && (
+                          {!isCancelled && !isDraft && isInTransit && isReceiver && handleReceiveTransfer && (
                             <button
                               type="button"
                               onClick={() => handleReceiveTransfer(doc)}
                               style={{ background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
                             >
-                              Nhận
+                              Nhận / Từ chối
                             </button>
                           )}
                           <button

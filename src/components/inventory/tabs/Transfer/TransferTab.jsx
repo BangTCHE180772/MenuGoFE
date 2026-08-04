@@ -1,17 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import TransferTable from './TransferTable';
 import TransferDocumentModal from './TransferDocumentModal';
 import ReceiveTransferDocumentModal from './ReceiveTransferDocumentModal';
+import { getTransferDocuments } from '../../../../api/documentApi';
 
 const TransferTab = ({
   documents = [],
-  loading,
+  loading: parentLoading,
   selectedBranchId,
   branches = [],
   products = [],
   fetchDocuments,
   handleDeleteDocument
 }) => {
+  const [transferList, setTransferList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalTransferOpen, setModalTransferOpen] = useState(false);
@@ -19,20 +22,57 @@ const TransferTab = ({
   const [modalReceiveOpen, setModalReceiveOpen] = useState(false);
   const [selectedTransferDoc, setSelectedTransferDoc] = useState(null);
 
+  const loadTransferDocuments = useCallback(async (bId) => {
+    if (!bId || bId <= 0) {
+      setTransferList([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getTransferDocuments(bId);
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setTransferList(data);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách phiếu chuyển kho:', err);
+      setTransferList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedBranchId && selectedBranchId > 0) {
+      loadTransferDocuments(selectedBranchId);
+    } else {
+      setTransferList([]);
+    }
+  }, [selectedBranchId, loadTransferDocuments]);
+
+  const displaySource = transferList.length > 0 ? transferList : documents;
+
   const transferDocuments = useMemo(() => {
-    return documents.filter((doc) => {
-      // Include Transfer (Type 2 & 3) and ReceiveTransfer (Type 7)
-      if (doc.type !== 2 && doc.type !== 3 && doc.type !== 7) return false;
-      if (statusFilter !== 'ALL' && doc.status !== statusFilter) return false;
+    return displaySource.filter((doc) => {
+      // Include Transfer (Type 2, 3, 7 or 'Transfer')
+      const isTransfer = doc.type === 2 || doc.type === 3 || doc.type === 7 || doc.type === 'Transfer' || doc.type === 'ReceiveTransfer';
+      if (!isTransfer && displaySource === documents) return false;
+
+      if (statusFilter !== 'ALL') {
+        const docStatusStr = String(doc.status);
+        if (statusFilter === 'Pending' && docStatusStr !== '0' && docStatusStr !== 'Pending') return false;
+        if (statusFilter === 'Completed' && docStatusStr !== '1' && docStatusStr !== 'Completed') return false;
+        if (statusFilter === 'Cancelled' && docStatusStr !== '2' && docStatusStr !== 'Cancelled' && docStatusStr !== 'Canceled') return false;
+      }
+
       if (searchText) {
         const lower = searchText.toLowerCase();
         const matchCode = doc.code?.toLowerCase().includes(lower);
-        const matchCreator = doc.creator?.toLowerCase().includes(lower);
-        if (!matchCode && !matchCreator) return false;
+        const matchCreator = (doc.creator || doc.createdByName || doc.snapshotCreatedByName)?.toLowerCase().includes(lower);
+        const matchBranch = (doc.snapshotBranchName || doc.snapshotToBranchName || doc.currentBranchName)?.toLowerCase().includes(lower);
+        if (!matchCode && !matchCreator && !matchBranch) return false;
       }
       return true;
     });
-  }, [documents, statusFilter, searchText]);
+  }, [displaySource, documents, statusFilter, searchText]);
 
   const handleOpenEdit = (docId) => {
     setEditDocumentId(docId);
@@ -49,19 +89,35 @@ const TransferTab = ({
     setModalReceiveOpen(true);
   };
 
+  const handleRefresh = () => {
+    if (selectedBranchId) {
+      loadTransferDocuments(selectedBranchId);
+      if (fetchDocuments) fetchDocuments(selectedBranchId);
+    }
+  };
+
+  const handleDelete = async (id, type) => {
+    if (handleDeleteDocument) {
+      await handleDeleteDocument(id, type);
+      handleRefresh();
+    }
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
       <TransferTable
         documents={transferDocuments}
+        selectedBranchId={selectedBranchId}
         searchText={searchText}
         setSearchText={setSearchText}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
-        loading={loading}
+        loading={loading || parentLoading}
         setModalTransferOpen={setModalTransferOpen}
         onEditDocument={handleOpenEdit}
         handleReceiveTransfer={handleOpenReceiveModal}
-        handleDeleteDocument={handleDeleteDocument}
+        handleDeleteDocument={handleDelete}
+        onRefresh={handleRefresh}
       />
 
       {/* MODAL 1: CHUYỂN HÀNG */}
@@ -69,9 +125,7 @@ const TransferTab = ({
         open={modalTransferOpen}
         editDocumentId={editDocumentId}
         onClose={handleCloseTransferModal}
-        onSuccess={() => {
-          fetchDocuments(selectedBranchId);
-        }}
+        onSuccess={handleRefresh}
         branchId={selectedBranchId}
         branches={branches}
         products={products}
@@ -81,9 +135,7 @@ const TransferTab = ({
       <ReceiveTransferDocumentModal
         open={modalReceiveOpen}
         onClose={() => setModalReceiveOpen(false)}
-        onSuccess={() => {
-          fetchDocuments(selectedBranchId);
-        }}
+        onSuccess={handleRefresh}
         documentData={selectedTransferDoc}
       />
     </div>

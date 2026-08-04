@@ -49,6 +49,7 @@ import ReportProfitPage from '../pages/ReportProfitPage';
 import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
+import CashFlowPage from '../pages/CashFlowPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -126,6 +127,7 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
+                <Route path="/cashflow" element={<CashFlowPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />

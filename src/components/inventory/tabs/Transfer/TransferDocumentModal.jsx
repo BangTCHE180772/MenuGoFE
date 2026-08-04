@@ -119,7 +119,7 @@ const TransferDocumentModal = ({
               setSelectedDateTime(dt);
               setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
               setOpenTimeISO(dt.toISOString());
-              setTargetBranchId(res.targetBranchId || '');
+              setTargetBranchId(res.toBranchId || res.targetBranchId || '');
               setFormData({
                 docCode: res.code || '',
                 note: res.note || ''
@@ -136,6 +136,7 @@ const TransferDocumentModal = ({
                 const baseAvgCost = d.snapshotAvgCost || d.unitPrice || matchP?.runningAverageCost || matchP?.avg || 0;
 
                 return {
+                  id: d.id ? Number(d.id) : null,
                   rowId: `${bInvId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                   bInventoryId: bInvId,
                   code: d.snapshotProductCode || d.currentProductCode || d.code || matchP?.code || `SP${bInvId}`,
@@ -181,6 +182,12 @@ const TransferDocumentModal = ({
           fetchBInventories(branchId, now.toISOString(), '');
         }
       }
+    } else {
+      setItems([]);
+      setFormData({ docCode: '', note: '' });
+      setSearchQuery('');
+      setShowDropdown(false);
+      setLoading(false);
     }
   }, [open, editDocumentId, branchId, fetchBInventories]);
 
@@ -342,35 +349,51 @@ const TransferDocumentModal = ({
 
     setLoading(true);
     try {
-      const dto = {
-        branchId: Number(branchId),
-        targetBranchId: Number(targetBranchId),
-        orderDate: openTimeISO || selectedDateTime.toISOString(),
-        note: formData.note || '',
-        details: items.map((i) => ({
-          bInventoryId: Number(i.bInventoryId),
-          unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
-          quantity: Number(i.transferQuantity) || 1,
-          unitPrice: Number(i.transferPrice) || 0,
-          note: i.note || ''
-        }))
-      };
-
       if (editDocumentId) {
+        // Edit mode: TransferDocumentUpdateDto
+        const updateDto = {
+          toBranchId: Number(targetBranchId),
+          orderDate: openTimeISO || selectedDateTime.toISOString(),
+          note: formData.note || '',
+          details: items.map((i) => ({
+            id: i.id ? Number(i.id) : null,
+            bInventoryId: Number(i.bInventoryId),
+            unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
+            quantity: Number(i.transferQuantity) || 1,
+            unitPrice: Number(i.transferPrice) || 0,
+            note: i.note || ''
+          }))
+        };
+
         if (isDraft) {
-          await updateTransferPending(editDocumentId, dto);
+          await updateTransferPending(editDocumentId, updateDto);
           showToast('Cập nhật phiếu chuyển kho nháp thành công!');
         } else {
-          await updateTransferPending(editDocumentId, dto);
+          await updateTransferPending(editDocumentId, updateDto);
           await completeTransferDocument(editDocumentId);
-          showToast('Hoàn thành phiếu chuyển kho thành công!');
+          showToast('Cập nhật và Hoàn thành phiếu chuyển kho thành công!');
         }
       } else {
+        // Create mode: TransferDocumentCreateDto
+        const createDto = {
+          branchId: Number(branchId),
+          toBranchId: Number(targetBranchId),
+          orderDate: openTimeISO || selectedDateTime.toISOString(),
+          note: formData.note || '',
+          details: items.map((i) => ({
+            bInventoryId: Number(i.bInventoryId),
+            unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
+            quantity: Number(i.transferQuantity) || 1,
+            unitPrice: Number(i.transferPrice) || 0,
+            note: i.note || ''
+          }))
+        };
+
         if (isDraft) {
-          await createTransferPending(dto);
+          await createTransferPending(createDto);
           showToast('Lưu tạm phiếu chuyển kho thành công!');
         } else {
-          await createTransferCompleted(dto);
+          await createTransferCompleted(createDto);
           showToast('Tạo và Hoàn thành phiếu chuyển kho thành công!');
         }
       }
@@ -909,25 +932,6 @@ const TransferDocumentModal = ({
 
           {/* ACTION BUTTONS */}
           <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
-            {editDocumentId && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleCancelPending}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #dc2626',
-                  color: '#dc2626',
-                  fontWeight: 600,
-                  borderRadius: 6,
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  fontSize: 11
-                }}
-              >
-                Hủy phiếu nháp
-              </button>
-            )}
             <button
               type="button"
               disabled={loading}

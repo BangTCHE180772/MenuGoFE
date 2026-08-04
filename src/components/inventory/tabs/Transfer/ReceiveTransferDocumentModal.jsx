@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '../../../../context/AuthContext';
-import { receiveTransferDocument, rejectTransferDocument } from '../../../../api/documentApi';
+import { receiveTransferDocument, rejectTransferDocument, getTransferById } from '../../../../api/documentApi';
 import { extractErrorMessage } from '../../utils/errorHelper';
 
 const ReceiveTransferDocumentModal = ({
@@ -23,36 +23,69 @@ const ReceiveTransferDocumentModal = ({
   const creatorName = user?.name || user?.email || 'Mno';
 
   const [loading, setLoading] = useState(false);
+  const [fullDoc, setFullDoc] = useState(null);
   const [items, setItems] = useState([]);
   const [receivingNote, setReceivingNote] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    if (open) {
+    if (open && documentData?.id) {
       setReceivingNote('');
       setErrorMessage('');
       setSuccessMessage('');
-      const rawDetails = documentData?.details || documentData?.documentDetails || [];
-      if (Array.isArray(rawDetails) && rawDetails.length > 0) {
-        setItems(
-          rawDetails.map((detail) => ({
-            id: detail.id,
-            bInventoryId: detail.bInventoryId,
-            code: detail.productCode || detail.snapshotProductCode || detail.currentProductCode || detail.bInventory?.product?.skuCode || `SP${detail.bInventory?.productId || detail.id}`,
-            name: detail.productName || detail.snapshotProductName || detail.currentProductName || detail.bInventory?.product?.name || 'Sản phẩm',
-            unitName: detail.unitName || detail.snapshotUnitName || detail.currentUnitName || detail.unitConversion?.unit?.name || '',
-            stock: detail.currentStockQuantity ?? detail.bInventory?.quantity ?? 0,
-            transferQty: detail.quantity || detail.baseQuantity || 1,
-            receiveQty: detail.receivedQuantity ?? detail.quantity ?? detail.baseQuantity ?? 1,
-            unitPrice: detail.unitPrice || 0,
-            note: detail.note || '',
-            editingNote: false
-          }))
-        );
-      } else {
-        setItems([]);
-      }
+      setLoading(true);
+
+      getTransferById(documentData.id)
+        .then((res) => {
+          const doc = res || documentData;
+          setFullDoc(doc);
+          const rawDetails = doc?.details || doc?.documentDetails || [];
+          if (Array.isArray(rawDetails) && rawDetails.length > 0) {
+            setItems(
+              rawDetails.map((detail) => {
+                const pCode = detail.productCode || detail.snapshotProductCode || detail.currentProductCode || detail.code || `SP${detail.bInventoryId || detail.id}`;
+                const pName = detail.productName || detail.snapshotProductName || detail.currentProductName || detail.name || 'Sản phẩm';
+                const uName = detail.unitName || detail.snapshotUnitName || detail.currentUnitName || detail.baseUnitName || 'Đơn vị';
+                const stock = detail.currentStockQuantity ?? detail.stock ?? 0;
+                const qty = Number(detail.quantity || detail.baseQuantity || 1);
+                const recQty = detail.receivedQuantity != null ? Number(detail.receivedQuantity) : qty;
+                const price = Number(detail.unitPrice || detail.snapshotAvgCost || 0);
+
+                return {
+                  id: detail.id,
+                  bInventoryId: detail.bInventoryId,
+                  code: pCode,
+                  name: pName,
+                  unitName: uName,
+                  stock: stock,
+                  transferQty: qty,
+                  receiveQty: recQty,
+                  unitPrice: price,
+                  note: detail.note || '',
+                  editingNote: false
+                };
+              })
+            );
+          } else {
+            setItems([]);
+          }
+        })
+        .catch((err) => {
+          console.error('Lỗi khi nạp chi tiết phiếu chuyển kho:', err);
+          setErrorMessage('Không thể tải chi tiết danh sách sản phẩm chuyển kho.');
+          setItems([]);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setFullDoc(null);
+      setItems([]);
+      setReceivingNote('');
+      setErrorMessage('');
+      setSuccessMessage('');
+      setLoading(false);
     }
   }, [open, documentData]);
 
@@ -156,12 +189,13 @@ const ReceiveTransferDocumentModal = ({
 
   if (!open) return null;
 
-  const docCode = documentData?.code || 'TRF000003';
-  const senderBranch = documentData?.branch?.name || 'Chi nhánh trung tâm';
-  const transferDate = documentData?.businessDate
-    ? dayjs(documentData.businessDate).format('DD/MM/YYYY HH:mm')
-    : '29/07/2026 23:47';
-  const docCreatorName = documentData?.creator?.name || documentData?.creator?.email || creatorName;
+  const activeDoc = fullDoc || documentData;
+  const docCode = activeDoc?.code || '---';
+  const senderBranch = activeDoc?.branchName || activeDoc?.snapshotBranchName || activeDoc?.branch?.name || activeDoc?.currentBranchName || 'Chi nhánh gửi';
+  const transferDate = (activeDoc?.orderDate || activeDoc?.businessDate || activeDoc?.createdAt)
+    ? dayjs(activeDoc.orderDate || activeDoc.businessDate || activeDoc.createdAt).format('DD/MM/YYYY HH:mm')
+    : dayjs().format('DD/MM/YYYY HH:mm');
+  const docCreatorName = activeDoc?.createdByName || activeDoc?.snapshotCreatedByName || activeDoc?.creator?.name || activeDoc?.creator?.email || creatorName;
 
   return (
     <div

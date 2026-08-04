@@ -66,7 +66,7 @@ const ProductSidebar = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
             { key: 'nguyenlieu', label: 'Nguyên liệu' },
-            { key: 'mathang', label: 'Mặt hàng' }
+            { key: 'monan', label: 'Món ăn' }
           ].map((item) => (
             <label
               key={item.key}
