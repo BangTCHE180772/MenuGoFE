@@ -13,6 +13,7 @@ import {
   Tag,
   Tooltip,
   Popconfirm,
+  Avatar,
   message,
   Row,
   Col,
@@ -84,6 +85,13 @@ const DETAIL_TYPE_OPTIONS = [
   { value: 'Penalty', label: 'Tiền phạt (-)' },
 ];
 
+const ROLES_MAP = {
+  3: { label: 'Quản lý', color: 'purple' },
+  4: { label: 'Thu ngân', color: 'blue' },
+  5: { label: 'Bếp trưởng', color: 'orange' },
+  6: { label: 'Phục vụ', color: 'green' },
+};
+
 const PayrollPage = () => {
   const { user } = useAuth();
   const [payrolls, setPayrolls] = useState([]);
@@ -107,6 +115,28 @@ const PayrollPage = () => {
     }
     return !a.roleIds.some((rId) => [1, 2, 3].includes(rId)); // Manager only manages Staff accounts
   });
+
+  // Group accounts by role for cleaner dropdown UX
+  const groupedAccounts = useCallback(() => {
+    const groups = {
+      3: { label: '👑 QUẢN LÝ', items: [] },
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
+      other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
+    };
+
+    filteredAccounts.forEach((a) => {
+      const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 'other');
+      if (groups[primaryRoleId]) {
+        groups[primaryRoleId].items.push(a);
+      } else {
+        groups.other.items.push(a);
+      }
+    });
+
+    return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
+  }, [filteredAccounts])();
 
   // Filter States
   const [searchText, setSearchText] = useState('');
@@ -547,47 +577,28 @@ const PayrollPage = () => {
       title: 'Hành động',
       key: 'actions',
       fixed: 'right',
-      width: 140,
+      width: 100,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="Xem chi tiết">
+          <Tooltip title="Chỉnh sửa">
             <Button
               type="text"
-              icon={<EyeOutlined style={{ color: '#1890ff' }} />}
-              onClick={() => handleOpenDetail(record)}
+              icon={<EditOutlined style={{ color: '#fa8c16' }} />}
+              onClick={() => handleOpenFormModal('edit', record)}
             />
           </Tooltip>
 
-          <Tooltip title="Đổi trạng thái">
-            <Button
-              type="text"
-              icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-              onClick={() => handleOpenStatusModal(record)}
-            />
+          <Tooltip title="Xóa">
+            <Popconfirm
+              title="Bạn chắc chắn muốn xóa bảng lương này?"
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Button type="text" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
           </Tooltip>
-
-          {record.status === PAYROLL_STATUS.Draft && (
-            <>
-              <Tooltip title="Chỉnh sửa bản nháp">
-                <Button
-                  type="text"
-                  icon={<EditOutlined style={{ color: '#fa8c16' }} />}
-                  onClick={() => handleOpenFormModal('edit', record)}
-                />
-              </Tooltip>
-
-              <Tooltip title="Xóa bản nháp">
-                <Popconfirm
-                  title="Bạn chắc chắn muốn xóa bản nháp này?"
-                  okText="Đồng ý"
-                  cancelText="Hủy"
-                  onConfirm={() => handleDelete(record.id)}
-                >
-                  <Button type="text" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
-              </Tooltip>
-            </>
-          )}
         </Space>
       ),
     },
@@ -824,7 +835,11 @@ const PayrollPage = () => {
             <Select
               placeholder="Chọn nhân viên cần tính lương..."
               showSearch
-              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
+              }
+              optionLabelProp="label"
+              dropdownStyle={{ maxHeight: 360 }}
               onChange={(val) => {
                 const acc = accounts.find((a) => a.id === val);
                 if (acc && acc.branchId) {
@@ -832,10 +847,52 @@ const PayrollPage = () => {
                 }
               }}
             >
-              {filteredAccounts.map((a) => (
-                <Select.Option key={a.id} value={a.id} label={a.name}>
-                  {a.name} (ID: {a.id})
-                </Select.Option>
+              {groupedAccounts.map(([roleKey, group]) => (
+                <Select.OptGroup
+                  key={roleKey}
+                  label={
+                    <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                      {group.label} ({group.items.length})
+                    </div>
+                  }
+                >
+                  {group.items.map((a) => {
+                    const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
+                    const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                    const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+
+                    return (
+                      <Select.Option
+                        key={a.id}
+                        value={a.id}
+                        label={`${a.name} (Mã: #${a.id})`}
+                        searchValue={searchValue}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Avatar
+                              size={30}
+                              src={a.avatarImage || undefined}
+                              icon={!a.avatarImage ? <UserOutlined /> : undefined}
+                              style={{ backgroundColor: a.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                {a.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                            {roleInfo.label}
+                          </Tag>
+                        </div>
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
               ))}
             </Select>
           </Form.Item>
@@ -925,7 +982,11 @@ const PayrollPage = () => {
                 <Select
                   placeholder="Chọn nhân viên..."
                   showSearch
-                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  optionLabelProp="label"
+                  dropdownStyle={{ maxHeight: 360 }}
                   onChange={(val) => {
                     const acc = accounts.find((a) => a.id === val);
                     if (acc && acc.branchId) {
@@ -933,10 +994,52 @@ const PayrollPage = () => {
                     }
                   }}
                 >
-                  {filteredAccounts.map((a) => (
-                    <Select.Option key={a.id} value={a.id} label={a.name}>
-                      {a.name} (ID: {a.id})
-                    </Select.Option>
+                  {groupedAccounts.map(([roleKey, group]) => (
+                    <Select.OptGroup
+                      key={roleKey}
+                      label={
+                        <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                          {group.label} ({group.items.length})
+                        </div>
+                      }
+                    >
+                      {group.items.map((a) => {
+                        const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
+                        const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                        const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+
+                        return (
+                          <Select.Option
+                            key={a.id}
+                            value={a.id}
+                            label={`${a.name} (Mã: #${a.id})`}
+                            searchValue={searchValue}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <Avatar
+                                  size={30}
+                                  src={a.avatarImage || undefined}
+                                  icon={!a.avatarImage ? <UserOutlined /> : undefined}
+                                  style={{ backgroundColor: a.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                    {a.name}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                    Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                                {roleInfo.label}
+                              </Tag>
+                            </div>
+                          </Select.Option>
+                        );
+                      })}
+                    </Select.OptGroup>
                   ))}
                 </Select>
               </Form.Item>
