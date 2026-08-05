@@ -1,72 +1,142 @@
-import React, { useState, useMemo } from 'react';
-import TransferSidebar from './TransferSidebar';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import TransferTable from './TransferTable';
 import TransferDocumentModal from './TransferDocumentModal';
-import { receiveTransferDocument } from '../../../../api/documentApi';
+import ReceiveTransferDocumentModal from './ReceiveTransferDocumentModal';
+import { getTransferDocuments } from '../../../../api/documentApi';
 
 const TransferTab = ({
   documents = [],
-  loading,
+  loading: parentLoading,
   selectedBranchId,
   branches = [],
   products = [],
   fetchDocuments,
   handleDeleteDocument
 }) => {
+  const [transferList, setTransferList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalTransferOpen, setModalTransferOpen] = useState(false);
+  const [editDocumentId, setEditDocumentId] = useState(null);
+  const [modalReceiveOpen, setModalReceiveOpen] = useState(false);
+  const [selectedTransferDoc, setSelectedTransferDoc] = useState(null);
+
+  const loadTransferDocuments = useCallback(async (bId) => {
+    if (!bId || bId <= 0) {
+      setTransferList([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getTransferDocuments(bId);
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setTransferList(data);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách phiếu chuyển kho:', err);
+      setTransferList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedBranchId && selectedBranchId > 0) {
+      loadTransferDocuments(selectedBranchId);
+    } else {
+      setTransferList([]);
+    }
+  }, [selectedBranchId, loadTransferDocuments]);
+
+  const displaySource = transferList.length > 0 ? transferList : documents;
 
   const transferDocuments = useMemo(() => {
-    return documents.filter((doc) => {
-      if (doc.type !== 3) return false;
+    return displaySource.filter((doc) => {
+      // Include Transfer (Type 2, 3, 7 or 'Transfer')
+      const isTransfer = doc.type === 2 || doc.type === 3 || doc.type === 7 || doc.type === 'Transfer' || doc.type === 'ReceiveTransfer';
+      if (!isTransfer && displaySource === documents) return false;
+
       if (statusFilter !== 'ALL') {
-        if (statusFilter === 'Pending' && doc.transferStatus !== 'Pending') return false;
-        if (statusFilter === 'Completed' && doc.status !== 'Completed') return false;
+        const docStatusStr = String(doc.status);
+        if (statusFilter === 'Pending' && docStatusStr !== '0' && docStatusStr !== 'Pending') return false;
+        if (statusFilter === 'Completed' && docStatusStr !== '1' && docStatusStr !== 'Completed') return false;
+        if (statusFilter === 'Cancelled' && docStatusStr !== '2' && docStatusStr !== 'Cancelled' && docStatusStr !== 'Canceled') return false;
       }
+
       if (searchText) {
         const lower = searchText.toLowerCase();
         const matchCode = doc.code?.toLowerCase().includes(lower);
-        const matchCreator = doc.creator?.toLowerCase().includes(lower);
-        if (!matchCode && !matchCreator) return false;
+        const matchCreator = (doc.creator || doc.createdByName || doc.snapshotCreatedByName)?.toLowerCase().includes(lower);
+        const matchBranch = (doc.snapshotBranchName || doc.snapshotToBranchName || doc.currentBranchName)?.toLowerCase().includes(lower);
+        if (!matchCode && !matchCreator && !matchBranch) return false;
       }
       return true;
     });
-  }, [documents, statusFilter, searchText]);
+  }, [displaySource, documents, statusFilter, searchText]);
 
-  const handleReceiveTransfer = async (doc) => {
-    if (!window.confirm(`Xác nhận nhận hàng chuyển cho mã phiếu ${doc.code}?`)) return;
-    try {
-      await receiveTransferDocument({ documentId: doc.id });
-      alert('Đã nhận hàng chuyển thành công!');
-      fetchDocuments(selectedBranchId);
-    } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Lỗi nhận hàng chuyển.');
+  const handleOpenEdit = (docId) => {
+    setEditDocumentId(docId);
+    setModalTransferOpen(true);
+  };
+
+  const handleCloseTransferModal = () => {
+    setModalTransferOpen(false);
+    setEditDocumentId(null);
+  };
+
+  const handleOpenReceiveModal = (doc = null) => {
+    setSelectedTransferDoc(doc);
+    setModalReceiveOpen(true);
+  };
+
+  const handleRefresh = () => {
+    if (selectedBranchId) {
+      loadTransferDocuments(selectedBranchId);
+      if (fetchDocuments) fetchDocuments(selectedBranchId);
+    }
+  };
+
+  const handleDelete = async (id, type) => {
+    if (handleDeleteDocument) {
+      await handleDeleteDocument(id, type);
+      handleRefresh();
     }
   };
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: '100%' }}>
-      <TransferSidebar statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
       <TransferTable
         documents={transferDocuments}
+        selectedBranchId={selectedBranchId}
         searchText={searchText}
         setSearchText={setSearchText}
-        loading={loading}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        loading={loading || parentLoading}
         setModalTransferOpen={setModalTransferOpen}
-        handleReceiveTransfer={handleReceiveTransfer}
-        handleDeleteDocument={handleDeleteDocument}
+        onEditDocument={handleOpenEdit}
+        handleReceiveTransfer={handleOpenReceiveModal}
+        handleDeleteDocument={handleDelete}
+        onRefresh={handleRefresh}
       />
 
+      {/* MODAL 1: CHUYỂN HÀNG */}
       <TransferDocumentModal
         open={modalTransferOpen}
-        onClose={() => setModalTransferOpen(false)}
-        onSuccess={() => {
-          fetchDocuments(selectedBranchId);
-        }}
+        editDocumentId={editDocumentId}
+        onClose={handleCloseTransferModal}
+        onSuccess={handleRefresh}
         branchId={selectedBranchId}
         branches={branches}
         products={products}
+      />
+
+      {/* MODAL 2: NHẬN HÀNG */}
+      <ReceiveTransferDocumentModal
+        open={modalReceiveOpen}
+        onClose={() => setModalReceiveOpen(false)}
+        onSuccess={handleRefresh}
+        documentData={selectedTransferDoc}
       />
     </div>
   );

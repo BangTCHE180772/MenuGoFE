@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
+import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const InvoiceTable = ({ invoices = [] }) => {
   const [searchText, setSearchText] = useState('');
@@ -18,58 +19,75 @@ const InvoiceTable = ({ invoices = [] }) => {
   const currentData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', background: '#ffffff', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <input
-          type="text"
-          placeholder="Theo mã hóa đơn..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            width: 240,
-            height: 26,
-            padding: '2px 10px',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#1e293b',
-            borderRadius: 16,
-            border: '1px solid #cbd5e1',
-            outline: 'none'
-          }}
-        />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
+      {/* TOP ACTION TOOLBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* SEARCH INPUT */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              placeholder="Theo mã hóa đơn, tên khách hàng..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '4px 10px 4px 30px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#1e293b',
+                borderRadius: 6,
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                transition: 'border 0.2s ease'
+              }}
+            />
+          </div>
+        </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
+            type="button"
             onClick={() => alert('Mở form Lập hóa đơn')}
             style={{
-              background: '#e8442a',
+              background: 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            + Lập hóa đơn
+            <PlusOutlined /> Lập hóa đơn
           </button>
           <button
+            type="button"
             onClick={() => alert('Đã làm mới hóa đơn')}
             style={{
               background: '#ffffff',
               color: '#334155',
               border: '1px solid #cbd5e1',
-              borderRadius: 4,
-              padding: '0 10px',
-              height: 26,
-              fontSize: 11,
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            Làm mới
+            <ReloadOutlined /> Làm mới
           </button>
         </div>
       </div>

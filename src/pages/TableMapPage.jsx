@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { message, Spin, Select } from 'antd';
+import { message, Spin, Select, Button } from 'antd';
+import { CheckCircleOutlined, FireOutlined } from '@ant-design/icons';
+import RequestRestockModal from '../components/order/RequestRestockModal';
+import InternalPickupModal from '../components/order/InternalPickupModal';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAreasByBranchId } from '../api/areaApi';
@@ -26,6 +29,8 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
   const [loadingTables, setLoadingTables] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [orderSummary, setOrderSummary] = useState(null);
+  const [isRestockModalVisible, setIsRestockModalVisible] = useState(false);
+  const [isInternalPickupModalVisible, setIsInternalPickupModalVisible] = useState(false);
 
   const { user } = useAuth();
   const { deviceEmployee, deviceInfo } = useDevice();
@@ -232,7 +237,27 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
         <div className="tablemap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <h2>Sơ đồ Bàn</h2>
-            {branches.length > 0 && (
+            {isWaiterMode && (
+              <>
+                <Button 
+                  type="primary"
+                  icon={<FireOutlined />}
+                  style={{ backgroundColor: '#f5222d', borderColor: '#f5222d', fontWeight: 'bold' }}
+                  onClick={() => setIsRestockModalVisible(true)}
+                >
+                  Yêu cầu Bếp
+                </Button>
+                <Button 
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 'bold' }}
+                  onClick={() => setIsInternalPickupModalVisible(true)}
+                >
+                  Nhận đồ nội bộ
+                </Button>
+              </>
+            )}
+            {branches.length > 1 && (
               <Select
                 style={{ width: 200 }}
                 value={selectedBranch}
@@ -335,6 +360,17 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
           <WaiterActionFeed tables={tables} onSelectTable={handleSelectTable} />
         )}
       </div>
+      
+      <RequestRestockModal 
+        visible={isRestockModalVisible} 
+        onClose={() => setIsRestockModalVisible(false)} 
+        branchId={selectedBranch}
+      />
+      <InternalPickupModal 
+        visible={isInternalPickupModalVisible} 
+        onClose={() => setIsInternalPickupModalVisible(false)} 
+        branchId={selectedBranch}
+      />
     </div>
   );
 };

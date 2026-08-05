@@ -43,10 +43,13 @@ import GlobalReservationListener from '../components/reservation/GlobalReservati
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
+import ReportRevenuePage from '../pages/ReportRevenuePage';
+import ReportExpensePage from '../pages/ReportExpensePage';
+import ReportProfitPage from '../pages/ReportProfitPage';
+import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
-import FinanceDashboardPage from '../pages/FinanceDashboardPage';
-import OrderDashboard from '../pages/OrderDashboard';
+import CashFlowPage from '../pages/CashFlowPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -124,6 +127,7 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
+                <Route path="/cashflow" element={<CashFlowPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
@@ -135,8 +139,11 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/financedashboard" element={<FinanceDashboardPage />} />
-                <Route path="/orderdashboard" element={<OrderDashboard />} />
+                <Route path="/reports/revenue" element={<ReportRevenuePage />} />
+                <Route path="/reports/expense" element={<ReportExpensePage />} />
+                <Route path="/reports/profit" element={<ReportProfitPage />} />
+                <Route path="/reports/inventory" element={<ReportInventoryPage />} />
+                <Route path="/inventoryreport" element={<ReportInventoryPage />} />
               </Route>
 
               {/* Owner, Admin */}

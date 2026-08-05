@@ -19,11 +19,11 @@ export const deleteMenu = (id) =>
 export const getMenuProducts = (menuId) =>
   axiosInstance.get(`/api/Menu/${menuId}/products`);
 
-export const getAllGroups = () =>
-  axiosInstance.get('/api/Group/sellable');
+export const getAllGroups = (branchId = null) =>
+  axiosInstance.get(branchId ? `/api/Group/sellable?branchId=${branchId}` : '/api/Group/sellable');
 
-export const searchProductsOData = async (searchText = '', groupId = null) => {
-  let filterClauses = ['IsSellable eq true'];
+export const searchProductsOData = async (searchText = '', groupId = null, branchId = null) => {
+  let filterClauses = ['IsSellable eq true', '(Type eq MenuGoBE.Models.Enums.ProductType\'Processed\' or Type eq MenuGoBE.Models.Enums.ProductType\'Manufactured\' or Type eq MenuGoBE.Models.Enums.ProductType\'Regular\')'];
 
   if (searchText) {
     filterClauses.push(`contains(Name, '${searchText}')`);
@@ -33,11 +33,15 @@ export const searchProductsOData = async (searchText = '', groupId = null) => {
     filterClauses.push(`GroupId eq ${groupId}`);
   }
 
+  if (branchId) {
+    filterClauses.push(`BInventories/any(b: b/BranchId eq ${branchId} and b/BranchActive eq true and b/ChainActive eq true)`);
+  }
+
   let query = '';
   if (filterClauses.length > 0) {
-    query = `?$filter=${filterClauses.join(' and ')}&$expand=Group&$top=50`;
+    query = `?$filter=${filterClauses.join(' and ')}&$expand=Group,Image&$top=50`;
   } else {
-    query = `?$expand=Group&$top=50`;
+    query = `?$expand=Group,Image&$top=50`;
   }
 
   const response = await axiosInstance.get(`/odata/ProductOData${query}`);

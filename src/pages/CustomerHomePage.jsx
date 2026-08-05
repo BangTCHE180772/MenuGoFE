@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Pagination } from "antd";
+import { Pagination, Select } from "antd";
 import {
   AppstoreOutlined,
   CoffeeOutlined,
@@ -7,9 +7,11 @@ import {
   LeftOutlined,
   RightOutlined,
 } from "@ant-design/icons";
+import { useSearchParams } from "react-router-dom";
 import { getMainChain } from "../api/chainApi";
 import { getAllBranches } from "../api/branchApi";
 import { getAllMenus, getProductsODataPaged } from "../api/menuApi";
+import { getBInventories } from "../api/binventoryApi";
 
 import CustomerHeader from "../components/customer/CustomerHeader";
 import CustomerHeroBanner from "../components/customer/CustomerHeroBanner";
@@ -84,6 +86,11 @@ const isCreatedInCurrentMonth = (dateStr) => {
 };
 
 const CustomerHomePage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryBranchId = searchParams.get("branchId");
+  const [activeBranchId, setActiveBranchId] = useState(null);
+  const [allInventoryProducts, setAllInventoryProducts] = useState([]);
+
   const [chainInfo, setChainInfo] = useState(MOCK_CHAIN);
   const [branches, setBranches] = useState(MOCK_BRANCHES);
   const [products, setProducts] = useState(MOCK_PRODUCTS);
@@ -132,76 +139,92 @@ const CustomerHomePage = () => {
     try {
       const res = await getAllBranches();
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        const activeList = res.data.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh");
         setBranches(res.data);
+        
+        // Xác định chi nhánh mặc định
+        if (queryBranchId) {
+          setActiveBranchId(parseInt(queryBranchId, 10));
+        } else if (activeList.length > 0) {
+          setActiveBranchId(activeList[0].id);
+        } else {
+          setActiveBranchId(res.data[0].id);
+        }
       }
     } catch (err) {
       console.warn("Dùng dữ liệu Branch mặc định:", err.message);
     } finally {
       setLoadingBranches(false);
     }
-  }, []);
+  }, [queryBranchId]);
 
   const fetchProducts = useCallback(
-    async (searchText = "", catId = "all", pageIdx = 1, size = 8) => {
+    async (searchText = "", catId = "all", currentMenus = menus, pageIdx = 1, size = 8, branchId = activeBranchId) => {
+      if (!branchId) return;
       setLoadingMenu(true);
       try {
-        const data = await getProductsODataPaged({
-          searchText,
-          menuId: catId,
-          pageSize: size,
-          pageIndex: pageIdx,
-        });
+        // Tải danh sách BInventory của chi nhánh
+        const rawBInventory = await getBInventories(branchId);
+        
+        if (Array.isArray(rawBInventory)) {
+          // Lọc lấy các sản phẩm bán được (Processed, Manufactured, Regular)
+          const sellableList = rawBInventory.filter(
+            (b) => b.type === "Processed" || b.type === "Manufactured" || b.type === "Regular"
+          );
 
-        const items = data.value || [];
-        const total = data["@odata.count"] ?? items.length;
-
-        setTotalCount(total);
-
-        if (items.length > 0) {
-          const formatted = items.map((p) => ({
-            ...p,
-            id: p.id || p.Id,
-            name: p.name || p.Name,
-            price: p.sellPrice ?? p.SellPrice ?? p.price ?? p.Price ?? 0,
-            imageLink:
-              p.imageLink ||
-              p.ImageLink ||
-              (p.Image && p.Image.ImageLink) ||
-              p.image ||
-              "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
-            groupName:
-              p.groupName ||
-              p.GroupName ||
-              p.Group?.Name ||
-              p.category ||
-              "Món ăn",
-            isNew:
-              p.isNew ??
-              isCreatedInCurrentMonth(
-                p.createdAt || p.CreatedAt || p.createdDate || p.CreatedDate,
-              ),
+          // Map sang định dạng sản phẩm của Menu
+          const mapped = sellableList.map((item) => ({
+            id: item.productId, // ProductId để order
+            bInventoryId: item.bInventoryId,
+            name: item.name,
+            price: item.sellPrice || 0,
+            imageLink: item.imageLink || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+            groupName: item.groupName || "Món ăn",
+            description: item.description || "",
+            isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
           }));
-          setProducts(formatted);
-        } else {
-          if (pageIdx === 1 && searchText === "" && catId === "all") {
-            setProducts(MOCK_PRODUCTS);
-            setTotalCount(MOCK_PRODUCTS.length);
-          } else {
-            setProducts([]);
+
+          // Áp dụng bộ lọc tìm kiếm (searchText)
+          let filtered = mapped;
+          if (searchText.trim()) {
+            const q = searchText.toLowerCase().trim();
+            filtered = filtered.filter(
+              (p) =>
+                (p.name || "").toLowerCase().includes(q) ||
+                (p.groupName || "").toLowerCase().includes(q)
+            );
           }
+
+          // Áp dụng bộ lọc danh mục (catId)
+          if (catId && catId !== "all" && catId !== "new") {
+            const selectedMenu = currentMenus.find((m) => String(m.id || m.Id) === String(catId));
+            if (selectedMenu) {
+              const menuName = (selectedMenu.name || "").toLowerCase();
+              filtered = filtered.filter((p) => (p.groupName || "").toLowerCase() === menuName);
+            }
+          } else if (catId === "new") {
+            filtered = filtered.filter((p) => p.isNew);
+          }
+
+          setTotalCount(filtered.length);
+
+          // Phân trang ở client
+          const startIndex = (pageIdx - 1) * size;
+          const paginated = filtered.slice(startIndex, startIndex + size);
+          setProducts(paginated);
+        } else {
+          setProducts([]);
+          setTotalCount(0);
         }
       } catch (err) {
-        console.warn(
-          "Gọi API OData paged lỗi, sử dụng dữ liệu món ăn mẫu:",
-          err.message,
-        );
-        setProducts(MOCK_PRODUCTS);
-        setTotalCount(MOCK_PRODUCTS.length);
+        console.warn("Gọi API BInventory của chi nhánh lỗi:", err.message);
+        setProducts([]);
+        setTotalCount(0);
       } finally {
         setLoadingMenu(false);
       }
     },
-    [menus],
+    [menus, activeBranchId],
   );
 
   const fetchMenus = useCallback(async () => {
@@ -221,36 +244,50 @@ const CustomerHomePage = () => {
     const initData = async () => {
       fetchChain();
       fetchBranches();
-      const currentMenus = await fetchMenus();
-      fetchProducts(searchKeyword, selectedCategory, currentMenus, 1, 8);
     };
-
     initData();
   }, [fetchChain, fetchBranches]);
 
+  useEffect(() => {
+    if (activeBranchId) {
+      const loadMenuData = async () => {
+        const currentMenus = await fetchMenus();
+        fetchProducts(searchKeyword, selectedCategory, currentMenus, currentPage, pageSize, activeBranchId);
+      };
+      loadMenuData();
+    }
+  }, [activeBranchId, fetchMenus]);
+
   //=================================================================================================================== filter data
+  const handleBranchChange = (branchId) => {
+    setActiveBranchId(branchId);
+    setCurrentPage(1);
+    setSearchParams({ branchId: String(branchId) });
+    fetchProducts(searchKeyword, selectedCategory, menus, 1, pageSize, branchId);
+  };
+
   const handleSearchChange = (val) => {
     setSearchKeyword(val);
     setCurrentPage(1);
-    fetchProducts(val, selectedCategory, menus, 1, pageSize);
+    fetchProducts(val, selectedCategory, menus, 1, pageSize, activeBranchId);
   };
 
   const handleSearchClear = () => {
     setSearchKeyword("");
     setCurrentPage(1);
-    fetchProducts("", selectedCategory, menus, 1, pageSize);
+    fetchProducts("", selectedCategory, menus, 1, pageSize, activeBranchId);
   };
 
   const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
     setCurrentPage(1);
-    fetchProducts(searchKeyword, catId, menus, 1, pageSize);
+    fetchProducts(searchKeyword, catId, menus, 1, pageSize, activeBranchId);
   };
 
   const handlePageChange = (page, size) => {
     setCurrentPage(page);
     setPageSize(size);
-    fetchProducts(searchKeyword, selectedCategory, menus, page, size);
+    fetchProducts(searchKeyword, selectedCategory, menus, page, size, activeBranchId);
   };
 
   const [touchStartX, setTouchStartX] = useState(0);
@@ -409,23 +446,40 @@ const CustomerHomePage = () => {
             <div className="title-underline"></div>
           </div>
 
-          <div className="menu-controls-bar">
-            <CustomerSearchBar
-              value={searchKeyword}
-              onChange={handleSearchChange}
-              onClear={handleSearchClear}
-            />
+          <div className="menu-controls-bar" style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center", marginBottom: "20px" }}>
+            <div className="branch-menu-selector" style={{ minWidth: "200px" }}>
+              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Chi nhánh thực đơn:</span>
+              <Select
+                style={{ width: "100%" }}
+                value={activeBranchId}
+                onChange={handleBranchChange}
+                placeholder="Chọn chi nhánh"
+                size="large"
+                options={branches.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh").map(b => ({
+                  label: b.name,
+                  value: b.id
+                }))}
+              />
+            </div>
 
-            <CustomerMenuFilter
-              categories={filterCategories}
-              activeCategory={selectedCategory}
-              onSelectCategory={handleCategorySelect}
-            />
+            <div style={{ flex: 1, display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
+              <CustomerSearchBar
+                value={searchKeyword}
+                onChange={handleSearchChange}
+                onClear={handleSearchClear}
+              />
 
-            <CustomerMenuSort
-              value={sortOption}
-              onChange={(val) => setSortOption(val)}
-            />
+              <CustomerMenuFilter
+                categories={filterCategories}
+                activeCategory={selectedCategory}
+                onSelectCategory={handleCategorySelect}
+              />
+
+              <CustomerMenuSort
+                value={sortOption}
+                onChange={(val) => setSortOption(val)}
+              />
+            </div>
           </div>
 
           <div

@@ -64,9 +64,13 @@ const DeviceLayout = () => {
 
     if (!tokenToUse || !deviceInfo?.isActive) return;
 
+    const hubUrl = import.meta.env.DEV
+      ? 'http://localhost:5067/notificationHub'
+      : 'https://menugobe.onrender.com/notificationHub';
+
     const setupSignalR = async () => {
       const conn = new HubConnectionBuilder()
-        .withUrl('http://localhost:5067/notificationHub')
+        .withUrl(hubUrl)
         .configureLogging(LogLevel.Information)
         .withAutomaticReconnect()
         .build();

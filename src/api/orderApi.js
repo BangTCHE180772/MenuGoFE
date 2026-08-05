@@ -41,6 +41,9 @@ export const createOrderDetail = (orderId, data) =>
 export const updateOrderDetail = (orderId, id, data) =>
   axiosInstance.put(`/api/Order/${orderId}/details/${id}`, data);
 
+export const updateCookingStatus = (orderDetailId, data) =>
+  axiosInstance.put(`/api/Order/details/${orderDetailId}/cooking-status`, data);
+
 export const deleteOrderDetail = (orderId, id) =>
   axiosInstance.delete(`/api/Order/${orderId}/details/${id}`);
 

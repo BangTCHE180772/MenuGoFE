@@ -22,6 +22,19 @@ const WaiterMobileSessionPage = () => {
   const checkAttendanceAndShift = useCallback(async () => {
     try {
       setLoading(true);
+
+      const isManager = user?.roles?.includes('Manager') || user?.role === 'Manager' || user?.roleName === 'Manager';
+      if (isManager) {
+        setAuthorized(true);
+        setShiftInfo({
+          name: 'Phiên Quản Lý',
+          time: 'Không giới hạn',
+          shiftEndTime: dayjs().add(24, 'hour'),
+          disconnectTime: dayjs().add(24, 'hour')
+        });
+        return;
+      }
+
       const [schedulesRes, shiftsRes] = await Promise.all([
         getMyWorkSchedules(),
         getAllShifts()
