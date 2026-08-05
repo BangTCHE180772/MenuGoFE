@@ -523,7 +523,25 @@ const PayrollPage = () => {
         </div>
       ),
     },
-
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            dataIndex: 'branchId',
+            key: 'branchId',
+            width: 170,
+            render: (id, record) => {
+              const fullName = record.branchName || getBranchName(id);
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Kỳ lương',
       key: 'period',

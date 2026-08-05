@@ -2,6 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfigProvider, App as AntdApp } from 'antd';
 import viVN from 'antd/locale/vi_VN';
+import dayjs from 'dayjs';
+import 'dayjs/locale/vi';
+
+dayjs.locale('vi');
 
 import { AuthProvider } from './context/AuthContext';
 import { BranchProvider } from './context/BranchContext';

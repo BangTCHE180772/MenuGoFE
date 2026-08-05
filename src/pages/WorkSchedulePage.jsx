@@ -51,10 +51,10 @@ import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Chờ thực hiện (Pending)', color: 'warning' },
-  { value: 'APPROVED', label: 'Đã duyệt (Approved)', color: 'processing' },
-  { value: 'COMPLETED', label: 'Hoàn thành (Completed)', color: 'success' },
-  { value: 'ABSENT', label: 'Vắng mặt (Absent)', color: 'error' },
+  { value: 'PENDING', label: 'Chờ thực hiện', color: 'warning' },
+  { value: 'APPROVED', label: 'Đã duyệt', color: 'processing' },
+  { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
+  { value: 'ABSENT', label: 'Vắng mặt', color: 'error' },
 ];
 
 const WorkSchedulePage = () => {
@@ -87,9 +87,9 @@ const WorkSchedulePage = () => {
 
   const groupedStaffAccounts = useMemo(() => {
     const groups = {
-      4: { label: '💳 THU NGÂN (CASHIER)', items: [] },
-      5: { label: '👨‍🍳 BẾP TRƯỞNG (CHEF)', items: [] },
-      6: { label: '🤵 PHỤC VỤ (WAITER)', items: [] },
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
       other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
     };
 
@@ -402,12 +402,25 @@ const WorkSchedulePage = () => {
       ),
       sorter: (a, b) => getAccountName(a.accountId).localeCompare(getAccountName(b.accountId)),
     },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchId',
-      key: 'branchId',
-      render: (id) => getBranchName(id),
-    },
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            dataIndex: 'branchId',
+            key: 'branchId',
+            width: 170,
+            render: (id) => {
+              const fullName = getBranchName(id);
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Ca trực',
       dataIndex: 'shiftId',
@@ -439,7 +452,7 @@ const WorkSchedulePage = () => {
         const outTime = record.checkOutAt ? dayjs(record.checkOutAt).format('HH:mm') : '--';
         return (
           <div>
-            <div>In: {inTime} - Out: {outTime}</div>
+            <div>Vào: {inTime} - Ra: {outTime}</div>
             {record.actualHours !== null && (
               <div style={{ fontSize: '11px', color: '#52c41a' }}>
                 Tổng giờ: {record.actualHours} giờ

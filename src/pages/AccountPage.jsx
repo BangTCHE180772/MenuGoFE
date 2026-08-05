@@ -362,6 +362,28 @@ const AccountPage = () => {
         </Space>
       ),
     },
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            key: 'branch',
+            width: 170,
+            render: (_, record) => {
+              const activeContract = record.contracts?.find((c) => c.status === 'Active' || c.status === 1);
+              const branchId = activeContract?.branchId || record.branchId;
+              const branch = branches.find((b) => b.id === branchId);
+              const fullName = branch ? branch.name : branchId ? `Chi nhánh #${branchId}` : '—';
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
@@ -509,7 +531,11 @@ const AccountPage = () => {
             >
               {branches.map((b) => (
                 <Select.Option key={b.id} value={b.id}>
-                  {b.name}
+                  <Tooltip title={b.name}>
+                    <span style={{ display: 'inline-block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      {b.name}
+                    </span>
+                  </Tooltip>
                 </Select.Option>
               ))}
             </Select>
