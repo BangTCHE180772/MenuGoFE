@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Spin, Tooltip } from 'antd';
 import { getStatusConfig, TABLE_STATUS } from '../../data/tableConstants';
+import '../../styles/pos-order-panel.css';
 
 const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
 
@@ -71,6 +72,64 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
   );
 };
 
+/* ── Ordered Item Row ────────────────────────────────────────────────────────── */
+const OrderedItem = ({ item, onMarkAsServed }) => {
+  const isReady = item.cookingStatus === 'Ready';
+  
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Waiting': return '#f59e0b'; // amber
+      case 'Cooking': return '#3b82f6'; // blue
+      case 'Ready': return '#10b981'; // green
+      case 'Served': return '#6b7280'; // gray
+      case 'Cancelled': return '#ef4444'; // red
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'Waiting': return 'Chờ nấu';
+      case 'Cooking': return 'Đang nấu';
+      case 'Ready': return 'Bếp đã xong';
+      case 'Served': return 'Đã phục vụ';
+      case 'Cancelled': return 'Đã huỷ';
+      default: return status;
+    }
+  };
+
+  return (
+    <div className={`pos-cart-item ${item.status === 'Cancelled' ? 'pos-cart-item--cancelled' : ''}`}>
+      <div className="pos-cart-item-top">
+        <div className="pos-cart-item-info">
+          <div className="pos-cart-item-name">{item.productName} <span style={{fontWeight: 'bold'}}>x{item.quantity}</span></div>
+          <div className="pos-cart-item-status-badge" style={{ backgroundColor: getStatusColor(item.cookingStatus) + '20', color: getStatusColor(item.cookingStatus) }}>
+            <span style={{ backgroundColor: getStatusColor(item.cookingStatus) }} className="pos-order-status-dot" />
+            {getStatusText(item.cookingStatus)}
+          </div>
+        </div>
+        <div className="pos-cart-item-total" style={{alignSelf: 'flex-start'}}>{formatPrice(item.price * item.quantity)}</div>
+      </div>
+
+      {(isReady || item.note) && (
+        <div className="pos-cart-item-bottom" style={{ marginTop: '8px', justifyContent: 'space-between' }}>
+          <div className="pos-cart-item-note-display" style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '12px' }}>
+            {item.note && `Ghi chú: ${item.note}`}
+          </div>
+          {isReady && (
+            <button 
+              className="pos-action-btn pos-action-btn--serve"
+              onClick={() => onMarkAsServed(item.orderDetailId)}
+            >
+              Đã phục vụ
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── OrderPanel ───────────────────────────────────────────────────────────── */
 const OrderPanel = ({
   table,
@@ -83,16 +142,26 @@ const OrderPanel = ({
   onConfirm,
   onChangeStatus,
   onPayment,
+  onMarkAsServed,
   onMerge,
   loading,
   isWaiterMode,
 }) => {
+  const [activeTab, setActiveTab] = useState('cart'); // 'cart' | 'ordered'
+
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = Math.round(subTotal * 0.08);
   const total = subTotal + tax;
+  
+  const orderedItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
+  const orderedSubTotal = orderedItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const orderedTax = Math.round(orderedSubTotal * 0.08);
+  const orderedTotal = orderedSubTotal + orderedTax;
+
   const cfg = table ? getStatusConfig(table.status) : null;
   const statusKey = table?.status || TABLE_STATUS.EMPTY;
   const transitions = [...(STATUS_TRANSITIONS[statusKey] || [])];
+  
   if (statusKey === TABLE_STATUS.OCCUPIED && summary?.activeOrderId) {
     const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
     if (cleanIndex >= 0 && !isWaiterMode) {
@@ -107,7 +176,7 @@ const OrderPanel = ({
   /* ─── 1. Chưa chọn bàn ────────────────────────────────────────────────── */
   if (!table) {
     return (
-      <aside className="pos-order-panel">
+      <aside className="pos-order-panel glass-panel">
         <div className="pos-order-empty-state">
           <div className="pos-order-empty-icon"></div>
           <h3>Chưa chọn bàn</h3>
@@ -118,9 +187,9 @@ const OrderPanel = ({
   }
 
   return (
-    <aside className="pos-order-panel">
+    <aside className="pos-order-panel glass-panel">
       {/* Table Info Header */}
-      <div className="pos-order-header">
+      <div className="pos-order-header glass-header">
         <div className="pos-order-table-name">{table.name}</div>
         <div
           className="pos-order-status-badge"
@@ -132,9 +201,9 @@ const OrderPanel = ({
       </div>
 
       {table.status === TABLE_STATUS.RESERVED && summary?.reservationId && (
-        <div style={{ padding: '0 16px 16px 16px', borderBottom: '1px solid #e5e7eb', marginBottom: '16px', fontSize: '14px', color: '#4b5563' }}>
-          <div style={{ marginBottom: '4px' }}><strong>Khách hàng:</strong> {summary.customerName} - {summary.customerPhone}</div>
-          <div><strong>Giờ đặt:</strong> {summary.reservationTime ? new Date(summary.reservationTime).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : ''}</div>
+        <div className="pos-reservation-info">
+          <div className="pos-res-row"><strong>Khách hàng:</strong> {summary.customerName} - {summary.customerPhone}</div>
+          <div className="pos-res-row"><strong>Giờ đặt:</strong> {summary.reservationTime ? new Date(summary.reservationTime).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : ''}</div>
         </div>
       )}
 
@@ -153,8 +222,7 @@ const OrderPanel = ({
           ))}
           {table.status === TABLE_STATUS.OCCUPIED && (
             <button
-              className="pos-status-btn pos-status-btn--default"
-              style={{ background: '#eab308', color: '#fff', borderColor: '#eab308' }}
+              className="pos-status-btn pos-status-btn--merge"
               onClick={onMerge}
               disabled={loading}
             >
@@ -172,60 +240,113 @@ const OrderPanel = ({
         </div>
       )}
 
-      {/* ─── 3. Bàn Có khách → Giỏ hàng đầy đủ ───────────────────────── */}
+      {/* ─── 3. Bàn Có khách → Giỏ hàng & Đã gọi ───────────────────────── */}
       {canOrder && (
-        <>
-          {/* Cart items */}
-          <div className="pos-cart-list">
-            {cartItems.length === 0 ? (
-              <div className="pos-cart-placeholder">
-                <div className="pos-cart-placeholder-icon"></div>
-                <p>Chưa có món nào</p>
-                <span>Chọn món từ thực đơn bên trái</span>
-              </div>
-            ) : (
-              cartItems.map((item) => (
-                <CartItem
-                  key={item.id}
-                  item={item}
-                  onUpdateQty={onUpdateQty}
-                  onRemove={onRemoveItem}
-                  onNoteChange={onNoteChange}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Totals */}
-          {cartItems.length > 0 && (
-            <div className="pos-order-summary">
-              <div className="pos-summary-row">
-                <span>Tạm tính</span>
-                <span>{formatPrice(subTotal)}</span>
-              </div>
-              <div className="pos-summary-row">
-                <span>Thuế VAT (8%)</span>
-                <span>{formatPrice(tax)}</span>
-              </div>
-              <div className="pos-summary-divider" />
-              <div className="pos-summary-row pos-summary-row--total">
-                <span>Tổng cộng</span>
-                <span>{formatPrice(total)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="pos-order-actions">
-            <button
-              className="pos-action-btn pos-action-btn--confirm"
-              onClick={onConfirm}
-              disabled={cartItems.length === 0 || loading}
+        <div className="pos-order-content-area">
+          <div className="pos-tabs">
+            <button 
+              className={`pos-tab ${activeTab === 'cart' ? 'active' : ''}`}
+              onClick={() => setActiveTab('cart')}
             >
-              {loading ? <Spin size="small" /> : 'Xác nhận gọi món'}
+              Giỏ hàng mới {cartItems.length > 0 && <span className="pos-tab-badge">{cartItems.length}</span>}
+            </button>
+            <button 
+              className={`pos-tab ${activeTab === 'ordered' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ordered')}
+            >
+              Đã gọi {orderedItems.length > 0 && <span className="pos-tab-badge">{orderedItems.length}</span>}
             </button>
           </div>
-        </>
+
+          {activeTab === 'cart' ? (
+            <>
+              <div className="pos-cart-list">
+                {cartItems.length === 0 ? (
+                  <div className="pos-cart-placeholder">
+                    <div className="pos-cart-placeholder-icon"></div>
+                    <p>Chưa có món mới nào</p>
+                    <span>Chọn món từ thực đơn bên trái</span>
+                  </div>
+                ) : (
+                  cartItems.map((item) => (
+                    <CartItem
+                      key={item.id}
+                      item={item}
+                      onUpdateQty={onUpdateQty}
+                      onRemove={onRemoveItem}
+                      onNoteChange={onNoteChange}
+                    />
+                  ))
+                )}
+              </div>
+
+              {cartItems.length > 0 && (
+                <div className="pos-order-summary glass-summary">
+                  <div className="pos-summary-row">
+                    <span>Tạm tính</span>
+                    <span>{formatPrice(subTotal)}</span>
+                  </div>
+                  <div className="pos-summary-row">
+                    <span>Thuế VAT (8%)</span>
+                    <span>{formatPrice(tax)}</span>
+                  </div>
+                  <div className="pos-summary-divider" />
+                  <div className="pos-summary-row pos-summary-row--total">
+                    <span>Tổng cộng</span>
+                    <span>{formatPrice(total)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="pos-order-actions">
+                <button
+                  className="pos-action-btn pos-action-btn--confirm"
+                  onClick={onConfirm}
+                  disabled={cartItems.length === 0 || loading}
+                >
+                  {loading ? <Spin size="small" /> : 'Xác nhận gọi món'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="pos-cart-list">
+                {orderedItems.length === 0 ? (
+                  <div className="pos-cart-placeholder">
+                    <div className="pos-cart-placeholder-icon"></div>
+                    <p>Bàn chưa gọi món nào</p>
+                  </div>
+                ) : (
+                  orderedItems.map((item) => (
+                    <OrderedItem
+                      key={item.orderDetailId}
+                      item={item}
+                      onMarkAsServed={onMarkAsServed}
+                    />
+                  ))
+                )}
+              </div>
+
+              {orderedItems.length > 0 && (
+                <div className="pos-order-summary glass-summary">
+                  <div className="pos-summary-row">
+                    <span>Tạm tính</span>
+                    <span>{formatPrice(orderedSubTotal)}</span>
+                  </div>
+                  <div className="pos-summary-row">
+                    <span>Thuế VAT (8%)</span>
+                    <span>{formatPrice(orderedTax)}</span>
+                  </div>
+                  <div className="pos-summary-divider" />
+                  <div className="pos-summary-row pos-summary-row--total">
+                    <span>Tổng thanh toán</span>
+                    <span>{formatPrice(orderedTotal)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
     </aside>
   );

@@ -26,7 +26,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await getAllGroups();
+        const res = await getAllGroups(branchId);
         if (res.data) {
           const dynamic = res.data.map(g => ({
             id: String(g.id),
@@ -39,7 +39,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [branchId]);
 
   const fetchProducts = async (searchText, groupId) => {
     setLoading(true);
@@ -194,7 +194,11 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
               disabled={!canOrder}
               title={canOrder ? `Thêm ${item.name}` : 'Chọn bàn Có khách để gọi món'}
             >
-              <div className="pos-menu-item-emoji"></div>
+              {item.imageLink && (
+                <div style={{ height: '60px', width: '60px', minWidth: '60px', borderRadius: '4px', overflow: 'hidden' }}>
+                  <img src={item.imageLink} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
               <div className="pos-menu-item-info">
                 <div className="pos-menu-item-name">{item.name}</div>
                 <div className="pos-menu-item-desc">{item.description}</div>

@@ -515,7 +515,7 @@ const KDSPage = () => {
               Màn hình Bếp & Chế biến (KDS)
             </Title>
             <Text style={{ color: '#595959' }}>
-              UC-097: Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
+              Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
             </Text>
           </div>
         </Space>
