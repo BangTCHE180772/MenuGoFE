@@ -226,13 +226,19 @@ const AccountPage = () => {
 
         Object.entries(responseData.errors).forEach(([fieldKey, messages]) => {
           const fieldName = fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
-          const errorTextList = Array.isArray(messages) ? messages : [messages];
+          const rawErrorList = Array.isArray(messages) ? messages : [messages];
+          // Filter out standard English validation error messages
+          const errorTextList = rawErrorList.filter(
+            (msg) => typeof msg === 'string' && !/^The\s+.*\s+field\b/i.test(msg) && !/field is required/i.test(msg)
+          );
 
-          if (['name', 'email', 'phone', 'password', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
-            fieldsToSet.push({ name: fieldName, errors: errorTextList });
-            fieldErrorSet = true;
-          } else {
-            unmappedMessages.push(...errorTextList);
+          if (errorTextList.length > 0) {
+            if (['name', 'email', 'phone', 'password', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
+              fieldsToSet.push({ name: fieldName, errors: errorTextList });
+              fieldErrorSet = true;
+            } else {
+              unmappedMessages.push(...errorTextList);
+            }
           }
         });
 
@@ -619,7 +625,15 @@ const AccountPage = () => {
             <Form.Item
               name="name"
               label="Họ và tên"
-              rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập họ tên!' },
+                { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự!' },
+                { max: 100, message: 'Họ tên không được vượt quá 100 ký tự!' },
+                {
+                  pattern: /^[a-zA-ZàáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠÂẦẤẨẪẬĂẰẮẲẴẶÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ\s]+$/,
+                  message: 'Họ tên chỉ được chứa chữ cái và khoảng trắng!',
+                },
+              ]}
               style={{ width: 330 }}
             >
               <Input prefix={<UserOutlined />} placeholder="Nhập họ và tên..." />
@@ -694,6 +708,7 @@ const AccountPage = () => {
             <Form.Item
               name="dateOfBirth"
               label="Ngày sinh"
+              rules={[{ required: true, message: 'Vui lòng chọn ngày sinh!' }]}
               style={{ width: 330 }}
             >
               <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày sinh" />
