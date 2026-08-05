@@ -493,17 +493,7 @@ const PayrollPage = () => {
         </div>
       ),
     },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchId',
-      key: 'branchId',
-      render: (id, record) => (
-        <span>
-          <BankOutlined style={{ marginRight: 4, color: '#8c8c8c' }} />
-          {record.branchName || getBranchName(id)}
-        </span>
-      ),
-    },
+
     {
       title: 'Kỳ lương',
       key: 'period',
@@ -532,30 +522,7 @@ const PayrollPage = () => {
       key: 'calculatedSalary',
       render: (val) => formatVND(val),
     },
-    {
-      title: 'Phụ cấp & Thưởng',
-      key: 'allowanceBonus',
-      render: (_, record) => {
-        const totalAdd = (record.totalAllowance || 0) + (record.bonusAmount || 0);
-        return (
-          <span style={{ color: totalAdd > 0 ? '#3f8600' : '#8c8c8c' }}>
-            +{formatVND(totalAdd)}
-          </span>
-        );
-      },
-    },
-    {
-      title: 'Khấu trừ & Phạt',
-      key: 'deductionPenalty',
-      render: (_, record) => {
-        const totalSub = (record.totalDeduction || 0) + (record.penaltyAmount || 0);
-        return (
-          <span style={{ color: totalSub > 0 ? '#cf1322' : '#8c8c8c' }}>
-            -{formatVND(totalSub)}
-          </span>
-        );
-      },
-    },
+
     {
       title: 'Thực nhận (Net)',
       dataIndex: 'netSalary',
@@ -721,53 +688,7 @@ const PayrollPage = () => {
         </div>
       </Card>
 
-      {/* Summary Statistics Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Tổng quỹ lương (Danh sách)"
-              value={stats.totalNet}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#e8442a', fontWeight: 700, fontSize: '20px' }}
-              prefix={<DollarCircleOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Đã thanh toán"
-              value={stats.paidAmount}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#3f8600', fontWeight: 700, fontSize: '20px' }}
-              suffix={`(${stats.paidCount} phiếu)`}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Chờ duyệt / Đã duyệt"
-              value={stats.pendingCount}
-              valueStyle={{ color: '#1890ff', fontWeight: 700, fontSize: '20px' }}
-              suffix="bản khai"
-              prefix={<ClockCircleOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Bản nháp"
-              value={stats.draftCount}
-              valueStyle={{ color: '#8c8c8c', fontWeight: 700, fontSize: '20px' }}
-              suffix="bản nháp"
-              prefix={<SyncOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-      </Row>
+
 
       {/* Filter and Table Card */}
       <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
