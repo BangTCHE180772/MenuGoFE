@@ -93,6 +93,9 @@ const ContractPage = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   
   const [form] = Form.useForm();
+  const watchRoleId = Form.useWatch('roleId', form);
+  const watchType = Form.useWatch('type', form);
+  const hideBaseWorkDay = watchRoleId === 3 || watchType === 'Part-time';
 
   // Load lists
   const loadData = useCallback(async (branchIdFilter = selectedBranch) => {
@@ -188,8 +191,10 @@ const ContractPage = () => {
   // Submit Handler
   const handleSubmit = async (values) => {
     try {
+      const isHideWorkDay = values.roleId === 3 || values.type === 'Part-time';
       const dataPayload = {
         ...values,
+        baseWorkDay: isHideWorkDay ? null : values.baseWorkDay,
         startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
         endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
       };
@@ -758,7 +763,7 @@ const ContractPage = () => {
 
           {/* Row 4: Base Salary & Base Work Day */}
           <Row gutter={24}>
-            <Col span={12}>
+            <Col span={hideBaseWorkDay ? 24 : 12}>
               <Form.Item
                 name="baseSalary"
                 label="Lương cơ bản (VND)"
@@ -773,15 +778,17 @@ const ContractPage = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="baseWorkDay"
-                label="Số ngày công chuẩn / tháng"
-                rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={1} max={31} />
-              </Form.Item>
-            </Col>
+            {!hideBaseWorkDay && (
+              <Col span={12}>
+                <Form.Item
+                  name="baseWorkDay"
+                  label="Số ngày công chuẩn / tháng"
+                  rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
+                >
+                  <InputNumber style={{ width: '100%' }} min={1} max={31} />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
 
           {/* Row 5: Start Date & End Date */}
