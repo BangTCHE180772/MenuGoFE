@@ -39,33 +39,33 @@ import { getRoleRange } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 
 const CONTRACT_TYPES = [
-  { value: 'Full-time', label: 'Toàn thời gian (Full-time)' },
-  { value: 'Part-time', label: 'Bán thời gian (Part-time)' },
-  { value: 'Seasonal', label: 'Thời vụ (Seasonal)' },
+  { value: 'Full-time', label: 'Toàn thời gian' },
+  { value: 'Part-time', label: 'Bán thời gian' },
+  { value: 'Seasonal', label: 'Thời vụ' },
 ];
 
 const SALARY_TYPES = [
-  { value: 'Fixed', label: 'Lương cố định (Fixed)' },
-  { value: 'Hourly', label: 'Lương theo giờ (Hourly)' },
+  { value: 'Fixed', label: 'Lương cố định' },
+  { value: 'Hourly', label: 'Lương theo giờ' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'Active', label: 'Hiệu lực (Active)', color: 'success' },
-  { value: 'Expired', label: 'Hết hiệu lực (Expired)', color: 'warning' },
-  { value: 'Terminated', label: 'Đã chấm dứt (Terminated)', color: 'error' },
+  { value: 'Active', label: 'Hiệu lực', color: 'success' },
+  { value: 'Expired', label: 'Hết hiệu lực', color: 'warning' },
+  { value: 'Terminated', label: 'Đã chấm dứt', color: 'error' },
 ];
 
 const ROLES_LIST = [
-  { value: 3, label: 'Quản lý (Manager)' },
-  { value: 4, label: 'Thu ngân (Cashier)' },
-  { value: 5, label: 'Bếp trưởng (Chef)' },
-  { value: 6, label: 'Phục vụ (Waiter)' },
+  { value: 3, label: 'Quản lý' },
+  { value: 4, label: 'Thu ngân' },
+  { value: 5, label: 'Bếp trưởng' },
+  { value: 6, label: 'Phục vụ' },
 ];
 
 const STAFF_ROLES_LIST = [
-  { value: 4, label: 'Thu ngân (Cashier)' },
-  { value: 5, label: 'Bếp trưởng (Chef)' },
-  { value: 6, label: 'Phục vụ (Waiter)' },
+  { value: 4, label: 'Thu ngân' },
+  { value: 5, label: 'Bếp trưởng' },
+  { value: 6, label: 'Phục vụ' },
 ];
 
 const ROLES_MAP = {
@@ -125,10 +125,10 @@ const ContractPage = () => {
   // Group accounts by role for cleaner dropdown UX
   const groupedAccounts = useCallback(() => {
     const groups = {
-      3: { label: '👑 QUẢN LÝ (MANAGER)', items: [] },
-      4: { label: '💳 THU NGÂN (CASHIER)', items: [] },
-      5: { label: '👨‍🍳 BẾP TRƯỞNG (CHEF)', items: [] },
-      6: { label: '🤵 PHỤC VỤ (WAITER)', items: [] },
+      3: { label: '👑 QUẢN LÝ', items: [] },
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
       other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
     };
 
@@ -303,18 +303,12 @@ const ContractPage = () => {
       render: (id) => getRoleName(id),
     },
     {
-      title: 'Chi nhánh',
-      dataIndex: 'branchId',
-      key: 'branchId',
-      render: (id) => getBranchName(id),
-    },
-    {
       title: 'Loại HĐ',
       dataIndex: 'type',
       key: 'type',
       render: (type) => {
         const found = CONTRACT_TYPES.find((t) => t.value === type);
-        return found ? found.label.split(' ')[0] : type;
+        return found ? found.label.split(' (')[0] : type;
       },
     },
     {
@@ -324,21 +318,8 @@ const ContractPage = () => {
       render: (val) => `${new Intl.NumberFormat('vi-VN').format(val)} đ`,
       sorter: (a, b) => a.baseSalary - b.baseSalary,
     },
-    {
-      title: 'Ngày công chuẩn',
-      dataIndex: 'baseWorkDay',
-      key: 'baseWorkDay',
-      align: 'center',
-    },
-    {
-      title: 'Thời gian hợp đồng',
-      key: 'duration',
-      render: (_, record) => {
-        const start = record.startDate ? dayjs(record.startDate).format('DD/MM/YYYY') : 'Chưa rõ';
-        const end = record.endDate ? dayjs(record.endDate).format('DD/MM/YYYY') : 'Chưa rõ';
-        return `${start} - ${end}`;
-      },
-    },
+
+
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -665,7 +646,7 @@ const ContractPage = () => {
               {isOwnerOrAdmin ? (
                 <>
                   <Form.Item label="Chức danh" required>
-                    <Input disabled value="Quản lý (Manager)" style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                    <Input disabled value="Quản lý" style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
                   </Form.Item>
                   <Form.Item name="roleId" noStyle>
                     <Input type="hidden" />
