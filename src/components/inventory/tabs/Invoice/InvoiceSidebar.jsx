@@ -12,14 +12,13 @@ const InvoiceSidebar = () => {
         display: 'flex',
         flexDirection: 'column',
         fontSize: 11,
-        padding: '10px 12px',
+        padding: '14px 12px',
         userSelect: 'none'
       }}
     >
-      <div style={{ paddingBottom: 6, marginBottom: 10, borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 11, color: '#e8442a' }}>
-        HÓA ĐƠN
+      <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 14 }}>
+        Quản lý các hóa đơn thanh toán từ khách hàng.
       </div>
-      <div style={{ fontSize: 10.5, color: '#64748b' }}>Quản lý các hóa đơn thanh toán từ khách hàng.</div>
 
       <div style={{ marginTop: 'auto', paddingTop: 6, fontSize: 9.5, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
         MenuGo ERP v2.5

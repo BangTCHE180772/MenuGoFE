@@ -27,7 +27,7 @@ const CustomerBranchCard = ({ branch, isMain }) => {
   return (
     <div className={`customer-branch-card ${isMain ? "main-branch" : ""}`}>
       <div className="branch-card-header">
-        <div className="branch-badge-group">
+        <div className="branch-badge-group" style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {isMain ? (
             <Tag color="gold" className="badge-headquarter">
               <StarFilled /> Trụ sở chính
@@ -36,6 +36,12 @@ const CustomerBranchCard = ({ branch, isMain }) => {
             <Tag color="blue" className="badge-branch">
               <ShopOutlined /> Chi nhánh
             </Tag>
+          )}
+
+          {branch.status === "Tạm dừng" ? (
+            <Tag color="warning" style={{ margin: 0, fontWeight: 600 }}>Tạm dừng</Tag>
+          ) : (
+            <Tag color="success" style={{ margin: 0, fontWeight: 600 }}>Hoạt động</Tag>
           )}
         </div>
       </div>

@@ -9,7 +9,9 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(4);
 
-  const activeBranches = branches || [];
+  const activeBranches = (branches || []).filter(
+    (b) => !b.isDeleted && b.status !== "Ngừng kinh doanh"
+  );
   const paginatedBranches = activeBranches.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
