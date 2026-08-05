@@ -41,7 +41,6 @@ import { useAuth } from '../context/AuthContext';
 const CONTRACT_TYPES = [
   { value: 'Full-time', label: 'Toàn thời gian' },
   { value: 'Part-time', label: 'Bán thời gian' },
-  { value: 'Seasonal', label: 'Thời vụ' },
 ];
 
 const SALARY_TYPES = [
@@ -52,6 +51,11 @@ const SALARY_TYPES = [
 const STATUS_OPTIONS = [
   { value: 'Active', label: 'Hiệu lực', color: 'success' },
   { value: 'Expired', label: 'Hết hiệu lực', color: 'warning' },
+  { value: 'Terminated', label: 'Đã chấm dứt', color: 'error' },
+];
+
+const FORM_STATUS_OPTIONS = [
+  { value: 'Active', label: 'Hiệu lực', color: 'success' },
   { value: 'Terminated', label: 'Đã chấm dứt', color: 'error' },
 ];
 
@@ -147,6 +151,15 @@ const ContractPage = () => {
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
   }, [accounts])();
 
+  // Handle Type Change to auto set salaryType
+  const handleTypeChange = (val) => {
+    const salaryTypeVal = val === 'Full-time' ? 'Fixed' : 'Hourly';
+    form.setFieldsValue({
+      type: val,
+      salaryType: salaryTypeVal,
+    });
+  };
+
   // Handle Create / Edit Open
   const handleOpenModal = (type, record = null) => {
     setModalType(type);
@@ -154,13 +167,14 @@ const ContractPage = () => {
     setIsModalOpen(true);
     
     if (type === 'edit' && record) {
+      const targetSalaryType = record.type === 'Full-time' ? 'Fixed' : 'Hourly';
       form.setFieldsValue({
         accountId: record.accountId,
         accountName: record.accountName || getAccountName(record.accountId),
         roleId: record.roleId,
         branchId: record.branchId,
         type: record.type,
-        salaryType: record.salaryType,
+        salaryType: targetSalaryType,
         baseSalary: record.baseSalary,
         baseWorkDay: record.baseWorkDay,
         status: record.status,
@@ -173,8 +187,8 @@ const ContractPage = () => {
       const defaultBranchId = branches.length > 0 ? branches[0].id : undefined;
       form.setFieldsValue({
         status: 'Active',
-        salaryType: 'Fixed',
         type: 'Full-time',
+        salaryType: 'Fixed',
         baseWorkDay: 26,
         branchId: defaultBranchId,
         roleId: isOwnerOrAdmin ? 3 : undefined,
@@ -736,7 +750,7 @@ const ContractPage = () => {
                 rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
               >
                 <Select placeholder="Chọn trạng thái...">
-                  {STATUS_OPTIONS.map((s) => (
+                  {FORM_STATUS_OPTIONS.map((s) => (
                     <Select.Option key={s.value} value={s.value}>
                       {s.label}
                     </Select.Option>
@@ -754,7 +768,7 @@ const ContractPage = () => {
                 label="Loại hợp đồng"
                 rules={[{ required: true, message: 'Vui lòng chọn loại hợp đồng!' }]}
               >
-                <Select placeholder="Chọn loại hợp đồng...">
+                <Select placeholder="Chọn loại hợp đồng..." onChange={handleTypeChange}>
                   {CONTRACT_TYPES.map((t) => (
                     <Select.Option key={t.value} value={t.value}>
                       {t.label}
@@ -769,7 +783,7 @@ const ContractPage = () => {
                 label="Hình thức lương"
                 rules={[{ required: true, message: 'Vui lòng chọn hình thức lương!' }]}
               >
-                <Select placeholder="Chọn hình thức lương...">
+                <Select disabled placeholder="Chọn hình thức lương...">
                   {SALARY_TYPES.map((st) => (
                     <Select.Option key={st.value} value={st.value}>
                       {st.label}

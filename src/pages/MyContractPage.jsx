@@ -37,7 +37,6 @@ const { Title, Text } = Typography;
 const CONTRACT_TYPES = {
   'Full-time': 'Toàn thời gian',
   'Part-time': 'Bán thời gian',
-  'Seasonal': 'Thời vụ',
 };
 
 const SALARY_TYPES = {
