@@ -71,11 +71,11 @@ const STATUS_CONFIG = {
 };
 
 const STATUS_OPTIONS = [
-  { value: PAYROLL_STATUS.Draft, label: 'Bản nháp (Draft)' },
-  { value: PAYROLL_STATUS.Pending, label: 'Chờ duyệt (Pending)' },
-  { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt (Approved)' },
-  { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán (Paid)' },
-  { value: PAYROLL_STATUS.Cancelled, label: 'Đã hủy (Cancelled)' },
+  { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
+  { value: PAYROLL_STATUS.Pending, label: 'Chờ duyệt' },
+  { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt' },
+  { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán' },
+  { value: PAYROLL_STATUS.Cancelled, label: 'Đã hủy' },
 ];
 
 const DETAIL_TYPE_OPTIONS = [
@@ -554,7 +554,7 @@ const PayrollPage = () => {
     },
 
     {
-      title: 'Thực nhận (Net)',
+      title: 'Thực nhận',
       dataIndex: 'netSalary',
       key: 'netSalary',
       sorter: (a, b) => a.netSalary - b.netSalary,
@@ -1081,8 +1081,8 @@ const PayrollPage = () => {
             <Col span={12}>
               <Form.Item name="salaryType" label="Hình thức lương">
                 <Select placeholder="Chọn hình thức lương">
-                  <Select.Option value="Monthly">Theo tháng (Monthly)</Select.Option>
-                  <Select.Option value="Hourly">Theo giờ (Hourly)</Select.Option>
+                  <Select.Option value="Monthly">Theo tháng</Select.Option>
+                  <Select.Option value="Hourly">Theo giờ</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -1221,7 +1221,7 @@ const PayrollPage = () => {
           <Card style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '8px', marginBottom: 12 }}>
             <Row gutter={16} align="middle">
               <Col span={12}>
-                <span style={{ fontSize: '13px', color: '#52c41a' }}>LƯƠNG THỰC NHẬN (NET):</span>
+                <span style={{ fontSize: '13px', color: '#52c41a' }}>LƯƠNG THỰC NHẬN:</span>
                 <Form.Item name="netSalary" noStyle>
                   <div style={{ fontSize: '22px', fontWeight: 700, color: '#3f8600' }}>
                     {formatVND(form.getFieldValue('netSalary'))}
