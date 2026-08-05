@@ -215,27 +215,42 @@ const AccountPage = () => {
       handleCloseModal();
       loadData();
     } catch (err) {
-      console.error(err);
-      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin nhân viên!';
-
-      // Map backend validation errors to specific form fields
-      const errorFieldMap = [
-        { keyword: 'Email', field: 'email' },
-        { keyword: 'điện thoại', field: 'phone' },
-        { keyword: 'CCCD', field: 'citizenIdCode' },
-      ];
-
+      console.error('Submit Account Error:', err);
+      const responseData = err.response?.data;
       let fieldErrorSet = false;
-      for (const { keyword, field } of errorFieldMap) {
-        if (errorMsg.includes(keyword)) {
-          form.setFields([{ name: field, errors: [errorMsg] }]);
-          fieldErrorSet = true;
-          break;
+
+      // Handle ASP.NET Core / FluentValidation problem details object
+      if (responseData?.errors && typeof responseData.errors === 'object') {
+        const fieldsToSet = [];
+        const unmappedMessages = [];
+
+        Object.entries(responseData.errors).forEach(([fieldKey, messages]) => {
+          const fieldName = fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
+          const errorTextList = Array.isArray(messages) ? messages : [messages];
+
+          if (['name', 'email', 'phone', 'password', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
+            fieldsToSet.push({ name: fieldName, errors: errorTextList });
+            fieldErrorSet = true;
+          } else {
+            unmappedMessages.push(...errorTextList);
+          }
+        });
+
+        if (fieldsToSet.length > 0) {
+          form.setFields(fieldsToSet);
+        }
+        if (unmappedMessages.length > 0) {
+          unmappedMessages.forEach((msg) => message.error(msg));
         }
       }
 
       if (!fieldErrorSet) {
-        message.error(errorMsg);
+        const errorMsg = responseData?.message || (typeof responseData === 'string' ? responseData : null);
+        if (errorMsg && errorMsg !== 'One or more validation errors occurred.') {
+          message.error(errorMsg);
+        } else if (!responseData?.errors) {
+          message.error('Có lỗi xảy ra khi lưu thông tin nhân viên!');
+        }
       }
     }
   };
@@ -316,17 +331,7 @@ const AccountPage = () => {
         </span>
       ),
     },
-    {
-      title: 'Số điện thoại',
-      dataIndex: 'phone',
-      key: 'phone',
-      render: (phone) => (
-        <span>
-          <PhoneOutlined style={{ marginRight: 6, color: '#8c8c8c' }} />
-          {phone}
-        </span>
-      ),
-    },
+
     {
       title: 'Giới tính',
       dataIndex: 'gender',
@@ -341,22 +346,12 @@ const AccountPage = () => {
         return val;
       }
     },
-    {
-      title: 'Ngày sinh',
-      dataIndex: 'dateOfBirth',
-      key: 'dateOfBirth',
-      render: (val) => val ? dayjs(val).format('DD/MM/YYYY') : '—',
-    },
-    {
-      title: 'CCCD',
-      dataIndex: 'citizenIdCode',
-      key: 'citizenIdCode',
-      render: (val) => val || '—',
-    },
+
     {
       title: 'Vai trò',
       dataIndex: 'roleIds',
       key: 'roleIds',
+      width: 140,
       render: (roleIds) => (
         <Space size={4} wrap>
           {(roleIds || []).map((rid) => {
@@ -557,7 +552,7 @@ const AccountPage = () => {
           rowKey="id"
           loading={loading}
           pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 'max-content' }}
           bordered
         />
       </Card>
