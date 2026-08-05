@@ -1,5 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Breadcrumb, Typography, Skeleton, Empty, Input, Button, Tooltip, Space, Modal } from "antd";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Breadcrumb,
+  Typography,
+  Skeleton,
+  Empty,
+  Input,
+  Button,
+  Tooltip,
+  Space,
+  Modal,
+  message,
+} from "antd";
 import {
   HomeOutlined,
   BarChartOutlined,
@@ -20,89 +31,171 @@ import ProfitCharts from "../components/reports/profit/ProfitCharts";
 import ProfitReportTable from "../components/reports/profit/ProfitReportTable";
 import ProfitCompareModal from "../components/reports/profit/ProfitCompareModal";
 
+import { getBranchDashboardStats } from "../api/dashboardApi";
+import { useBranch } from "../context/BranchContext";
+
 const { Title, Text } = Typography;
 
-/**
- * Generator dữ liệu linh hoạt theo Mốc Thời Gian (Year -> 12 rows, Month -> 30 rows, Week -> 7 rows, Day -> 24 rows)
- */
-const generateProfitReportData = (presetTime) => {
-  let length = 30;
-  let labelPrefix = "Ngày ";
-
-  if (presetTime === "today" || presetTime === "yesterday") {
-    length = 24;
-    labelPrefix = "Giờ ";
-  } else if (presetTime === "this_week" || presetTime === "last_week") {
-    length = 7;
-    labelPrefix = "Thứ ";
-  } else if (presetTime === "this_year") {
-    length = 12;
-    labelPrefix = "Tháng ";
-  }
-
-  const list = Array.from({ length }, (_, i) => {
-    let label = `${labelPrefix}${i + 1}`;
-    if (labelPrefix === "Thứ ") {
-      label = i === 6 ? "Chủ Nhật" : `Thứ ${i + 2}`;
-    } else if (labelPrefix === "Giờ ") {
-      label = `${String(i).padStart(2, "0")}:00`;
-    }
-
-    const revenue = Math.round((4000000 + Math.random() * 12000000) / 10000) * 10000;
-    const expense = Math.round((revenue * (0.32 + Math.random() * 0.15)) / 10000) * 10000;
-    const profit = revenue - expense;
-    const marginPct = Number(((profit / (revenue || 1)) * 100).toFixed(1));
-    const costRatioPct = Number(((expense / (revenue || 1)) * 100).toFixed(1));
-
-    return {
-      id: `PFT-${i + 1}`,
-      timeLabel: label,
-      revenue,
-      expense,
-      profit,
-      marginPct,
-      costRatioPct,
-    };
-  });
-
-  return list;
-};
+const formatVND = (val) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
 /**
  * Page: ProfitReportPage
- * Báo cáo Lợi nhuận chuyên sâu cho quản lý / chủ nhà hàng.
+ * Báo cáo Lợi nhuận chuyên sâu — kết nối với dữ liệu thật từ Backend
  * Đường dẫn: /reports/profit
  */
 const ReportProfitPage = () => {
-  const [loading, setLoading] = useState(true);
-  const [presetTime, setPresetTime] = useState("this_month");
-  const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
-  const [searchText, setSearchText] = useState("");
-  const [tableData, setTableData] = useState([]);
-
+  const { currentBranchId } = useBranch();
+  const [loading, setLoading]         = useState(true);
+  const [presetTime, setPresetTime]   = useState("this_month");
+  const [dateRange, setDateRange]     = useState([
+    dayjs().startOf("month"),
+    dayjs().endOf("month"),
+  ]);
+  const [searchText, setSearchText]   = useState("");
   const [compareModalVisible, setCompareModalVisible] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen]               = useState(false);
 
-  // TODO: API Fetch Profit Report Data (GET /api/v1/reports/profit)
+  // ── Dữ liệu thật từ BE ───────────────────────────────────────────────────
+  const [beStats, setBeStats]                 = useState(null);
+  const [tableData, setTableData]             = useState([]);
+  const [trendData, setTrendData]             = useState([]);
+  const [waterfallData, setWaterfallData]     = useState([]);
+  const [distributionData, setDistributionData] = useState([]);
+
+  const fetchReportData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [start, end] = dateRange;
+      const startStr = start.format("YYYY-MM-DD");
+      const endStr   = end.format("YYYY-MM-DD");
+
+      const today = dayjs().startOf("day");
+      const isToday = start.isSame(today, "day") && end.isSame(today, "day");
+
+      const presetToRange = {
+        today:       "today",
+        yesterday:   "yesterday",
+        this_week:   "custom",
+        last_week:   "custom",
+        this_month:  "thisMonth",
+        last_month:  "lastMonth",
+        this_year:   "custom",
+        custom:      "custom",
+      };
+      const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
+
+      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
+
+      if (res?.data) {
+        const data = res.data;
+        setBeStats(data);
+
+        // 1. Phân tích theo mốc thời gian (bảng chi tiết): Lấy từ dailyStats hoặc hourSlots
+        let list = [];
+        if (data.dailyStats && data.dailyStats.length > 0) {
+          list = data.dailyStats.map((s, idx) => {
+            const rev = s.revenue || 0;
+            const exp = s.expense || 0;
+            const prof = s.profit || 0;
+            return {
+              id:           `PFT-${idx + 1}`,
+              timeLabel:    s.date || "N/A",
+              revenue:      rev,
+              expense:      exp,
+              profit:       prof,
+              marginPct:    rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,
+              costRatioPct: rev > 0 ? Number(((exp / rev) * 100).toFixed(1)) : 0,
+            };
+          });
+        } else if (data.hourSlots && data.hourSlots.length > 0) {
+          const totalRev = data.revenue || 0;
+          const totalExp = data.expenses || 0;
+          const expRatio = totalRev > 0 ? totalExp / totalRev : 0;
+
+          list = data.hourSlots.map((s, idx) => {
+            const rev = s.value || 0;
+            const exp = Math.round(rev * expRatio);
+            const prof = rev - exp;
+            return {
+              id:           `PFT-${idx + 1}`,
+              timeLabel:    s.slot || "N/A",
+              revenue:      rev,
+              expense:      exp,
+              profit:       prof,
+              marginPct:    rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,
+              costRatioPct: rev > 0 ? Number(((exp / rev) * 100).toFixed(1)) : 0,
+            };
+          });
+        }
+        setTableData(list);
+
+        // 2. Trend Data cho ProfitCharts
+        setTrendData(
+          list.map((item) => ({
+            date:    item.timeLabel,
+            revenue: item.revenue,
+            expense: item.expense,
+            profit:  item.profit,
+          }))
+        );
+
+        // 3. Waterfall Data cho Cơ cấu hình thành lợi nhuận
+        const flowList = data.cashFlowList || [];
+        const costCategories = {};
+        flowList
+          .filter((cf) => cf.type === "out")
+          .forEach((cf) => {
+            costCategories[cf.category || "Chi phí khác"] =
+              (costCategories[cf.category || "Chi phí khác"] || 0) + Math.abs(cf.amount || 0);
+          });
+
+        const waterfall = [
+          { name: "Tổng Doanh Thu", amount: data.revenue || 0, isTotal: true },
+          ...Object.keys(costCategories).map((cat) => ({
+            name:   cat,
+            amount: -costCategories[cat],
+            isCost: true,
+          })),
+          { name: "Lợi Nhuận Ròng", amount: data.profit || 0, isProfit: true },
+        ];
+        setWaterfallData(waterfall);
+
+        // 4. Phân bổ khoảng lợi nhuận
+        const ranges = [
+          { range: "< 0 ₫",      min: -Infinity, max: 0,         count: 0 },
+          { range: "0 - 10M",    min: 0,         max: 10000000,  count: 0 },
+          { range: "10M - 20M",  min: 10000000,  max: 20000000,  count: 0 },
+          { range: "20M - 50M",  min: 20000000,  max: 50000000,  count: 0 },
+          { range: "> 50M",     min: 50000000,  max: Infinity,  count: 0 },
+        ];
+        list.forEach((item) => {
+          const prof = item.profit;
+          const match = ranges.find((r) => prof >= r.min && prof < r.max);
+          if (match) match.count += 1;
+        });
+        setDistributionData(ranges.filter((r) => r.count > 0));
+      }
+    } catch (err) {
+      console.error("[ReportProfitPage] API error:", err);
+      message.warning("Không thể tải dữ liệu lợi nhuận. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange, presetTime, currentBranchId]);
+
   useEffect(() => {
     fetchReportData();
-  }, [presetTime, dateRange]);
+  }, [currentBranchId, fetchReportData]);
 
-  const fetchReportData = () => {
-    setLoading(true);
-    // TODO: Replace with real API call e.g. axios.get('/api/v1/reports/profit', { params: { preset: presetTime, startDate, endDate } })
-    setTimeout(() => {
-      const generated = generateProfitReportData(presetTime);
-      setTableData(generated);
-      setLoading(false);
-    }, 450);
+  const handlePresetChange = (val) => {
+    setPresetTime(val);
   };
 
   const handleResetFilters = () => {
     setPresetTime("this_month");
     setDateRange([dayjs().startOf("month"), dayjs().endOf("month")]);
     setSearchText("");
-    fetchReportData();
   };
 
   // Client-side filtering
@@ -111,18 +204,28 @@ const ReportProfitPage = () => {
   });
 
   // Calculate Summary Totals
-  const totalRevenue = filteredData.reduce((acc, c) => acc + c.revenue, 0);
-  const totalExpense = filteredData.reduce((acc, c) => acc + c.expense, 0);
-  const netProfit = totalRevenue - totalExpense;
-  const avgPerDay = filteredData.length ? Math.round(netProfit / filteredData.length) : 0;
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.profit), 0);
-  const lowestVal = filteredData.reduce((min, c) => Math.min(min, c.profit), filteredData[0]?.profit || 0);
+  const totalRevenue = beStats?.revenue || 0;
+  const totalExpense = beStats?.expenses || 0;
+  const netProfit    = beStats?.profit || 0;
+
+  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
+  const avgPerDay   = Math.round(totalRevenue / daysInRange);
+
+  const dailyList = beStats?.dailyStats || [];
+  const revenueValues = dailyList.map((d) => d.revenue || 0);
+  const highestVal = revenueValues.length ? Math.max(...revenueValues) : totalRevenue;
+  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
+
+  // Điểm hòa vốn ước tính
+  const breakEvenTarget = 40000000; // mục tiêu điểm hòa vốn giả định
+  const breakEvenPercent =
+    breakEvenTarget > 0 ? Number(((totalRevenue / breakEvenTarget) * 100).toFixed(1)) : 0;
 
   const columnDefs = [
     { title: "Mốc Thời Gian", field: "timeLabel" },
-    { title: "Doanh Thu", field: (r) => `${r.revenue.toLocaleString()} đ`, align: "right" },
-    { title: "Chi Phí", field: (r) => `-${r.expense.toLocaleString()} đ`, align: "right" },
-    { title: "Lợi Nhuận Ròng", field: (r) => `+${r.profit.toLocaleString()} đ`, align: "right" },
+    { title: "Doanh Thu", field: (r) => formatVND(r.revenue), align: "right" },
+    { title: "Chi Phí",   field: (r) => `-${formatVND(r.expense)}`, align: "right" },
+    { title: "Lợi Nhuận Ròng", field: (r) => `+${formatVND(r.profit)}`, align: "right" },
     { title: "Tỷ Suất Lợi Nhuận", field: (r) => `${r.marginPct}%`, align: "right" },
     { title: "Tỷ Lệ Chi Phí", field: (r) => `${r.costRatioPct}%`, align: "right" },
   ];
@@ -168,19 +271,19 @@ const ReportProfitPage = () => {
           data={filteredData}
           summaryRow={[
             "Tổng cộng",
-            `${totalRevenue.toLocaleString()} đ`,
-            `-${totalExpense.toLocaleString()} đ`,
-            `+${netProfit.toLocaleString()} đ`,
-            `${((netProfit / (totalRevenue || 1)) * 100).toFixed(1)}%`,
-            `${((totalExpense / (totalRevenue || 1)) * 100).toFixed(1)}%`,
+            formatVND(totalRevenue),
+            `-${formatVND(totalExpense)}`,
+            `+${formatVND(netProfit)}`,
+            `${totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0}%`,
+            `${totalRevenue > 0 ? ((totalExpense / totalRevenue) * 100).toFixed(1) : 0}%`,
           ]}
         />
       </div>
 
-      {/* ── REPORT FILTER BAR (Có nút Đặt lại) ───────────────────────────────── */}
+      {/* ── REPORT FILTER BAR ───────────────────────────────────────────────── */}
       <ReportFilter
         presetTime={presetTime}
-        onPresetChange={setPresetTime}
+        onPresetChange={handlePresetChange}
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         onRefresh={fetchReportData}
@@ -188,36 +291,44 @@ const ReportProfitPage = () => {
         loading={loading}
       />
 
-      {/* ── LOADING SKELETON OR CONTENT ────────────────────────────────────── */}
+      {/* ── LOADING SKELETON OR CONTENT ─────────────────────────────────────── */}
       {loading ? (
         <Skeleton active paragraph={{ rows: 10 }} />
-      ) : filteredData.length === 0 ? (
-        <Empty description="Không tìm thấy dữ liệu lợi nhuận nào phù hợp với bộ lọc" />
       ) : (
         <>
-          {/* 1. Summary KPI Cards + Compare Button */}
+          {/* 1. Summary KPI Cards */}
           <ProfitSummaryCards
             data={{
-              profit: netProfit,
-              profitMargin: Number(((netProfit / (totalRevenue || 1)) * 100).toFixed(1)),
-              costRatio: Number(((totalExpense / (totalRevenue || 1)) * 100).toFixed(1)),
-              breakEvenPct: 129.3,
-              growthPct: 24.8,
+              profit:       netProfit,
+              profitMargin: totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(1)) : 0,
+              costRatio:    totalRevenue > 0 ? Number(((totalExpense / totalRevenue) * 100).toFixed(1)) : 0,
+              breakEvenPct: breakEvenPercent,
+              growthPct:    0,
             }}
             onOpenCompare={() => setCompareModalVisible(true)}
           />
 
           {/* 2. Profit Charts */}
           <ProfitCharts
+            trendData={trendData}
+            waterfallData={waterfallData}
+            distributionData={distributionData}
             breakEvenInfo={{
-              target: 220000000,
+              target:  breakEvenTarget,
               current: totalRevenue,
-              percent: Number(((totalRevenue / 220000000) * 100).toFixed(1)),
+              percent: breakEvenPercent,
             }}
           />
 
-          {/* 3. Report Data Table với Thanh Toolbar Tích Hợp Có Nút Xuất/In, Phóng to */}
-          <div style={{ background: "#ffffff", padding: 18, borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+          {/* 3. Profit Report Table */}
+          <div
+            style={{
+              background: "#ffffff",
+              padding: 18,
+              borderRadius: 10,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -232,10 +343,9 @@ const ReportProfitPage = () => {
                 Bảng Phân Tích Lợi Nhuận Theo Mốc Thời Gian ({filteredData.length} dòng)
               </Title>
 
-              {/* Toolbar Tích Hợp: Tìm kiếm, Làm mới, Đặt lại, Xuất/In, Phóng to */}
               <Space wrap size="small">
                 <Input
-                  placeholder="Tìm mốc thời gian (ngày, giờ...)"
+                  placeholder="Tìm mốc thời gian..."
                   prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -244,7 +354,11 @@ const ReportProfitPage = () => {
                 />
 
                 <Tooltip title="Làm mới dữ liệu lợi nhuận">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchReportData}
+                    style={{ borderRadius: 6 }}
+                  />
                 </Tooltip>
 
                 <Tooltip title="Xóa bộ lọc tìm kiếm">
@@ -259,11 +373,11 @@ const ReportProfitPage = () => {
                   data={filteredData}
                   summaryRow={[
                     "Tổng cộng",
-                    `${totalRevenue.toLocaleString()} đ`,
-                    `-${totalExpense.toLocaleString()} đ`,
-                    `+${netProfit.toLocaleString()} đ`,
-                    `${((netProfit / (totalRevenue || 1)) * 100).toFixed(1)}%`,
-                    `${((totalExpense / (totalRevenue || 1)) * 100).toFixed(1)}%`,
+                    formatVND(totalRevenue),
+                    `-${formatVND(totalExpense)}`,
+                    `+${formatVND(netProfit)}`,
+                    `${totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0}%`,
+                    `${totalRevenue > 0 ? ((totalExpense / totalRevenue) * 100).toFixed(1) : 0}%`,
                   ]}
                 />
 
@@ -277,17 +391,28 @@ const ReportProfitPage = () => {
               </Space>
             </div>
 
-            <ProfitReportTable
-              data={filteredData}
-              loading={loading}
-              presetTime={presetTime}
-            />
+            {filteredData.length === 0 ? (
+              <Empty description="Không có dữ liệu lợi nhuận nào trong kỳ được chọn" />
+            ) : (
+              <ProfitReportTable
+                data={filteredData}
+                loading={loading}
+                presetTime={presetTime}
+              />
+            )}
           </div>
 
-          {/* Fullscreen Table Modal */}
+          {/* Fullscreen Modal */}
           <Modal
             title={
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingRight: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingRight: 24,
+                }}
+              >
                 <span style={{ fontWeight: 800, fontSize: 16 }}>
                   Bảng Phân Tích Lợi Nhuận Theo Mốc Thời Gian ({filteredData.length} dòng)
                 </span>
@@ -322,12 +447,12 @@ const ReportProfitPage = () => {
             avgPerDay={avgPerDay}
             highestVal={highestVal}
             lowestVal={lowestVal}
-            variance={24.8}
+            variance={0}
           />
         </>
       )}
 
-      {/* So Sánh Hiệu Quả Lợi Nhuận & Kinh Doanh Modal */}
+      {/* So Sánh Modal */}
       <ProfitCompareModal
         visible={compareModalVisible}
         onClose={() => setCompareModalVisible(false)}

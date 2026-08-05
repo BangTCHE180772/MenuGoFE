@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Modal,
   Select,
@@ -9,17 +9,11 @@ import {
   Typography,
   Tag,
   Divider,
-  Alert,
   Space,
+  Spin,
 } from "antd";
 import {
   SwapOutlined,
-  DollarOutlined,
-  ShoppingOutlined,
-  CalculatorOutlined,
-  CalendarOutlined,
-  RiseOutlined,
-  FallOutlined,
   LineChartOutlined,
   PieChartOutlined,
 } from "@ant-design/icons";
@@ -37,413 +31,263 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
+import { getBranchDashboardStats } from "../../../api/dashboardApi";
+import { useBranch } from "../../../context/BranchContext";
 
-const { Title, Text } = Typography;
+const { Text, Title } = Typography;
 
 const formatVND = (val) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    val || 0,
-  );
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
 const PAYMENT_COLORS = ["#16a34a", "#2563eb", "#0284c7", "#8b5cf6"];
 
+// ─── Fetch stats cho 1 kỳ từ BE ────────────────────────────────────────────
+const fetchPeriodStats = async (date, pickerType, branchId) => {
+  let start, end, range;
+  const d = dayjs(date);
+
+  if (pickerType === "date") {
+    const isToday = d.isSame(dayjs(), "day");
+    const isYesterday = d.isSame(dayjs().subtract(1, "day"), "day");
+    start = d.format("YYYY-MM-DD");
+    end   = d.format("YYYY-MM-DD");
+    range = isToday ? "today" : isYesterday ? "yesterday" : "custom";
+  } else if (pickerType === "month") {
+    start = d.startOf("month").format("YYYY-MM-DD");
+    end   = d.endOf("month").format("YYYY-MM-DD");
+    const isThisMonth = d.isSame(dayjs(), "month");
+    const isLastMonth = d.isSame(dayjs().subtract(1, "month"), "month");
+    range = isThisMonth ? "thisMonth" : isLastMonth ? "lastMonth" : "custom";
+  } else {
+    // year
+    start = d.startOf("year").format("YYYY-MM-DD");
+    end   = d.endOf("year").format("YYYY-MM-DD");
+    range = "custom";
+  }
+
+  const res = await getBranchDashboardStats(range, start, end, branchId);
+  return res?.data || null;
+};
+
+// ─── Map BE stats → period summary ─────────────────────────────────────────
+const mapToPeriod = (beData, dateLabel) => {
+  if (!beData) return { title: dateLabel, totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, avgRevenuePerDay: 1, payments: [], trendData: [] };
+
+  const revenue = beData.revenue || 0;
+  const orders  = beData.completedBills || 0;
+
+  // dailyStats → trend
+  const trendData = (beData.dailyStats || []).map((s) => ({
+    date:    s.date,
+    revenue: s.revenue || 0,
+  }));
+
+  // hourSlots → fallback nếu ko có dailyStats
+  const trendFallback = (beData.hourSlots || []).map((s) => ({
+    date:    s.slot,
+    revenue: s.value || 0,
+  }));
+
+  return {
+    title:           dateLabel,
+    totalRevenue:    revenue,
+    totalOrders:     orders,
+    avgOrderValue:   beData.avgOrderValue || 0,
+    avgRevenuePerDay: revenue,   // 1 ngày = chính nó; 1 tháng tính sau
+    payments:        (beData.paymentMethods || []).map((m) => ({ name: m.name, value: m.value || 0 })),
+    trendData:       trendData.length > 0 ? trendData : trendFallback,
+  };
+};
+
 /**
  * Component: RevenueCompareModal
- * Modal So Sánh Hiệu Quả Vận Hành Doanh Thu giữa 2 kỳ cùng loại thời gian (Năm vs Năm, Tháng vs Tháng, Ngày vs Ngày bất kỳ).
+ * So sánh doanh thu 2 kỳ bất kỳ — dữ liệu thật từ BE
  */
 const RevenueCompareModal = ({ visible, onClose }) => {
-  const [hoveredPieIndex, setHoveredPieIndex] = useState(-1);
-  // Chế độ thời gian: "date" (Ngày), "month" (Tháng), "year" (Năm)
+  const { currentBranchId } = useBranch();
+  const [hoveredPieIndexA, setHoveredPieIndexA] = useState(-1);
+  const [hoveredPieIndexB, setHoveredPieIndexB] = useState(-1);
   const [pickerType, setPickerType] = useState("date");
-
-  // Mốc A (Kỳ này) & Mốc B (Kỳ so sánh) - Mặc định theo ngày: Hôm nay vs Hôm qua
   const [dateA, setDateA] = useState(dayjs());
   const [dateB, setDateB] = useState(dayjs().subtract(1, "day"));
 
-  const typeOptions = [
-    { label: "So sánh theo ngày", value: "date" },
-    { label: "So sánh theo tháng", value: "month" },
-    { label: "So sánh theo năm", value: "year" },
-  ];
-
-  const handlePickerTypeChange = (val) => {
-    setPickerType(val);
-    const now = dayjs();
-    if (val === "date") {
-      // Mặc định: Hôm nay vs Hôm qua
-      setDateA(now);
-      setDateB(now.subtract(1, "day"));
-    } else if (val === "month") {
-      // Mặc định: Tháng này vs Tháng trước
-      setDateA(now.startOf("month"));
-      setDateB(now.subtract(1, "month").startOf("month"));
-    } else if (val === "year") {
-      // Mặc định: Năm này vs Năm trước
-      setDateA(now.startOf("year"));
-      setDateB(now.subtract(1, "year").startOf("year"));
-    }
-  };
+  const [loadingA, setLoadingA] = useState(false);
+  const [loadingB, setLoadingB] = useState(false);
+  const [periodA, setPeriodA]   = useState(null);
+  const [periodB, setPeriodB]   = useState(null);
 
   const formatTitle = (d, type) => {
     if (!d) return "";
-    if (type === "date") return `Ngày ${d.format("DD/MM/YYYY")}`;
+    if (type === "date")  return `Ngày ${d.format("DD/MM/YYYY")}`;
     if (type === "month") return `Tháng ${d.format("MM/YYYY")}`;
     return `Năm ${d.format("YYYY")}`;
   };
 
-  // Combined Trends Data cho cả 2 kỳ so sánh
-  const combinedTrends = [
-    {
-      date: "Mốc 1 (Tuần 1 / Giờ 1-6)",
-      revenueA: 65000000,
-      revenueB: 58000000,
-    },
-    {
-      date: "Mốc 2 (Tuần 2 / Giờ 7-12)",
-      revenueA: 78000000,
-      revenueB: 62000000,
-    },
-    {
-      date: "Mốc 3 (Tuần 3 / Giờ 13-18)",
-      revenueA: 81000000,
-      revenueB: 69000000,
-    },
-    {
-      date: "Mốc 4 (Tuần 4 / Giờ 19-24)",
-      revenueA: 60500000,
-      revenueB: 58800000,
-    },
-  ];
+  const loadPeriodA = useCallback(async () => {
+    setLoadingA(true);
+    try {
+      const data = await fetchPeriodStats(dateA, pickerType, currentBranchId);
+      setPeriodA(mapToPeriod(data, `Kỳ chọn: ${formatTitle(dateA, pickerType)}`));
+    } finally { setLoadingA(false); }
+  }, [dateA, pickerType, currentBranchId]);
 
-  // Dynamic Data cho Kỳ A (Kỳ chọn)
-  const dataA = {
-    title: `Kỳ chọn: ${formatTitle(dateA, pickerType)}`,
-    totalRevenue: 284500000,
-    totalOrders: 1420,
-    avgOrderValue: 200350,
-    avgRevenuePerDay: 9483333,
-    growthPct: 14.8,
-    payments: [
-      { name: "Tiền mặt", value: 105000000 },
-      { name: "Chuyển khoản QR", value: 124000000 },
-      { name: "Chuyển khoản NH", value: 35000000 },
-      { name: "Thẻ Visa/Master", value: 20500000 },
-    ],
+  const loadPeriodB = useCallback(async () => {
+    setLoadingB(true);
+    try {
+      const data = await fetchPeriodStats(dateB, pickerType, currentBranchId);
+      setPeriodB(mapToPeriod(data, `Kỳ so sánh: ${formatTitle(dateB, pickerType)}`));
+    } finally { setLoadingB(false); }
+  }, [dateB, pickerType, currentBranchId]);
+
+  useEffect(() => { if (visible) { loadPeriodA(); loadPeriodB(); } }, [visible, loadPeriodA, loadPeriodB, currentBranchId]);
+
+  const handlePickerTypeChange = (val) => {
+    setPickerType(val);
+    const now = dayjs();
+    if (val === "date") { setDateA(now); setDateB(now.subtract(1, "day")); }
+    else if (val === "month") { setDateA(now.startOf("month")); setDateB(now.subtract(1, "month").startOf("month")); }
+    else { setDateA(now.startOf("year")); setDateB(now.subtract(1, "year").startOf("year")); }
   };
 
-  // Dynamic Data cho Kỳ B (Kỳ so sánh)
-  const dataB = {
-    title: `Kỳ so sánh: ${formatTitle(dateB, pickerType)}`,
-    totalRevenue: 247800000,
-    totalOrders: 1290,
-    avgOrderValue: 192093,
-    avgRevenuePerDay: 7993548,
-    growthPct: 8.2,
-    payments: [
-      { name: "Tiền mặt", value: 98000000 },
-      { name: "Chuyển khoản QR", value: 102000000 },
-      { name: "Chuyển khoản NH", value: 31000000 },
-      { name: "Thẻ Visa/Master", value: 16800000 },
-    ],
-  };
+  // ── Biểu đồ kết hợp cả 2 kỳ trên cùng 1 Line chart ───────────────────
+  const combinedTrend = (() => {
+    if (!periodA && !periodB) return [];
+    const tA = periodA?.trendData || [];
+    const tB = periodB?.trendData || [];
+    const len = Math.max(tA.length, tB.length);
+    return Array.from({ length: len }, (_, i) => ({
+      date:     tA[i]?.date || tB[i]?.date || `Mốc ${i + 1}`,
+      revenueA: tA[i]?.revenue || 0,
+      revenueB: tB[i]?.revenue || 0,
+    }));
+  })();
 
-  // Chênh lệch % giữa Kỳ A và Kỳ B
-  const diffRevenuePct = Number(
-    (
-      ((dataA.totalRevenue - dataB.totalRevenue) / dataB.totalRevenue) *
-      100
-    ).toFixed(1),
-  );
-  const diffOrdersPct = Number(
-    (
-      ((dataA.totalOrders - dataB.totalOrders) / dataB.totalOrders) *
-      100
-    ).toFixed(1),
-  );
+  const diffRevenuePct =
+    periodA && periodB && periodB.totalRevenue > 0
+      ? Number((((periodA.totalRevenue - periodB.totalRevenue) / periodB.totalRevenue) * 100).toFixed(1))
+      : 0;
+  const diffRevenueDelta = periodA && periodB ? periodA.totalRevenue - periodB.totalRevenue : 0;
+  const diffOrdersPct =
+    periodA && periodB && periodB.totalOrders > 0
+      ? Number((((periodA.totalOrders - periodB.totalOrders) / periodB.totalOrders) * 100).toFixed(1))
+      : 0;
+  const diffOrdersDelta = periodA && periodB ? periodA.totalOrders - periodB.totalOrders : 0;
 
-  const renderPeriodBlock = (periodData, isCurrent = true) => (
-    <Card
-      bordered
-      style={{
-        borderRadius: 10,
-        borderColor: "#e2e8f0",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-        background: "#ffffff",
-      }}
-      bodyStyle={{ padding: 16 }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
+  // ── Render 1 khối kỳ ───────────────────────────────────────────────────
+  const renderPeriodBlock = (period, loading, isCurrent, hoveredIdx, setHoveredIdx) => (
+    <Spin spinning={loading}>
+      <Card
+        bordered
+        style={{ borderRadius: 10, borderColor: isCurrent ? "#bfdbfe" : "#d1fae5", background: "#fff" }}
+        bodyStyle={{ padding: 16 }}
       >
-        <Title
-          level={5}
-          style={{ margin: 0, color: "#1e293b", fontWeight: 700 }}
-        >
+        <Title level={5} style={{ margin: "0 0 12px", color: "#1e293b", fontWeight: 700 }}>
           {isCurrent ? "📌 " : "⏱️ "}
-          {periodData.title}
+          {period?.title || (isCurrent ? "Kỳ chọn" : "Kỳ so sánh")}
         </Title>
-      </div>
 
-      {/* 5 KPIs Row - Harmonized Style */}
-      <Row gutter={[8, 8]} style={{ marginBottom: 16 }}>
-        <Col span={4.8} style={{ flex: "1 0 18%" }}>
-          <div
-            style={{
-              background: "#f8fafc",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Doanh Thu
-            </Text>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#2563eb" }}>
-              {formatVND(periodData.totalRevenue)}
-            </div>
-          </div>
-        </Col>
-        <Col span={4.8} style={{ flex: "1 0 18%" }}>
-          <div
-            style={{
-              background: "#f8fafc",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Số Đơn Hàng
-            </Text>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#ea580c" }}>
-              {periodData.totalOrders} đơn
-            </div>
-          </div>
-        </Col>
-        <Col span={4.8} style={{ flex: "1 0 18%" }}>
-          <div
-            style={{
-              background: "#f8fafc",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Giá Trị Đơn (AOV)
-            </Text>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#10b981" }}>
-              {formatVND(periodData.avgOrderValue)}
-            </div>
-          </div>
-        </Col>
-        <Col span={4.8} style={{ flex: "1 0 18%" }}>
-          <div
-            style={{
-              background: "#f8fafc",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Doanh Thu / Ngày
-            </Text>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#8b5cf6" }}>
-              {formatVND(periodData.avgRevenuePerDay)}
-            </div>
-          </div>
-        </Col>
-        <Col span={4.8} style={{ flex: "1 0 18%" }}>
-          <div
-            style={{
-              background: "#f8fafc",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Growth %
-            </Text>
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 14,
-                color: periodData.growthPct >= 0 ? "#16a34a" : "#dc2626",
-              }}
-            >
-              +{periodData.growthPct}%
-            </div>
-          </div>
-        </Col>
-      </Row>
+        {/* KPIs */}
+        <Row gutter={[8, 8]} style={{ marginBottom: 14 }}>
+          {[
+            { label: "Doanh Thu",   value: formatVND(period?.totalRevenue),    color: "#2563eb" },
+            { label: "Số Đơn",      value: `${period?.totalOrders || 0} đơn`,  color: "#ea580c" },
+            { label: "Giá Trị AOV", value: formatVND(period?.avgOrderValue),   color: "#10b981" },
+          ].map((kpi) => (
+            <Col key={kpi.label} xs={8}>
+              <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid #e2e8f0" }}>
+                <Text type="secondary" style={{ fontSize: 11, display: "block" }}>{kpi.label}</Text>
+                <div style={{ fontWeight: 700, fontSize: 13, color: kpi.color }}>{kpi.value}</div>
+              </div>
+            </Col>
+          ))}
+        </Row>
 
-      {/* 2 Charts in Period */}
-      <Row gutter={[12, 12]}>
-        {/* Biểu đồ Xu hướng Doanh thu theo thời gian (2 Line) */}
-        <Col span={14}>
-          <div
-            style={{
-              background: "#fff",
-              padding: 12,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text
-              strong
-              style={{ fontSize: 12, display: "block", marginBottom: 8 }}
-            >
-              <LineChartOutlined style={{ color: "var(--color-primary)" }} /> Xu
-              hướng Doanh thu theo thời gian
-            </Text>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={combinedTrends}
-                  margin={{ top: 10, right: 10, left: -15, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    stroke="#94a3b8"
-                    fontSize={9}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    stroke="#94a3b8"
-                    fontSize={10}
-                    tickFormatter={(v) => `${v / 1000000}M`}
-                  />
-                  <Tooltip formatter={(v, name) => [formatVND(v), name]} />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
-                  />
-
-                  {/* Line Kỳ Chọn (Period A - Xanh Dương Đậm) */}
-                  <Line
-                    type="monotone"
-                    dataKey="revenueA"
-                    name={`Kỳ chọn (${formatTitle(dateA, pickerType)})`}
-                    stroke="#2563eb"
-                    strokeWidth={isCurrent ? 3 : 1.8}
-                    strokeDasharray={isCurrent ? "" : "4 4"}
-                    dot={{ r: isCurrent ? 5 : 3 }}
-                  />
-
-                  {/* Line Kỳ So Sánh (Period B - Xanh Dương Nhạt/Cyan) */}
-                  <Line
-                    type="monotone"
-                    dataKey="revenueB"
-                    name={`Kỳ so sánh (${formatTitle(dateB, pickerType)})`}
-                    stroke="#0ea5e9"
-                    strokeWidth={!isCurrent ? 3 : 1.8}
-                    strokeDasharray={!isCurrent ? "" : "4 4"}
-                    dot={{ r: !isCurrent ? 5 : 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+        {/* Charts: Trend + Pie */}
+        <Row gutter={[10, 10]}>
+          <Col span={14}>
+            <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
+              <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
+                <LineChartOutlined style={{ color: "#2563eb" }} /> Xu hướng doanh thu
+              </Text>
+              <div style={{ width: "100%", height: 160 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={combinedTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="date" tickLine={false} stroke="#94a3b8" fontSize={9} />
+                    <YAxis tickLine={false} stroke="#94a3b8" fontSize={9} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />
+                    <Tooltip formatter={(v, name) => [formatVND(v), name]} />
+                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="revenueA"
+                      name="Kỳ chọn"
+                      stroke="#2563eb"
+                      strokeWidth={isCurrent ? 3 : 2}
+                      strokeDasharray={isCurrent ? undefined : "4 4"}
+                      dot={{ r: isCurrent ? 5 : 3 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="revenueB"
+                      name="Kỳ so sánh"
+                      stroke="#0ea5e9"
+                      strokeWidth={isCurrent ? 2 : 3}
+                      strokeDasharray={isCurrent ? "4 4" : undefined}
+                      dot={{ r: isCurrent ? 3 : 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
-        </Col>
-
-        {/* Biểu đồ Tỷ trọng Phương thức Thanh toán có chú giải Legend */}
-        <Col span={10}>
-          <div
-            style={{
-              background: "#fff",
-              padding: 12,
-              borderRadius: 6,
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <Text
-              strong
-              style={{ fontSize: 12, display: "block", marginBottom: 8 }}
-            >
-              <PieChartOutlined style={{ color: "#16a34a" }} /> Tỷ trọng PTTT
-            </Text>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={periodData.payments}
-                    cx="50%"
-                    cy="40%"
-                    innerRadius={30}
-                    outerRadius={50}
-                    dataKey="value"
-                    onMouseEnter={(_, index) => setHoveredPieIndex(index)}
-                    onMouseLeave={() => setHoveredPieIndex(-1)}
-                  >
-                    {periodData.payments.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]}
-                        opacity={
-                          hoveredPieIndex === -1 || hoveredPieIndex === i
-                            ? 1
-                            : 0.35
-                        }
-                        stroke={hoveredPieIndex === i ? "#000" : "none"}
-                        strokeWidth={2}
-                        style={{ cursor: "pointer", transition: "all 0.2s" }}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => [formatVND(v), "Số tiền"]} />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
-                    formatter={(value, entry, index) => (
-                      <span
-                        style={{
-                          fontWeight: hoveredPieIndex === index ? 700 : 500,
-                          color:
-                            hoveredPieIndex === index ? "#0f172a" : "#64748b",
-                          fontSize: hoveredPieIndex === index ? 11 : 10,
-                          transition: "all 0.2s",
-                        }}
+          </Col>
+          <Col span={10}>
+            <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
+              <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
+                <PieChartOutlined style={{ color: "#16a34a" }} /> Tỷ trọng Phương thức thanh toán
+              </Text>
+              <div style={{ width: "100%", height: 160 }}>
+                {(period?.payments?.length || 0) === 0 ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: 12 }}>
+                    Chưa có dữ liệu
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={period.payments}
+                        cx="50%" cy="40%"
+                        innerRadius={28} outerRadius={48}
+                        dataKey="value"
+                        onMouseEnter={(_, i) => setHoveredIdx(i)}
+                        onMouseLeave={() => setHoveredIdx(-1)}
                       >
-                        {value}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+                        {period.payments.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]}
+                            opacity={hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.35}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => [formatVND(v), "Số tiền"]} />
+                      <Legend wrapperStyle={{ fontSize: 10, paddingTop: 2 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
-          </div>
-        </Col>
-      </Row>
-    </Card>
+          </Col>
+        </Row>
+      </Card>
+    </Spin>
   );
 
   return (
     <Modal
       title={
         <Space>
-          <SwapOutlined
-            style={{ color: "var(--color-primary)", fontSize: 20 }}
-          />
-          <span style={{ fontWeight: 800, fontSize: 18 }}>
-            So Sánh Hiệu Quả Vận Hành Doanh Thu
-          </span>
+          <SwapOutlined style={{ color: "var(--color-primary)", fontSize: 20 }} />
+          <span style={{ fontWeight: 800, fontSize: 18 }}>So Sánh Hiệu Quả Vận Hành Doanh Thu</span>
         </Space>
       }
       open={visible}
@@ -451,119 +295,69 @@ const RevenueCompareModal = ({ visible, onClose }) => {
       footer={null}
       width={1100}
       style={{ top: 20 }}
+      bodyStyle={{ maxHeight: "85vh", overflowY: "auto", padding: "16px 20px" }}
     >
-      {/* Header Bar: Chọn Chế độ so sánh Ngày/Tháng/Năm & 2 DatePickers bất kỳ */}
-      <div
-        style={{
-          background: "#f1f5f9",
-          padding: "14px 18px",
-          borderRadius: 8,
-          marginBottom: 18,
-        }}
-      >
+      {/* ── Header: Chọn loại + 2 DatePicker ────────────────────────────── */}
+      <div style={{ background: "#f1f5f9", padding: "14px 18px", borderRadius: 8, marginBottom: 16 }}>
         <Row gutter={[16, 12]} align="middle">
           <Col xs={24} md={8}>
-            <Text
-              strong
-              style={{ display: "block", fontSize: 12, marginBottom: 4 }}
-            >
-              1. Loại mốc thời gian so sánh:
-            </Text>
+            <Text strong style={{ display: "block", fontSize: 12, marginBottom: 4 }}>1. Loại mốc thời gian:</Text>
             <Select
               value={pickerType}
               onChange={handlePickerTypeChange}
-              options={typeOptions}
               style={{ width: "100%" }}
+              options={[
+                { label: "So sánh theo ngày",  value: "date" },
+                { label: "So sánh theo tháng", value: "month" },
+                { label: "So sánh theo năm",   value: "year" },
+              ]}
             />
           </Col>
-
           <Col xs={12} md={8}>
-            <Text
-              strong
-              style={{ display: "block", fontSize: 12, marginBottom: 4 }}
-            >
-              2. Kỳ chọn:
-            </Text>
+            <Text strong style={{ display: "block", fontSize: 12, marginBottom: 4 }}>2. Kỳ chọn:</Text>
             <DatePicker
               picker={pickerType}
               value={dateA}
               onChange={(val) => val && setDateA(val)}
-              format={
-                pickerType === "date"
-                  ? "DD/MM/YYYY"
-                  : pickerType === "month"
-                    ? "MM/YYYY"
-                    : "YYYY"
-              }
+              format={pickerType === "date" ? "DD/MM/YYYY" : pickerType === "month" ? "MM/YYYY" : "YYYY"}
               style={{ width: "100%", borderRadius: 6 }}
             />
           </Col>
-
           <Col xs={12} md={8}>
-            <Text
-              strong
-              style={{ display: "block", fontSize: 12, marginBottom: 4 }}
-            >
-              3. Kỳ so sánh:
-            </Text>
+            <Text strong style={{ display: "block", fontSize: 12, marginBottom: 4 }}>3. Kỳ so sánh:</Text>
             <DatePicker
               picker={pickerType}
               value={dateB}
               onChange={(val) => val && setDateB(val)}
-              format={
-                pickerType === "date"
-                  ? "DD/MM/YYYY"
-                  : pickerType === "month"
-                    ? "MM/YYYY"
-                    : "YYYY"
-              }
+              format={pickerType === "date" ? "DD/MM/YYYY" : pickerType === "month" ? "MM/YYYY" : "YYYY"}
               style={{ width: "100%", borderRadius: 6 }}
             />
           </Col>
         </Row>
       </div>
 
-      {/* Chênh lệch hiệu quả tổng kết Badge */}
+      {/* ── Chênh lệch tổng kết ────────────────────────────────────────── */}
       <div
         style={{
-          background: "#fff7ed",
-          padding: "10px 16px",
-          borderRadius: 8,
-          border: "1px solid #ffedd5",
-          marginBottom: 18,
-          display: "flex",
-          gap: 20,
-          alignItems: "center",
+          background: "#fff7ed", padding: "10px 16px", borderRadius: 8,
+          border: "1px solid #ffedd5", marginBottom: 16,
+          display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap",
         }}
       >
-        <Text strong>
-          Tăng trưởng chênh lệch giữa {formatTitle(dateA, pickerType)} vs{" "}
-          {formatTitle(dateB, pickerType)}:
-        </Text>
-        <Tag
-          color={diffRevenuePct >= 0 ? "success" : "error"}
-          style={{ fontSize: 14, fontWeight: 700, padding: "2px 8px" }}
-        >
-          Doanh thu: {diffRevenuePct >= 0 ? "+" : ""}
-          {diffRevenuePct}% (
-          {formatVND(dataA.totalRevenue - dataB.totalRevenue)})
+        <Text strong>Tăng trưởng: {formatTitle(dateA, pickerType)} vs {formatTitle(dateB, pickerType)}</Text>
+        <Tag color={diffRevenuePct >= 0 ? "success" : "error"} style={{ fontSize: 13, fontWeight: 700, padding: "2px 8px" }}>
+          Doanh thu: {diffRevenuePct >= 0 ? "+" : ""}{diffRevenuePct}% ({diffRevenueDelta >= 0 ? "+" : ""}{formatVND(diffRevenueDelta)})
         </Tag>
-        <Tag
-          color={diffOrdersPct >= 0 ? "success" : "error"}
-          style={{ fontSize: 14, fontWeight: 700, padding: "2px 8px" }}
-        >
-          Đơn hàng: {diffOrdersPct >= 0 ? "+" : ""}
-          {diffOrdersPct}% (+{dataA.totalOrders - dataB.totalOrders} đơn)
+        <Tag color={diffOrdersPct >= 0 ? "success" : "error"} style={{ fontSize: 13, fontWeight: 700, padding: "2px 8px" }}>
+          Đơn hàng: {diffOrdersPct >= 0 ? "+" : ""}{diffOrdersPct}% ({diffOrdersDelta >= 0 ? "+" : ""}{diffOrdersDelta} đơn)
         </Tag>
       </div>
 
-      {/* 2 Khối kỳ A và B */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {renderPeriodBlock(dataA, true)}
-        <Divider style={{ margin: "4px 0" }}>
-          ⚡ So sánh đối chiếu trực tiếp với ⚡
-        </Divider>
-        {renderPeriodBlock(dataB, false)}
+      {/* ── 2 khối kỳ ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {renderPeriodBlock(periodA, loadingA, true,  hoveredPieIndexA, setHoveredPieIndexA)}
+        <Divider style={{ margin: "4px 0" }}>⚡ So sánh đối chiếu trực tiếp ⚡</Divider>
+        {renderPeriodBlock(periodB, loadingB, false, hoveredPieIndexB, setHoveredPieIndexB)}
       </div>
     </Modal>
   );

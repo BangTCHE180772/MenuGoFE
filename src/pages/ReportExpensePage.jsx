@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { Breadcrumb, Typography, Skeleton, Empty, Select, Col, Input, Button, Tooltip, Space, Modal } from "antd";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Breadcrumb,
+  Typography,
+  Skeleton,
+  Empty,
+  Select,
+  Col,
+  Input,
+  Button,
+  Tooltip,
+  Space,
+  Modal,
+  message,
+} from "antd";
 import {
   HomeOutlined,
   BarChartOutlined,
@@ -21,77 +34,153 @@ import ExpenseReportTable from "../components/reports/expense/ExpenseReportTable
 import ExpenseDetailDrawer from "../components/reports/expense/ExpenseDetailDrawer";
 import ExpenseCompareModal from "../components/reports/expense/ExpenseCompareModal";
 
+import { getBranchDashboardStats } from "../api/dashboardApi";
+import { useBranch } from "../context/BranchContext";
+
 const { Title, Text } = Typography;
 
-// Mock Generator cho Báo cáo Chi phí
-const MOCK_EXPENSES = Array.from({ length: 35 }, (_, i) => {
-  const expNum = String(2001 + i).padStart(4, "0");
-  const categories = [
-    "Nguyên liệu & Thực phẩm",
-    "Lương nhân viên",
-    "Thuê mặt bằng",
-    "Điện, Nước & Gas",
-    "Tiếp thị & Quảng cáo",
-    "Chi phí khác",
-  ];
-  const suppliers = [
-    "NPP Thực Phẩm Sạch Hải Đăng",
-    "Công ty Điện Lực Thành Phố",
-    "Đơn Vị Truyền Thông Marketing",
-    "Công ty Cấp Nước Sạch",
-    "Công ty Bất Động Sản Đô Thị",
-  ];
-  const creators = ["Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường"];
+const formatVND = (val) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    val || 0
+  );
 
-  const cat = categories[i % categories.length];
-  let amount = Math.round((500000 + Math.random() * 5000000) / 10000) * 10000;
-  if (cat === "Thuê mặt bằng") amount = 18000000;
-  if (cat === "Lương nhân viên") amount = 32000000;
+// ─── Map BE CashFlowList → Expense Bills ────────────────────────────────────
+const mapCashFlowToExpenses = (cashFlowList = []) => {
+  return cashFlowList
+    .filter((cf) => cf.type === "out") // Chỉ lấy các khoản Chi
+    .map((cf, idx) => {
+      const timeVal = cf.time || "";
+      const parsedTime = timeVal.length > 5 ? dayjs(timeVal) : null;
+      const dateStr = parsedTime ? parsedTime.format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY");
+      const timeStr = parsedTime ? parsedTime.format("HH:mm") : timeVal;
+      const amount  = Math.abs(cf.amount || 0);
 
-  return {
-    id: `EXP-${expNum}`,
-    expenseCode: `PC${expNum}`,
-    date: dayjs().subtract(i % 20, "day").format("DD/MM/YYYY"),
-    time: `${String(9 + (i % 10)).padStart(2, "0")}:${String((i * 11) % 60).padStart(2, "0")}`,
-    category: cat,
-    supplier: suppliers[i % suppliers.length],
-    createdBy: creators[i % creators.length],
-    amount,
-    notes: `Chi tiền ${cat.toLowerCase()} theo hợp đồng và chứng từ kèm theo.`,
-    status: "Completed",
-  };
-});
+      return {
+        id:          String(cf.id || idx + 1),
+        expenseCode: `PC${String(Math.abs(cf.id || idx + 1)).padStart(6, "0")}`,
+        date:        dateStr,
+        time:        timeStr,
+        category:    cf.category || "Chi phí khác",
+        supplier:    "Hệ thống",
+        createdBy:   "Hệ thống",
+        amount,
+        notes:       `Phiếu chi tiền ${cf.category ? cf.category.toLowerCase() : "hoạt động"} ghi nhận từ hệ thống.`,
+        status:      "Completed",
+      };
+    });
+};
 
 /**
- * Page: ExpenseReportPage
- * Báo cáo Chi phí chuyên sâu cho quản lý / chủ nhà hàng.
+ * Page: ReportExpensePage
+ * Báo cáo Chi phí chuyên sâu — kết nối với dữ liệu thật của BE
  * Đường dẫn: /reports/expense
  */
 const ReportExpensePage = () => {
-  const [loading, setLoading] = useState(true);
-  const [presetTime, setPresetTime] = useState("this_month");
-  const [dateRange, setDateRange] = useState([dayjs().startOf("month"), dayjs().endOf("month")]);
-  const [searchText, setSearchText] = useState("");
+  const { currentBranchId } = useBranch();
+  const [loading, setLoading]         = useState(true);
+  const [presetTime, setPresetTime]   = useState("this_month");
+  const [dateRange, setDateRange]     = useState([
+    dayjs().startOf("month"),
+    dayjs().endOf("month"),
+  ]);
+  const [searchText, setSearchText]           = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [selectedCreatedBy, setSelectedCreatedBy] = useState("all");
 
   const [selectedExpense, setSelectedExpense] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [drawerVisible, setDrawerVisible]     = useState(false);
+  const [isFullscreen, setIsFullscreen]       = useState(false);
   const [compareModalVisible, setCompareModalVisible] = useState(false);
 
-  // TODO: API Fetch Expense Report Data (GET /api/v1/reports/expense)
+  // ── Dữ liệu thật từ BE ───────────────────────────────────────────────────
+  const [beStats, setBeStats]           = useState(null);
+  const [allExpenses, setAllExpenses]   = useState([]);
+  const [trendData, setTrendData]       = useState([]);
+  const [breakdownData, setBreakdownData] = useState([]);
+  const [topExpenseData, setTopExpenseData] = useState([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+
+  const fetchReportData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [start, end] = dateRange;
+      const startStr = start.format("YYYY-MM-DD");
+      const endStr   = end.format("YYYY-MM-DD");
+
+      const today = dayjs().startOf("day");
+      const isToday = start.isSame(today, "day") && end.isSame(today, "day");
+
+      const presetToRange = {
+        today:       "today",
+        yesterday:   "yesterday",
+        this_week:   "custom",
+        last_week:   "custom",
+        this_month:  "thisMonth",
+        last_month:  "lastMonth",
+        this_year:   "custom",
+        custom:      "custom",
+      };
+      const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
+
+      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
+
+      if (res?.data) {
+        const data = res.data;
+        setBeStats(data);
+        setTotalRevenue(data.revenue || 0);
+
+        // Map danh sách chi phí
+        const expenses = mapCashFlowToExpenses(data.cashFlowList || []);
+        setAllExpenses(expenses);
+
+        // Map trend data
+        if (data.dailyStats && data.dailyStats.length > 0) {
+          setTrendData(
+            data.dailyStats.map((s) => ({
+              date:    s.date,
+              expense: s.expense || 0,
+            }))
+          );
+        } else {
+          setTrendData([]);
+        }
+
+        // Map breakdown data (Theo nhóm danh mục)
+        const categoriesMap = {};
+        expenses.forEach((item) => {
+          categoriesMap[item.category] = (categoriesMap[item.category] || 0) + item.amount;
+        });
+        const breakdown = Object.keys(categoriesMap).map((catName) => ({
+          name:  catName,
+          value: categoriesMap[catName],
+        }));
+        setBreakdownData(breakdown);
+
+        // Map top expenses
+        const sorted = [...expenses]
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 5)
+          .map((item) => ({
+            name: item.notes || item.category,
+            amount: item.amount,
+          }));
+        setTopExpenseData(sorted);
+      }
+    } catch (err) {
+      console.error("[ReportExpensePage] API error:", err);
+      message.warning("Không thể tải dữ liệu chi phí. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange, presetTime, currentBranchId]);
+
   useEffect(() => {
     fetchReportData();
-  }, [presetTime, dateRange, selectedCategory, selectedSupplier, selectedCreatedBy]);
+  }, [currentBranchId, fetchReportData]);
 
-  const fetchReportData = () => {
-    setLoading(true);
-    // TODO: Replace with real API call e.g. axios.get('/api/v1/reports/expense', { params: { startDate, endDate, category, supplier, createdBy } })
-    setTimeout(() => {
-      setLoading(false);
-    }, 450);
+  const handlePresetChange = (val) => {
+    setPresetTime(val);
   };
 
   const handleResetFilters = () => {
@@ -101,17 +190,15 @@ const ReportExpensePage = () => {
     setSelectedCategory("all");
     setSelectedSupplier("all");
     setSelectedCreatedBy("all");
-    fetchReportData();
   };
 
-  // Client-side filtering
-  const filteredData = MOCK_EXPENSES.filter((item) => {
+  // ── Client-side filtering ───────────────────────────────────────────────
+  const filteredData = allExpenses.filter((item) => {
     const matchSearch =
       !searchText ||
       item.expenseCode.toLowerCase().includes(searchText.toLowerCase()) ||
       item.category.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.supplier.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.createdBy.toLowerCase().includes(searchText.toLowerCase());
+      item.notes.toLowerCase().includes(searchText.toLowerCase());
 
     const matchCategory = selectedCategory === "all" || item.category === selectedCategory;
     const matchSupplier = selectedSupplier === "all" || item.supplier === selectedSupplier;
@@ -120,22 +207,33 @@ const ReportExpensePage = () => {
     return matchSearch && matchCategory && matchSupplier && matchCreatedBy;
   });
 
-  // Calculate Summary Totals
-  const totalExpense = filteredData.reduce((acc, c) => acc + c.amount, 0);
-  const avgExpense = filteredData.length ? Math.round(totalExpense / filteredData.length) : 0;
-  const avgPerDay = Math.round(totalExpense / 30);
-  const highestVal = filteredData.reduce((max, c) => Math.max(max, c.amount), 0);
-  const lowestVal = filteredData.reduce((min, c) => Math.min(min, c.amount), filteredData[0]?.amount || 0);
+  // ── Tính toán số liệu tổng hợp ─────────────────────────────────────────
+  const totalExpense = beStats?.expenses || 0;
+  const avgExpense   = filteredData.length ? Math.round(totalExpense / filteredData.length) : 0;
+
+  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
+  const avgPerDay   = Math.round((beStats?.revenue || 0) / daysInRange);
+
+  const dailyList = beStats?.dailyStats || [];
+  const revenueValues = dailyList.map((d) => d.revenue || 0);
+  const highestVal = revenueValues.length ? Math.max(...revenueValues) : (beStats?.revenue || 0);
+  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
+
+  // Lấy các option động cho category filter
+  const categoryOptions = [
+    { label: "Tất cả loại chi phí", value: "all" },
+    ...breakdownData.map((b) => ({ label: b.name, value: b.name })),
+  ];
 
   const columnDefs = [
     { title: "Mã Phiếu Chi", field: "expenseCode" },
-    { title: "Ngày", field: "date" },
-    { title: "Giờ", field: "time" },
+    { title: "Ngày",         field: "date" },
+    { title: "Giờ",         field: "time" },
     { title: "Loại Chi Phí", field: "category" },
-    { title: "Nhà Cung Cấp / Đối Tác", field: "supplier" },
-    { title: "Người Tạo", field: "createdBy" },
-    { title: "Giá Trị Chi", field: (r) => `-${r.amount.toLocaleString()} đ`, align: "right" },
-    { title: "Ghi chú", field: "notes" },
+    { title: "Nhà Cung Cấp", field: "supplier" },
+    { title: "Người Tạo",    field: "createdBy" },
+    { title: "Giá Trị Chi",  field: (r) => `-${formatVND(r.amount)}`, align: "right" },
+    { title: "Ghi chú",      field: "notes" },
   ];
 
   return (
@@ -178,22 +276,16 @@ const ReportExpensePage = () => {
           columnDefs={columnDefs}
           data={filteredData}
           summaryRow={[
-            "Tổng cộng",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            `-${totalExpense.toLocaleString()} đ`,
-            "-",
+            "Tổng cộng", "-", "-", "-", "-", "-",
+            `-${formatVND(totalExpense)}`, "-",
           ]}
         />
       </div>
 
-      {/* ── REPORT FILTER BAR (Có nút Đặt lại filter) ────────────────────── */}
+      {/* ── REPORT FILTER BAR ───────────────────────────────────────────────── */}
       <ReportFilter
         presetTime={presetTime}
-        onPresetChange={setPresetTime}
+        onPresetChange={handlePresetChange}
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         onRefresh={fetchReportData}
@@ -201,31 +293,40 @@ const ReportExpensePage = () => {
         loading={loading}
       />
 
-      {/* ── LOADING SKELETON OR CONTENT ────────────────────────────────────── */}
+      {/* ── LOADING SKELETON OR CONTENT ─────────────────────────────────────── */}
       {loading ? (
         <Skeleton active paragraph={{ rows: 10 }} />
-      ) : filteredData.length === 0 ? (
-        <Empty description="Không tìm thấy chứng từ chi phí nào phù hợp với bộ lọc" />
       ) : (
         <>
-          {/* 1. Summary KPI Cards + Compare Button */}
+          {/* 1. Summary KPI Cards */}
           <ExpenseSummaryCards
             data={{
               totalExpense,
               avgExpense,
               avgExpensePerDay: avgPerDay,
-              growthPct: -4.2,
+              growthPct: 0,
               largestExpense: highestVal,
             }}
             onOpenCompare={() => setCompareModalVisible(true)}
           />
 
-          {/* 2. Expense Charts (Đã bỏ Biến động Chi phí theo Danh mục) */}
-          <ExpenseCharts />
+          {/* 2. Expense Charts */}
+          <ExpenseCharts
+            trendData={trendData}
+            breakdownData={breakdownData}
+            topExpenseData={topExpenseData}
+          />
 
-          {/* 3. Report Data Table với Thanh Toolbar 2 Hàng (Hàng 1: Tiêu đề + Tìm kiếm; Hàng 2: Các bộ lọc & Xuất/In) */}
-          <div style={{ background: "#ffffff", padding: 18, borderRadius: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-            {/* Hàng 1: Tiêu đề + Khung tìm kiếm đứng riêng 1 hàng */}
+          {/* 3. Expense Report Table */}
+          <div
+            style={{
+              background: "#ffffff",
+              padding: 18,
+              borderRadius: 10,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            }}
+          >
+            {/* Hàng 1: Tiêu đề + Khung tìm kiếm */}
             <div
               style={{
                 display: "flex",
@@ -250,7 +351,7 @@ const ReportExpensePage = () => {
               />
             </div>
 
-            {/* Hàng 2: Các bộ lọc còn lại & nút thao tác bên dưới khung tìm kiếm */}
+            {/* Hàng 2: Các bộ lọc */}
             <div
               style={{
                 display: "flex",
@@ -265,46 +366,16 @@ const ReportExpensePage = () => {
                 <Select
                   value={selectedCategory}
                   onChange={setSelectedCategory}
-                  style={{ width: 170 }}
-                  options={[
-                    { label: "Tất cả loại chi phí", value: "all" },
-                    { label: "Nguyên liệu & Thực phẩm", value: "Nguyên liệu & Thực phẩm" },
-                    { label: "Lương nhân viên", value: "Lương nhân viên" },
-                    { label: "Thuê mặt bằng", value: "Thuê mặt bằng" },
-                    { label: "Điện, Nước & Gas", value: "Điện, Nước & Gas" },
-                    { label: "Tiếp thị & Quảng cáo", value: "Tiếp thị & Quảng cáo" },
-                    { label: "Chi phí khác", value: "Chi phí khác" },
-                  ]}
-                />
-
-                <Select
-                  value={selectedSupplier}
-                  onChange={setSelectedSupplier}
                   style={{ width: 180 }}
-                  options={[
-                    { label: "Tất cả NCC / Đối tác", value: "all" },
-                    { label: "NPP Thực Phẩm Sạch Hải Đăng", value: "NPP Thực Phẩm Sạch Hải Đăng" },
-                    { label: "Công ty Điện Lực Thành Phố", value: "Công ty Điện Lực Thành Phố" },
-                    { label: "Đơn Vị Truyền Thông Marketing", value: "Đơn Vị Truyền Thông Marketing" },
-                    { label: "Công ty Cấp Nước Sạch", value: "Công ty Cấp Nước Sạch" },
-                    { label: "Công ty Bất Động Sản Đô Thị", value: "Công ty Bất Động Sản Đô Thị" },
-                  ]}
-                />
-
-                <Select
-                  value={selectedCreatedBy}
-                  onChange={setSelectedCreatedBy}
-                  style={{ width: 150 }}
-                  options={[
-                    { label: "Tất cả người tạo", value: "all" },
-                    { label: "Nguyễn Văn An", value: "Nguyễn Văn An" },
-                    { label: "Trần Thị Bình", value: "Trần Thị Bình" },
-                    { label: "Lê Hoàng Cường", value: "Lê Hoàng Cường" },
-                  ]}
+                  options={categoryOptions}
                 />
 
                 <Tooltip title="Làm mới dữ liệu phiếu chi">
-                  <Button icon={<ReloadOutlined />} onClick={fetchReportData} style={{ borderRadius: 6 }} />
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchReportData}
+                    style={{ borderRadius: 6 }}
+                  />
                 </Tooltip>
 
                 <Tooltip title="Xóa tất cả bộ lọc phiếu chi">
@@ -318,14 +389,8 @@ const ReportExpensePage = () => {
                   columnDefs={columnDefs}
                   data={filteredData}
                   summaryRow={[
-                    "Tổng cộng",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    "-",
-                    `-${totalExpense.toLocaleString()} đ`,
-                    "-",
+                    "Tổng cộng", "-", "-", "-", "-", "-",
+                    `-${formatVND(totalExpense)}`, "-",
                   ]}
                 />
 
@@ -339,20 +404,31 @@ const ReportExpensePage = () => {
               </Space>
             </div>
 
-            <ExpenseReportTable
-              data={filteredData}
-              loading={loading}
-              onSelectExpense={(exp) => {
-                setSelectedExpense(exp);
-                setDrawerVisible(true);
-              }}
-            />
+            {filteredData.length === 0 ? (
+              <Empty description="Không có khoản chi phí nào ghi nhận trong kỳ được chọn" />
+            ) : (
+              <ExpenseReportTable
+                data={filteredData}
+                loading={loading}
+                onSelectExpense={(exp) => {
+                  setSelectedExpense(exp);
+                  setDrawerVisible(true);
+                }}
+              />
+            )}
           </div>
 
-          {/* Fullscreen Expense Table Modal */}
+          {/* Fullscreen Modal */}
           <Modal
             title={
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingRight: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingRight: 24,
+                }}
+              >
                 <span style={{ fontWeight: 800, fontSize: 16 }}>
                   Danh Sách Chứng Từ & Phiếu Chi Chi Tiết ({filteredData.length} chứng từ)
                 </span>
@@ -384,13 +460,13 @@ const ReportExpensePage = () => {
 
           {/* 4. Footer ERP Summary */}
           <SummaryFooter
-            totalRevenue={284500000}
+            totalRevenue={totalRevenue}
             totalExpense={totalExpense}
-            netProfit={284500000 - totalExpense}
+            netProfit={totalRevenue - totalExpense}
             avgPerDay={avgPerDay}
             highestVal={highestVal}
             lowestVal={lowestVal}
-            variance={-4.2}
+            variance={0}
           />
         </>
       )}
@@ -402,7 +478,7 @@ const ReportExpensePage = () => {
         expenseData={selectedExpense}
       />
 
-      {/* So Sánh Hiệu Quả Chi Phí Vận Hành Modal */}
+      {/* Expense Compare Modal */}
       <ExpenseCompareModal
         visible={compareModalVisible}
         onClose={() => setCompareModalVisible(false)}

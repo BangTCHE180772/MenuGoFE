@@ -23,3 +23,9 @@ export const batchUpdateCookingStatus = (detailIds, cookingStatus) =>
  */
 export const cancelOrderDetail = (detailId) =>
   axiosInstance.put(`/api/Order/details/${detailId}/cancel`);
+
+/**
+ * Gửi yêu cầu bếp (nước chấm, v.v.)
+ */
+export const requestRestock = (data) =>
+  axiosInstance.post('/api/Kitchen/request-restock', data);

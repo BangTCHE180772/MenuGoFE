@@ -222,22 +222,24 @@ const ConsumptionVarianceTable = ({
   return (
     <Card
       style={{
-        borderRadius: 16,
-        marginBottom: 24,
-        boxShadow: "0 2px 12px rgba(0,0,0,0.03)",
-        border: "1px solid #e2e8f0",
+        borderRadius: isFullscreen ? 0 : 16,
+        marginBottom: isFullscreen ? 0 : 24,
+        boxShadow: isFullscreen ? "none" : "0 2px 12px rgba(0,0,0,0.03)",
+        border: isFullscreen ? "none" : "1px solid #e2e8f0",
       }}
-      bodyStyle={{ padding: "20px 24px" }}
+      bodyStyle={{ padding: isFullscreen ? 0 : "20px 24px" }}
     >
       {/* Title */}
-      <div style={{ marginBottom: 16 }}>
-        <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
-          🍽️ Báo cáo Tiêu thụ & Biến động Sai số Nguyên liệu (Consumption Report)
-        </Title>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          Đã nhập ➔ Tồn kho ➔ Đã tiêu thụ (trừ tự động khi thanh toán order POS). Tiêu hao vượt = Đã tiêu thụ − Đã nhập. Ngưỡng sai số cảnh báo: <strong>{varianceThreshold}%</strong>.
-        </Text>
-      </div>
+      {!isFullscreen && (
+        <div style={{ marginBottom: 16 }}>
+          <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
+            🍽️ Báo cáo Tiêu thụ & Biến động Sai số Nguyên liệu (Consumption Report)
+          </Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Đã nhập ➔ Tồn kho ➔ Đã tiêu thụ (trừ tự động khi thanh toán order POS). Tiêu hao vượt = Đã tiêu thụ − Đã nhập. Ngưỡng sai số cảnh báo: <strong>{varianceThreshold}%</strong>.
+          </Text>
+        </div>
+      )}
 
       {/* Toolbar: Search, Filter, Refresh, Reset, Export/PDF/Print Dropdown, Fullscreen */}
       <div

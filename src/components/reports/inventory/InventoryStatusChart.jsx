@@ -103,8 +103,14 @@ const InventoryStatusChart = ({ data }) => {
 
       {/* Top Quick Status Summary Badges */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        {MOCK_STATUS_SUMMARY.map((item) => (
-          <Col xs={12} sm={8} md={4.8} key={item.key} style={{ flex: 1 }}>
+        {[
+          { label: "Bình thường",  count: chartData[0]?.normal || 0,       color: "#22c55e", bg: "#f0fdf4", border: "#bbf7d0" },
+          { label: "Sắp hết",     count: chartData[0]?.lowStock || 0,     color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+          { label: "Hết hàng",     count: chartData[0]?.outOfStock || 0,   color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+          { label: "Cần kiểm tra",  count: chartData[0]?.needCheck || 0,    color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+          { label: "Sắp hết hạn",  count: chartData[0]?.expiringSoon || 0, color: "#ea580c", bg: "#fff7ed", border: "#ffedd5" },
+        ].map((item, idx) => (
+          <Col xs={12} sm={8} md={4.8} key={idx} style={{ flex: 1 }}>
             <div
               style={{
                 background: item.bg,
@@ -137,17 +143,22 @@ const InventoryStatusChart = ({ data }) => {
             <YAxis type="category" dataKey="category" stroke="#94a3b8" fontSize={12} width={80} />
             <Tooltip content={<CustomTooltip />} />
             <Legend
-              wrapperStyle={{ paddingTop: 8, fontSize: 12 }}
-              formatter={(value) => {
-                const labels = {
-                  normal: "Bình thường",
-                  lowStock: "Sắp hết",
-                  outOfStock: "Hết hàng",
-                  needCheck: "Cần kiểm tra",
-                  expiringSoon: "Sắp hết hạn",
-                };
-                return <span style={{ color: "#334155", fontWeight: 500 }}>{labels[value] || value}</span>;
-              }}
+              content={() => (
+                <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", paddingTop: 10 }}>
+                  {[
+                    { label: "Bình thường", color: "#22c55e" },
+                    { label: "Sắp hết",     color: "#f59e0b" },
+                    { label: "Hết hàng",    color: "#ef4444" },
+                    { label: "Cần kiểm tra", color: "#0ea5e9" },
+                    { label: "Sắp hết hạn",  color: "#f97316" },
+                  ].map((item, index) => (
+                    <div key={index} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ display: "inline-block", width: 12, height: 12, backgroundColor: item.color, borderRadius: 2 }} />
+                      <span style={{ fontSize: 12, fontWeight: 500, color: "#334155" }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             />
             <Bar dataKey="normal" name="normal" stackId="status" fill="#22c55e" radius={[4, 0, 0, 4]} barSize={28} />
             <Bar dataKey="lowStock" name="lowStock" stackId="status" fill="#f59e0b" barSize={28} />
