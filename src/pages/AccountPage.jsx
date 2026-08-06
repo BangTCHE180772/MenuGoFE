@@ -42,6 +42,7 @@ import { getAllBranches } from '../api/branchApi';
 import { uploadImage } from '../api/imageApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
+import AccountDetailModal from '../components/account/AccountDetailModal';
 
 const GENDER_OPTIONS = [
   { value: 'Nam', label: 'Nam' },
@@ -88,6 +89,20 @@ const AccountPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('create');
   const [editingRecord, setEditingRecord] = useState(null);
+
+  // Detail Modal states
+  const [detailRecord, setDetailRecord] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const handleOpenDetailModal = (record) => {
+    setDetailRecord(record);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setDetailRecord(null);
+  };
 
   const [form] = Form.useForm();
   const avatarImageValue = Form.useWatch('avatarImage', form);
@@ -308,21 +323,26 @@ const AccountPage = () => {
       title: 'Nhân viên',
       key: 'employee',
       render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar
-            size={38}
-            src={record.avatarImage || undefined}
-            icon={!record.avatarImage ? <UserOutlined /> : undefined}
-            style={{
-              backgroundColor: record.avatarImage ? undefined : '#e8442a',
-              flexShrink: 0,
-            }}
-          />
-          <div>
-            <strong style={{ color: '#e8442a' }}>{record.name}</strong>
-            <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {record.id}</div>
+        <Tooltip title="Bấm để xem chi tiết nhân viên">
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+            onClick={() => handleOpenDetailModal(record)}
+          >
+            <Avatar
+              size={38}
+              src={record.avatarImage || undefined}
+              icon={!record.avatarImage ? <UserOutlined /> : undefined}
+              style={{
+                backgroundColor: record.avatarImage ? undefined : '#e8442a',
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <strong style={{ color: '#e8442a', transition: 'color 0.2s' }}>{record.name}</strong>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {record.id}</div>
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
     },
@@ -720,6 +740,10 @@ const AccountPage = () => {
             <Form.Item
               name="citizenIdCode"
               label="Số CMND/CCCD"
+              rules={[
+                { required: true, message: 'Vui lòng nhập số CMND/CCCD!' },
+                { pattern: /^\d{12}$/, message: 'Số CMND/CCCD phải bao gồm đúng 12 chữ số!' },
+              ]}
               style={{ width: 330 }}
             >
               <Input placeholder="Nhập số CMND/CCCD..." />
@@ -778,6 +802,15 @@ const AccountPage = () => {
           )}
         </Form>
       </Modal>
+
+      {/* Employee Detail Modal */}
+      <AccountDetailModal
+        open={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        account={detailRecord}
+        branches={branches}
+        onEdit={(rec) => handleOpenModal('edit', rec)}
+      />
     </div>
   );
 };
