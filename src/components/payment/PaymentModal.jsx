@@ -74,18 +74,21 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     items.forEach((item) => {
       if (item.status === 'Cancelled') return;
 
+      const effectiveQuantity = item.quantity - (item.returnedQuantity || 0);
+      if (effectiveQuantity <= 0) return;
+
       const key = `${item.productId || item.productName}-${item.price}`;
       if (map.has(key)) {
         const existing = map.get(key);
-        existing.quantity += item.quantity;
-        existing.totalPrice += item.quantity * item.price;
+        existing.quantity += effectiveQuantity;
+        existing.totalPrice += effectiveQuantity * item.price;
       } else {
         map.set(key, {
           key: key,
           name: item.productName,
           price: item.price,
-          quantity: item.quantity,
-          totalPrice: item.quantity * item.price,
+          quantity: effectiveQuantity,
+          totalPrice: effectiveQuantity * item.price,
         });
       }
     });
