@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Spin, Tooltip } from 'antd';
 import { getStatusConfig, TABLE_STATUS } from '../../data/tableConstants';
+import ReturnItemModal from './ReturnItemModal';
 import '../../styles/pos-order-panel.css';
 
 const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
@@ -72,9 +73,11 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
   );
 };
 
-/* ── Ordered Item Row ────────────────────────────────────────────────────────── */
-const OrderedItem = ({ item, onMarkAsServed }) => {
+/* ── OrderedItem Row ────────────────────────────────────────────────────────── */
+const OrderedItem = ({ item, onMarkAsServed, onRequestReturn }) => {
   const isReady = item.cookingStatus === 'Ready';
+  const isServed = item.cookingStatus === 'Served' || item.status === 'PartialReturned';
+  const returnableQty = item.quantity - (item.returnedQuantity || 0);
   
   const getStatusColor = (status) => {
     switch (status) {
@@ -106,29 +109,42 @@ const OrderedItem = ({ item, onMarkAsServed }) => {
           <div className="pos-cart-item-status-badge" style={{ backgroundColor: getStatusColor(item.cookingStatus) + '20', color: getStatusColor(item.cookingStatus) }}>
             <span style={{ backgroundColor: getStatusColor(item.cookingStatus) }} className="pos-order-status-dot" />
             {getStatusText(item.cookingStatus)}
+            {item.returnedQuantity > 0 && <span style={{ marginLeft: 4, color: '#f59e0b' }}>(Đã trả {item.returnedQuantity})</span>}
           </div>
         </div>
         <div className="pos-cart-item-total" style={{alignSelf: 'flex-start'}}>{formatPrice(item.price * item.quantity)}</div>
       </div>
 
-      {(isReady || item.note) && (
+      {(isReady || item.note || (isServed && returnableQty > 0)) && (
         <div className="pos-cart-item-bottom" style={{ marginTop: '8px', justifyContent: 'space-between' }}>
           <div className="pos-cart-item-note-display" style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '12px' }}>
             {item.note && `Ghi chú: ${item.note}`}
           </div>
-          {isReady && (
-            <button 
-              className="pos-action-btn pos-action-btn--serve"
-              onClick={() => onMarkAsServed(item.orderDetailId)}
-            >
-              Đã phục vụ
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {isReady && (
+              <button 
+                className="pos-action-btn pos-action-btn--serve"
+                onClick={() => onMarkAsServed(item.orderDetailId)}
+              >
+                Đã phục vụ
+              </button>
+            )}
+            {isServed && returnableQty > 0 && (
+              <button 
+                className="pos-action-btn pos-action-btn--return"
+                style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5' }}
+                onClick={() => onRequestReturn(item)}
+              >
+                Trả món
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 };
+
 
 /* ── OrderPanel ───────────────────────────────────────────────────────────── */
 const OrderPanel = ({
@@ -144,17 +160,23 @@ const OrderPanel = ({
   onPayment,
   onMarkAsServed,
   onMerge,
+  onRefresh, // Thêm prop này để refresh order sau khi trả món thành công
   loading,
   isWaiterMode,
 }) => {
   const [activeTab, setActiveTab] = useState('cart'); // 'cart' | 'ordered'
+  const [returnItem, setReturnItem] = useState(null);
 
   const subTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = Math.round(subTotal * 0.08);
   const total = subTotal + tax;
   
   const orderedItems = summary?.items?.filter(i => i.status !== 'Cancelled') || [];
-  const orderedSubTotal = orderedItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const orderedSubTotal = orderedItems.reduce((s, i) => {
+    // Trừ đi số lượng đã trả khi tính tổng tiền
+    const qty = i.quantity - (i.returnedQuantity || 0);
+    return s + i.price * Math.max(0, qty);
+  }, 0);
   const orderedTax = Math.round(orderedSubTotal * 0.08);
   const orderedTotal = orderedSubTotal + orderedTax;
 
@@ -322,6 +344,7 @@ const OrderPanel = ({
                       key={item.orderDetailId}
                       item={item}
                       onMarkAsServed={onMarkAsServed}
+                      onRequestReturn={(i) => setReturnItem(i)}
                     />
                   ))
                 )}
@@ -348,6 +371,17 @@ const OrderPanel = ({
           )}
         </div>
       )}
+
+      {/* Return Item Modal */}
+      <ReturnItemModal
+        visible={!!returnItem}
+        item={returnItem}
+        onCancel={() => setReturnItem(null)}
+        onSuccess={() => {
+          setReturnItem(null);
+          if (onRefresh) onRefresh();
+        }}
+      />
     </aside>
   );
 };
