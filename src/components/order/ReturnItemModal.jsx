@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, InputNumber, Input, Form, message, Checkbox } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 
-const ReturnItemModal = ({ visible, item, onCancel, onSuccess }) => {
+const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +22,11 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess }) => {
         isIntact: values.isIntact || false,
       };
 
-      await axiosInstance.put(`/Order/details/${item.orderDetailId}/request-return`, payload);
+      if (isCustomerMode) {
+        await axiosInstance.post(`/api/Order/details/${item.orderDetailId}/customer-request-return`, payload);
+      } else {
+        await axiosInstance.put(`/api/Order/details/${item.orderDetailId}/request-return`, payload);
+      }
       
       message.success('Đã gửi yêu cầu trả món thành công!');
       form.resetFields();
