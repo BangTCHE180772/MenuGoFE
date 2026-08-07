@@ -13,11 +13,13 @@ import { useAuth } from "../context/AuthContext";
 import { useDevice } from "../context/DeviceContext";
 import { login, setup2FA, confirmSetup2FA, verify2FA } from "../api/authApi";
 import { Link } from "react-router-dom";
+import ForgotPasswordModal from "../components/auth/ForgotPasswordModal";
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Login, 2: Setup 2FA, 3: Verify 2FA
   const [accountId, setAccountId] = useState(null);
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
   const [setupData, setSetupData] = useState(null); // { secretKey, qrCodeUrl }
   const [pin, setPin] = useState("");
 
@@ -193,9 +195,13 @@ const LoginPage = () => {
 
             {/*============================================================================= Forgot Password and Register Links */}
             <div className="forgot-password-links-div">
-              <Link to="/forgot-password" className="forgot-password-link">
+              <span 
+                onClick={() => setForgotModalVisible(true)} 
+                className="forgot-password-link" 
+                style={{ cursor: "pointer" }}
+              >
                 Quên mật khẩu?
-              </Link>
+              </span>
             </div>
           </Form>
         )}
@@ -311,6 +317,10 @@ const LoginPage = () => {
           </>
         )}
       </div>
+      <ForgotPasswordModal 
+        visible={forgotModalVisible} 
+        onClose={() => setForgotModalVisible(false)} 
+      />
     </div>
   );
 };
