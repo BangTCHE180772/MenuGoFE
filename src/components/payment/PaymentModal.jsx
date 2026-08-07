@@ -147,6 +147,12 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
       message.error('Không tìm thấy mã hoá đơn hợp lệ!');
       return;
     }
+
+    if (!customerDeclined && (!customerName || customerName.trim() === '')) {
+      message.error('Vui lòng nhập Tên khách hàng (hoặc chọn "Khách không cung cấp")!');
+      return;
+    }
+
     if (isPayingRef.current) return;
 
     isPayingRef.current = true;
