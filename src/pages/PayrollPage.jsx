@@ -267,6 +267,13 @@ const PayrollPage = () => {
     setIsFormModalOpen(true);
 
     if (type === 'edit' && record) {
+      // Map numeric enum Type -> string name for SalaryDetails (backend returns e.g. 4 for Penalty)
+      const TYPE_INT_TO_STRING = { 1: 'Allowance', 2: 'Bonus', 3: 'Deduction', 4: 'Penalty' };
+      const mappedDetails = (record.salaryDetails || []).map((d) => ({
+        ...d,
+        type: typeof d.type === 'number' ? (TYPE_INT_TO_STRING[d.type] || d.typeName || d.type) : (d.typeName || d.type),
+      }));
+
       form.setFieldsValue({
         accountId: record.accountId,
         branchId: record.branchId,
@@ -284,7 +291,7 @@ const PayrollPage = () => {
         netSalary: record.netSalary || 0,
         status: record.status || PAYROLL_STATUS.Draft,
         note: record.note || '',
-        salaryDetails: record.salaryDetails || [],
+        salaryDetails: mappedDetails,
       });
     } else {
       form.resetFields();
@@ -508,19 +515,42 @@ const PayrollPage = () => {
       key: 'id',
       width: 75,
       sorter: (a, b) => a.id - b.id,
+      defaultSortOrder: 'ascend',
     },
     {
       title: 'Nhân viên',
       dataIndex: 'accountId',
       key: 'accountId',
       render: (id, record) => (
-        <div>
-          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>
-            <UserOutlined style={{ marginRight: 4 }} />
-            ID: {id}
+        <Tooltip title="Bấm để xem chi tiết bảng lương">
+          <div
+            onClick={() => handleOpenDetail(record)}
+            style={{ cursor: 'pointer', display: 'inline-block' }}
+          >
+            <strong
+              style={{
+                color: '#e8442a',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {record.accountName || getAccountName(id)}
+              <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
+            </strong>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>
+              <UserOutlined style={{ marginRight: 4 }} />
+              ID: {id}
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
     },
     ...(isOwnerOrAdmin
@@ -1183,14 +1213,21 @@ const PayrollPage = () => {
                       {...restField}
                       name={[name, 'type']}
                       rules={[{ required: true, message: 'Chọn loại!' }]}
-                      style={{ width: 140 }}
+                      style={{ width: 160 }}
                     >
-                      <Select placeholder="Loại">
-                        {DETAIL_TYPE_OPTIONS.map((t) => (
-                          <Select.Option key={t.value} value={t.value}>
-                            {t.label}
-                          </Select.Option>
-                        ))}
+                      <Select placeholder="Chọn loại khoản" optionLabelProp="label">
+                        <Select.Option value="Allowance" label="+ Phụ cấp">
+                          <span style={{ color: '#389e0d', fontWeight: 600 }}>✚ Phụ cấp</span>
+                        </Select.Option>
+                        <Select.Option value="Bonus" label="+ Tiền thưởng">
+                          <span style={{ color: '#1677ff', fontWeight: 600 }}>✚ Tiền thưởng</span>
+                        </Select.Option>
+                        <Select.Option value="Deduction" label="- Khấu trừ">
+                          <span style={{ color: '#cf1322', fontWeight: 600 }}>▬ Khấu trừ</span>
+                        </Select.Option>
+                        <Select.Option value="Penalty" label="- Tiền phạt">
+                          <span style={{ color: '#d4380d', fontWeight: 600 }}>▬ Tiền phạt</span>
+                        </Select.Option>
                       </Select>
                     </Form.Item>
 
@@ -1361,7 +1398,7 @@ const PayrollPage = () => {
               }}
             >
               <div style={{ fontSize: '13px', color: '#cf1322', textTransform: 'uppercase', letterSpacing: 1 }}>
-                THỰC NHẬN (NET SALARY):
+                LƯƠNG THỰC NHẬN:
               </div>
               <div style={{ fontSize: '26px', fontWeight: 800, color: '#a8071a' }}>
                 {formatVND(detailRecord.netSalary)}
