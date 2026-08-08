@@ -17,6 +17,9 @@ import {
   Popconfirm,
   Avatar,
   message,
+  Descriptions,
+  Divider,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,10 +29,17 @@ import {
   FileProtectOutlined,
   InfoCircleOutlined,
   UserOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  DollarOutlined,
+  BankOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getContracts,
+  getContractById,
   createContract,
   updateContract,
   deleteContract,
@@ -95,6 +105,30 @@ const ContractPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
   const [editingRecord, setEditingRecord] = useState(null);
+
+  // Detail Modal states
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailRecord, setDetailRecord] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const handleOpenDetail = async (record) => {
+    setIsDetailModalOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await getContractById(record.id);
+      setDetailRecord(res.data || record);
+    } catch (err) {
+      console.error(err);
+      setDetailRecord(record);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setDetailRecord(null);
+  };
   
   const [form] = Form.useForm();
   const watchRoleId = Form.useWatch('roleId', form);
@@ -309,10 +343,32 @@ const ContractPage = () => {
       dataIndex: 'accountId',
       key: 'accountId',
       render: (id, record) => (
-        <div>
-          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {id}</div>
-        </div>
+        <Tooltip title="Bấm để xem chi tiết hợp đồng">
+          <div
+            onClick={() => handleOpenDetail(record)}
+            style={{ cursor: 'pointer', display: 'inline-block' }}
+          >
+            <strong
+              style={{
+                color: '#e8442a',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {record.accountName || getAccountName(id)}
+              <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
+            </strong>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {id}</div>
+          </div>
+        </Tooltip>
       ),
     },
     {
@@ -893,6 +949,195 @@ const ContractPage = () => {
             <Input.TextArea placeholder="Nhập ghi chú chi tiết hoặc thỏa thuận riêng..." rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Contract Detail Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
+            <FileProtectOutlined />
+            <span>CHI TIẾT HỢP ĐỒNG LAO ĐỘNG #{detailRecord?.id}</span>
+          </div>
+        }
+        open={isDetailModalOpen}
+        onCancel={handleCloseDetailModal}
+        width={720}
+        footer={[
+          <Button key="close" onClick={handleCloseDetailModal} style={{ borderRadius: '6px' }}>
+            Đóng
+          </Button>,
+          <Button
+            key="edit"
+            type="primary"
+            icon={<EditOutlined />}
+            style={{
+              background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+              border: 'none',
+              borderRadius: '6px',
+            }}
+            onClick={() => {
+              const currentDetail = detailRecord;
+              handleCloseDetailModal();
+              if (currentDetail) {
+                handleOpenModal('edit', currentDetail);
+              }
+            }}
+          >
+            Chỉnh sửa hợp đồng
+          </Button>,
+        ]}
+      >
+        <Spin spinning={detailLoading}>
+          {detailRecord && (
+            <div style={{ marginTop: 12 }}>
+              {/* Header Status Card */}
+              <div
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #fffbfb 0%, #fff6f5 100%)',
+                  border: '1px solid #ffdeda',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 20,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#e8442a' }}>
+                    Hợp Đồng #{detailRecord.id}
+                  </div>
+                  {detailRecord.createdAt && (
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 2 }}>
+                      Ngày tạo hệ thống: {dayjs(detailRecord.createdAt).format('DD/MM/YYYY HH:mm')}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {(() => {
+                    const opt = STATUS_OPTIONS.find((s) => s.value === detailRecord.status) || {
+                      label: detailRecord.status,
+                      color: 'default',
+                    };
+                    return (
+                      <Tag
+                        color={opt.color}
+                        style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '20px', fontWeight: 600 }}
+                      >
+                        {opt.label}
+                      </Tag>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Account & Role & Branch info */}
+              <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+                <Col span={12}>
+                  <Card size="small" style={{ borderRadius: '8px', background: '#fafafa' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <UserOutlined />
+                      <span>Nhân viên hợp đồng</span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
+                      {detailRecord.accountName || getAccountName(detailRecord.accountId)}
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      {(() => {
+                        const roleInfo = ROLES_MAP[detailRecord.roleId] || { label: getRoleName(detailRecord.roleId), color: 'default' };
+                        return <Tag color={roleInfo.color}>{roleInfo.label}</Tag>;
+                      })()}
+                    </div>
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card size="small" style={{ borderRadius: '8px', background: '#fafafa' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <BankOutlined />
+                      <span>Chi nhánh áp dụng</span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
+                      {detailRecord.branchName || getBranchName(detailRecord.branchId)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
+                      Mã chi nhánh: #{detailRecord.branchId}
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Salary & Work Days Info */}
+              <Card
+                size="small"
+                title={
+                  <Space style={{ color: '#e8442a', fontWeight: 'bold', fontSize: '14px' }}>
+                    <DollarOutlined />
+                    <span>Chế Độ Lương & Ngày Công</span>
+                  </Space>
+                }
+                style={{ borderRadius: '8px', marginBottom: 16 }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Mức lương cơ bản</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: 4 }}>
+                      {new Intl.NumberFormat('vi-VN').format(detailRecord.baseSalary || 0)} đ
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Hình thức lương</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || detailRecord.salaryType}
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Số ngày công chuẩn / tháng</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {detailRecord.baseWorkDay ? `${detailRecord.baseWorkDay} ngày` : 'N/A (Lương giờ / Quản lý)'}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Validity & Type Info */}
+              <Card
+                size="small"
+                title={
+                  <Space style={{ color: '#1890ff', fontWeight: 'bold', fontSize: '14px' }}>
+                    <CalendarOutlined />
+                    <span>Thời Gian & Loại Hợp Đồng</span>
+                  </Space>
+                }
+                style={{ borderRadius: '8px', marginBottom: 16 }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Loại hợp đồng</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {CONTRACT_TYPES.find((ct) => ct.value === detailRecord.type)?.label || detailRecord.type}
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Thời hạn hiệu lực</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {detailRecord.startDate ? dayjs(detailRecord.startDate).format('DD/MM/YYYY') : 'N/A'}
+                      {'  ➔  '}
+                      {detailRecord.endDate ? dayjs(detailRecord.endDate).format('DD/MM/YYYY') : 'Không thời hạn'}
+                    </div>
+                  </Col>
+                </Row>
+                {detailRecord.note && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e5e7eb' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Ghi chú bổ sung:</div>
+                    <div style={{ fontSize: '13px', color: '#4b5563', fontStyle: 'italic', marginTop: 2 }}>
+                      "{detailRecord.note}"
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+        </Spin>
       </Modal>
     </div>
   );
