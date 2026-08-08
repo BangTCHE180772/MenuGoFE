@@ -30,7 +30,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule } from '../api/workScheduleApi';
+import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getAllAccounts } from '../api/accountApi';
@@ -121,11 +121,10 @@ const MyWorkSchedulePage = () => {
           return;
         }
         const payload = {
-          ...targetShift,
-          status: `LEAVE_REQUEST:${values.reason || 'Xin nghỉ ca'}`,
-          managerApproved: false,
+          workScheduleId: targetShift.id,
+          reason: values.reason || 'Xin nghỉ ca'
         };
-        await updateWorkSchedule(payload);
+        await requestLeave(payload);
         message.success('🟢 Đã gửi đơn xin nghỉ ca làm việc! Chờ Quản lý / Admin duyệt.');
       } else {
         const targetDateStr = dayjs(values.workDate).format('YYYY-MM-DD');
@@ -135,10 +134,9 @@ const MyWorkSchedulePage = () => {
           setLeaveLoading(false);
           return;
         }
-        await Promise.all(mySchedulesOnDay.map(s => updateWorkSchedule({
-          ...s,
-          status: `LEAVE_REQUEST:${values.reason || 'Xin nghỉ phép ngày'}`,
-          managerApproved: false,
+        await Promise.all(mySchedulesOnDay.map(s => requestLeave({
+          workScheduleId: s.id,
+          reason: values.reason || 'Xin nghỉ phép ngày'
         })));
         message.success(`🟢 Đã gửi đơn xin nghỉ ngày ${targetDateStr} (${mySchedulesOnDay.length} ca)! Chờ Admin duyệt.`);
       }
@@ -160,20 +158,12 @@ const MyWorkSchedulePage = () => {
       const workDateStr = dayjs(selectedSchedule.workDate).format('YYYY-MM-DD');
       
       const payload = {
-        id: selectedSchedule.id,
-        accountId: values.targetAccountId, // Bước 1: Gửi sang nhân viên được nhận ca
-        branchId: selectedSchedule.branchId,
-        shiftId: selectedSchedule.shiftId,
-        code: selectedSchedule.code || `WS-${selectedSchedule.branchId}-${selectedSchedule.shiftId}-${values.targetAccountId}-${dayjs(selectedSchedule.workDate).format('YYYYMMDD')}`,
-        workDate: workDateStr,
-        checkInAt: selectedSchedule.checkInAt,
-        checkOutAt: selectedSchedule.checkOutAt,
-        actualHours: selectedSchedule.actualHours,
-        status: `TRANSFER_PENDING_EMP:${selectedSchedule.accountId || user?.id || 0}:${values.note || 'Đổi ca'}`,
-        managerApproved: false,
+        workScheduleId: selectedSchedule.id,
+        targetAccountId: values.targetAccountId,
+        note: values.note || 'Đổi ca'
       };
 
-      await updateWorkSchedule(payload);
+      await requestShiftSwap(payload);
       message.success(`🟢 Đã gửi yêu cầu đổi ca cho nhân viên ${targetAccount ? targetAccount.name : values.targetAccountId}! Chờ nhân viên đồng ý.`);
       setTransferModalOpen(false);
       loadData();

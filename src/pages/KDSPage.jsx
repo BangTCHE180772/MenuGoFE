@@ -195,9 +195,13 @@ const KDSPage = () => {
   const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
   const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
 
-  // AF1: Split identical dishes into batches of 10
+  // AF1: Split identical dishes into batches of 10.
+  // Only initial/new orders (Waiting/Accepted) are shown up here — once a batch
+  // is confirmed into Cooking, finishing it happens per-card down in the queue below.
   const activeBatchGroups = useMemo(() => {
-    const activeItems = items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
+    const activeItems = items.filter(
+      (i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING || i.cookingStatus === COOKING_STATUS.ACCEPTED
+    );
     const groups = {};
 
     // Group active items by product ID/Name
@@ -272,6 +276,65 @@ const KDSPage = () => {
     return allBatches;
   }, [items]);
 
+  // Group a list of items by dish, splitting each dish into batches of up to 10
+  // portions (mẻ) so the queue columns below the Batch Processing Bar are also
+  // divided by mẻ instead of a flat, ungrouped list.
+  const groupItemsByDish = useCallback((list) => {
+    const groups = {};
+    list.forEach((item) => {
+      const key = item.productId || item.productName;
+      if (!groups[key]) {
+        groups[key] = {
+          productId: item.productId,
+          productName: item.productName || item.ProductName,
+          items: [],
+        };
+      }
+      groups[key].items.push(item);
+    });
+
+    const result = [];
+    Object.values(groups).forEach((group) => {
+      const sorted = [...group.items].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      let batchIndex = 1;
+      let currentBatch = { productId: group.productId, productName: group.productName, batchIndex, totalQty: 0, items: [] };
+
+      sorted.forEach((item) => {
+        if (currentBatch.totalQty > 0 && currentBatch.totalQty + item.quantity > 10) {
+          result.push(currentBatch);
+          batchIndex += 1;
+          currentBatch = { productId: group.productId, productName: group.productName, batchIndex, totalQty: 0, items: [] };
+        }
+        currentBatch.items.push(item);
+        currentBatch.totalQty += item.quantity;
+      });
+
+      if (currentBatch.items.length > 0) result.push(currentBatch);
+    });
+
+    return result;
+  }, []);
+
+  // Reusable renderer for a "chia theo mẻ" grouped column section
+  const renderGroupedColumn = (list, emptyLabel) => {
+    if (list.length === 0) {
+      return <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>{emptyLabel}</div>;
+    }
+    return groupItemsByDish(list).map((batch) => (
+      <div key={`${batch.productId || batch.productName}_${batch.batchIndex}`} style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text strong style={{ color: '#000000', fontSize: 14 }}>{batch.productName}</Text>
+          {batch.items.length > 1 && (
+            <Tag color="cyan" style={{ margin: 0, fontWeight: 700 }}>
+              Mẻ {batch.batchIndex} • {batch.totalQty} phần
+            </Tag>
+          )}
+        </div>
+        {batch.items.map(renderKdsCard)}
+      </div>
+    ));
+  };
+
   // Display items based on current active tab
   const filteredItems = useMemo(() => {
     switch (activeTab) {
@@ -328,8 +391,11 @@ const KDSPage = () => {
           boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
           marginBottom: 16,
           width: '100%',
+          height: 340,
+          display: 'flex',
+          flexDirection: 'column',
         }}
-        bodyStyle={{ padding: 16 }}
+        bodyStyle={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}
       >
         {/* Card Header: Table Name & Time */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
@@ -379,8 +445,19 @@ const KDSPage = () => {
               🍲
             </div>
           )}
-          <div style={{ flex: 1 }}>
-            <Title level={4} style={{ color: '#000000', margin: '0 0 4px 0', fontSize: 16 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Title
+              level={4}
+              style={{
+                color: '#000000',
+                margin: '0 0 4px 0',
+                fontSize: 16,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
               {item.productName}
             </Title>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums' }}>
@@ -389,7 +466,7 @@ const KDSPage = () => {
           </div>
         </div>
 
-        {/* Note / Special instructions */}
+        {/* Note / Special instructions (scrolls internally so the frame never grows) */}
         {item.note && (
           <div
             style={{
@@ -400,6 +477,8 @@ const KDSPage = () => {
               marginBottom: 12,
               color: '#ffe58f',
               fontSize: 13,
+              maxHeight: 56,
+              overflowY: 'auto',
             }}
           >
             <strong>📝 Ghi chú:</strong> {item.note}
@@ -408,6 +487,9 @@ const KDSPage = () => {
 
         {/* Status Badge */}
         <div style={{ marginBottom: 16 }}>{statusTag}</div>
+
+        {/* Spacer keeps the frame uniform (same height) regardless of note/image content */}
+        <div style={{ flex: 1 }} />
 
         {/* Action Buttons (Normal Flow) */}
         <Space direction="vertical" style={{ width: '100%' }}>
@@ -623,9 +705,6 @@ const KDSPage = () => {
               const batchAcceptedIds = [...new Set(batch.details
                 .filter((d) => d.cookingStatus === COOKING_STATUS.ACCEPTED)
                 .map((d) => d.orderDetailId))];
-              const batchCookingIds = [...new Set(batch.details
-                .filter((d) => d.cookingStatus === COOKING_STATUS.COOKING)
-                .map((d) => d.orderDetailId))];
 
               return (
                 <Col xs={24} sm={12} md={8} lg={6} key={`${batch.productId || batch.productName}_batch_${batch.batchIndex}`}>
@@ -673,37 +752,24 @@ const KDSPage = () => {
                       </Space>
                     </div>
 
-                    {/* Batch Action Buttons */}
+                    {/* Batch Action: confirm the initial batch into cooking. Finishing
+                        happens per-card down in the "Đang nấu" column below. */}
                     <Space direction="vertical" style={{ width: '100%' }}>
-                      {(batchWaitingIds.length > 0 || batchAcceptedIds.length > 0) && (
-                        <Button
-                          type="primary"
-                          block
-                          size="small"
-                          icon={<FireOutlined />}
-                          onClick={() =>
-                            handleBatchStatusChange(
-                              [...batchWaitingIds, ...batchAcceptedIds],
-                              COOKING_STATUS.COOKING
-                            )
-                          }
-                          style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
-                        >
-                          Xác nhận làm mẻ ({batchWaitingIds.length + batchAcceptedIds.length} món)
-                        </Button>
-                      )}
-                      {batchCookingIds.length > 0 && (
-                        <Button
-                          type="primary"
-                          block
-                          size="small"
-                          icon={<CheckCircleOutlined />}
-                          onClick={() => handleBatchStatusChange(batchCookingIds, COOKING_STATUS.READY)}
-                          style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-                        >
-                          Đã nấu xong mẻ ({batchCookingIds.length} món)
-                        </Button>
-                      )}
+                      <Button
+                        type="primary"
+                        block
+                        size="small"
+                        icon={<FireOutlined />}
+                        onClick={() =>
+                          handleBatchStatusChange(
+                            [...batchWaitingIds, ...batchAcceptedIds],
+                            COOKING_STATUS.COOKING
+                          )
+                        }
+                        style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
+                      >
+                        Xác nhận làm mẻ ({batchWaitingIds.length + batchAcceptedIds.length} món)
+                      </Button>
                     </Space>
                   </div>
                 </Col>
@@ -738,10 +804,7 @@ const KDSPage = () => {
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
               <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
-                {[...waitingItems, ...acceptedItems].map(renderKdsCard)}
-                {[...waitingItems, ...acceptedItems].length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món chờ chế biến</div>
-                )}
+                {renderGroupedColumn([...waitingItems, ...acceptedItems], 'Không có món chờ chế biến')}
               </div>
             </div>
           </Col>
@@ -763,10 +826,7 @@ const KDSPage = () => {
                 <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
               </div>
               <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
-                {cookingItems.map(renderKdsCard)}
-                {cookingItems.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món đang làm</div>
-                )}
+                {renderGroupedColumn(cookingItems, 'Không có món đang làm')}
               </div>
             </div>
           </Col>
@@ -788,10 +848,7 @@ const KDSPage = () => {
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
               <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
-                {readyItems.map(renderKdsCard)}
-                {readyItems.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Chưa có món hoàn thành</div>
-                )}
+                {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
               </div>
             </div>
           </Col>
