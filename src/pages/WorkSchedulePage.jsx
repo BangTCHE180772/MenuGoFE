@@ -51,11 +51,22 @@ import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Chờ thực hiện', color: 'warning' },
-  { value: 'APPROVED', label: 'Đã duyệt', color: 'processing' },
-  { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
-  { value: 'ABSENT', label: 'Vắng mặt', color: 'error' },
+  { value: 'PENDING',        label: 'Chờ thực hiện',  color: 'warning' },
+  { value: 'APPROVED',       label: 'Đã duyệt',        color: 'processing' },
+  { value: 'Đang làm việc',  label: 'Đang làm việc',   color: 'blue' },
+  { value: 'Hoàn thành',     label: 'Hoàn thành',      color: 'success' },
+  { value: 'Vắng mặt',       label: 'Vắng mặt',        color: 'error' },
+  // Giữ lại để tương thích với dữ liệu cũ trong DB
+  { value: 'COMPLETED',      label: 'Hoàn thành',      color: 'success' },
+  { value: 'ABSENT',         label: 'Vắng mặt',        color: 'error' },
 ];
+
+// Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
+const getStatusOption = (status) =>
+  STATUS_OPTIONS.find((s) => s.value === status) ||
+  STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (status || '').toLowerCase()) ||
+  { label: status, color: 'default' };
+
 
 const WorkSchedulePage = () => {
   const { user, role } = useAuth();
@@ -362,7 +373,7 @@ const WorkSchedulePage = () => {
     if (selectedAccount && item.accountId !== selectedAccount) return false;
     if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
-    if (selectedStatus && item.status !== selectedStatus) return false;
+    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
     if (searchDate) {
       const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
       const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
@@ -467,7 +478,7 @@ const WorkSchedulePage = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        const opt = STATUS_OPTIONS.find((s) => s.value === status) || { label: status, color: 'default' };
+        const opt = getStatusOption(status);
         return <Tag color={opt.color}>{opt.label}</Tag>;
       },
     },
@@ -760,7 +771,13 @@ const WorkSchedulePage = () => {
                     value={selectedStatus}
                     onChange={(val) => setSelectedStatus(val)}
                   >
-                    {STATUS_OPTIONS.map((st) => (
+                    {[
+                      { value: 'PENDING',   label: 'Chờ thực hiện' },
+                      { value: 'APPROVED',  label: 'Đã duyệt' },
+                      { value: 'Working',   label: 'Đang làm việc' },
+                      { value: 'COMPLETED', label: 'Hoàn thành' },
+                      { value: 'ABSENT',    label: 'Vắng mặt' },
+                    ].map((st) => (
                       <Select.Option key={st.value} value={st.value}>
                         {st.label}
                       </Select.Option>
