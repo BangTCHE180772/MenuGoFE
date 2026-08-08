@@ -445,13 +445,35 @@ const SalaryDetailPage = () => {
       dataIndex: 'accountId',
       key: 'accountId',
       render: (id, record) => (
-        <div>
-          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>
-            <UserOutlined style={{ marginRight: 4 }} />
-            ID: {id}
+        <Tooltip title="Bấm để xem chi tiết chi tiết lương">
+          <div
+            onClick={() => handleOpenDetail(record)}
+            style={{ cursor: 'pointer', display: 'inline-block' }}
+          >
+            <strong
+              style={{
+                color: '#e8442a',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {record.accountName || getAccountName(id)}
+              <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
+            </strong>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>
+              <UserOutlined style={{ marginRight: 4 }} />
+              ID: {id}
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
     },
     {
@@ -968,7 +990,9 @@ const SalaryDetailPage = () => {
               })()}
             </Descriptions.Item>
             <Descriptions.Item label="Ghi chú">{detailRecord.note || '—'}</Descriptions.Item>
-            <Descriptions.Item label="ID Người tạo">{detailRecord.createdBy || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Người tạo">
+              {detailRecord.createdByName || (detailRecord.createdBy ? `Tài khoản #${detailRecord.createdBy}` : '—')}
+            </Descriptions.Item>
             <Descriptions.Item label="Thời gian tạo">
               {detailRecord.createdAt ? new Date(detailRecord.createdAt).toLocaleString('vi-VN') : '—'}
             </Descriptions.Item>
