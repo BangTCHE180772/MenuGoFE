@@ -39,6 +39,8 @@ const CustomerOrderPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [isCallingStaff, setIsCallingStaff] = useState(false);
+  const [isRequestingBill, setIsRequestingBill] = useState(false);
   const [returnItem, setReturnItem] = useState(null);
 
   const fetchTableSummary = useCallback(async () => {
@@ -121,26 +123,30 @@ const CustomerOrderPage = () => {
   const handleCallStaff = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsCallingStaff(true);
     try {
       await callStaff(tableId);
       message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gọi nhân viên');
+      message.error(error.response?.data?.message || 'Lỗi khi gọi nhân viên');
     } finally {
       actionRef.current = false;
+      setIsCallingStaff(false);
     }
   };
 
   const handleRequestBill = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsRequestingBill(true);
     try {
       await requestBill(tableId);
       message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gửi yêu cầu');
+      message.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu');
     } finally {
       actionRef.current = false;
+      setIsRequestingBill(false);
     }
   };
 
@@ -266,33 +272,35 @@ const CustomerOrderPage = () => {
           {isOccupied && (
             <button
               onClick={handleCallStaff}
+              disabled={isCallingStaff}
               style={{
-                background: '#3b82f6',
+                background: isCallingStaff ? '#9ca3af' : '#3b82f6',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isCallingStaff ? 'not-allowed' : 'pointer'
               }}
             >
-              Gọi phục vụ hỗ trợ
+              {isCallingStaff ? 'Đang gọi...' : 'Gọi phục vụ hỗ trợ'}
             </button>
           )}
           {isOccupied && summary?.items?.length > 0 && (
             <button
               onClick={handleRequestBill}
+              disabled={isRequestingBill}
               style={{
-                background: '#ef4444',
+                background: isRequestingBill ? '#9ca3af' : '#ef4444',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isRequestingBill ? 'not-allowed' : 'pointer'
               }}
             >
-              Thanh toán
+              {isRequestingBill ? 'Đang gửi...' : 'Thanh toán'}
             </button>
           )}
         </div>
