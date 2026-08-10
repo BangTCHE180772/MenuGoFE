@@ -22,6 +22,7 @@ import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import MyContractPage from '../pages/MyContractPage';
 import AccountPage from '../pages/AccountPage';
+import MyProfilePage from '../pages/MyProfilePage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
 import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
 import ShiftPage from '../pages/ShiftPage';
@@ -94,6 +95,7 @@ const AppRouter = () => {
             <Route element={<MainLayout />}>
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
+              <Route path="/my-profile" element={<MyProfilePage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route
