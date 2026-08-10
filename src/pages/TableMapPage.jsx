@@ -6,7 +6,7 @@ import InternalPickupModal from '../components/order/InternalPickupModal';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAreasByBranchId } from '../api/areaApi';
-import { getTableOrderSummary, confirmOrderItem, updateCookingStatus } from '../api/tableMapApi';
+import { getTableOrderSummary, confirmOrderItem, updateCookingStatus, rejectOrderItem } from '../api/tableMapApi';
 import { cancelOrderDetail } from '../api/orderApi';
 import { useAuth } from '../context/AuthContext';
 import { useSignalR } from '../context/SignalRContext';
@@ -188,9 +188,9 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
     setTables(prev => prev.map(t => t.id === table.id ? { ...t, isBlinking: false } : t));
   };
 
-  const handleConfirmItem = async (orderDetailId) => {
+  const handleConfirmItem = async (orderDetailId, quantity) => {
     try {
-      await confirmOrderItem(orderDetailId);
+      await confirmOrderItem(orderDetailId, quantity);
       message.success('Đã xác nhận món!');
 
       if (selectedTable) {
@@ -211,9 +211,9 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
     }
   };
 
-  const handleRejectItem = async (orderDetailId) => {
+  const handleRejectItem = async (orderDetailId, reason) => {
     try {
-      await cancelOrderDetail(orderDetailId);
+      await rejectOrderItem(orderDetailId, reason);
       message.success('Đã từ chối món!');
       if (selectedTable) loadOrderSummary(selectedTable.id);
     } catch (err) {

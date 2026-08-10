@@ -4,6 +4,7 @@ import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { createOrder, createOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
+import { useSignalR } from '../context/SignalRContext';
 import MenuPanel from '../components/order/MenuPanel';
 import ReturnItemModal from '../components/order/ReturnItemModal';
 import '../styles/customer-order.css';
@@ -59,6 +60,28 @@ const CustomerOrderPage = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [fetchTableSummary]);
+
+  const connection = useSignalR();
+
+  useEffect(() => {
+    if (connection) {
+      const handleNotification = (data) => {
+        if (data.type === 'item-rejected' && data.tableId === parseInt(tableId)) {
+          Modal.warning({
+            title: 'Món ăn bị từ chối',
+            content: `Rất tiếc, nhà hàng vừa từ chối món "${data.productName}" của bạn với lý do: ${data.reason}. Mong bạn thông cảm và chọn món khác nhé!`,
+            okText: 'Đã hiểu',
+          });
+          fetchTableSummary();
+        }
+      };
+
+      connection.on('ReceiveNotification', handleNotification);
+      return () => {
+        connection.off('ReceiveNotification', handleNotification);
+      };
+    }
+  }, [connection, tableId, fetchTableSummary]);
 
   const tableStatus = summary?.tableStatus?.toLowerCase();
   const isReserved = tableStatus === 'reserved';
