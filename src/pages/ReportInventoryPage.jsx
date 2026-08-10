@@ -22,6 +22,7 @@ import OperationalAlerts from "../components/reports/inventory/OperationalAlerts
 import { getBInventories } from "../api/binventoryApi";
 import { getBranchDashboardStats } from "../api/dashboardApi";
 import { useBranch } from "../context/BranchContext";
+import "../styles/ReportInventoryPage.css";
 
 import { MOCK_OPERATIONAL_ALERTS } from "../components/reports/inventory/InventoryReportData";
 
@@ -289,7 +290,7 @@ const ReportInventoryPage = () => {
   const totalImportedValue = statsData.totalValue || 0;
 
   return (
-    <div style={{ padding: "16px 24px", minHeight: "100vh", background: "#f8fafc" }}>
+    <div className="report-container">
       {/* ── BREADCRUMB ──────────────────────────────────────────────────────── */}
       <Breadcrumb style={{ marginBottom: 12 }}>
         <Breadcrumb.Item href="/home">
@@ -304,18 +305,9 @@ const ReportInventoryPage = () => {
       </Breadcrumb>
 
       {/* ── HEADER TITLE & EXPORT ───────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: 16,
-          gap: 12,
-        }}
-      >
+      <div className="report-header">
         <div>
-          <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+          <Title level={3} className="report-title">
             Báo Cáo Nguyên Liệu & Tiêu Thụ Kho
           </Title>
           <Text type="secondary">
@@ -400,7 +392,7 @@ const ReportInventoryPage = () => {
           {/* 1. Phóng to Bảng tiêu thụ nguyên liệu */}
           <Modal
             title={
-              <span style={{ fontWeight: 800, fontSize: 16 }}>
+              <span className="modal-title-bold">
                 🍽️ Báo cáo Tiêu thụ & Biến động Sai số Nguyên liệu
               </span>
             }
@@ -423,7 +415,7 @@ const ReportInventoryPage = () => {
           {/* 2. Phóng to Bảng chi tiết nhật ký kho */}
           <Modal
             title={
-              <span style={{ fontWeight: 800, fontSize: 16 }}>
+              <span className="modal-title-bold">
                 📦 Chi Tiết Nhật Ký Giao Dịch Kho
               </span>
             }

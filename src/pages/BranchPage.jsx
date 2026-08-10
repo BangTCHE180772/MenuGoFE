@@ -204,7 +204,7 @@ const BranchPage = () => {
 
   const handleRefresh = () => {
     loadBranches();
-    message.success("Làm mới danh sách thành công");
+    message.success("Làm mới thành công");
   };
 
   // const handleTableChange = (pagination, filters, sorter) => {
@@ -245,7 +245,7 @@ const BranchPage = () => {
     try {
       await deleteBranch(id);
 
-      message.success("Chi nhánh đã được chuyển sang trạng thái Ngừng kinh doanh (Xóa mềm)");
+      message.success("Chi nhánh đã được chuyển sang trạng thái Ngừng kinh doanh");
 
       loadBranches();
     } catch (err) {
@@ -256,7 +256,7 @@ const BranchPage = () => {
 
   const handleToggleStatus = async (record) => {
     if (record.isDeleted || record.status === "Ngừng kinh doanh") {
-      message.warning("Chi nhánh đã ngừng kinh doanh (đã xóa), chỉ Dev mới thao tác mở lại từ SQL.");
+      message.warning("Chi nhánh đã ngừng kinh doanh, liên hệ admin để thao tác mở chi nhánh.");
       return;
     }
 
@@ -402,23 +402,23 @@ const BranchPage = () => {
 
                 <div className="ant-dropdown-menu-item">
                   <Popconfirm
-                    title="Xác nhận xóa mềm chi nhánh?"
+                    title="Xác nhận xóa (ngừng hoạt động) chi nhánh?"
                     okText="Tiếp tục"
                     cancelText="Hủy"
                     onConfirm={() => {
                       Modal.confirm({
-                        title: "Xác nhận xóa mềm chi nhánh",
+                        title: "Xác nhận? (Hệ thống sẽ khóa chi nhánh khỏi việc các thao tác)",
                         content: (
                           <div>
                             <div>
-                              Bạn sắp chuyển chi nhánh <strong>"{record.name}"</strong> sang trạng thái <strong>Ngừng kinh doanh</strong> (Xóa mềm).
+                              Bạn sắp chuyển chi nhánh <strong>"{record.name}"</strong> sang trạng thái <strong>Ngừng kinh doanh</strong>.
                             </div>
                             <div style={{ marginTop: 8, color: "#ff4d4f", fontWeight: 700 }}>
-                              ⚠️ Chi nhánh vẫn lưu trữ trong DB nhưng sẽ bị khóa trên UI ⚠️
+                              ⚠️ Dữ liệu Chi nhánh vẫn sẽ được lưu trữ (liên hệ quản trị viên để mở lại) ⚠️
                             </div>
                           </div>
                         ),
-                        okText: "Xóa mềm",
+                        okText: "Xóa",
                         cancelText: "Hủy",
                         okType: "danger",
                         onOk: () => handleDelete(record.id),
@@ -433,7 +433,7 @@ const BranchPage = () => {
               </>
             ) : (
               <div style={{ padding: "8px 12px", color: "#94a3b8", fontSize: 12, fontStyle: "italic" }}>
-                Đã ngừng kinh doanh (Chỉ Dev thao tác SQL)
+                Đã ngừng kinh doanh
               </div>
             )}
           </div>

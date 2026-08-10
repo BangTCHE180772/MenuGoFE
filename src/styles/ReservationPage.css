@@ -1,0 +1,71 @@
+/* ReservationPage.css */
+
+.reservation-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.reservation-container.full-padding {
+  padding: 24px;
+}
+
+.reservation-container.compact-padding {
+  padding: 16px 0;
+}
+
+.reservation-card {
+  height: 100%;
+}
+
+.reservation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.reservation-content-area {
+  flex: 1;
+  overflow: auto;
+  background-color: #f0f2f5;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.calendar-cell-events {
+  font-size: 12px;
+}
+
+.calendar-cell-total {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.card-time {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.card-customer-header {
+  margin-bottom: 12px;
+}
+
+.card-customer-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.card-customer-phone {
+  color: #595959;
+}
+
+.card-row {
+  margin-bottom: 8px;
+}
+
+.card-note {
+  margin-bottom: 16px;
+  min-height: 22px;
+}
