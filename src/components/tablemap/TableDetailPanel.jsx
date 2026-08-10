@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, Tag, Empty, Spin, Typography, message, Modal } from 'antd';
+import { Button, Tag, Empty, Spin, Typography, message, Modal, AutoComplete } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleOutlined, CloseCircleOutlined, CodeSandboxOutlined, DollarOutlined, BranchesOutlined, DisconnectOutlined, SwapOutlined } from '@ant-design/icons';
 import PaymentModal from '../payment/PaymentModal';
@@ -15,6 +15,35 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
   const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
+
+  const [editedQuantities, setEditedQuantities] = useState({});
+  const [rejectingItem, setRejectingItem] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const REJECT_REASONS = [
+    { value: 'Hết nguyên liệu', label: 'Hết nguyên liệu' },
+    { value: 'Món đang tạm ngưng phục vụ', label: 'Món đang tạm ngưng phục vụ' },
+    { value: 'Không đủ số lượng khách yêu cầu', label: 'Không đủ số lượng khách yêu cầu' },
+    { value: 'Không thể đáp ứng yêu cầu đặc biệt', label: 'Không thể đáp ứng yêu cầu đặc biệt' },
+    { value: 'Khách báo hủy / Đổi món khác', label: 'Khách báo hủy / Đổi món khác' },
+  ];
+
+  const getDisplayQuantity = (item) => {
+    return editedQuantities[item.orderDetailId] !== undefined
+      ? editedQuantities[item.orderDetailId]
+      : item.quantity;
+  };
+
+  const handleQuantityChange = (item, delta) => {
+    const current = getDisplayQuantity(item);
+    const next = current + delta;
+    
+    if (next <= 0) {
+      setRejectingItem(item);
+    } else {
+      setEditedQuantities(prev => ({ ...prev, [item.orderDetailId]: next }));
+    }
+  };
 
   const handleUnmerge = () => {
     Modal.confirm({
@@ -158,7 +187,16 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
               <div key={item.orderDetailId} className="tablemap-item-row">
                 <div className="tablemap-item-info">
                   <div className="tablemap-item-name">
-                    <strong>{item.quantity}x</strong> {item.productName}
+                    {item.status === 'CustomerPending' && !isPosHub ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <Button size="small" onClick={() => handleQuantityChange(item, -1)}>-</Button>
+                        <strong>{getDisplayQuantity(item)}</strong>
+                        <Button size="small" onClick={() => handleQuantityChange(item, 1)}>+</Button>
+                        <span style={{ marginLeft: '4px' }}>{item.productName}</span>
+                      </div>
+                    ) : (
+                      <><strong>{item.quantity}x</strong> {item.productName}</>
+                    )}
                   </div>
                   {item.note && <div className="tablemap-item-note">Ghi chú: {item.note}</div>}
                   <div className="tablemap-item-status">
@@ -174,7 +212,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
                           type="primary"
                           size="small"
                           icon={<CheckCircleOutlined />}
-                          onClick={() => onConfirm(item.orderDetailId)}
+                          onClick={() => onConfirm(item.orderDetailId, getDisplayQuantity(item))}
                         >
                           Xác nhận
                         </Button>
@@ -182,16 +220,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
                           danger
                           size="small"
                           icon={<CloseCircleOutlined />}
-                          onClick={() => {
-                            Modal.confirm({
-                              title: 'Từ chối món',
-                              content: `Bạn có chắc chắn muốn từ chối món "${item.productName}" không?`,
-                              okText: 'Từ chối',
-                              okType: 'danger',
-                              cancelText: 'Hủy',
-                              onOk: () => onReject(item.orderDetailId)
-                            });
-                          }}
+                          onClick={() => setRejectingItem(item)}
                           style={{ marginLeft: '8px' }}
                         >
                           Từ chối
@@ -251,6 +280,39 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
           onMoved={onPaymentSuccess}
         />
       )}
+
+      <Modal
+        title={rejectingItem ? `Từ chối món: ${rejectingItem.productName}` : 'Từ chối món'}
+        open={!!rejectingItem}
+        onOk={() => {
+          if (!rejectReason) {
+            message.error("Vui lòng chọn hoặc nhập lý do từ chối");
+            return;
+          }
+          onReject(rejectingItem.orderDetailId, rejectReason);
+          setRejectingItem(null);
+          setRejectReason('');
+        }}
+        onCancel={() => {
+          setRejectingItem(null);
+          setRejectReason('');
+        }}
+        okText="Xác nhận từ chối"
+        cancelText="Huỷ"
+        okButtonProps={{ danger: true }}
+      >
+        <p>Vui lòng chọn hoặc gõ lý do từ chối món này:</p>
+        <AutoComplete
+          style={{ width: '100%' }}
+          placeholder="Chọn hoặc nhập lý do"
+          value={rejectReason}
+          onChange={setRejectReason}
+          options={REJECT_REASONS}
+          filterOption={(inputValue, option) =>
+            option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+          }
+        />
+      </Modal>
     </div>
   );
 };

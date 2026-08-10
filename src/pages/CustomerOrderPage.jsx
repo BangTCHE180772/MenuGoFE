@@ -4,6 +4,7 @@ import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { createOrder, createOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
+import { useSignalR } from '../context/SignalRContext';
 import MenuPanel from '../components/order/MenuPanel';
 import ReturnItemModal from '../components/order/ReturnItemModal';
 import '../styles/customer-order.css';
@@ -38,6 +39,8 @@ const CustomerOrderPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [isCallingStaff, setIsCallingStaff] = useState(false);
+  const [isRequestingBill, setIsRequestingBill] = useState(false);
   const [returnItem, setReturnItem] = useState(null);
 
   const fetchTableSummary = useCallback(async () => {
@@ -59,6 +62,28 @@ const CustomerOrderPage = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [fetchTableSummary]);
+
+  const connection = useSignalR();
+
+  useEffect(() => {
+    if (connection) {
+      const handleNotification = (data) => {
+        if (data.type === 'item-rejected' && data.tableId === parseInt(tableId)) {
+          Modal.warning({
+            title: 'Món ăn bị từ chối',
+            content: `Rất tiếc, nhà hàng vừa từ chối món "${data.productName}" của bạn với lý do: ${data.reason}. Mong bạn thông cảm và chọn món khác nhé!`,
+            okText: 'Đã hiểu',
+          });
+          fetchTableSummary();
+        }
+      };
+
+      connection.on('ReceiveNotification', handleNotification);
+      return () => {
+        connection.off('ReceiveNotification', handleNotification);
+      };
+    }
+  }, [connection, tableId, fetchTableSummary]);
 
   const tableStatus = summary?.tableStatus?.toLowerCase();
   const isReserved = tableStatus === 'reserved';
@@ -98,26 +123,30 @@ const CustomerOrderPage = () => {
   const handleCallStaff = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsCallingStaff(true);
     try {
       await callStaff(tableId);
       message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gọi nhân viên');
+      message.error(error.response?.data?.message || 'Lỗi khi gọi nhân viên');
     } finally {
       actionRef.current = false;
+      setIsCallingStaff(false);
     }
   };
 
   const handleRequestBill = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsRequestingBill(true);
     try {
       await requestBill(tableId);
       message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gửi yêu cầu');
+      message.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu');
     } finally {
       actionRef.current = false;
+      setIsRequestingBill(false);
     }
   };
 
@@ -243,33 +272,35 @@ const CustomerOrderPage = () => {
           {isOccupied && (
             <button
               onClick={handleCallStaff}
+              disabled={isCallingStaff}
               style={{
-                background: '#3b82f6',
+                background: isCallingStaff ? '#9ca3af' : '#3b82f6',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isCallingStaff ? 'not-allowed' : 'pointer'
               }}
             >
-              Gọi phục vụ hỗ trợ
+              {isCallingStaff ? 'Đang gọi...' : 'Gọi phục vụ hỗ trợ'}
             </button>
           )}
           {isOccupied && summary?.items?.length > 0 && (
             <button
               onClick={handleRequestBill}
+              disabled={isRequestingBill}
               style={{
-                background: '#ef4444',
+                background: isRequestingBill ? '#9ca3af' : '#ef4444',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isRequestingBill ? 'not-allowed' : 'pointer'
               }}
             >
-              Thanh toán
+              {isRequestingBill ? 'Đang gửi...' : 'Thanh toán'}
             </button>
           )}
         </div>

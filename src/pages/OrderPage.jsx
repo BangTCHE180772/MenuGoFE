@@ -19,8 +19,8 @@ import { FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
-import { createOrder, createOrderDetail, updateCookingStatus } from '../api/orderApi';
-import { getTableOrderSummary } from '../api/tableMapApi';
+import { createOrder, createOrderDetail, updateCookingStatus, cancelOrder } from '../api/orderApi';
+import { getTableOrderSummary, confirmOrderItem, rejectOrderItem } from '../api/tableMapApi';
 import { checkInReservation } from '../api/reservationApi';
 import { TABLE_STATUS } from '../data/tableConstants';
 import TablePanel from '../components/order/TablePanel';
@@ -104,6 +104,18 @@ const OrderPage = ({ isWaiterMode }) => {
         setOrderSummary(null);
       });
   }, [selectedTable]);
+
+  const handleRefreshData = () => {
+    loadTables();
+    if (selectedTable) {
+      getTableOrderSummary(selectedTable.id)
+        .then(res => setOrderSummary(res.data))
+        .catch(err => {
+          console.error(err);
+          setOrderSummary(null);
+        });
+    }
+  };
 
   const handleAddItem = useCallback((item) => {
     setCartItems((prev) => {
@@ -203,8 +215,9 @@ const OrderPage = ({ isWaiterMode }) => {
     if (isConfirmingRef.current) return;
 
     const isOccupied = selectedTable.status?.toLowerCase() === 'occupied';
-    if (!isOccupied) {
-      message.warning('Bàn phải ở trạng thái Có khách để gọi món');
+    const isEmpty = selectedTable.status?.toLowerCase() === 'empty';
+    if (!isOccupied && !isEmpty) {
+      message.warning('Chỉ có thể gọi món khi bàn Trống hoặc Có khách');
       return;
     }
 
@@ -216,6 +229,26 @@ const OrderPage = ({ isWaiterMode }) => {
     try {
       const summaryRes = await getTableOrderSummary(selectedTable.id);
       let orderId = summaryRes.data?.originalOrderId || summaryRes.data?.activeOrderId;
+
+      if (isEmpty) {
+        try {
+          await updateTable({
+            id: selectedTable.id,
+            areaId: selectedTable.areaId,
+            name: selectedTable.name,
+            status: 'Occupied',
+            isActive: selectedTable.isActive ?? true,
+          });
+          const updated = { ...selectedTable, status: 'Occupied' };
+          setSelectedTable(updated);
+          setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
+        } catch (err) {
+          message.error('Lỗi khi cập nhật trạng thái bàn sang Có khách');
+          setOrderLoading(false);
+          isConfirmingRef.current = false;
+          return;
+        }
+      }
 
       if (!orderId) {
         const orderRes = await createOrder({
@@ -272,6 +305,32 @@ const OrderPage = ({ isWaiterMode }) => {
     }
   };
 
+  const handleConfirmItem = async (orderDetailId, quantity) => {
+    try {
+      await confirmOrderItem(orderDetailId, quantity);
+      message.success('Đã xác nhận món!');
+      if (selectedTable) {
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        setOrderSummary(summaryRes.data);
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    }
+  };
+
+  const handleRejectItem = async (orderDetailId, reason) => {
+    try {
+      await rejectOrderItem(orderDetailId, reason);
+      message.success('Đã từ chối món!');
+      if (selectedTable) {
+        const summaryRes = await getTableOrderSummary(selectedTable.id);
+        setOrderSummary(summaryRes.data);
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Từ chối thất bại');
+    }
+  };
+
   const handlePaymentClick = () => {
     const activeItems = orderSummary?.items?.filter(i => i.status !== 'Cancelled') || [];
     const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
@@ -287,7 +346,26 @@ const OrderPage = ({ isWaiterMode }) => {
     }
   };
 
+  const handleCancelOrder = async (orderId) => {
+    Modal.confirm({
+      title: 'Xác nhận hủy hóa đơn',
+      content: 'Bạn có chắc chắn muốn hủy hóa đơn này không? Bàn sẽ được dọn dẹp.',
+      okText: 'Đồng ý',
+      cancelText: 'Bỏ qua',
+      onOk: async () => {
+        try {
+          await cancelOrder(orderId);
+          message.success('Đã hủy hóa đơn thành công!');
+          handleRefreshData();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Lỗi khi hủy hóa đơn');
+        }
+      }
+    });
+  };
+
   const isOccupied = selectedTable?.status?.toLowerCase() === 'occupied';
+  const canOrder = selectedTable?.status?.toLowerCase() === 'occupied' || selectedTable?.status?.toLowerCase() === 'empty';
 
   return (
     <div className="pos-page">
@@ -318,7 +396,7 @@ const OrderPage = ({ isWaiterMode }) => {
           <span className="pos-top-bar-time" suppressHydrationWarning>
             {new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
           </span>
-          <button className="pos-top-bar-refresh" onClick={loadTables} title="Làm mới danh sách bàn">
+          <button className="pos-top-bar-refresh" onClick={handleRefreshData} title="Làm mới danh sách bàn và đơn hàng">
             🔄
           </button>
         </div>
@@ -334,7 +412,7 @@ const OrderPage = ({ isWaiterMode }) => {
         />
 
         <MenuPanel
-          canOrder={isOccupied}
+          canOrder={canOrder}
           onAddItem={handleAddItem}
           branchId={deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || (user?.branchIds && user.branchIds[0]) || 1}
         />
@@ -343,7 +421,7 @@ const OrderPage = ({ isWaiterMode }) => {
           table={selectedTable}
           summary={orderSummary}
           cartItems={cartItems}
-          canOrder={isOccupied}
+          canOrder={canOrder}
           onUpdateQty={handleUpdateQty}
           onRemoveItem={handleRemoveItem}
           onNoteChange={handleNoteChange}
@@ -351,6 +429,9 @@ const OrderPage = ({ isWaiterMode }) => {
           onChangeStatus={handleChangeTableStatus}
           onPayment={handlePaymentClick}
           onMarkAsServed={handleMarkAsServed}
+          onConfirmItem={handleConfirmItem}
+          onRejectItem={handleRejectItem}
+          onCancelOrder={handleCancelOrder}
           onMerge={() => setIsMergeModalVisible(true)}
           onRefresh={() => {
             if (selectedTable) {
