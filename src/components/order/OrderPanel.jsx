@@ -85,6 +85,7 @@ const OrderedItem = ({
 }) => {
   const isReady = item.cookingStatus === 'Ready';
   const isServed = item.cookingStatus === 'Served' || item.status === 'PartialReturned';
+  const isPending = item.status === 'CustomerPending';
   const returnableQty = item.quantity - (item.returnedQuantity || 0);
   
   const getStatusColor = (status) => {
@@ -247,7 +248,8 @@ const OrderPanel = ({
     return s + i.price * Math.max(0, qty);
   }, 0);
   const orderedTax = Math.round(orderedSubTotal * 0.08);
-  const orderedTotal = orderedSubTotal + orderedTax;
+  const orderedTotalRaw = orderedSubTotal + orderedTax;
+  const orderedTotal = Math.round(orderedTotalRaw / 1000) * 1000;
 
   const cfg = table ? getStatusConfig(table.status) : null;
   const statusKey = table?.status || TABLE_STATUS.EMPTY;

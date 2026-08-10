@@ -23,6 +23,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [usePoints, setUsePoints] = useState(false);
   const [allVouchers, setAllVouchers] = useState([]);
+  const [cashTendered, setCashTendered] = useState('');
 
   const connection = useSignalR();
 
@@ -37,6 +38,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
       setVoucherCode('');
       setAppliedVoucher(null);
       setUsePoints(false);
+      setCashTendered('');
 
       const fetchVouchers = async () => {
         try {
@@ -141,7 +143,15 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     pointsDiscount = Math.min(pointsAvailable, afterVoucher); // 1 point = 1 VND
   }
 
-  const grandTotal = baseTotal - voucherDiscount - pointsDiscount;
+  const grandTotalRaw = baseTotal - voucherDiscount - pointsDiscount;
+  const isCash = paymentMethod === 'Cash';
+  const grandTotal = isCash ? Math.round(grandTotalRaw / 1000) * 1000 : grandTotalRaw;
+  const roundingDiscount = isCash ? grandTotalRaw - grandTotal : 0;
+  
+  const cashNum = parseInt(cashTendered?.toString().replace(/\D/g, ''), 10) || 0;
+  const changeAmount = Math.max(0, cashNum - grandTotal);
+  
+  const isCashInsufficient = paymentMethod === 'Cash' && cashNum < grandTotal;
 
   const isPayingRef = useRef(false);
 
@@ -308,7 +318,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
           style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
           onClick={handlePay}
           loading={loading}
-          disabled={qrCodeData && paymentMethod === 'PayOS'}
+          disabled={(qrCodeData && paymentMethod === 'PayOS') || isCashInsufficient}
         >
           {paymentMethod === 'PayOS' ? (qrCodeData ? 'Đang chờ thanh toán...' : 'Tạo mã QR PayOS') : 'Thanh toán hoá đơn'}
         </Button>,
@@ -374,6 +384,35 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
           >
             Kiểm tra thanh toán
           </Button>
+        </div>
+      )}
+
+      {/* Cash Tendered Section */}
+      {paymentMethod === 'Cash' && (
+        <div style={{ marginBottom: 16, padding: '12px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91caff' }}>
+          <Text strong>Tiền khách đưa (VNĐ):</Text>
+          <Input 
+            value={cashTendered} 
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '');
+              setCashTendered(val ? Number(val).toLocaleString('vi-VN') : '');
+            }} 
+            placeholder="Nhập số tiền khách đưa"
+            style={{ marginTop: 8, marginBottom: 8, fontSize: 16, fontWeight: 'bold' }}
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Button size="small" onClick={() => setCashTendered(grandTotal.toLocaleString('vi-VN'))}>Vừa đủ</Button>
+            <Button size="small" onClick={() => setCashTendered((50000).toLocaleString('vi-VN'))}>50,000</Button>
+            <Button size="small" onClick={() => setCashTendered((100000).toLocaleString('vi-VN'))}>100,000</Button>
+            <Button size="small" onClick={() => setCashTendered((200000).toLocaleString('vi-VN'))}>200,000</Button>
+            <Button size="small" onClick={() => setCashTendered((500000).toLocaleString('vi-VN'))}>500,000</Button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong>Tiền thừa trả khách:</Text>
+            <Text strong style={{ fontSize: 18, color: changeAmount > 0 ? '#52c41a' : (isCashInsufficient ? '#f5222d' : 'inherit') }}>
+              {isCashInsufficient ? 'Chưa đủ tiền' : formatPrice(changeAmount)}
+            </Text>
+          </div>
         </div>
       )}
 
@@ -481,21 +520,29 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
           <Text>{formatPrice(vat)}</Text>
         </div>
         {voucherDiscount > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
-            <Text type="success">Voucher giảm:</Text>
-            <Text type="success">-{formatPrice(voucherDiscount)}</Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginBottom: 8, color: '#ff4d4f' }}>
+            <Text style={{ color: '#ff4d4f' }}>Khuyến mãi (Voucher):</Text>
+            <Text style={{ color: '#ff4d4f' }}>-{formatPrice(voucherDiscount)}</Text>
           </div>
         )}
         {pointsDiscount > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
-            <Text type="success">Dùng điểm:</Text>
-            <Text type="success">-{formatPrice(pointsDiscount)}</Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginBottom: 8, color: '#faad14' }}>
+            <Text style={{ color: '#faad14' }}>Trừ điểm ({pointsDiscount} điểm):</Text>
+            <Text style={{ color: '#faad14' }}>-{formatPrice(pointsDiscount)}</Text>
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginTop: 8 }}>
-          <Text strong style={{ fontSize: 16 }}>
-            Tổng cộng:
-          </Text>
+        {roundingDiscount !== 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', marginBottom: 8, color: roundingDiscount > 0 ? '#52c41a' : '#1890ff' }}>
+            <Text style={{ color: roundingDiscount > 0 ? '#52c41a' : '#1890ff' }}>
+              {roundingDiscount > 0 ? 'Giảm giá làm tròn:' : 'Phụ phí làm tròn:'}
+            </Text>
+            <Text style={{ color: roundingDiscount > 0 ? '#52c41a' : '#1890ff' }}>
+              {roundingDiscount > 0 ? `-${formatPrice(roundingDiscount)}` : `+${formatPrice(Math.abs(roundingDiscount))}`}
+            </Text>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
+          <Text strong style={{ fontSize: 16 }}>Tổng cộng:</Text>
           <Text strong style={{ fontSize: 18, color: '#f5222d' }}>
             {formatPrice(grandTotal > 0 ? grandTotal : 0)}
           </Text>
