@@ -51,6 +51,7 @@ import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 import CashFlowPage from '../pages/CashFlowPage';
+import NotificationPage from '../pages/NotificationPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -125,6 +126,7 @@ const AppRouter = () => {
               <Route path="/my-payroll" element={<MyPayrollPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
+              <Route path="/notifications" element={<NotificationPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />

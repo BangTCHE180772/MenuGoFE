@@ -33,6 +33,7 @@ import {
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
+import NotificationBell from "./NotificationBell";
 
 // ─── Tùy chọn con của Quản Lý Kho ──────────────────────────────────────────
 const INVENTORY_SUB_MENU = [
@@ -216,20 +217,23 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Sidebar Header: Logo & Toggle Button */}
-      <div className="sidebar-header">
+      <div className="sidebar-header" style={{ flexDirection: collapsed ? 'column' : 'row', gap: collapsed ? 8 : 0, paddingBottom: collapsed ? 8 : 0, height: 'auto' }}>
         <Link to="/home" className="sidebar-logo">
           <div className="sidebar-logo-icon">
             <CrownOutlined style={{ fontSize: 22, color: "var(--color-primary)" }} />
           </div>
           {!collapsed && <span className="sidebar-logo-text">MenuGo</span>}
         </Link>
-        <Button
-          type="text"
-          className="sidebar-toggle-btn"
-          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          onClick={onToggleCollapse}
-          title={collapsed ? "Mở rộng Sidebar" : "Thu gọn Sidebar"}
-        />
+        <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: collapsed ? 8 : 4 }}>
+          <NotificationBell collapsed={collapsed} />
+          <Button
+            type="text"
+            className="sidebar-toggle-btn"
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={onToggleCollapse}
+            title={collapsed ? "Mở rộng Sidebar" : "Thu gọn Sidebar"}
+          />
+        </div>
       </div>
 
       {/* Branch Selector */}
