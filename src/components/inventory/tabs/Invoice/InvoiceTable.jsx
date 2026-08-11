@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const InvoiceTable = ({ invoices = [] }) => {
-  const [searchText, setSearchText] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
 
   const filtered = invoices.filter((inv) => {
     if (searchText) {
@@ -30,7 +51,7 @@ const InvoiceTable = ({ invoices = [] }) => {
               type="text"
               placeholder="Theo mã hóa đơn, tên khách hàng..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               style={{
                 width: '100%',
                 height: 32,

@@ -52,7 +52,7 @@ import ReportInventoryPage from '../pages/ReportInventoryPage';
 import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 import CashFlowPage from '../pages/CashFlowPage';
-import NotificationsPage from '../pages/NotificationsPage';
+import NotificationPage from '../pages/NotificationPage';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -99,7 +99,7 @@ const AppRouter = () => {
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/my-profile" element={<MyProfilePage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/notifications" element={<NotificationPage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route

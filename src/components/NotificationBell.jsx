@@ -1,178 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { Badge, Popover, List, Typography, Button, Space, Tag } from 'antd';
-import { BellOutlined, CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, ShopOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Popover, Badge, Button, List, Spin, Avatar, Typography, Divider } from 'antd';
+import { BellOutlined, MessageOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useBranch } from '../context/BranchContext';
+import { useSignalR } from '../context/SignalRContext';
+import { useAuth } from '../context/AuthContext';
+import { getRecentNotifications, getUnreadCount, markAsRead } from '../api/notificationApi';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getUnreadCount, getRecentNotifications, markAsRead } from '../api/notificationApi';
-import { useAuth } from '../context/AuthContext';
+import 'dayjs/locale/vi';
 
 dayjs.extend(relativeTime);
+dayjs.locale('vi');
 
 const { Text } = Typography;
 
-const NotificationBell = () => {
+const NotificationBell = ({ collapsed }) => {
+  const [visible, setVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [popoverVisible, setPopoverVisible] = useState(false);
+
+  const { currentBranchId, branches } = useBranch();
+  const { role } = useAuth();
+  const connection = useSignalR();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
-  const fetchUnreadCount = async () => {
+  // Load số lượng chưa đọc và thông báo gần nhất
+  const loadData = useCallback(async () => {
     try {
-      const res = await getUnreadCount();
-      if (res.data) {
-        setUnreadCount(res.data.count);
-      }
-    } catch (error) {
-      console.error('Failed to fetch unread count', error);
-    }
-  };
+      setLoading(true);
+      const countRes = await getUnreadCount(currentBranchId);
+      setUnreadCount(countRes.count);
 
-  const fetchNotifications = async () => {
-    setLoading(true);
-    try {
-      const res = await getRecentNotifications();
-      if (res.data) {
-        setNotifications(res.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch notifications', error);
+      const recentRes = await getRecentNotifications(currentBranchId);
+      setNotifications(recentRes);
+    } catch (err) {
+      console.error('Lỗi khi tải thông báo:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentBranchId]);
 
   useEffect(() => {
-    if (user) {
-      fetchUnreadCount();
-    }
-  }, [user]);
+    loadData();
+  }, [loadData]);
 
-  // Lắng nghe SignalR để update khi có thông báo mới (cả Operational và WorkSchedule)
+  // Đăng ký nhận thông báo Realtime qua SignalR
   useEffect(() => {
-    const handleUpdate = () => {
-      fetchUnreadCount();
-      if (popoverVisible) {
-        fetchNotifications();
-      }
-    };
+    if (connection) {
+      const handleReceive = (payload) => {
+        // Kiểm tra xem thông báo có thuộc chi nhánh hiện tại không (hoặc đang xem All Branches - currentBranchId = null)
+        const isBelongsToBranch = !currentBranchId || payload.branchId === currentBranchId;
+        
+        if (isBelongsToBranch) {
+          // Tăng badge unread
+          setUnreadCount((prev) => prev + 1);
+          // Tải lại danh sách
+          loadData();
+        }
+      };
 
-    window.addEventListener('work-schedule-updated', handleUpdate);
-    window.addEventListener('notification-updated', handleUpdate); // For future generic updates
-
-    return () => {
-      window.removeEventListener('work-schedule-updated', handleUpdate);
-      window.removeEventListener('notification-updated', handleUpdate);
-    };
-  }, [popoverVisible]);
-
-  const handleVisibleChange = (visible) => {
-    setPopoverVisible(visible);
-    if (visible) {
-      fetchNotifications();
+      connection.on('ReceiveNotification', handleReceive);
+      return () => {
+        connection.off('ReceiveNotification', handleReceive);
+      };
     }
-  };
+  }, [connection, currentBranchId, loadData]);
 
-  const handleNotificationClick = async (item) => {
-    if (!item.isRead) {
-      try {
+  const handleItemClick = async (item) => {
+    try {
+      if (!item.isRead) {
         await markAsRead(item.id);
-        fetchUnreadCount();
-        setNotifications(prev => 
-          prev.map(n => n.id === item.id ? { ...n, isRead: true } : n)
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
         );
-      } catch (error) {
-        console.error('Failed to mark as read', error);
       }
-    }
+      setVisible(false);
 
-    setPopoverVisible(false);
-
-    if (item.redirectUrl) {
-      navigate(item.redirectUrl);
+      if (item.redirectUrl) {
+        navigate(item.redirectUrl);
+      }
+    } catch (err) {
+      console.error('Lỗi khi cập nhật trạng thái đọc:', err);
     }
   };
 
-  const getIconForType = (type, priority) => {
-    if (type === 'Operational' && priority === 'Critical') return <WarningOutlined style={{ color: '#ff4d4f' }} />;
-    if (type === 'Inventory') return <ShopOutlined style={{ color: '#faad14' }} />;
-    if (type === 'Quality') return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-    return <InfoCircleOutlined style={{ color: '#1677ff' }} />;
+  const getNotifIcon = (type, isImportant) => {
+    if (isImportant) return <Avatar style={{ backgroundColor: '#fff1f0', color: '#ff4d4f' }}>🔴</Avatar>;
+    
+    switch (type) {
+      case 'Inventory':
+        return <Avatar style={{ backgroundColor: '#e6f7ff', color: '#1890ff' }}>📦</Avatar>;
+      case 'Order':
+        return <Avatar style={{ backgroundColor: '#f6ffed', color: '#52c41a' }}>🍽️</Avatar>;
+      case 'Quality':
+        return <Avatar style={{ backgroundColor: '#fff7e6', color: '#faad14' }}>🔍</Avatar>;
+      case 'ShelfLife':
+        return <Avatar style={{ backgroundColor: '#fff2e8', color: '#fa541c' }}>⏳</Avatar>;
+      case 'Operational':
+      default:
+        return <Avatar style={{ backgroundColor: '#f9f0ff', color: '#722ed1' }}>⚠️</Avatar>;
+    }
   };
 
-  const content = (
-    <div style={{ width: 350, maxHeight: 400, overflowY: 'auto' }}>
-      <List
-        loading={loading}
-        dataSource={notifications}
-        locale={{ emptyText: 'Không có thông báo mới' }}
-        renderItem={(item) => (
-          <List.Item
-            className={`notification-item ${item.isRead ? 'read' : 'unread'}`}
-            style={{ 
-              cursor: 'pointer', 
-              padding: '12px',
-              backgroundColor: item.isRead ? 'transparent' : '#f0f5ff',
-              borderBottom: '1px solid #f0f0f0',
-              transition: 'background-color 0.3s'
-            }}
-            onClick={() => handleNotificationClick(item)}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fafafa'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = item.isRead ? 'transparent' : '#f0f5ff'}
-          >
-            <List.Item.Meta
-              avatar={getIconForType(item.type, item.priority)}
-              title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Text strong={!item.isRead} style={{ fontSize: '14px', marginBottom: 4, display: 'block' }}>
-                    {item.title}
-                  </Text>
-                  {item.isImportant && <Tag color="error">Quan trọng</Tag>}
-                </div>
-              }
-              description={
-                <div>
-                  <Text type="secondary" style={{ fontSize: '13px', display: 'block', marginBottom: 8 }}>
-                    {item.message}
-                  </Text>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    {dayjs(item.createdAt).fromNow()}
-                  </Text>
-                </div>
-              }
-            />
-          </List.Item>
-        )}
-      />
-      {notifications.length > 0 && (
-        <div style={{ textAlign: 'center', padding: '10px 0', borderTop: '1px solid #f0f0f0' }}>
-          <Button type="link" onClick={() => { setPopoverVisible(false); navigate('/notifications'); }}>
-            Xem tất cả thông báo
-          </Button>
+  const popoverContent = (
+    <div style={{ width: 360 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px' }}>
+        <Text strong style={{ fontSize: 16 }}>Thông báo mới nhận</Text>
+        {unreadCount > 0 && <Badge count={unreadCount} style={{ backgroundColor: '#ff4d4f' }} />}
+      </div>
+      <Divider style={{ margin: '4px 0' }} />
+      
+      {loading && notifications.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
+      ) : notifications.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px 8px', color: '#8c8c8c' }}>
+          <MessageOutlined style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
+          Không có thông báo mới nào hôm nay.
+        </div>
+      ) : (
+        <div style={{ maxHeight: 320, overflowY: 'auto', padding: '0 8px' }}>
+          <List
+            itemLayout="horizontal"
+            dataSource={notifications}
+            renderItem={(item) => (
+              <List.Item
+                onClick={() => handleItemClick(item)}
+                style={{
+                  cursor: 'pointer',
+                  padding: '10px 8px',
+                  borderRadius: 6,
+                  transition: 'background 0.2s',
+                  backgroundColor: item.isRead ? 'transparent' : '#f0f9ff',
+                  marginBottom: 4,
+                  borderBottom: '1px solid #f0f0f0'
+                }}
+                className="notif-item-hover"
+              >
+                <List.Item.Meta
+                  avatar={getNotifIcon(item.type, item.isImportant)}
+                  title={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Text strong={!item.isRead} style={{ fontSize: 13, color: '#262626', pr: 8 }}>
+                        {item.title}
+                      </Text>
+                      {!item.isRead && <span style={{ width: 8, height: 8, backgroundColor: '#1890ff', borderRadius: '50%', flexShrink: 0, marginTop: 6 }} />}
+                    </div>
+                  }
+                  description={
+                    <div>
+                      <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                        {item.message}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8c8c8c' }}>
+                        <span>
+                          <ClockCircleOutlined style={{ marginRight: 4 }} />
+                          {dayjs(item.createdAt).fromNow()}
+                        </span>
+                        {!currentBranchId && item.branchName && (
+                          <span style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
+                            {item.branchName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  }
+                />
+              </List.Item>
+            )}
+          />
         </div>
       )}
+      
+      <Divider style={{ margin: '4px 0' }} />
+      <div style={{ textAlign: 'center', padding: '6px 0' }}>
+        <Button
+          type="link"
+          size="small"
+          onClick={() => {
+            setVisible(false);
+            navigate('/notifications');
+          }}
+          style={{ width: '100%', fontWeight: 600 }}
+        >
+          Xem tất cả thông báo
+        </Button>
+      </div>
+    </div>
+  );
     </div>
   );
 
   return (
     <Popover
-      content={content}
-      title="Thông báo"
+      content={popoverContent}
+      title={null}
       trigger="click"
-      open={popoverVisible}
-      onOpenChange={handleVisibleChange}
-      placement="bottomRight"
+      open={visible}
+      onOpenChange={setVisible}
+      placement="rightTop"
+      overlayClassName="notif-bell-popover"
+      overlayStyle={{ zIndex: 1050 }}
     >
-      <Badge count={unreadCount} overflowCount={99} size="small" style={{ cursor: 'pointer' }}>
-        <Button 
-          type="text" 
-          icon={<BellOutlined style={{ fontSize: '20px', color: '#595959' }} />} 
-          className="notification-bell-btn"
-          style={{ width: '40px', height: '40px', borderRadius: '50%' }}
-        />
-      </Badge>
+      <div className={`sidebar-notif-bell-wrapper ${collapsed ? 'collapsed' : ''}`} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Badge count={unreadCount} overflowCount={99} size="small" offset={[2, 2]}>
+          <Button
+            type="text"
+            icon={<BellOutlined style={{ fontSize: 20, color: 'var(--color-text-secondary)' }} />}
+            className="sidebar-notif-btn"
+            title="Thông báo"
+          />
+        </Badge>
+      </div>
     </Popover>
   );
 };

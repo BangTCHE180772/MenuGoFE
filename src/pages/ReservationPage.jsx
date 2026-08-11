@@ -5,6 +5,7 @@ import { getReservations, checkInReservation, cancelReservation } from '../api/r
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
 import ReservationEditModal from '../components/reservation/ReservationEditModal';
 import dayjs from 'dayjs';
+import '../styles/ReservationPage.css';
 
 const { Title, Text } = Typography;
 
@@ -82,8 +83,8 @@ const ReservationPage = ({ isPosHub }) => {
     const totalGuests = dailyData.reduce((sum, r) => sum + r.numberOfGuests, 0);
 
     return (
-      <div className="calendar-cell-events" style={{ fontSize: '12px' }}>
-        <div style={{ color: '#1890ff', fontWeight: 'bold' }}>{dailyData.length} Đơn ({totalGuests} khách)</div>
+      <div className="calendar-cell-events">
+        <div className="calendar-cell-total">{dailyData.length} Đơn ({totalGuests} khách)</div>
         {pendingCount > 0 && <div><Badge status="warning" text={`${pendingCount} Chờ`} /></div>}
         {completedCount > 0 && <div><Badge status="success" text={`${completedCount} Đã đến`} /></div>}
       </div>
@@ -133,11 +134,12 @@ const ReservationPage = ({ isPosHub }) => {
       <Col xs={24} sm={12} md={12} lg={8} xl={6} key={r.id}>
         <Card
           hoverable
-          style={{ borderColor: cardBorderColor, backgroundColor: cardBg, height: '100%' }}
+          style={{ borderColor: cardBorderColor, backgroundColor: cardBg }}
+          className="reservation-card"
           headStyle={{ borderBottom: `1px solid ${cardBorderColor}`, backgroundColor: 'transparent' }}
           title={
             <Space>
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{rTime.format('HH:mm')}</span>
+              <span className="card-time">{rTime.format('HH:mm')}</span>
               {getStatusTag()}
             </Space>
           }
@@ -157,17 +159,17 @@ const ReservationPage = ({ isPosHub }) => {
             )
           }
         >
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1890ff' }}>{r.customerName}</div>
-            <div style={{ color: '#595959' }}>📞 {r.customerPhone}</div>
+          <div className="card-customer-header">
+            <div className="card-customer-name">{r.customerName}</div>
+            <div className="card-customer-phone">📞 {r.customerPhone}</div>
           </div>
 
-          <Row style={{ marginBottom: '8px' }}>
+          <Row className="card-row">
             <Col span={12}><Text type="secondary">Số lượng:</Text> <br /> <b>{r.numberOfGuests} người</b></Col>
             <Col span={12}><Text type="secondary">Bàn xếp:</Text> <br /> <b>{r.tableNames?.join(', ') || 'Chưa xếp'}</b></Col>
           </Row>
 
-          <div style={{ marginBottom: '16px', minHeight: '22px' }}>
+          <div className="card-note">
             <Text type="secondary">Ghi chú:</Text> {r.note || <Text type="secondary" italic>Không có</Text>}
           </div>
 
@@ -196,10 +198,10 @@ const ReservationPage = ({ isPosHub }) => {
   ];
 
   return (
-    <div style={{ padding: isPosHub ? '16px 0' : '24px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className={`reservation-container ${isPosHub ? 'compact-padding' : 'full-padding'}`}>
 
       {/* Header Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div className="reservation-header">
         <Space size="large">
           {!isPosHub && <Title level={3} style={{ margin: 0 }}>Quản Lý Đặt Bàn</Title>}
 
@@ -232,7 +234,7 @@ const ReservationPage = ({ isPosHub }) => {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflow: 'auto', backgroundColor: '#f0f2f5', padding: '16px', borderRadius: '8px' }}>
+      <div className="reservation-content-area">
         {viewMode === 'calendar' ? (
           <Card bodyStyle={{ padding: 0 }}>
             <Calendar

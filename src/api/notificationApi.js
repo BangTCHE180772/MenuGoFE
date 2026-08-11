@@ -1,17 +1,39 @@
 import axiosInstance from './axiosInstance';
 
-export const getUnreadCount = () => {
-  return axiosInstance.get('/api/Notification/unread-count');
+/**
+ * Lấy danh sách lịch sử thông báo (có phân trang và lọc)
+ * @param {object} params - { branchId, fromDate, toDate, type, isRead, search, page, pageSize }
+ */
+export const getNotifications = async (params) => {
+  const res = await axiosInstance.get('/api/notification', { params });
+  return res.data;
 };
 
-export const getRecentNotifications = () => {
-  return axiosInstance.get('/api/Notification/recent');
+/**
+ * Lấy 5 thông báo gần nhất (dùng cho chuông thông báo)
+ * @param {number} branchId - ID chi nhánh (tùy chọn)
+ */
+export const getRecentNotifications = async (branchId) => {
+  const params = branchId ? { branchId } : {};
+  const res = await axiosInstance.get('/api/notification/recent', { params });
+  return res.data;
 };
 
-export const markAsRead = (id) => {
-  return axiosInstance.put(`/api/Notification/${id}/read`);
+/**
+ * Lấy số lượng thông báo chưa đọc
+ * @param {number} branchId - ID chi nhánh (tùy chọn)
+ */
+export const getUnreadCount = async (branchId) => {
+  const params = branchId ? { branchId } : {};
+  const res = await axiosInstance.get('/api/notification/unread-count', { params });
+  return res.data;
 };
 
-export const getPagedNotifications = (params) => {
-  return axiosInstance.get('/api/Notification', { params });
+/**
+ * Đánh dấu thông báo đã đọc
+ * @param {number} id - ID thông báo
+ */
+export const markAsRead = async (id) => {
+  const res = await axiosInstance.put(`/api/notification/${id}/read`);
+  return res.data;
 };

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ImportReturnTable from './ImportReturnTable';
 import ReturnDocumentModal from '../Import/ReturnDocumentModal';
 
@@ -21,8 +22,29 @@ const ImportReturnTab = ({
   fetchDocuments,
   handleDeleteDocument
 }) => {
-  const [searchText, setSearchText] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Sync searchText with searchParams from URL when it changes
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
 
   // Lọc phiếu Trả hàng NCC (DocumentType.Return = 4 hoặc "Return")
   const returnDocuments = useMemo(() => {
@@ -58,7 +80,7 @@ const ImportReturnTab = ({
       <ImportReturnTable
         documents={returnDocuments}
         searchText={searchText}
-        setSearchText={setSearchText}
+        setSearchText={handleSearchChange}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         loading={loading}
