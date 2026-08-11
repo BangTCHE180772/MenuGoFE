@@ -837,7 +837,19 @@ const MyWorkSchedulePage = () => {
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
                   options={accounts
-                    .filter((acc) => acc.id !== selectedSchedule.accountId)
+                    .filter((acc) => {
+                      if (acc.id === selectedSchedule.accountId) return false;
+                      const userRoles = user?.roleIds || [];
+                      const accRoles = acc.roleIds || [];
+                      
+                      // Cannot swap with Admin(1), Owner(2), Manager(3)
+                      const isAdminOrManager = accRoles.some(r => [1, 2, 3].includes(r));
+                      if (isAdminOrManager) return false;
+
+                      // Must have at least one shared role
+                      const hasSharedRole = userRoles.some(r => accRoles.includes(r));
+                      return hasSharedRole;
+                    })
                     .map((acc) => ({
                       value: acc.id,
                       label: `${acc.name} ${acc.phone ? `(${acc.phone})` : ''}`,

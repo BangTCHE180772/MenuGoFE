@@ -11,3 +11,7 @@ export const getRecentNotifications = () => {
 export const markAsRead = (id) => {
   return axiosInstance.put(`/api/Notification/${id}/read`);
 };
+
+export const getPagedNotifications = (params) => {
+  return axiosInstance.get('/api/Notification', { params });
+};
