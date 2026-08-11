@@ -14,6 +14,7 @@ import {
   Spin,
   Tooltip,
   Popconfirm,
+  Modal,
 } from 'antd';
 import {
   FireOutlined,
@@ -48,6 +49,7 @@ const KDSPage = () => {
   const [activeTab, setActiveTab] = useState('ALL');
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
+  const [showCompletedModal, setShowCompletedModal] = useState(false);
   const signalRConnection = useSignalR();
 
   // Join branch-specific SignalR group
@@ -566,8 +568,10 @@ const KDSPage = () => {
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: 16,
           backgroundColor: '#ffffff',
           padding: '16px 24px',
           borderRadius: 12,
@@ -576,7 +580,7 @@ const KDSPage = () => {
           boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
         }}
       >
-        <Space size="large">
+        <Space size="large" style={{ flexShrink: 0 }}>
           <div
             style={{
               width: 48,
@@ -588,21 +592,22 @@ const KDSPage = () => {
               justifyContent: 'center',
               fontSize: 24,
               color: '#ffffff',
+              flexShrink: 0,
             }}
           >
             <FireOutlined />
           </div>
-          <div>
-            <Title level={3} style={{ color: '#000000', margin: 0 }}>
+          <div style={{ minWidth: 0 }}>
+            <Title level={3} style={{ color: '#000000', margin: 0, whiteSpace: 'nowrap' }}>
               Màn hình Bếp & Chế biến (KDS)
             </Title>
-            <Text style={{ color: '#595959' }}>
+            <Text style={{ color: '#595959', whiteSpace: 'nowrap' }}>
               Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
             </Text>
           </div>
         </Space>
 
-        <Space size="middle">
+        <Space size="middle" wrap style={{ flexShrink: 0 }}>
           {/* View Mode Toggle Button Group */}
           <Button.Group>
             <Button
@@ -686,6 +691,15 @@ const KDSPage = () => {
             </span>
             <Tag color="warning">Tối ưu 10 phần/mẻ</Tag>
           </Space>
+        }
+        extra={
+          <Button
+            icon={<CheckCircleOutlined />}
+            onClick={() => setShowCompletedModal(true)}
+            style={{ backgroundColor: '#f6ffed', borderColor: '#52c41a', color: '#389e0d' }}
+          >
+            Đơn đã hoàn thành ({readyItems.length})
+          </Button>
         }
         style={{
           backgroundColor: '#ffffff',
@@ -922,6 +936,19 @@ const KDSPage = () => {
           )}
         </>
       )}
+
+      {/* ── Modal: All completed orders (Đơn đã hoàn thành) ─────── */}
+      <Modal
+        title={`✅ Đơn đã hoàn thành (${readyItems.length})`}
+        open={showCompletedModal}
+        onCancel={() => setShowCompletedModal(false)}
+        footer={null}
+        width={900}
+      >
+        <div style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
+          {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
+        </div>
+      </Modal>
     </div>
   );
 };

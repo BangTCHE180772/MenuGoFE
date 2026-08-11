@@ -79,6 +79,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
+   * Cập nhật thông tin user hiện tại trong context/localStorage
+   * (dùng sau khi người dùng chỉnh sửa thông tin cá nhân)
+   */
+  const updateUser = (patch) => {
+    setUser((prev) => {
+      const next = { ...prev, ...patch };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  /**
    * Đăng xuất
    */
   const logout = async () => {
@@ -102,6 +114,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isLoading,
     setAuth,
+    updateUser,
     logout,
     hasRole,
     ROLES,

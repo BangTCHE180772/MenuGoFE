@@ -204,6 +204,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
       key: "profile",
       icon: <UserOutlined />,
       label: "Thông tin tài khoản",
+      onClick: () => navigate("/my-profile"),
     },
     {
       key: "logout",
