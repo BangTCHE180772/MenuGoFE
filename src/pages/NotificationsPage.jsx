@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Typography, Button, Space, message } from 'antd';
 import { CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, ShopOutlined, CheckOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ const NotificationsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const loadData = async (pageIndex = page, size = pageSize) => {
+  const loadData = useCallback(async (pageIndex = page, size = pageSize) => {
     setLoading(true);
     try {
       const res = await getPagedNotifications({
@@ -34,13 +34,13 @@ const NotificationsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
 
   useEffect(() => {
     if (user) {
       loadData(page, pageSize);
     }
-  }, [page, pageSize, user]);
+  }, [page, pageSize, user, loadData]);
 
   const handleTableChange = (pagination) => {
     setPage(pagination.current);
