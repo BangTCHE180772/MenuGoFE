@@ -46,6 +46,10 @@ const MyWorkSchedulePage = () => {
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(dayjs());
   
+  const isManagerOrAdmin =
+    user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên', 'Quản lý', 'Manager'].includes(r)) ||
+    user?.roleIds?.some((id) => [1, 2, 3].includes(id));
+
   // Modal detail states
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -144,7 +148,8 @@ const MyWorkSchedulePage = () => {
       loadData();
     } catch (err) {
       console.error(err);
-      message.error('Có lỗi xảy ra khi gửi đơn xin nghỉ!');
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ!';
+      message.error(errorMsg);
     } finally {
       setLeaveLoading(false);
     }
@@ -178,6 +183,14 @@ const MyWorkSchedulePage = () => {
 
   useEffect(() => {
     loadData();
+
+    // Lắng nghe event từ SignalR (dispatch ở MainLayout)
+    const handleUpdate = () => loadData();
+    window.addEventListener('work-schedule-updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('work-schedule-updated', handleUpdate);
+    };
   }, [loadData]);
 
   const getBranchName = (id) => {
@@ -191,6 +204,17 @@ const MyWorkSchedulePage = () => {
     const start = sh.startTime ? sh.startTime.substring(0, 5) : '--:--';
     const end = sh.endTime ? sh.endTime.substring(0, 5) : '--:--';
     return { name: sh.name, time: `${start} - ${end}`, startTime: sh.startTime, endTime: sh.endTime };
+  };
+
+  const getShiftGradientClass = (shiftInfo, status) => {
+    if (status === 'Absent') return 'shift-gradient-absent';
+    if (status === 'Working' || status === 'Completed') return 'shift-gradient-working';
+    if (status && (status.startsWith('LEAVE_REQUEST') || status.startsWith('TRANSFER'))) return 'shift-gradient-pending';
+    
+    const startHour = shiftInfo.startTime ? parseInt(shiftInfo.startTime.split(':')[0]) : 0;
+    if (startHour < 12) return 'shift-gradient-morning';
+    if (startHour < 18) return 'shift-gradient-afternoon';
+    return 'shift-gradient-evening';
   };
 
   // Week calculation (ISO standard: Monday is first day of the week)
@@ -288,22 +312,25 @@ const MyWorkSchedulePage = () => {
   };
 
   return (
-    <div className="my-work-schedule-page animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto', padding: '16px' }}>
+    <div className="my-work-schedule-page animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
       
       {/* Header matching screenshot */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', padding: '16px 24px', borderRadius: '16px' }}>
         <Button 
           type="text" 
+          shape="circle"
+          size="large"
           icon={<ArrowLeftOutlined style={{ fontSize: '18px' }} />} 
           onClick={() => navigate('/home')} 
         />
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold', color: '#000' }}>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#1f2937', letterSpacing: '-0.5px' }}>
           Lịch làm việc
         </h2>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <Button 
             type="primary" 
-            style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold', borderRadius: '6px' }}
+            size="large"
+            style={{ background: 'linear-gradient(135deg, #e8442a, #ff8c42)', border: 'none', fontWeight: 'bold', borderRadius: '12px', boxShadow: '0 4px 12px rgba(232, 68, 42, 0.3)' }}
             icon={<FileTextOutlined />}
             onClick={() => handleOpenLeaveModal('day')}
           >
@@ -311,7 +338,9 @@ const MyWorkSchedulePage = () => {
           </Button>
           <Button 
             type="text" 
-            icon={<ReloadOutlined style={{ fontSize: '16px' }} />} 
+            shape="circle"
+            size="large"
+            icon={<ReloadOutlined style={{ fontSize: '18px', color: '#6b7280' }} />} 
             onClick={loadData}
             loading={loading}
           />
@@ -391,7 +420,7 @@ const MyWorkSchedulePage = () => {
         })}
 
       {/* 👑 Khu vực Admin / Quản lý Phê duyệt Đơn xin nghỉ & Đổi ca */}
-      {(schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING_ADMIN'))) && (
+      {isManagerOrAdmin && (schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING'))) && (
         <Card
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#cf1322', fontSize: '15px', fontWeight: 'bold' }}>
@@ -443,10 +472,11 @@ const MyWorkSchedulePage = () => {
               );
             })}
 
-            {/* Đơn đổi ca (đã 2 bên đồng ý) */}
-            {schedules.filter((s) => s.status?.startsWith('TRANSFER_PENDING_ADMIN')).map((item) => {
+            {/* Đơn đổi ca (đang xử lý) */}
+            {schedules.filter((s) => s.status?.startsWith('TRANSFER_PENDING')).map((item) => {
               const parts = (item.status || '').split(':');
-              const senderId = Number(parts[1]) || item.accountId;
+              const isPendingEmp = item.status.startsWith('TRANSFER_PENDING_EMP');
+              const senderId = Number(parts[1]) || (isPendingEmp ? undefined : item.accountId);
               const senderName = getAccountName(senderId);
               const receiverName = getAccountName(item.accountId);
               const shiftInfo = getShiftDetails(item.shiftId);
@@ -457,13 +487,20 @@ const MyWorkSchedulePage = () => {
                 }}>
                   <div>
                     <Tag color="gold">🔄 ĐỔI CA LÀM</Tag>
-                    <strong>{senderName}</strong> ➔ <strong>{receiverName}</strong> (2 NV đã đồng ý).
+                    <strong>{senderName}</strong> ➔ <strong>{receiverName}</strong> 
+                    {isPendingEmp ? (
+                      <span style={{ color: '#fa8c16', marginLeft: 8 }}>(Đang chờ {receiverName} xác nhận)</span>
+                    ) : (
+                      <span style={{ color: '#52c41a', marginLeft: 8 }}>(2 NV đã đồng ý)</span>
+                    )}
                     <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>
                       📅 Ca: <strong>{shiftInfo.name} ({shiftInfo.time})</strong> - Ngày: <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <Button type="primary" size="small" style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }} onClick={async () => {
+                    <Button type="primary" size="small" style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }} 
+                      disabled={isPendingEmp}
+                      onClick={async () => {
                       try {
                         await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
                         message.success(`🟢 Đã duyệt đổi ca chính thức cho ${receiverName}!`);
@@ -475,11 +512,11 @@ const MyWorkSchedulePage = () => {
                     <Button danger size="small" onClick={async () => {
                       try {
                         await updateWorkSchedule({ ...item, accountId: senderId, status: 'APPROVED', managerApproved: true });
-                        message.info('❌ Đã từ chối yêu cầu đổi ca.');
+                        message.info('❌ Đã hủy/từ chối yêu cầu đổi ca.');
                         loadData();
                       } catch (e) { message.error('Lỗi từ chối!'); }
                     }}>
-                      Từ chối
+                      {isPendingEmp ? 'Hủy yêu cầu' : 'Từ chối'}
                     </Button>
                   </div>
                 </div>
@@ -490,116 +527,144 @@ const MyWorkSchedulePage = () => {
       )}
 
       {/* Week Selector Container */}
-      <div style={{
+      <div className="glass-card" style={{
         display: 'flex',
-        alignItems: 'stretch',
-        border: '2px solid #000000',
-        borderRadius: '6px',
-        marginBottom: '20px',
-        overflow: 'hidden',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: '16px',
+        marginBottom: '24px',
+        padding: '16px 24px',
       }}>
         <Button
-          type="text"
-          style={{ height: 'auto', borderRadius: 0, padding: '12px 18px', background: '#e0e0e0', borderRight: '2px solid #000000' }}
-          icon={<ArrowLeftOutlined style={{ fontSize: '16px', fontWeight: 'bold' }} />}
+          shape="circle"
+          size="large"
+          icon={<ArrowLeftOutlined />}
           onClick={handlePrevWeek}
+          style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
         />
-        <div style={{
-          flex: 1,
-          textAlign: 'center',
-          padding: '10px 0',
-          background: '#dcdcdc',
-          color: '#000000',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
-          <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{getWeekLabel()}</div>
-          <div style={{ fontSize: '14px', marginTop: '2px', letterSpacing: '0.5px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: '800', fontSize: '18px', color: '#1f2937' }}>
+            {getWeekLabel()}
+          </div>
+          <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px', fontWeight: '500' }}>
             {monday.format('DD/MM/YYYY')} - {sunday.format('DD/MM/YYYY')}
           </div>
         </div>
         <Button
-          type="text"
-          style={{ height: 'auto', borderRadius: 0, padding: '12px 18px', background: '#e0e0e0', borderLeft: '2px solid #000000' }}
-          icon={<ArrowRightOutlined style={{ fontSize: '16px', fontWeight: 'bold' }} />}
+          shape="circle"
+          size="large"
+          icon={<ArrowRightOutlined />}
           onClick={handleNextWeek}
+          style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
         />
       </div>
 
       {/* Day List */}
       <Spin spinning={loading}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {weekDays.map((dayItem) => {
+        <div style={{ overflowX: 'auto', paddingBottom: '12px' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)', 
+            gap: '16px', 
+            minWidth: '1050px' 
+          }}>
+            {weekDays.map((dayItem, index) => {
             const dateStr = dayItem.format('YYYY-MM-DD');
             const daySchedules = schedules.filter(
               (item) => dayjs(item.workDate).format('YYYY-MM-DD') === dateStr
             );
+            
+            const isToday = dayItem.isSame(dayjs(), 'day');
 
             return (
               <div 
                 key={dateStr}
+                className="glass-card animate-fade-in-up"
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #d9d9d9',
-                  borderRadius: '4px',
-                  padding: '16px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  animationDelay: `${index * 0.05}s`,
+                  borderTop: isToday ? '4px solid #e8442a' : undefined
                 }}
               >
                 {/* Day Header row */}
                 <div style={{ 
                   display: 'flex', 
-                  justifyContent: 'space-between', 
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  marginBottom: '14px',
-                  color: '#000000'
+                  marginBottom: '16px',
+                  color: isToday ? '#e8442a' : '#1f2937',
+                  borderBottom: '1px solid rgba(0,0,0,0.05)',
+                  paddingBottom: '12px',
+                  textAlign: 'center'
                 }}>
-                  <span style={{ fontWeight: '500', fontSize: '16px' }}>{getDayLabel(dayItem)}</span>
-                  <span style={{ fontSize: '14px' }}>{dayItem.format('DD/MM/YYYY')}</span>
+                  <span style={{ fontWeight: '800', fontSize: '16px', textTransform: 'uppercase' }}>
+                    {isToday ? 'Hôm nay' : getDayLabel(dayItem)}
+                  </span>
+                  <span style={{ fontSize: '24px', fontWeight: '400', marginTop: '4px', color: isToday ? '#e8442a' : '#4b5563' }}>
+                    {dayItem.format('DD')}
+                  </span>
                 </div>
 
                 {/* Grid for shifts on this day */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {daySchedules.length > 0 ? (
                     daySchedules.map((item) => {
                       const shiftInfo = getShiftDetails(item.shiftId);
                       const statusDetails = getShiftStatusTextAndColor(item, shiftInfo);
+                      const gradientClass = getShiftGradientClass(shiftInfo, item.status);
+                      
+                      let isShiftPast = false;
+                      if (shiftInfo && shiftInfo.endTime) {
+                        const endStr = shiftInfo.endTime.length > 5 ? shiftInfo.endTime : `${shiftInfo.endTime}:00`;
+                        isShiftPast = dayjs(`${dateStr} ${endStr}`).isBefore(dayjs());
+                      }
 
                       return (
                         <div
                           key={item.id}
-                          onClick={() => handleShiftClick(item)}
+                          className={`shift-card ${gradientClass}`}
                           style={{
-                            background: '#1890ff', // Vivid blue block matching photo layout
-                            border: '1px solid #000000', // Black thin border
-                            borderRadius: '4px',
-                            padding: '10px 14px',
-                            minWidth: '160px',
-                            flex: '1',
-                            textAlign: 'center',
+                            padding: '16px',
                             cursor: 'pointer',
-                            transition: 'all 0.2s',
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(30,136,229,0.3)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
+                          onClick={() => handleShiftClick(item)}
                         >
-                          <div style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '14px' }}>
-                            {shiftInfo.name} ({shiftInfo.time})
+                          {(!isShiftPast && item.status !== 'Working' && item.status !== 'Completed') && (
+                             <Tooltip title="Đổi ca nhanh">
+                               <div 
+                                 className="shift-action-btn"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   setSelectedSchedule(item);
+                                   handleOpenTransfer();
+                                 }}
+                               >
+                                 <SwapOutlined />
+                               </div>
+                             </Tooltip>
+                          )}
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                             <ClockCircleOutlined style={{ fontSize: '14px' }} />
+                             <span style={{ fontWeight: '700', fontSize: '14px', lineHeight: 1.2 }}>
+                               {shiftInfo.name}
+                             </span>
                           </div>
+                          
+                          <div style={{ fontSize: '13px', opacity: 0.9, marginBottom: '8px', fontWeight: '500' }}>
+                             {shiftInfo.time}
+                          </div>
+                          
                           <div style={{ 
-                            color: statusDetails.color, 
-                            fontSize: '13px', 
-                            marginTop: '4px', 
-                            fontWeight: 'bold' 
+                            background: 'rgba(0, 0, 0, 0.04)', 
+                            padding: '4px 8px', 
+                            borderRadius: '6px',
+                            display: 'inline-block',
+                            fontSize: '11px', 
+                            fontWeight: '700',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            textTransform: 'uppercase'
                           }}>
                             {statusDetails.text}
                           </div>
@@ -608,18 +673,23 @@ const MyWorkSchedulePage = () => {
                     })
                   ) : (
                     <div style={{ 
-                      color: '#bfbfbf', 
+                      color: '#9ca3af', 
                       fontStyle: 'italic', 
-                      fontSize: '13px',
-                      padding: '4px 0' 
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      padding: '24px 0',
+                      background: 'rgba(249, 250, 251, 0.5)',
+                      borderRadius: '12px',
+                      border: '1px dashed #d1d5db'
                     }}>
-                      Không có ca trực
+                      Chưa có lịch làm việc
                     </div>
                   )}
                 </div>
               </div>
             );
           })}
+        </div>
         </div>
       </Spin>
 
@@ -770,7 +840,7 @@ const MyWorkSchedulePage = () => {
                     .filter((acc) => acc.id !== selectedSchedule.accountId)
                     .map((acc) => ({
                       value: acc.id,
-                      label: `${acc.name} ${acc.phone ? `(${acc.phone})` : ''} - ID #${acc.id}`,
+                      label: `${acc.name} ${acc.phone ? `(${acc.phone})` : ''}`,
                     }))}
                 />
               </Form.Item>
@@ -847,7 +917,12 @@ const MyWorkSchedulePage = () => {
                     label={<span style={{ fontWeight: 600 }}>Chọn ngày xin nghỉ (Tất cả ca trong ngày):</span>}
                     rules={[{ required: true, message: 'Vui lòng chọn ngày xin nghỉ!' }]}
                   >
-                    <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" size="large" />
+                    <DatePicker 
+                      style={{ width: '100%' }} 
+                      format="DD/MM/YYYY" 
+                      size="large" 
+                      disabledDate={(current) => current && current.isBefore(dayjs().startOf('day'))}
+                    />
                   </Form.Item>
                 );
               }
@@ -862,6 +937,13 @@ const MyWorkSchedulePage = () => {
                     placeholder="Chọn ca trực..."
                     options={schedules
                       .filter(s => (s.accountId === (user?.id || s.accountId)) && s.status !== 'ABSENT' && s.status !== 'LEAVE_APPROVED')
+                      .filter(s => {
+                        const sh = getShiftDetails(s.shiftId);
+                        if (!sh || !sh.endTime) return true;
+                        const dateStr = dayjs(s.workDate).format('YYYY-MM-DD');
+                        const endStr = sh.endTime.length > 5 ? sh.endTime : `${sh.endTime}:00`;
+                        return !dayjs(`${dateStr} ${endStr}`).isBefore(dayjs());
+                      })
                       .map(s => {
                         const sh = getShiftDetails(s.shiftId);
                         return {

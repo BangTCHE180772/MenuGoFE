@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
+import NotificationBell from './NotificationBell';
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -390,33 +391,47 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
         })}
       </nav>
 
-      {/* Sidebar Footer: User Info & Logout */}
-      <div className="sidebar-footer">
-        <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="topRight">
-          <div className="sidebar-user">
-            <Avatar className="sidebar-avatar" icon={<UserOutlined />} />
-            {!collapsed && (
+      {/* Sidebar Footer: User Info, Bell & Logout */}
+      <div className="sidebar-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+        {!collapsed && (
+          <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="topRight">
+            <div className="sidebar-user" style={{ flex: 1, overflow: 'hidden' }}>
+              <Avatar className="sidebar-avatar" icon={<UserOutlined />} />
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name">
+                <span className="sidebar-user-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                   {user?.name || user?.fullName || "Người dùng"}
                 </span>
                 <span className="sidebar-user-role">
                   {ROLE_LABELS[role] || role || "Nhân viên"}
                 </span>
               </div>
-            )}
+            </div>
+          </Dropdown>
+        )}
+        
+        <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: '4px' }}>
+          <NotificationBell />
+          {!collapsed && (
+            <Tooltip title="Đăng xuất" placement="top">
+              <Button
+                type="text"
+                danger
+                icon={<LogoutOutlined />}
+                onClick={handleLogout}
+                className="sidebar-logout-btn"
+                style={{ width: '40px', height: '40px', borderRadius: '50%' }}
+              />
+            </Tooltip>
+          )}
+        </div>
+        
+        {/* If collapsed, still show avatar that can click to dropdown */}
+        {collapsed && (
+          <div style={{ marginTop: '12px' }}>
+            <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="topRight">
+              <Avatar className="sidebar-avatar" icon={<UserOutlined />} style={{ cursor: 'pointer' }} />
+            </Dropdown>
           </div>
-        </Dropdown>
-        {!collapsed && (
-          <Tooltip title="Đăng xuất" placement="right">
-            <Button
-              type="text"
-              danger
-              icon={<LogoutOutlined />}
-              onClick={handleLogout}
-              className="sidebar-logout-btn"
-            />
-          </Tooltip>
         )}
       </div>
     </aside>

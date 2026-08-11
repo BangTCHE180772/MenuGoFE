@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { notification } from 'antd';
 import { useSignalR } from '../context/SignalRContext';
+import { useAuth } from '../context/AuthContext';
 import SideBar from '../components/SideBar';
 import ToTop from '../components/ToTop';
 
@@ -12,6 +13,7 @@ import ToTop from '../components/ToTop';
 const MainLayout = () => {
   const connection = useSignalR();
   const location = useLocation();
+  const { user } = useAuth();
   const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
 
   // Sidebar collapse state initialized from localStorage
@@ -30,6 +32,14 @@ const MainLayout = () => {
       return nextState;
     });
   };
+
+  useEffect(() => {
+    if (connection && user) {
+      // Tham gia group của user và branch để nhận thông báo realtime
+      if (user.id) connection.invoke('JoinUserGroup', user.id).catch(console.error);
+      if (user.branchId) connection.invoke('JoinBranchGroup', user.branchId).catch(console.error);
+    }
+  }, [connection, user]);
 
   useEffect(() => {
     if (connection) {
@@ -55,10 +65,24 @@ const MainLayout = () => {
         });
       };
 
+      const handleWorkScheduleNotification = (data) => {
+        notification.info({
+          message: 'Thông báo Lịch làm việc',
+          description: data.message,
+          placement: 'topRight',
+          duration: 5,
+        });
+        
+        // Dispatch event so MyWorkSchedulePage can refresh data
+        window.dispatchEvent(new Event('work-schedule-updated'));
+      };
+
       connection.on('ReceiveNotification', handleNotification);
+      connection.on('ReceiveWorkScheduleNotification', handleWorkScheduleNotification);
 
       return () => {
         connection.off('ReceiveNotification', handleNotification);
+        connection.off('ReceiveWorkScheduleNotification', handleWorkScheduleNotification);
       };
     }
   }, [connection]);
