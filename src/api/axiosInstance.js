@@ -20,6 +20,25 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Block write operations if the selected branch is inactive (except updating the branch itself to active)
+    const currentBranchStatus = localStorage.getItem('currentBranchStatus');
+    if (currentBranchStatus === 'Ngừng kinh doanh') {
+      const method = (config.method || 'GET').toUpperCase();
+      const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+      if (isWriteMethod) {
+        const isBranchUpdate = config.url && (config.url.toLowerCase().includes('/api/branch') || config.url.toLowerCase().includes('/api/Branch'));
+        if (!isBranchUpdate) {
+          const error = new Error('Thao tác bị từ chối: Chi nhánh này đã ngừng kinh doanh. Không thể thực hiện các thao tác thay đổi dữ liệu.');
+          error.response = {
+            status: 400,
+            data: { message: error.message }
+          };
+          return Promise.reject(error);
+        }
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

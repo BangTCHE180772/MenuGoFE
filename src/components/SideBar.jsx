@@ -248,9 +248,9 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
               placeholder="Chọn chi nhánh"
               options={branches.map((b) => ({
                 label: (
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>
-                    <ShopOutlined style={{ marginRight: 6, color: "var(--color-primary)" }} />
-                    {b.name}
+                  <span style={{ fontSize: 13, fontWeight: 500, color: b.status === "Ngừng kinh doanh" ? "#ff4d4f" : "inherit" }}>
+                    <ShopOutlined style={{ marginRight: 6, color: b.status === "Ngừng kinh doanh" ? "#ff4d4f" : "var(--color-primary)" }} />
+                    {b.name} {b.status === "Ngừng kinh doanh" ? " (Ngừng kinh doanh)" : ""}
                   </span>
                 ),
                 value: b.id,
@@ -263,8 +263,8 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
                 menu={{
                   items: branches.map((b) => ({
                     key: b.id,
-                    label: b.name,
-                    icon: <ShopOutlined />,
+                    label: b.status === "Ngừng kinh doanh" ? `${b.name} (Ngừng kinh doanh)` : b.name,
+                    icon: <ShopOutlined style={{ color: b.status === "Ngừng kinh doanh" ? "#ff4d4f" : undefined }} />,
                     onClick: () => selectBranch(b.id),
                   })),
                   selectedKeys: [String(currentBranchId)],
