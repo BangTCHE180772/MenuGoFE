@@ -190,6 +190,7 @@ const NotificationBell = ({ collapsed }) => {
       </div>
     </div>
   );
+
   return (
     <Popover
       content={popoverContent}
