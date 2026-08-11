@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -31,6 +32,22 @@ const METHOD_LABELS = {
 /* ─── Page ─────────────────────────────────── */
 const CashFlowPage = () => {
   const { currentBranchId } = useBranch();
+  const navigate = useNavigate();
+
+  const handleNavigateToSource = (row) => {
+    if (!row.sourceType || !row.sourceCode) return;
+    let tab = '';
+    if (row.sourceType === 'Import') {
+      tab = 'Import';
+    } else if (row.sourceType === 'Return') {
+      tab = 'ImportReturn';
+    } else if (row.sourceType === 'Sale') {
+      tab = 'Invoice';
+    } else {
+      return;
+    }
+    navigate(`/inventory-management?tab=${tab}&search=${row.sourceCode}`);
+  };
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -300,7 +317,16 @@ const CashFlowPage = () => {
                   className={row.directionValue === 1 ? 'row-inflow' : 'row-outflow'}
                 >
                   <td>
-                    <span className="code-text">{row.code}</span>
+                    {row.sourceType && row.sourceCode ? (
+                      <span
+                        className="code-text cashflow-reference-link"
+                        onClick={() => handleNavigateToSource(row)}
+                      >
+                        {row.code}
+                      </span>
+                    ) : (
+                      <span className="code-text">{row.code}</span>
+                    )}
                   </td>
                   <td>
                     {row.directionValue === 1 ? (
@@ -325,9 +351,16 @@ const CashFlowPage = () => {
                       : <span className="empty-text">—</span>}
                   </td>
                   <td>
-                    {row.documentCode
-                      ? <span className="doc-code-tag">{row.documentCode}</span>
-                      : <span className="empty-text">—</span>}
+                    {row.documentCode ? (
+                      <span
+                        className="doc-code-tag cashflow-reference-link"
+                        onClick={() => handleNavigateToSource(row)}
+                      >
+                        {row.documentCode}
+                      </span>
+                    ) : (
+                      <span className="empty-text">—</span>
+                    )}
                   </td>
                   <td>{formatDate(row.businessDate)}</td>
                   <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ImportTable from './ImportTable';
 import ImportDocumentModal from './ImportDocumentModal';
 import ReturnDocumentModal from './ReturnDocumentModal';
@@ -12,12 +13,33 @@ const ImportTab = ({
   fetchDocuments,
   handleDeleteDocument
 }) => {
-  const [searchText, setSearchText] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalImportOpen, setModalImportOpen] = useState(false);
   const [modalReturnOpen, setModalReturnOpen] = useState(false);
   const [selectedReturnDoc, setSelectedReturnDoc] = useState(null);
   const [editingDocument, setEditingDocument] = useState(null);
+
+  // Sync searchText with searchParams from URL when it changes
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
 
   const importDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -43,7 +65,7 @@ const ImportTab = ({
         documents={importDocuments}
         allDocuments={documents}
         searchText={searchText}
-        setSearchText={setSearchText}
+        setSearchText={handleSearchChange}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         loading={loading}
