@@ -99,6 +99,7 @@ const AppRouter = () => {
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/my-profile" element={<MyProfilePage />} />
+              <Route path="/notifications" element={<NotificationPage />} />
 
               {/* Mọi role đã đăng nhập đều xem được */}
               <Route
@@ -128,7 +129,6 @@ const AppRouter = () => {
               <Route path="/my-payroll" element={<MyPayrollPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
-              <Route path="/notifications" element={<NotificationPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
