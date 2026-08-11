@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import { useBranch } from '../context/BranchContext';
 import { getCashFlows, deleteCashFlow } from '../api/cashFlowApi';
 import CreateCashFlowModal from '../components/cashflow/CreateCashFlowModal';
+import '../styles/CashFlowPage.css';
 
 /* ─── Helpers ─────────────────────────────── */
 const formatMoney = (v) =>
@@ -119,139 +120,102 @@ const CashFlowPage = () => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
+    <div className="cashflow-container">
 
       {/* ─── TOP HEADER ─────────────────────────────────── */}
-      <div style={{
-        background: '#ffffff', borderBottom: '1px solid #e2e8f0',
-        padding: '0 20px', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', height: 46, flexShrink: 0,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 14,
-          }}>
+      <div className="cashflow-header">
+        <div className="cashflow-header-title">
+          <div className="cashflow-logo-wrapper">
             <WalletOutlined />
           </div>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+          <h2 className="cashflow-header-text">
             SỔ THU CHI
           </h2>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#10b981', fontWeight: 600 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+        <div className="cashflow-sync-status">
+          <span className="cashflow-sync-dot" />
           Live Synced
         </div>
       </div>
 
       {/* ─── BODY ────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px 16px', gap: 12 }}>
+      <div className="cashflow-body">
 
         {/* ─── STAT CARDS ─── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, flexShrink: 0 }}>
+        <div className="cashflow-stats-row">
           {/* Total Inflow */}
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 4 }}>
+          <div className="cashflow-stat-card inflow">
+            <div className="cashflow-stat-title-inflow">
               <ArrowUpOutlined style={{ marginRight: 4 }} />Tổng Thu
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>
+            <div className="cashflow-stat-val-inflow">
               {totalInflow.toLocaleString('vi-VN')} ₫
             </div>
-            <div style={{ fontSize: 11, color: '#86efac', marginTop: 2 }}>
+            <div className="cashflow-stat-subtitle inflow">
               {filtered.filter(r => r.directionValue === 1).length} phiếu
             </div>
           </div>
 
           {/* Total Outflow */}
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c', marginBottom: 4 }}>
+          <div className="cashflow-stat-card outflow">
+            <div className="cashflow-stat-title-outflow">
               <ArrowDownOutlined style={{ marginRight: 4 }} />Tổng Chi
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#dc2626' }}>
+            <div className="cashflow-stat-val-outflow">
               {totalOutflow.toLocaleString('vi-VN')} ₫
             </div>
-            <div style={{ fontSize: 11, color: '#fca5a5', marginTop: 2 }}>
+            <div className="cashflow-stat-subtitle outflow">
               {filtered.filter(r => r.directionValue === 2).length} phiếu
             </div>
           </div>
 
           {/* Net Balance */}
-          <div style={{
-            background: netBalance >= 0 ? '#f0f9ff' : '#fffbeb',
-            border: `1px solid ${netBalance >= 0 ? '#bae6fd' : '#fde68a'}`,
-            borderRadius: 10, padding: '12px 16px',
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: netBalance >= 0 ? '#0369a1' : '#d97706', marginBottom: 4 }}>
+          <div className={`cashflow-stat-card net ${netBalance >= 0 ? 'positive' : 'negative'}`}>
+            <div className={`cashflow-stat-title-net ${netBalance >= 0 ? 'positive' : 'negative'}`}>
               Số dư ròng
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: netBalance >= 0 ? '#0369a1' : '#d97706' }}>
+            <div className={`cashflow-stat-val-net ${netBalance >= 0 ? 'positive' : 'negative'}`}>
               {netBalance < 0 ? '−' : '+'}{Math.abs(netBalance).toLocaleString('vi-VN')} ₫
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{filtered.length} phiếu hiển thị</div>
+            <div className="cashflow-stat-subtitle net">{filtered.length} phiếu hiển thị</div>
           </div>
         </div>
 
         {/* ─── TOOLBAR ─── */}
-        <div style={{
-          background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0',
-          padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
-          flexWrap: 'wrap', flexShrink: 0,
-        }}>
+        <div className="cashflow-toolbar">
           {/* Create buttons */}
           <button
             type="button"
+            className="btn-create-inflow"
             onClick={() => { setModalDirection(1); setModalOpen(true); }}
-            style={{
-              height: 32, padding: '0 14px', border: 'none', borderRadius: 6,
-              background: 'linear-gradient(135deg, #16a34a, #22c55e)',
-              color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 5,
-              boxShadow: '0 2px 4px rgba(22,163,74,0.3)',
-            }}
           >
             <PlusOutlined /> Tạo phiếu Thu
           </button>
           <button
             type="button"
+            className="btn-create-outflow"
             onClick={() => { setModalDirection(2); setModalOpen(true); }}
-            style={{
-              height: 32, padding: '0 14px', border: 'none', borderRadius: 6,
-              background: 'linear-gradient(135deg, #dc2626, #ef4444)',
-              color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 5,
-              boxShadow: '0 2px 4px rgba(220,38,38,0.3)',
-            }}
           >
             <PlusOutlined /> Tạo phiếu Chi
           </button>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 2px' }} />
+          <div className="toolbar-divider" />
 
           {/* Search */}
-          <div style={{ position: 'relative' }}>
-            <SearchOutlined style={{
-              position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)',
-              color: '#94a3b8', fontSize: 12,
-            }} />
+          <div className="search-input-wrapper">
+            <SearchOutlined className="search-icon" />
             <input
               type="text"
               placeholder="Tìm mã, ghi chú, đối tác..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              style={{
-                height: 32, padding: '0 10px 0 28px', fontSize: 12,
-                border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none',
-                width: 230, color: '#1e293b',
-              }}
+              className="search-input"
             />
           </div>
 
           {/* Direction filter pills */}
-          <div style={{ display: 'flex', gap: 3, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+          <div className="dir-filter-pills">
             {[
               { key: 'ALL', label: 'Tất cả' },
               { key: '1', label: 'Thu' },
@@ -261,15 +225,7 @@ const CashFlowPage = () => {
                 key={opt.key}
                 type="button"
                 onClick={() => setDirFilter(opt.key)}
-                style={{
-                  padding: '4px 10px', fontSize: 11.5, cursor: 'pointer',
-                  fontWeight: dirFilter === opt.key ? 700 : 500,
-                  color: dirFilter === opt.key ? '#0ea5e9' : '#475569',
-                  background: dirFilter === opt.key ? '#fff' : 'transparent',
-                  border: 'none', borderRadius: 4,
-                  boxShadow: dirFilter === opt.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                }}
+                className={`dir-filter-btn ${dirFilter === opt.key ? 'active' : 'inactive'}`}
               >
                 {opt.label}
               </button>
@@ -281,21 +237,21 @@ const CashFlowPage = () => {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            style={{ height: 32, padding: '0 8px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', color: '#1e293b' }}
+            className="date-input"
           />
           <span style={{ fontSize: 12, color: '#94a3b8' }}>→</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            style={{ height: 32, padding: '0 8px', fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 6, outline: 'none', color: '#1e293b' }}
+            className="date-input"
           />
 
           {(dateFrom || dateTo) && (
             <button
               type="button"
               onClick={() => { setDateFrom(''); setDateTo(''); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 13, padding: '0 2px' }}
+              className="btn-clear-date"
             >
               <CloseCircleOutlined />
             </button>
@@ -307,39 +263,28 @@ const CashFlowPage = () => {
               type="button"
               onClick={fetchData}
               disabled={loading}
-              style={{
-                height: 32, padding: '0 12px', border: '1px solid #cbd5e1',
-                borderRadius: 6, background: '#fff', color: '#334155',
-                fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}
+              className="btn-refresh"
             >
-              <ReloadOutlined style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              <ReloadOutlined className={loading ? 'spin-animation' : ''} />
               Làm mới
             </button>
           </div>
         </div>
 
         {/* ─── TABLE ─── */}
-        <div style={{
-          flex: 1, overflow: 'auto', border: '1px solid #e2e8f0',
-          borderRadius: 8, background: '#fff',
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, whiteSpace: 'nowrap' }}>
+        <div className="cashflow-table-wrapper">
+          <table className="cashflow-table">
             <thead>
-              <tr style={{
-                background: '#f1f5f9', borderBottom: '1px solid #cbd5e1',
-                color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase',
-              }}>
-                <th style={th}>Mã phiếu</th>
-                <th style={th}>Loại</th>
-                <th style={{ ...th, textAlign: 'right' }}>Số tiền</th>
-                <th style={th}>Phương thức</th>
-                <th style={th}>Đối tác</th>
-                <th style={th}>Chứng từ gốc</th>
-                <th style={th}>Ngày</th>
-                <th style={{ ...th, maxWidth: 200 }}>Ghi chú</th>
-                <th style={{ ...th, textAlign: 'center' }}>Xóa</th>
+              <tr>
+                <th>Mã phiếu</th>
+                <th>Loại</th>
+                <th style={{ textAlign: 'right' }}>Số tiền</th>
+                <th>Phương thức</th>
+                <th>Đối tác</th>
+                <th>Chứng từ gốc</th>
+                <th>Ngày</th>
+                <th style={{ maxWidth: 200 }}>Ghi chú</th>
+                <th style={{ textAlign: 'center' }}>Xóa</th>
               </tr>
             </thead>
             <tbody>
@@ -352,72 +297,55 @@ const CashFlowPage = () => {
               ) : pageData.map((row) => (
                 <tr
                   key={row.id}
-                  style={{
-                    borderBottom: '1px solid #f1f5f9',
-                    background: row.directionValue === 1 ? 'rgba(240,253,244,0.5)' : 'rgba(254,242,242,0.4)',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = row.directionValue === 1 ? 'rgba(240,253,244,0.5)' : 'rgba(254,242,242,0.4)'}
+                  className={row.directionValue === 1 ? 'row-inflow' : 'row-outflow'}
                 >
-                  <td style={td}>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 11 }}>{row.code}</span>
+                  <td>
+                    <span className="code-text">{row.code}</span>
                   </td>
-                  <td style={td}>
+                  <td>
                     {row.directionValue === 1 ? (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: '#dcfce7', color: '#15803d',
-                        padding: '2px 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 700,
-                      }}>
+                      <span className="tag-direction inflow">
                         <ArrowUpOutlined />Thu
                       </span>
                     ) : (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: '#fee2e2', color: '#b91c1c',
-                        padding: '2px 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 700,
-                      }}>
+                      <span className="tag-direction outflow">
                         <ArrowDownOutlined />Chi
                       </span>
                     )}
                   </td>
-                  <td style={{ ...td, textAlign: 'right' }}>
-                    <span style={{
-                      fontWeight: 700,
-                      color: row.directionValue === 1 ? '#16a34a' : '#dc2626',
-                    }}>
+                  <td style={{ textAlign: 'right' }}>
+                    <span className={`amount-text ${row.directionValue === 1 ? 'inflow' : 'outflow'}`}>
                       {row.directionValue === 2 ? '−' : '+'}{(row.totalAmount || 0).toLocaleString('vi-VN')} ₫
                     </span>
                   </td>
-                  <td style={td}>{METHOD_LABELS[row.paymentMethod] || row.paymentMethod || '—'}</td>
-                  <td style={td}>
+                  <td>{METHOD_LABELS[row.paymentMethod] || row.paymentMethod || '—'}</td>
+                  <td>
                     {row.partnerName
-                      ? <span style={{ color: '#475569', fontWeight: 500 }}>{row.partnerName}</span>
-                      : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>—</span>}
+                      ? <span className="partner-text">{row.partnerName}</span>
+                      : <span className="empty-text">—</span>}
                   </td>
-                  <td style={td}>
+                  <td>
                     {row.documentCode
-                      ? <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace', fontSize: 10.5 }}>{row.documentCode}</span>
-                      : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      ? <span className="doc-code-tag">{row.documentCode}</span>
+                      : <span className="empty-text">—</span>}
                   </td>
-                  <td style={td}>{formatDate(row.businessDate)}</td>
-                  <td style={{ ...td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {row.note || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>—</span>}
+                  <td>{formatDate(row.businessDate)}</td>
+                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {row.note || <span className="empty-text">—</span>}
                   </td>
-                  <td style={{ ...td, textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center' }}>
                     {!row.documentId ? (
                       confirmDeleteId === row.id ? (
-                        <span style={{ display: 'inline-flex', gap: 4 }}>
+                        <span className="confirm-delete-group">
                           <button
                             type="button"
                             onClick={() => handleDelete(row.id)}
-                            style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10.5, cursor: 'pointer', fontWeight: 600 }}
+                            className="btn-confirm-yes"
                           >Xác nhận</button>
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(null)}
-                            style={{ background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: 4, padding: '2px 6px', fontSize: 10.5, cursor: 'pointer' }}
+                            className="btn-confirm-no"
                           >Không</button>
                         </span>
                       ) : (
@@ -425,13 +353,13 @@ const CashFlowPage = () => {
                           type="button"
                           onClick={() => setConfirmDeleteId(row.id)}
                           title="Hủy phiếu"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', fontSize: 13, padding: '2px 4px' }}
+                          className="btn-delete"
                         >
                           <DeleteOutlined />
                         </button>
                       )
                     ) : (
-                      <span title="Phiếu từ chứng từ - không thể xóa" style={{ color: '#e2e8f0', fontSize: 13 }}>
+                      <span title="Phiếu từ chứng từ - không thể xóa" className="btn-delete-disabled">
                         <DeleteOutlined />
                       </span>
                     )}
@@ -444,12 +372,12 @@ const CashFlowPage = () => {
 
         {/* ─── PAGINATION ─── */}
         {filtered.length > pageSize && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, flexShrink: 0, paddingTop: 4 }}>
+          <div className="pagination-wrapper">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              style={pgBtn(currentPage === 1)}
+              className="pg-btn"
             >‹</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
@@ -461,13 +389,13 @@ const CashFlowPage = () => {
               .map((p, idx) =>
                 p === '...'
                   ? <span key={idx} style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>
-                  : <button key={p} type="button" onClick={() => setCurrentPage(p)} style={pgBtn(false, p === currentPage)}>{p}</button>
+                  : <button key={p} type="button" onClick={() => setCurrentPage(p)} className={`pg-btn ${p === currentPage ? 'active' : ''}`}>{p}</button>
               )}
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              style={pgBtn(currentPage === totalPages)}
+              className="pg-btn"
             >›</button>
             <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 6 }}>
               {filtered.length} phiếu
@@ -487,17 +415,5 @@ const CashFlowPage = () => {
     </div>
   );
 };
-
-/* ── Style helpers ── */
-const th = { padding: '8px 12px', textAlign: 'left' };
-const td = { padding: '7px 12px', color: '#334155' };
-const pgBtn = (disabled, active = false) => ({
-  width: 28, height: 28, border: `1px solid ${active ? '#0ea5e9' : '#e2e8f0'}`,
-  borderRadius: 5, background: active ? '#0ea5e9' : '#fff',
-  color: active ? '#fff' : disabled ? '#cbd5e1' : '#475569',
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  fontWeight: active ? 700 : 400, fontSize: 13,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-});
 
 export default CashFlowPage;
