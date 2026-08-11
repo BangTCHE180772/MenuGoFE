@@ -41,6 +41,7 @@ import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
+import GlobalStockAlertListener from '../components/inventory/GlobalStockAlertListener';
 import DeviceSetupPage from '../pages/DeviceSetupPage';
 import DeviceManagementPage from '../pages/DeviceManagementPage';
 import DeviceAuthPage from '../pages/DeviceAuthPage';
@@ -58,6 +59,7 @@ const AppRouter = () => {
     <BrowserRouter>
       <SignalRProvider>
         <GlobalReservationListener />
+        <GlobalStockAlertListener />
         <Routes>
           {/* ── Public: không cần đăng nhập ──────────────────────────── */}
           <Route element={<AuthLayout />}>

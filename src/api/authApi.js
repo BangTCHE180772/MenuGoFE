@@ -37,3 +37,15 @@ export const getProfile = () =>
  */
 export const getRoleRange = (branchId) =>
   axiosInstance.get('/api/Account/exclude-roles', { params: { branchId } });
+
+/**
+ * Quên mật khẩu & Reset password
+ */
+export const forgotPassword = (email) =>
+  axiosInstance.post('/api/Auth/forgot-password', { email });
+
+export const verifyResetOtp = (data) =>
+  axiosInstance.post('/api/Auth/verify-reset-otp', data);
+
+export const resetPassword = (data) =>
+  axiosInstance.post('/api/Auth/reset-password', data);
