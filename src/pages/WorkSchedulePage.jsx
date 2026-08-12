@@ -429,8 +429,26 @@ const WorkSchedulePage = () => {
       title: 'Quản lý duyệt',
       key: 'approved',
       align: 'center',
-      render: (_, record) => (
-        isManager ? (
+      render: (_, record) => {
+        const now = dayjs();
+        const workDateStr = dayjs(record.workDate).format('YYYY-MM-DD');
+        const shift = shifts.find((s) => s.id === record.shiftId);
+        
+        const startStr = shift?.startTime ? shift.startTime.substring(0, 5) : '00:00';
+        const shiftStart = dayjs(`${workDateStr} ${startStr}`);
+        
+        const endStr = shift?.endTime ? shift.endTime.substring(0, 5) : '23:59';
+        const shiftEnd = dayjs(`${workDateStr} ${endStr}`);
+
+        const isAbsent = record.status === 'ABSENT';
+        const isMissed = !record.checkInAt && now.isAfter(shiftEnd);
+        const isLate = !record.checkInAt && now.isAfter(shiftStart);
+
+        if (isAbsent || isMissed || isLate) {
+          return <Tag color="error">Trễ/Vắng mặt</Tag>;
+        }
+
+        return isManager ? (
           <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
             <Switch
               checkedChildren={<CheckCircleOutlined />}
@@ -443,8 +461,8 @@ const WorkSchedulePage = () => {
           <Tag color={record.managerApproved ? 'success' : 'default'}>
             {record.managerApproved ? 'Đã duyệt' : 'Chưa duyệt'}
           </Tag>
-        )
-      ),
+        );
+      },
     },
   ];
 

@@ -782,11 +782,22 @@ const MyWorkSchedulePage = () => {
             </div>
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong>Phê duyệt của quản lý:</strong>
-              {selectedSchedule.managerApproved ? (
-                <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt công</Tag>
-              ) : (
-                <Tag icon={<CloseCircleOutlined />} color="warning">Chờ duyệt công</Tag>
-              )}
+              {(() => {
+                const shiftDetails = getShiftDetails(selectedSchedule.shiftId);
+                const statusInfo = getShiftStatusTextAndColor(selectedSchedule, shiftDetails);
+                
+                if (statusInfo.text === 'Trễ/Vắng mặt' || statusInfo.text === 'Vắng mặt') {
+                  return <Tag color="error">Trễ/Vắng mặt</Tag>;
+                }
+                if (statusInfo.text === 'Chưa đến giờ') {
+                  return <Tag color="default">Chưa làm</Tag>;
+                }
+                
+                if (selectedSchedule.managerApproved) {
+                  return <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt công</Tag>;
+                }
+                return <Tag icon={<CloseCircleOutlined />} color="warning">Chờ duyệt công</Tag>;
+              })()}
             </div>
           </div>
         )}
