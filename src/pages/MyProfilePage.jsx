@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Tag,
+  Upload,
 } from 'antd';
 import {
   UserOutlined,
@@ -22,9 +23,11 @@ import {
   IdcardOutlined,
   LockOutlined,
   SaveOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe, updateMe, changePassword } from '../api/accountApi';
+import { uploadImage } from '../api/imageApi';
 import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
@@ -44,6 +47,34 @@ const MyProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleCustomImageUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingImage(true);
+    try {
+      const res = await uploadImage(file);
+      if (res.data) {
+        const imgObj = res.data;
+        form.setFieldsValue({
+          avatarImage: imgObj.imageLink,
+        });
+        // We also need to update the form's internal state to trigger re-render of the Upload component
+        // so that it shows the uploaded image immediately. Form.Item will automatically read from form's value if we use shouldUpdate or if we force update.
+        // Actually, just setFieldsValue should be enough if the Form.Item listens properly, but sometimes it doesn't without a rerender.
+        // Let's also update the profile state locally so the header avatar updates instantly or rely on the form value.
+        setProfile((prev) => ({ ...prev, avatarImage: imgObj.imageLink }));
+        
+        message.success('Tải ảnh lên thành công!');
+        if (onSuccess) onSuccess(imgObj);
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      message.error('Không thể tải ảnh lên.');
+      if (onError) onError(err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -198,8 +229,26 @@ const MyProfilePage = () => {
               </Form.Item>
             </Col>
             <Col xs={24}>
-              <Form.Item name="avatarImage" label="Link ảnh đại diện">
-                <Input placeholder="Nhập URL ảnh đại diện..." />
+              <Form.Item name="avatarImage" label="Ảnh đại diện">
+                <Upload
+                  name="file"
+                  listType="picture-card"
+                  showUploadList={false}
+                  customRequest={handleCustomImageUpload}
+                >
+                  {form.getFieldValue('avatarImage') || profile?.avatarImage ? (
+                    <img
+                      src={form.getFieldValue('avatarImage') || profile?.avatarImage}
+                      alt="avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div>
+                      {uploadingImage ? <Spin /> : <UploadOutlined style={{ fontSize: 26, color: '#1890ff' }} />}
+                      <div style={{ marginTop: 8 }}>{uploadingImage ? 'Đang tải...' : 'Tải ảnh lên'}</div>
+                    </div>
+                  )}
+                </Upload>
               </Form.Item>
             </Col>
           </Row>
