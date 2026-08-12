@@ -79,6 +79,7 @@ const ROLE_MENUS = {
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
     { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
   ],
@@ -99,6 +100,7 @@ const ROLE_MENUS = {
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.MANAGER]: [
@@ -118,6 +120,7 @@ const ROLE_MENUS = {
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
+    { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.CASHIER]: [

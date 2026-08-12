@@ -327,6 +327,84 @@ const MyWorkSchedulePage = () => {
           />
         </div>
       </div>
+      {/* 📊 Tổng hợp tháng hiện tại */}
+      {(() => {
+        const now = dayjs();
+        const monthStart = now.startOf('month');
+        const monthEnd = now.endOf('month');
+        const LATE_GRACE = 5; // phút
+        const myMonthSchedules = schedules.filter((s) => {
+          const d = dayjs(s.workDate);
+          return !d.isBefore(monthStart, 'day') && !d.isAfter(monthEnd, 'day') && s.accountId === user?.id;
+        });
+        const totalScheduled = myMonthSchedules.length;
+        let worked = 0, absent = 0, onTime = 0, late = 0, totalHours = 0;
+        myMonthSchedules.forEach((s) => {
+          const st = (s.status || '').toUpperCase();
+          if (st === 'ABSENT' || st === 'VắNG MặT' || st === 'LEAVE_APPROVED' || st.startsWith('LEAVE_APPROVED')) {
+            absent++;
+          } else if (s.checkInAt) {
+            worked++;
+            totalHours += s.actualHours || 0;
+            const sh = shifts.find((x) => x.id === s.shiftId);
+            if (sh && sh.startTime) {
+              const dateStr = dayjs(s.workDate).format('YYYY-MM-DD');
+              const shiftStart = dayjs(`${dateStr} ${sh.startTime.substring(0, 5)}`);
+              const checkIn = dayjs(s.checkInAt);
+              if (checkIn.isAfter(shiftStart.add(LATE_GRACE, 'minute'))) late++;
+              else onTime++;
+            } else {
+              onTime++;
+            }
+          }
+        });
+        if (totalScheduled === 0) return null;
+        const stats = [
+          { label: 'Ca phân', value: totalScheduled, color: '#4f46e5', bg: '#f5f3ff' },
+          { label: 'Đi làm', value: worked, color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Vắng', value: absent, color: '#dc2626', bg: '#fff1f0' },
+          { label: 'Đúng giờ', value: onTime, color: '#0284c7', bg: '#f0f9ff' },
+          { label: 'Muộn', value: late, color: '#d97706', bg: '#fffbeb' },
+          { label: `${Number(totalHours).toFixed(1)}h`, value: null, color: '#7c3aed', bg: '#f5f3ff', isHours: true },
+        ];
+        return (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #fafafa 0%, #f9f5ff 100%)',
+              border: '1px solid #e9d5ff',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              boxShadow: '0 2px 8px rgba(124,58,237,0.08)',
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#6d28d9', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📊 Tổng hợp tháng {now.format('MM/YYYY')}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {stats.map((s, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: s.bg,
+                    border: `1px solid ${s.color}22`,
+                    borderRadius: '8px',
+                    padding: '10px 8px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: s.color }}>
+                    {s.isHours ? s.label : s.value}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                    {s.isHours ? 'Tổng giờ công' : s.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 🔔 Yêu cầu chuyển ca cho Nhân viên (Bước 2: NV đồng ý) */}
       {schedules
