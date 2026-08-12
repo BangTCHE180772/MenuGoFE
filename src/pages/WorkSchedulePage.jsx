@@ -34,6 +34,7 @@ import {
   SolutionOutlined,
   ReloadOutlined,
   FileDoneOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -647,6 +648,113 @@ const WorkSchedulePage = () => {
           </Space>
         </div>
       </Card>
+
+      {/* 👑 Khu vực Admin / Quản lý Phê duyệt Đơn xin nghỉ & Đổi ca */}
+      {(isManager || isOwnerOrAdmin) && (schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING'))) && (
+        <Card
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#cf1322', fontSize: '15px', fontWeight: 'bold' }}>
+              <SafetyCertificateOutlined />
+              <span>DUYỆT ĐƠN XIN NGHỈ & ĐỔI CA (ADMIN / QUẢN LÝ)</span>
+            </div>
+          }
+          style={{ marginBottom: '20px', border: '2px solid #cf1322', borderRadius: '8px', background: '#fff1f0' }}
+          bodyStyle={{ padding: '12px 16px' }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Đơn xin nghỉ */}
+            {schedules.filter((s) => s.status?.startsWith('LEAVE_REQUEST')).map((item) => {
+              const parts = (item.status || '').split(':');
+              const reason = parts.slice(1).join(':') || 'Xin nghỉ phép';
+              const empName = getAccountName(item.accountId);
+              const shiftInfo = getShiftDetails(item.shiftId);
+              return (
+                <div key={item.id} style={{
+                  background: '#fff', border: '1px solid #ffccc7', borderRadius: '6px', padding: '10px 14px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+                }}>
+                  <div>
+                    <Tag color="purple">🕒 XIN NGHỈ</Tag>
+                    <strong>{empName}</strong> xin nghỉ ca <strong>{shiftInfo.name} ({shiftInfo.time})</strong> ngày <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong>.
+                    <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>💬 Lý do: <em>{reason}</em></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button type="primary" size="small" style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }} onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, status: 'LEAVE_APPROVED', managerApproved: true });
+                        message.success(`🟢 Đã duyệt cho nhân viên ${empName} nghỉ làm ca này!`);
+                        loadData();
+                      } catch (e) { message.error('Lỗi khi duyệt nghỉ!'); }
+                    }}>
+                      Duyệt nghỉ
+                    </Button>
+                    <Button danger size="small" onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
+                        message.info(`❌ Đã từ chối đơn xin nghỉ của ${empName}.`);
+                        loadData();
+                      } catch (e) { message.error('Lỗi từ chối!'); }
+                    }}>
+                      Từ chối
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Đơn đổi ca (đang xử lý) */}
+            {schedules.filter((s) => s.status?.startsWith('TRANSFER_PENDING')).map((item) => {
+              const parts = (item.status || '').split(':');
+              const isPendingEmp = item.status.startsWith('TRANSFER_PENDING_EMP');
+              const senderId = Number(parts[1]) || (isPendingEmp ? undefined : item.accountId);
+              const senderName = getAccountName(senderId);
+              const receiverName = getAccountName(item.accountId);
+              const shiftInfo = getShiftDetails(item.shiftId);
+              return (
+                <div key={item.id} style={{
+                  background: '#fff', border: '1px solid #ffe58f', borderRadius: '6px', padding: '10px 14px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+                }}>
+                  <div>
+                    <Tag color="gold">🔄 ĐỔI CA LÀM</Tag>
+                    <strong>{senderName}</strong> ➔ <strong>{receiverName}</strong> 
+                    {isPendingEmp ? (
+                      <span style={{ color: '#fa8c16', marginLeft: 8 }}>(Đang chờ {receiverName} xác nhận)</span>
+                    ) : (
+                      <span style={{ color: '#52c41a', marginLeft: 8 }}>(2 NV đã đồng ý)</span>
+                    )}
+                    <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>
+                      📅 Ca: <strong>{shiftInfo.name} ({shiftInfo.time})</strong> - Ngày: <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button type="primary" size="small" style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }} 
+                      disabled={isPendingEmp}
+                      onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
+                        message.success(`🟢 Đã duyệt đổi ca chính thức cho ${receiverName}!`);
+                        loadData();
+                      } catch (e) { message.error('Lỗi khi duyệt đổi ca!'); }
+                    }}>
+                      Duyệt đổi ca
+                    </Button>
+                    <Button danger size="small" onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, accountId: senderId, status: 'APPROVED', managerApproved: true });
+                        message.info('❌ Đã hủy/từ chối yêu cầu đổi ca.');
+                        loadData();
+                      } catch (e) { message.error('Lỗi từ chối!'); }
+                    }}>
+                      {isPendingEmp ? 'Hủy yêu cầu' : 'Từ chối'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Main Container Tabs */}
       <Tabs
