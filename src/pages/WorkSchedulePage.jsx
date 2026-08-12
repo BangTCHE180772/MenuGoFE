@@ -20,6 +20,7 @@ import {
   Tabs,
   Divider,
   Calendar,
+  Avatar,
 } from 'antd';
 import {
   PlusOutlined,
@@ -34,6 +35,7 @@ import {
   SolutionOutlined,
   ReloadOutlined,
   FileDoneOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -49,11 +51,22 @@ import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Chờ thực hiện (Pending)', color: 'warning' },
-  { value: 'APPROVED', label: 'Đã duyệt (Approved)', color: 'processing' },
-  { value: 'COMPLETED', label: 'Hoàn thành (Completed)', color: 'success' },
-  { value: 'ABSENT', label: 'Vắng mặt (Absent)', color: 'error' },
+  { value: 'PENDING',        label: 'Chờ thực hiện',  color: 'warning' },
+  { value: 'APPROVED',       label: 'Đã duyệt',        color: 'processing' },
+  { value: 'Đang làm việc',  label: 'Đang làm việc',   color: 'blue' },
+  { value: 'Hoàn thành',     label: 'Hoàn thành',      color: 'success' },
+  { value: 'Vắng mặt',       label: 'Vắng mặt',        color: 'error' },
+  // Giữ lại để tương thích với dữ liệu cũ trong DB
+  { value: 'COMPLETED',      label: 'Hoàn thành',      color: 'success' },
+  { value: 'ABSENT',         label: 'Vắng mặt',        color: 'error' },
 ];
+
+// Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
+const getStatusOption = (status) =>
+  STATUS_OPTIONS.find((s) => s.value === status) ||
+  STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (status || '').toLowerCase()) ||
+  { label: status, color: 'default' };
+
 
 const WorkSchedulePage = () => {
   const { user, role } = useAuth();
@@ -75,6 +88,38 @@ const WorkSchedulePage = () => {
   }, [branches, isManager, managerBranchId]);
 
   const defaultBranchId = allowedBranches.length > 0 ? allowedBranches[0].id : null;
+
+  const ROLES_MAP = {
+    3: { label: 'Quản lý', color: 'purple' },
+    4: { label: 'Thu ngân', color: 'blue' },
+    5: { label: 'Bếp trưởng', color: 'orange' },
+    6: { label: 'Phục vụ', color: 'green' },
+  };
+
+  const groupedStaffAccounts = useMemo(() => {
+    const groups = {
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
+      other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
+    };
+
+    accounts
+      .filter((a) => {
+        if (!a.roleIds || a.roleIds.length === 0) return false;
+        return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
+      })
+      .forEach((a) => {
+        const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 'other');
+        if (groups[primaryRoleId]) {
+          groups[primaryRoleId].items.push(a);
+        } else {
+          groups.other.items.push(a);
+        }
+      });
+
+    return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
+  }, [accounts]);
   
   // Filtering states
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -328,7 +373,7 @@ const WorkSchedulePage = () => {
     if (selectedAccount && item.accountId !== selectedAccount) return false;
     if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
-    if (selectedStatus && item.status !== selectedStatus) return false;
+    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
     if (searchDate) {
       const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
       const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
@@ -368,12 +413,25 @@ const WorkSchedulePage = () => {
       ),
       sorter: (a, b) => getAccountName(a.accountId).localeCompare(getAccountName(b.accountId)),
     },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchId',
-      key: 'branchId',
-      render: (id) => getBranchName(id),
-    },
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            dataIndex: 'branchId',
+            key: 'branchId',
+            width: 170,
+            render: (id) => {
+              const fullName = getBranchName(id);
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Ca trực',
       dataIndex: 'shiftId',
@@ -405,7 +463,7 @@ const WorkSchedulePage = () => {
         const outTime = record.checkOutAt ? dayjs(record.checkOutAt).format('HH:mm') : '--';
         return (
           <div>
-            <div>In: {inTime} - Out: {outTime}</div>
+            <div>Vào: {inTime} - Ra: {outTime}</div>
             {record.actualHours !== null && (
               <div style={{ fontSize: '11px', color: '#52c41a' }}>
                 Tổng giờ: {record.actualHours} giờ
@@ -420,7 +478,7 @@ const WorkSchedulePage = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        const opt = STATUS_OPTIONS.find((s) => s.value === status) || { label: status, color: 'default' };
+        const opt = getStatusOption(status);
         return <Tag color={opt.color}>{opt.label}</Tag>;
       },
     },
@@ -713,7 +771,13 @@ const WorkSchedulePage = () => {
                     value={selectedStatus}
                     onChange={(val) => setSelectedStatus(val)}
                   >
-                    {STATUS_OPTIONS.map((st) => (
+                    {[
+                      { value: 'PENDING',   label: 'Chờ thực hiện' },
+                      { value: 'APPROVED',  label: 'Đã duyệt' },
+                      { value: 'Working',   label: 'Đang làm việc' },
+                      { value: 'COMPLETED', label: 'Hoàn thành' },
+                      { value: 'ABSENT',    label: 'Vắng mặt' },
+                    ].map((st) => (
                       <Select.Option key={st.value} value={st.value}>
                         {st.label}
                       </Select.Option>
@@ -815,17 +879,64 @@ const WorkSchedulePage = () => {
               rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
               style={{ flex: 1 }}
             >
-              <Select placeholder="Chọn nhân viên..." showSearch optionFilterProp="label">
-                {accounts
-                  .filter((a) => {
-                    if (!a.roleIds || a.roleIds.length === 0) return false;
-                    return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
-                  })
-                  .map((a) => (
-                    <Select.Option key={a.id} value={a.id} label={a.name}>
-                      {a.name} (ID: {a.id})
-                    </Select.Option>
-                  ))}
+              <Select
+                placeholder="Tìm kiếm theo tên, ID, SĐT, chức danh..."
+                showSearch
+                filterOption={(input, option) => {
+                  if (!input) return true;
+                  const searchValue = option?.searchValue || '';
+                  return searchValue.toLowerCase().includes(input.toLowerCase());
+                }}
+                optionLabelProp="label"
+                dropdownStyle={{ maxHeight: 360 }}
+              >
+                {groupedStaffAccounts.map(([roleKey, group]) => (
+                  <Select.OptGroup
+                    key={roleKey}
+                    label={
+                      <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                        {group.label} ({group.items.length})
+                      </div>
+                    }
+                  >
+                    {group.items.map((a) => {
+                      const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
+                      const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                      const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+
+                      return (
+                        <Select.Option
+                          key={a.id}
+                          value={a.id}
+                          label={`${a.name} (Mã: #${a.id})`}
+                          searchValue={searchValue}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <Avatar
+                                size={28}
+                                src={a.avatarImage || undefined}
+                                icon={!a.avatarImage ? <UserOutlined /> : undefined}
+                                style={{ backgroundColor: a.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                  {a.name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                  Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                              {roleInfo.label}
+                            </Tag>
+                          </div>
+                        </Select.Option>
+                      );
+                    })}
+                  </Select.OptGroup>
+                ))}
               </Select>
             </Form.Item>
 
@@ -957,21 +1068,64 @@ const WorkSchedulePage = () => {
           >
             <Select
               mode="multiple"
-              placeholder="Chọn các nhân viên..."
+              placeholder="Chọn các nhân viên (hoặc gõ tên, ID, SĐT)..."
               showSearch
-              optionFilterProp="label"
+              filterOption={(input, option) => {
+                if (!input) return true;
+                const searchValue = option?.searchValue || '';
+                return searchValue.toLowerCase().includes(input.toLowerCase());
+              }}
+              optionLabelProp="label"
               style={{ width: '100%' }}
+              dropdownStyle={{ maxHeight: 360 }}
             >
-              {accounts
-                .filter((a) => {
-                  if (!a.roleIds || a.roleIds.length === 0) return false;
-                  return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
-                })
-                .map((a) => (
-                  <Select.Option key={a.id} value={a.id} label={a.name}>
-                    {a.name} (ID: {a.id})
-                  </Select.Option>
-                ))}
+              {groupedStaffAccounts.map(([roleKey, group]) => (
+                <Select.OptGroup
+                  key={roleKey}
+                  label={
+                    <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                      {group.label} ({group.items.length})
+                    </div>
+                  }
+                >
+                  {group.items.map((a) => {
+                    const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
+                    const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                    const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+
+                    return (
+                      <Select.Option
+                        key={a.id}
+                        value={a.id}
+                        label={`${a.name} (#${a.id})`}
+                        searchValue={searchValue}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Avatar
+                              size={28}
+                              src={a.avatarImage || undefined}
+                              icon={!a.avatarImage ? <UserOutlined /> : undefined}
+                              style={{ backgroundColor: a.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                {a.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                            {roleInfo.label}
+                          </Tag>
+                        </div>
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              ))}
             </Select>
           </Form.Item>
 

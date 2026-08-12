@@ -15,7 +15,11 @@ import {
   Tag,
   Tooltip,
   Popconfirm,
+  Avatar,
   message,
+  Descriptions,
+  Divider,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -24,10 +28,18 @@ import {
   SearchOutlined,
   FileProtectOutlined,
   InfoCircleOutlined,
+  UserOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  DollarOutlined,
+  BankOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getContracts,
+  getContractById,
   createContract,
   updateContract,
   deleteContract,
@@ -37,34 +49,45 @@ import { getRoleRange } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 
 const CONTRACT_TYPES = [
-  { value: 'Full-time', label: 'Toàn thời gian (Full-time)' },
-  { value: 'Part-time', label: 'Bán thời gian (Part-time)' },
-  { value: 'Seasonal', label: 'Thời vụ (Seasonal)' },
+  { value: 'Full-time', label: 'Toàn thời gian' },
+  { value: 'Part-time', label: 'Bán thời gian' },
 ];
 
 const SALARY_TYPES = [
-  { value: 'Fixed', label: 'Lương cố định (Fixed)' },
-  { value: 'Hourly', label: 'Lương theo giờ (Hourly)' },
+  { value: 'Fixed', label: 'Lương cố định' },
+  { value: 'Hourly', label: 'Lương theo giờ' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'Active', label: 'Hiệu lực (Active)', color: 'success' },
-  { value: 'Expired', label: 'Hết hiệu lực (Expired)', color: 'warning' },
-  { value: 'Terminated', label: 'Đã chấm dứt (Terminated)', color: 'error' },
+  { value: 'Active', label: 'Hiệu lực', color: 'success' },
+  { value: 'Expired', label: 'Hết hiệu lực', color: 'warning' },
+  { value: 'Terminated', label: 'Đã chấm dứt', color: 'error' },
+];
+
+const FORM_STATUS_OPTIONS = [
+  { value: 'Active', label: 'Hiệu lực', color: 'success' },
+  { value: 'Terminated', label: 'Đã chấm dứt', color: 'error' },
 ];
 
 const ROLES_LIST = [
-  { value: 3, label: 'Quản lý (Manager)' },
-  { value: 4, label: 'Thu ngân (Cashier)' },
-  { value: 5, label: 'Bếp trưởng (Chef)' },
-  { value: 6, label: 'Phục vụ (Waiter)' },
+  { value: 3, label: 'Quản lý' },
+  { value: 4, label: 'Thu ngân' },
+  { value: 5, label: 'Bếp trưởng' },
+  { value: 6, label: 'Phục vụ' },
 ];
 
 const STAFF_ROLES_LIST = [
-  { value: 4, label: 'Thu ngân (Cashier)' },
-  { value: 5, label: 'Bếp trưởng (Chef)' },
-  { value: 6, label: 'Phục vụ (Waiter)' },
+  { value: 4, label: 'Thu ngân' },
+  { value: 5, label: 'Bếp trưởng' },
+  { value: 6, label: 'Phục vụ' },
 ];
+
+const ROLES_MAP = {
+  3: { label: 'Quản lý', color: 'purple' },
+  4: { label: 'Thu ngân', color: 'blue' },
+  5: { label: 'Bếp trưởng', color: 'orange' },
+  6: { label: 'Phục vụ', color: 'green' },
+};
 
 const ContractPage = () => {
   const { user } = useAuth();
@@ -82,8 +105,35 @@ const ContractPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
   const [editingRecord, setEditingRecord] = useState(null);
+
+  // Detail Modal states
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailRecord, setDetailRecord] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const handleOpenDetail = async (record) => {
+    setIsDetailModalOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await getContractById(record.id);
+      setDetailRecord(res.data || record);
+    } catch (err) {
+      console.error(err);
+      setDetailRecord(record);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setDetailRecord(null);
+  };
   
   const [form] = Form.useForm();
+  const watchRoleId = Form.useWatch('roleId', form);
+  const watchType = Form.useWatch('type', form);
+  const hideBaseWorkDay = watchRoleId === 3 || watchType === 'Part-time';
 
   // Load lists
   const loadData = useCallback(async (branchIdFilter = selectedBranch) => {
@@ -113,6 +163,37 @@ const ContractPage = () => {
     user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
     user?.roleIds?.some((id) => id === 1 || id === 2);
 
+  // Group accounts by role for cleaner dropdown UX
+  const groupedAccounts = useCallback(() => {
+    const groups = {
+      3: { label: '👑 QUẢN LÝ', items: [] },
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
+      other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
+    };
+
+    accounts.forEach((a) => {
+      const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 'other');
+      if (groups[primaryRoleId]) {
+        groups[primaryRoleId].items.push(a);
+      } else {
+        groups.other.items.push(a);
+      }
+    });
+
+    return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
+  }, [accounts])();
+
+  // Handle Type Change to auto set salaryType
+  const handleTypeChange = (val) => {
+    const salaryTypeVal = val === 'Full-time' ? 'Fixed' : 'Hourly';
+    form.setFieldsValue({
+      type: val,
+      salaryType: salaryTypeVal,
+    });
+  };
+
   // Handle Create / Edit Open
   const handleOpenModal = (type, record = null) => {
     setModalType(type);
@@ -120,13 +201,14 @@ const ContractPage = () => {
     setIsModalOpen(true);
     
     if (type === 'edit' && record) {
+      const targetSalaryType = record.type === 'Full-time' ? 'Fixed' : 'Hourly';
       form.setFieldsValue({
         accountId: record.accountId,
         accountName: record.accountName || getAccountName(record.accountId),
         roleId: record.roleId,
         branchId: record.branchId,
         type: record.type,
-        salaryType: record.salaryType,
+        salaryType: targetSalaryType,
         baseSalary: record.baseSalary,
         baseWorkDay: record.baseWorkDay,
         status: record.status,
@@ -139,8 +221,8 @@ const ContractPage = () => {
       const defaultBranchId = branches.length > 0 ? branches[0].id : undefined;
       form.setFieldsValue({
         status: 'Active',
-        salaryType: 'Fixed',
         type: 'Full-time',
+        salaryType: 'Fixed',
         baseWorkDay: 26,
         branchId: defaultBranchId,
         roleId: isOwnerOrAdmin ? 3 : undefined,
@@ -157,8 +239,10 @@ const ContractPage = () => {
   // Submit Handler
   const handleSubmit = async (values) => {
     try {
+      const isHideWorkDay = values.roleId === 3 || values.type === 'Part-time';
       const dataPayload = {
         ...values,
+        baseWorkDay: isHideWorkDay ? null : values.baseWorkDay,
         startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
         endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
       };
@@ -259,10 +343,32 @@ const ContractPage = () => {
       dataIndex: 'accountId',
       key: 'accountId',
       render: (id, record) => (
-        <div>
-          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {id}</div>
-        </div>
+        <Tooltip title="Bấm để xem chi tiết hợp đồng">
+          <div
+            onClick={() => handleOpenDetail(record)}
+            style={{ cursor: 'pointer', display: 'inline-block' }}
+          >
+            <strong
+              style={{
+                color: '#e8442a',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {record.accountName || getAccountName(id)}
+              <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
+            </strong>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {id}</div>
+          </div>
+        </Tooltip>
       ),
     },
     {
@@ -271,19 +377,32 @@ const ContractPage = () => {
       key: 'roleId',
       render: (id) => getRoleName(id),
     },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchId',
-      key: 'branchId',
-      render: (id) => getBranchName(id),
-    },
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            dataIndex: 'branchId',
+            key: 'branchId',
+            width: 170,
+            render: (id, record) => {
+              const fullName = record.branchName || getBranchName(id);
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Loại HĐ',
       dataIndex: 'type',
       key: 'type',
       render: (type) => {
         const found = CONTRACT_TYPES.find((t) => t.value === type);
-        return found ? found.label.split(' ')[0] : type;
+        return found ? found.label.split(' (')[0] : type;
       },
     },
     {
@@ -293,21 +412,8 @@ const ContractPage = () => {
       render: (val) => `${new Intl.NumberFormat('vi-VN').format(val)} đ`,
       sorter: (a, b) => a.baseSalary - b.baseSalary,
     },
-    {
-      title: 'Ngày công chuẩn',
-      dataIndex: 'baseWorkDay',
-      key: 'baseWorkDay',
-      align: 'center',
-    },
-    {
-      title: 'Thời gian hợp đồng',
-      key: 'duration',
-      render: (_, record) => {
-        const start = record.startDate ? dayjs(record.startDate).format('DD/MM/YYYY') : 'Chưa rõ';
-        const end = record.endDate ? dayjs(record.endDate).format('DD/MM/YYYY') : 'Chưa rõ';
-        return `${start} - ${end}`;
-      },
-    },
+
+
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -568,15 +674,63 @@ const ContractPage = () => {
                   rules={[{ required: true, message: 'Vui lòng chọn nhân viên!' }]}
                 >
                   <Select
-                    placeholder="Chọn nhân viên..."
+                    placeholder="Tìm kiếm theo tên, ID, SĐT, chức danh..."
                     showSearch
-                    optionFilterProp="label"
+                    filterOption={(input, option) => {
+                      if (!input) return true;
+                      const searchValue = option?.searchValue || '';
+                      return searchValue.toLowerCase().includes(input.toLowerCase());
+                    }}
                     onChange={handleAccountChange}
+                    optionLabelProp="label"
+                    dropdownStyle={{ maxHeight: 360 }}
                   >
-                    {accounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name} (Code: {a.id})
-                      </Select.Option>
+                    {groupedAccounts.map(([roleKey, group]) => (
+                      <Select.OptGroup
+                        key={roleKey}
+                        label={
+                          <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                            {group.label} ({group.items.length})
+                          </div>
+                        }
+                      >
+                        {group.items.map((a) => {
+                          const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
+                          const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                          const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+
+                          return (
+                            <Select.Option
+                              key={a.id}
+                              value={a.id}
+                              label={`${a.name} (Mã: #${a.id})`}
+                              searchValue={searchValue}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <Avatar
+                                    size={30}
+                                    src={a.avatarImage || undefined}
+                                    icon={!a.avatarImage ? <UserOutlined /> : undefined}
+                                    style={{ backgroundColor: a.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                                  />
+                                  <div>
+                                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                      {a.name}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                      Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                                  {roleInfo.label}
+                                </Tag>
+                              </div>
+                            </Select.Option>
+                          );
+                        })}
+                      </Select.OptGroup>
                     ))}
                   </Select>
                 </Form.Item>
@@ -586,7 +740,7 @@ const ContractPage = () => {
               {isOwnerOrAdmin ? (
                 <>
                   <Form.Item label="Chức danh" required>
-                    <Input disabled value="Quản lý (Manager)" style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
+                    <Input disabled value="Quản lý" style={{ color: 'rgba(0, 0, 0, 0.85)' }} />
                   </Form.Item>
                   <Form.Item name="roleId" noStyle>
                     <Input type="hidden" />
@@ -652,7 +806,7 @@ const ContractPage = () => {
                 rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
               >
                 <Select placeholder="Chọn trạng thái...">
-                  {STATUS_OPTIONS.map((s) => (
+                  {FORM_STATUS_OPTIONS.map((s) => (
                     <Select.Option key={s.value} value={s.value}>
                       {s.label}
                     </Select.Option>
@@ -670,7 +824,7 @@ const ContractPage = () => {
                 label="Loại hợp đồng"
                 rules={[{ required: true, message: 'Vui lòng chọn loại hợp đồng!' }]}
               >
-                <Select placeholder="Chọn loại hợp đồng...">
+                <Select placeholder="Chọn loại hợp đồng..." onChange={handleTypeChange}>
                   {CONTRACT_TYPES.map((t) => (
                     <Select.Option key={t.value} value={t.value}>
                       {t.label}
@@ -685,7 +839,7 @@ const ContractPage = () => {
                 label="Hình thức lương"
                 rules={[{ required: true, message: 'Vui lòng chọn hình thức lương!' }]}
               >
-                <Select placeholder="Chọn hình thức lương...">
+                <Select disabled placeholder="Chọn hình thức lương...">
                   {SALARY_TYPES.map((st) => (
                     <Select.Option key={st.value} value={st.value}>
                       {st.label}
@@ -698,7 +852,7 @@ const ContractPage = () => {
 
           {/* Row 4: Base Salary & Base Work Day */}
           <Row gutter={24}>
-            <Col span={12}>
+            <Col span={hideBaseWorkDay ? 24 : 12}>
               <Form.Item
                 name="baseSalary"
                 label="Lương cơ bản (VND)"
@@ -713,15 +867,17 @@ const ContractPage = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="baseWorkDay"
-                label="Số ngày công chuẩn / tháng"
-                rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={1} max={31} />
-              </Form.Item>
-            </Col>
+            {!hideBaseWorkDay && (
+              <Col span={12}>
+                <Form.Item
+                  name="baseWorkDay"
+                  label="Số ngày công chuẩn / tháng"
+                  rules={[{ required: true, message: 'Vui lòng nhập ngày công chuẩn!' }]}
+                >
+                  <InputNumber style={{ width: '100%' }} min={1} max={31} />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
 
           {/* Row 5: Start Date & End Date */}
@@ -793,6 +949,195 @@ const ContractPage = () => {
             <Input.TextArea placeholder="Nhập ghi chú chi tiết hoặc thỏa thuận riêng..." rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Contract Detail Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
+            <FileProtectOutlined />
+            <span>CHI TIẾT HỢP ĐỒNG LAO ĐỘNG #{detailRecord?.id}</span>
+          </div>
+        }
+        open={isDetailModalOpen}
+        onCancel={handleCloseDetailModal}
+        width={720}
+        footer={[
+          <Button key="close" onClick={handleCloseDetailModal} style={{ borderRadius: '6px' }}>
+            Đóng
+          </Button>,
+          <Button
+            key="edit"
+            type="primary"
+            icon={<EditOutlined />}
+            style={{
+              background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+              border: 'none',
+              borderRadius: '6px',
+            }}
+            onClick={() => {
+              const currentDetail = detailRecord;
+              handleCloseDetailModal();
+              if (currentDetail) {
+                handleOpenModal('edit', currentDetail);
+              }
+            }}
+          >
+            Chỉnh sửa hợp đồng
+          </Button>,
+        ]}
+      >
+        <Spin spinning={detailLoading}>
+          {detailRecord && (
+            <div style={{ marginTop: 12 }}>
+              {/* Header Status Card */}
+              <div
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #fffbfb 0%, #fff6f5 100%)',
+                  border: '1px solid #ffdeda',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 20,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#e8442a' }}>
+                    Hợp Đồng #{detailRecord.id}
+                  </div>
+                  {detailRecord.createdAt && (
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 2 }}>
+                      Ngày tạo hệ thống: {dayjs(detailRecord.createdAt).format('DD/MM/YYYY HH:mm')}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {(() => {
+                    const opt = STATUS_OPTIONS.find((s) => s.value === detailRecord.status) || {
+                      label: detailRecord.status,
+                      color: 'default',
+                    };
+                    return (
+                      <Tag
+                        color={opt.color}
+                        style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '20px', fontWeight: 600 }}
+                      >
+                        {opt.label}
+                      </Tag>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Account & Role & Branch info */}
+              <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+                <Col span={12}>
+                  <Card size="small" style={{ borderRadius: '8px', background: '#fafafa' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <UserOutlined />
+                      <span>Nhân viên hợp đồng</span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
+                      {detailRecord.accountName || getAccountName(detailRecord.accountId)}
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      {(() => {
+                        const roleInfo = ROLES_MAP[detailRecord.roleId] || { label: getRoleName(detailRecord.roleId), color: 'default' };
+                        return <Tag color={roleInfo.color}>{roleInfo.label}</Tag>;
+                      })()}
+                    </div>
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card size="small" style={{ borderRadius: '8px', background: '#fafafa' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <BankOutlined />
+                      <span>Chi nhánh áp dụng</span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
+                      {detailRecord.branchName || getBranchName(detailRecord.branchId)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
+                      Mã chi nhánh: #{detailRecord.branchId}
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Salary & Work Days Info */}
+              <Card
+                size="small"
+                title={
+                  <Space style={{ color: '#e8442a', fontWeight: 'bold', fontSize: '14px' }}>
+                    <DollarOutlined />
+                    <span>Chế Độ Lương & Ngày Công</span>
+                  </Space>
+                }
+                style={{ borderRadius: '8px', marginBottom: 16 }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Mức lương cơ bản</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: 4 }}>
+                      {new Intl.NumberFormat('vi-VN').format(detailRecord.baseSalary || 0)} đ
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Hình thức lương</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || detailRecord.salaryType}
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Số ngày công chuẩn / tháng</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {detailRecord.baseWorkDay ? `${detailRecord.baseWorkDay} ngày` : 'N/A (Lương giờ / Quản lý)'}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Validity & Type Info */}
+              <Card
+                size="small"
+                title={
+                  <Space style={{ color: '#1890ff', fontWeight: 'bold', fontSize: '14px' }}>
+                    <CalendarOutlined />
+                    <span>Thời Gian & Loại Hợp Đồng</span>
+                  </Space>
+                }
+                style={{ borderRadius: '8px', marginBottom: 16 }}
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Loại hợp đồng</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {CONTRACT_TYPES.find((ct) => ct.value === detailRecord.type)?.label || detailRecord.type}
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Thời hạn hiệu lực</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                      {detailRecord.startDate ? dayjs(detailRecord.startDate).format('DD/MM/YYYY') : 'N/A'}
+                      {'  ➔  '}
+                      {detailRecord.endDate ? dayjs(detailRecord.endDate).format('DD/MM/YYYY') : 'Không thời hạn'}
+                    </div>
+                  </Col>
+                </Row>
+                {detailRecord.note && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e5e7eb' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Ghi chú bổ sung:</div>
+                    <div style={{ fontSize: '13px', color: '#4b5563', fontStyle: 'italic', marginTop: 2 }}>
+                      "{detailRecord.note}"
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+        </Spin>
       </Modal>
     </div>
   );

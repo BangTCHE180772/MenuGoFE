@@ -35,14 +35,13 @@ import { useAuth } from '../context/AuthContext';
 const { Title, Text } = Typography;
 
 const CONTRACT_TYPES = {
-  'Full-time': 'Toàn thời gian (Full-time)',
-  'Part-time': 'Bán thời gian (Part-time)',
-  'Seasonal': 'Thời vụ (Seasonal)',
+  'Full-time': 'Toàn thời gian',
+  'Part-time': 'Bán thời gian',
 };
 
 const SALARY_TYPES = {
-  'Fixed': 'Lương cố định (Fixed)',
-  'Hourly': 'Lương theo giờ (Hourly)',
+  'Fixed': 'Lương cố định',
+  'Hourly': 'Lương theo giờ',
 };
 
 const STATUS_TAGS = {
