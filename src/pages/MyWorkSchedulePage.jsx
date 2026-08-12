@@ -713,15 +713,23 @@ const MyWorkSchedulePage = () => {
           }
           
           return [
-            <Button
-              key="leave"
-              type="primary"
-              icon={<FileTextOutlined />}
-              onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
-              style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }}
-            >
-              Xin nghỉ ca này
-            </Button>,
+            <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể xin nghỉ." : ""} key="leave-tooltip">
+              <Button
+                key="leave"
+                type="primary"
+                icon={<FileTextOutlined />}
+                onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
+                disabled={isShiftPast}
+                style={{ 
+                  background: isShiftPast ? '#d9d9d9' : '#722ed1', 
+                  borderColor: isShiftPast ? '#d9d9d9' : '#722ed1', 
+                  fontWeight: 'bold',
+                  color: isShiftPast ? '#8c8c8c' : '#fff'
+                }}
+              >
+                Xin nghỉ ca này
+              </Button>
+            </Tooltip>,
             <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể chuyển ca." : ""} key="transfer-tooltip">
               <Button
                 key="transfer"
@@ -839,7 +847,8 @@ const MyWorkSchedulePage = () => {
                   options={accounts
                     .filter((acc) => {
                       if (acc.id === selectedSchedule.accountId) return false;
-                      const userRoles = user?.roleIds || [];
+                      const currentAccount = accounts.find(a => a.id === selectedSchedule.accountId);
+                      const currentRoles = currentAccount?.roleIds || [];
                       const accRoles = acc.roleIds || [];
                       
                       // Cannot swap with Admin(1), Owner(2), Manager(3)
@@ -847,7 +856,7 @@ const MyWorkSchedulePage = () => {
                       if (isAdminOrManager) return false;
 
                       // Must have at least one shared role
-                      const hasSharedRole = userRoles.some(r => accRoles.includes(r));
+                      const hasSharedRole = currentRoles.some(r => accRoles.includes(r));
                       return hasSharedRole;
                     })
                     .map((acc) => ({
