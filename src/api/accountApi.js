@@ -22,3 +22,15 @@ export const getRoleRange = (branchId) =>
 
 export const getManagerAccounts = () =>
   axiosInstance.get('/api/Account/managers');
+
+/**
+ * Lấy / cập nhật thông tin tài khoản của chính người dùng đang đăng nhập
+ */
+export const getMe = () =>
+  axiosInstance.get('/api/Account/me');
+
+export const updateMe = (data) =>
+  axiosInstance.put('/api/Account/me', data);
+
+export const changePassword = (data) =>
+  axiosInstance.put('/api/Account/change-password', data);

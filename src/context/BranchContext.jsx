@@ -56,13 +56,31 @@ export const BranchProvider = ({ children }) => {
     setCurrentBranchId(branchId);
     if (branchId) {
       localStorage.setItem('currentBranchId', branchId.toString());
+      const activeBranch = branches.find(b => b.id === branchId);
+      localStorage.setItem('currentBranchStatus', activeBranch?.status || 'Hoạt động');
     } else {
       localStorage.removeItem('currentBranchId');
+      localStorage.removeItem('currentBranchStatus');
     }
   };
 
+  // Sync currentBranchStatus to localStorage whenever currentBranchId or branches list updates
+  useEffect(() => {
+    if (currentBranchId && branches.length > 0) {
+      const activeBranch = branches.find(b => b.id === currentBranchId);
+      if (activeBranch) {
+        localStorage.setItem('currentBranchStatus', activeBranch.status || 'Hoạt động');
+      }
+    } else {
+      localStorage.removeItem('currentBranchStatus');
+    }
+  }, [currentBranchId, branches]);
+
+  const currentBranch = branches.find(b => b.id === currentBranchId);
+  const isBranchInactive = currentBranch ? currentBranch.status === 'Ngừng kinh doanh' : false;
+
   return (
-    <BranchContext.Provider value={{ currentBranchId, selectBranch, branches }}>
+    <BranchContext.Provider value={{ currentBranchId, selectBranch, branches, isBranchInactive }}>
       {children}
     </BranchContext.Provider>
   );

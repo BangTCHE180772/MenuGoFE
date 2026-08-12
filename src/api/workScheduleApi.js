@@ -21,3 +21,9 @@ export const assignWorkSchedules = (data) =>
 export const getMyWorkSchedules = () =>
   axiosInstance.get('/api/WorkSchedule/mine');
 
+export const requestLeave = (data) =>
+  axiosInstance.post('/api/WorkSchedule/leave-request', data);
+
+export const requestShiftSwap = (data) =>
+  axiosInstance.post('/api/WorkSchedule/shift-swap', data);
+

@@ -2287,3 +2287,107 @@ body::-webkit-scrollbar:horizontal,
   background: var(--color-border);
   border-radius: 4px;
 }
+
+/* ─── MyWorkSchedulePage Redesign ────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+}
+
+.shift-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: none;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.shift-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.shift-gradient-morning {
+  background: #e0f2fe; /* Light blue */
+  color: #0369a1; /* Dark blue text */
+  border-left: 4px solid #38bdf8;
+}
+
+.shift-gradient-afternoon {
+  background: #fff7ed; /* Light orange */
+  color: #c2410c; /* Dark orange text */
+  border-left: 4px solid #fb923c;
+}
+
+.shift-gradient-evening {
+  background: #f3e8ff; /* Light purple */
+  color: #7e22ce; /* Dark purple text */
+  border-left: 4px solid #c084fc;
+}
+
+.shift-gradient-absent {
+  background: #fee2e2; /* Light red */
+  color: #b91c1c; /* Dark red text */
+  border-left: 4px solid #f87171;
+}
+
+.shift-gradient-working {
+  background: #dcfce7; /* Light green */
+  color: #15803d; /* Dark green text */
+  border-left: 4px solid #4ade80;
+}
+
+.shift-gradient-pending {
+  background: #f3f4f6; /* Light gray */
+  color: #374151; /* Dark gray text */
+  border-left: 4px solid #9ca3af;
+}
+
+.shift-action-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.shift-card:hover .shift-action-btn {
+  opacity: 0.8;
+}
+
+.shift-action-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+  opacity: 1 !important;
+  transform: scale(1.1);
+  color: #000;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

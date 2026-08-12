@@ -70,6 +70,16 @@ const ImportReturnTable = ({
     }
   };
 
+  // Auto-expand single result matching searchText
+  React.useEffect(() => {
+    if (documents.length === 1 && searchText && documents[0].code?.toLowerCase() === searchText.toLowerCase()) {
+      const singleDocId = documents[0].id;
+      if (expandedDocId !== singleDocId) {
+        toggleExpand(singleDocId);
+      }
+    }
+  }, [documents, searchText]);
+
   const handleTabChange = (docId, tabKey) => {
     setActiveTabMap((prev) => ({ ...prev, [docId]: tabKey }));
   };

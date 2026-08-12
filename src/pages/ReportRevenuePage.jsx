@@ -36,6 +36,7 @@ import RevenueCompareModal from "../components/reports/revenue/RevenueCompareMod
 
 import { getBranchDashboardStats } from "../api/dashboardApi";
 import { useBranch } from "../context/BranchContext";
+import "../styles/ReportRevenuePage.css";
 
 const { Title, Text } = Typography;
 
@@ -244,7 +245,7 @@ const ReportRevenuePage = () => {
   ];
 
   return (
-    <div style={{ padding: "16px 24px", minHeight: "100vh", background: "#f8fafc" }}>
+    <div className="revenue-container">
       {/* ── BREADCRUMB ──────────────────────────────────────────────────────── */}
       <Breadcrumb style={{ marginBottom: 12 }}>
         <Breadcrumb.Item href="/home">
@@ -259,18 +260,9 @@ const ReportRevenuePage = () => {
       </Breadcrumb>
 
       {/* ── HEADER TITLE & EXPORT ───────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: 16,
-          gap: 12,
-        }}
-      >
+      <div className="revenue-header">
         <div>
-          <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+          <Title level={3} className="revenue-title">
             Báo Cáo Doanh Thu Bán Hàng
           </Title>
           <Text type="secondary">
@@ -324,25 +316,9 @@ const ReportRevenuePage = () => {
           />
 
           {/* 3. Bills Table */}
-          <div
-            style={{
-              background: "#ffffff",
-              padding: 18,
-              borderRadius: 10,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                marginBottom: 16,
-                gap: 12,
-              }}
-            >
-              <Title level={5} style={{ margin: 0, fontWeight: 700 }}>
+          <div className="table-section">
+            <div className="table-header">
+              <Title level={5} className="table-title">
                 Nhật Ký Hóa Đơn Doanh Thu Bán Hàng Chi Tiết ({filteredData.length} hóa đơn)
               </Title>
 
@@ -414,21 +390,14 @@ const ReportRevenuePage = () => {
           {/* Fullscreen Modal */}
           <Modal
             title={
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingRight: 24,
-                }}
-              >
-                <span style={{ fontWeight: 800, fontSize: 16 }}>
+              <div className="modal-header">
+                <span className="modal-title-bold">
                   Nhật Ký Hóa Đơn Doanh Thu ({filteredData.length} hóa đơn)
                 </span>
                 <Button
                   icon={<FullscreenExitOutlined />}
                   onClick={() => setIsFullscreen(false)}
-                  style={{ borderRadius: 6 }}
+                  className="revenue-btn"
                 >
                   Thu nhỏ
                 </Button>

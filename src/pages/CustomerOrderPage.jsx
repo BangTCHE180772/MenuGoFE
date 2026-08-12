@@ -4,7 +4,9 @@ import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { createOrder, createOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
+import { useSignalR } from '../context/SignalRContext';
 import MenuPanel from '../components/order/MenuPanel';
+import ReturnItemModal from '../components/order/ReturnItemModal';
 import '../styles/customer-order.css';
 
 const formatPrice = (price) => Number(price).toLocaleString('vi-VN') + 'đ';
@@ -37,6 +39,9 @@ const CustomerOrderPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [isCallingStaff, setIsCallingStaff] = useState(false);
+  const [isRequestingBill, setIsRequestingBill] = useState(false);
+  const [returnItem, setReturnItem] = useState(null);
 
   const fetchTableSummary = useCallback(async () => {
     try {
@@ -57,6 +62,28 @@ const CustomerOrderPage = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [fetchTableSummary]);
+
+  const connection = useSignalR();
+
+  useEffect(() => {
+    if (connection) {
+      const handleNotification = (data) => {
+        if (data.type === 'item-rejected' && data.tableId === parseInt(tableId)) {
+          Modal.warning({
+            title: 'Món ăn bị từ chối',
+            content: `Rất tiếc, nhà hàng vừa từ chối món "${data.productName}" của bạn với lý do: ${data.reason}. Mong bạn thông cảm và chọn món khác nhé!`,
+            okText: 'Đã hiểu',
+          });
+          fetchTableSummary();
+        }
+      };
+
+      connection.on('ReceiveNotification', handleNotification);
+      return () => {
+        connection.off('ReceiveNotification', handleNotification);
+      };
+    }
+  }, [connection, tableId, fetchTableSummary]);
 
   const tableStatus = summary?.tableStatus?.toLowerCase();
   const isReserved = tableStatus === 'reserved';
@@ -96,26 +123,30 @@ const CustomerOrderPage = () => {
   const handleCallStaff = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsCallingStaff(true);
     try {
       await callStaff(tableId);
       message.success('Đã gửi thông báo đến nhân viên. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gọi nhân viên');
+      message.error(error.response?.data?.message || 'Lỗi khi gọi nhân viên');
     } finally {
       actionRef.current = false;
+      setIsCallingStaff(false);
     }
   };
 
   const handleRequestBill = async () => {
     if (actionRef.current) return;
     actionRef.current = true;
+    setIsRequestingBill(true);
     try {
       await requestBill(tableId);
       message.success('Đã gửi yêu cầu thanh toán / dọn bàn. Vui lòng đợi trong giây lát!', 3);
     } catch (error) {
-      message.error('Lỗi khi gửi yêu cầu');
+      message.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu');
     } finally {
       actionRef.current = false;
+      setIsRequestingBill(false);
     }
   };
 
@@ -241,33 +272,35 @@ const CustomerOrderPage = () => {
           {isOccupied && (
             <button
               onClick={handleCallStaff}
+              disabled={isCallingStaff}
               style={{
-                background: '#3b82f6',
+                background: isCallingStaff ? '#9ca3af' : '#3b82f6',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isCallingStaff ? 'not-allowed' : 'pointer'
               }}
             >
-              Gọi phục vụ hỗ trợ
+              {isCallingStaff ? 'Đang gọi...' : 'Gọi phục vụ hỗ trợ'}
             </button>
           )}
           {isOccupied && summary?.items?.length > 0 && (
             <button
               onClick={handleRequestBill}
+              disabled={isRequestingBill}
               style={{
-                background: '#ef4444',
+                background: isRequestingBill ? '#9ca3af' : '#ef4444',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '20px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: isRequestingBill ? 'not-allowed' : 'pointer'
               }}
             >
-              Thanh toán
+              {isRequestingBill ? 'Đang gửi...' : 'Thanh toán'}
             </button>
           )}
         </div>
@@ -297,32 +330,50 @@ const CustomerOrderPage = () => {
         ) : (
           <div className="co-ordered-list">
             {summary.items?.length > 0 ? (
-              summary.items.map((item) => (
-                <div key={item.orderDetailId} className="co-ordered-item">
-                  <div className="co-ordered-info">
-                    <div className="co-ordered-name">{item.productName}</div>
-                    <div className="co-ordered-meta">
-                      <span>SL: {item.quantity}</span>
-                      <span className="co-ordered-price">{formatPrice(item.price)}</span>
+              summary.items.map((item) => {
+                const isServed = item.cookingStatus === 'Served' || item.status === 'PartialReturned';
+                const returnableQty = item.quantity - (item.returnedQuantity || 0);
+
+                return (
+                  <div key={item.orderDetailId} className="co-ordered-item">
+                    <div className="co-ordered-info">
+                      <div className="co-ordered-name">{item.productName}</div>
+                      <div className="co-ordered-meta">
+                        <span>SL: {item.quantity}</span>
+                        <span className="co-ordered-price">{formatPrice(item.price)}</span>
+                      </div>
+                      {item.returnedQuantity > 0 && (
+                        <div style={{ color: '#f59e0b', fontSize: '12px', marginTop: 4 }}>
+                          (Đã trả {item.returnedQuantity} món)
+                        </div>
+                      )}
+                    </div>
+                    <div className="co-ordered-status">
+                      {getStatusBadge(item.status, item.cookingStatus)}
+                      <span className="co-ordered-time">
+                        {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {item.status !== 'Cancelled' && item.cookingStatus === 'Waiting' && (
+                        <button
+                          className="co-btn-cancel-item"
+                          onClick={() => handleCancelItem(item.orderDetailId, item.productName)}
+                          style={{ marginTop: '8px', color: '#ef4444', background: 'transparent', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          Hủy món
+                        </button>
+                      )}
+                      {isServed && returnableQty > 0 && (
+                        <button
+                          onClick={() => setReturnItem(item)}
+                          style={{ marginTop: '8px', color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                        >
+                          Trả món
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="co-ordered-status">
-                    {getStatusBadge(item.status, item.cookingStatus)}
-                    <span className="co-ordered-time">
-                      {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {item.status !== 'Cancelled' && item.cookingStatus === 'Waiting' && (
-                      <button
-                        className="co-btn-cancel-item"
-                        onClick={() => handleCancelItem(item.orderDetailId, item.productName)}
-                        style={{ marginTop: '8px', color: '#ef4444', background: 'transparent', border: '1px solid #ef4444', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        Hủy món
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="co-empty-state">
                 <div className="co-empty-state-icon">🍽️</div>

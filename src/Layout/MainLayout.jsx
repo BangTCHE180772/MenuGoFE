@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { notification } from 'antd';
 import { useSignalR } from '../context/SignalRContext';
+import { useAuth } from '../context/AuthContext';
 import SideBar from '../components/SideBar';
 import ToTop from '../components/ToTop';
+import { useBranch } from '../context/BranchContext';
 
 /**
  * Layout chính của app sau khi đăng nhập
@@ -12,6 +14,8 @@ import ToTop from '../components/ToTop';
 const MainLayout = () => {
   const connection = useSignalR();
   const location = useLocation();
+  const { user } = useAuth();
+  const { isBranchInactive } = useBranch();
   const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
 
   // Sidebar collapse state initialized from localStorage
@@ -30,6 +34,14 @@ const MainLayout = () => {
       return nextState;
     });
   };
+
+  useEffect(() => {
+    if (connection && user) {
+      // Tham gia group của user và branch để nhận thông báo realtime
+      if (user.id) connection.invoke('JoinUserGroup', user.id).catch(console.error);
+      if (user.branchId) connection.invoke('JoinBranchGroup', user.branchId).catch(console.error);
+    }
+  }, [connection, user]);
 
   useEffect(() => {
     if (connection) {
@@ -55,10 +67,24 @@ const MainLayout = () => {
         });
       };
 
+      const handleWorkScheduleNotification = (data) => {
+        notification.info({
+          message: 'Thông báo Lịch làm việc',
+          description: data.message,
+          placement: 'topRight',
+          duration: 5,
+        });
+        
+        // Dispatch event so MyWorkSchedulePage can refresh data
+        window.dispatchEvent(new Event('work-schedule-updated'));
+      };
+
       connection.on('ReceiveNotification', handleNotification);
+      connection.on('ReceiveWorkScheduleNotification', handleWorkScheduleNotification);
 
       return () => {
         connection.off('ReceiveNotification', handleNotification);
+        connection.off('ReceiveWorkScheduleNotification', handleWorkScheduleNotification);
       };
     }
   }, [connection]);
@@ -66,7 +92,27 @@ const MainLayout = () => {
   return (
     <div className={`main-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <SideBar collapsed={collapsed} onToggleCollapse={handleToggleCollapse} />
-      <div className="main-content-wrapper">
+      <div className="main-content-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
+        {isBranchInactive && (
+          <div style={{
+            background: '#fff2f0',
+            borderBottom: '1px solid #ffccc7',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#ff4d4f',
+            fontWeight: 600,
+            fontSize: '13px',
+            zIndex: 100,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+          }}>
+            <span role="img" aria-label="warning" style={{ fontSize: '15px' }}>⚠️</span>
+            <span>
+              <strong>Chi nhánh này đã ngừng kinh doanh.</strong> Hệ thống đang hiển thị ở chế độ xem lịch sử. Toàn bộ các chức năng thêm mới, chỉnh sửa, và xóa đều bị khóa.
+            </span>
+          </div>
+        )}
         <main className={`main-content ${isFluid ? 'fluid' : ''}`}>
           <Outlet />
         </main>
