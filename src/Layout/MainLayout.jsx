@@ -5,6 +5,7 @@ import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
 import SideBar from '../components/SideBar';
 import ToTop from '../components/ToTop';
+import { useBranch } from '../context/BranchContext';
 
 /**
  * Layout chính của app sau khi đăng nhập
@@ -14,6 +15,7 @@ const MainLayout = () => {
   const connection = useSignalR();
   const location = useLocation();
   const { user } = useAuth();
+  const { isBranchInactive } = useBranch();
   const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
 
   // Sidebar collapse state initialized from localStorage
@@ -90,7 +92,27 @@ const MainLayout = () => {
   return (
     <div className={`main-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <SideBar collapsed={collapsed} onToggleCollapse={handleToggleCollapse} />
-      <div className="main-content-wrapper">
+      <div className="main-content-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
+        {isBranchInactive && (
+          <div style={{
+            background: '#fff2f0',
+            borderBottom: '1px solid #ffccc7',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#ff4d4f',
+            fontWeight: 600,
+            fontSize: '13px',
+            zIndex: 100,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+          }}>
+            <span role="img" aria-label="warning" style={{ fontSize: '15px' }}>⚠️</span>
+            <span>
+              <strong>Chi nhánh này đã ngừng kinh doanh.</strong> Hệ thống đang hiển thị ở chế độ xem lịch sử. Toàn bộ các chức năng thêm mới, chỉnh sửa, và xóa đều bị khóa.
+            </span>
+          </div>
+        )}
         <main className={`main-content ${isFluid ? 'fluid' : ''}`}>
           <Outlet />
         </main>
