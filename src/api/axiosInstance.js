@@ -23,12 +23,14 @@ axiosInstance.interceptors.request.use(
 
     // Block write operations if the selected branch is inactive (except updating the branch itself to active)
     const currentBranchStatus = localStorage.getItem('currentBranchStatus');
-    if (currentBranchStatus === 'Ngừng kinh doanh') {
+    if (token && currentBranchStatus === 'Ngừng kinh doanh') {
       const method = (config.method || 'GET').toUpperCase();
       const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
       if (isWriteMethod) {
-        const isBranchUpdate = config.url && (config.url.toLowerCase().includes('/api/branch') || config.url.toLowerCase().includes('/api/Branch'));
-        if (!isBranchUpdate) {
+        const urlLower = (config.url || '').toLowerCase();
+        const isBranchUpdate = urlLower.includes('/api/branch') || urlLower.includes('/api/Branch');
+        const isAuthRequest = urlLower.includes('/api/auth') || urlLower.includes('/api/Auth');
+        if (!isBranchUpdate && !isAuthRequest) {
           const error = new Error('Thao tác bị từ chối: Chi nhánh này đã ngừng kinh doanh. Không thể thực hiện các thao tác thay đổi dữ liệu.');
           error.response = {
             status: 400,
