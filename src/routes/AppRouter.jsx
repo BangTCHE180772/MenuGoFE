@@ -25,6 +25,7 @@ import AccountPage from '../pages/AccountPage';
 import MyProfilePage from '../pages/MyProfilePage';
 import WorkSchedulePage from '../pages/WorkSchedulePage';
 import MyWorkSchedulePage from '../pages/MyWorkSchedulePage';
+import WorkScheduleSummaryPage from '../pages/WorkScheduleSummaryPage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
@@ -144,6 +145,7 @@ const AppRouter = () => {
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
+                <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
                 <Route path="/reports/revenue" element={<ReportRevenuePage />} />
                 <Route path="/reports/expense" element={<ReportExpensePage />} />

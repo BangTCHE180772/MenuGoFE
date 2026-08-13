@@ -15,6 +15,7 @@ import {
   Popconfirm,
   Avatar,
   message,
+  Upload,
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,6 +28,8 @@ import {
   PhoneOutlined,
   LockOutlined,
   BankOutlined,
+  UploadOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -36,8 +39,10 @@ import {
   deleteAccount,
 } from '../api/accountApi';
 import { getAllBranches } from '../api/branchApi';
+import { uploadImage } from '../api/imageApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
+import AccountDetailModal from '../components/account/AccountDetailModal';
 
 const GENDER_OPTIONS = [
   { value: 'Nam', label: 'Nam' },
@@ -85,7 +90,62 @@ const AccountPage = () => {
   const [modalType, setModalType] = useState('create');
   const [editingRecord, setEditingRecord] = useState(null);
 
+  // Detail Modal states
+  const [detailRecord, setDetailRecord] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const handleOpenDetailModal = (record) => {
+    setDetailRecord(record);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setDetailRecord(null);
+  };
+
   const [form] = Form.useForm();
+  const avatarImageValue = Form.useWatch('avatarImage', form);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const beforeAvatarUpload = (file) => {
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg';
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const isValidExt = ['jpg', 'jpeg', 'png'].includes(ext);
+
+    if (!isJpgOrPng || !isValidExt) {
+      message.error('Chỉ chấp nhận file ảnh định dạng JPG, JPEG, PNG!');
+      return Upload.LIST_IGNORE;
+    }
+
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('Dung lượng file ảnh không được vượt quá 5MB!');
+      return Upload.LIST_IGNORE;
+    }
+
+    return true;
+  };
+
+  const handleAvatarUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingAvatar(true);
+    try {
+      const res = await uploadImage(file);
+      if (res.data) {
+        const imgUrl = res.data.imageLink || res.data.ImageLink;
+        form.setFieldsValue({ avatarImage: imgUrl });
+        form.validateFields(['avatarImage']);
+        message.success('Tải ảnh đại diện thành công!');
+        if (onSuccess) onSuccess(res.data);
+      }
+    } catch (err) {
+      console.error('Upload avatar error:', err);
+      message.error('Không thể tải ảnh đại diện lên!');
+      if (onError) onError(err);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Load data
   const loadData = useCallback(async () => {
@@ -170,27 +230,48 @@ const AccountPage = () => {
       handleCloseModal();
       loadData();
     } catch (err) {
-      console.error(err);
-      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin nhân viên!';
-
-      // Map backend validation errors to specific form fields
-      const errorFieldMap = [
-        { keyword: 'Email', field: 'email' },
-        { keyword: 'điện thoại', field: 'phone' },
-        { keyword: 'CCCD', field: 'citizenIdCode' },
-      ];
-
+      console.error('Submit Account Error:', err);
+      const responseData = err.response?.data;
       let fieldErrorSet = false;
-      for (const { keyword, field } of errorFieldMap) {
-        if (errorMsg.includes(keyword)) {
-          form.setFields([{ name: field, errors: [errorMsg] }]);
-          fieldErrorSet = true;
-          break;
+
+      // Handle ASP.NET Core / FluentValidation problem details object
+      if (responseData?.errors && typeof responseData.errors === 'object') {
+        const fieldsToSet = [];
+        const unmappedMessages = [];
+
+        Object.entries(responseData.errors).forEach(([fieldKey, messages]) => {
+          const fieldName = fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
+          const rawErrorList = Array.isArray(messages) ? messages : [messages];
+          // Filter out standard English validation error messages
+          const errorTextList = rawErrorList.filter(
+            (msg) => typeof msg === 'string' && !/^The\s+.*\s+field\b/i.test(msg) && !/field is required/i.test(msg)
+          );
+
+          if (errorTextList.length > 0) {
+            if (['name', 'email', 'phone', 'password', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
+              fieldsToSet.push({ name: fieldName, errors: errorTextList });
+              fieldErrorSet = true;
+            } else {
+              unmappedMessages.push(...errorTextList);
+            }
+          }
+        });
+
+        if (fieldsToSet.length > 0) {
+          form.setFields(fieldsToSet);
+        }
+        if (unmappedMessages.length > 0) {
+          unmappedMessages.forEach((msg) => message.error(msg));
         }
       }
 
       if (!fieldErrorSet) {
-        message.error(errorMsg);
+        const errorMsg = responseData?.message || (typeof responseData === 'string' ? responseData : null);
+        if (errorMsg && errorMsg !== 'One or more validation errors occurred.') {
+          message.error(errorMsg);
+        } else if (!responseData?.errors) {
+          message.error('Có lỗi xảy ra khi lưu thông tin nhân viên!');
+        }
       }
     }
   };
@@ -242,21 +323,26 @@ const AccountPage = () => {
       title: 'Nhân viên',
       key: 'employee',
       render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar
-            size={38}
-            src={record.avatarImage || undefined}
-            icon={!record.avatarImage ? <UserOutlined /> : undefined}
-            style={{
-              backgroundColor: record.avatarImage ? undefined : '#e8442a',
-              flexShrink: 0,
-            }}
-          />
-          <div>
-            <strong style={{ color: '#e8442a' }}>{record.name}</strong>
-            <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {record.id}</div>
+        <Tooltip title="Bấm để xem chi tiết nhân viên">
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+            onClick={() => handleOpenDetailModal(record)}
+          >
+            <Avatar
+              size={38}
+              src={record.avatarImage || undefined}
+              icon={!record.avatarImage ? <UserOutlined /> : undefined}
+              style={{
+                backgroundColor: record.avatarImage ? undefined : '#e8442a',
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <strong style={{ color: '#e8442a', transition: 'color 0.2s' }}>{record.name}</strong>
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {record.id}</div>
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
     },
@@ -271,17 +357,7 @@ const AccountPage = () => {
         </span>
       ),
     },
-    {
-      title: 'Số điện thoại',
-      dataIndex: 'phone',
-      key: 'phone',
-      render: (phone) => (
-        <span>
-          <PhoneOutlined style={{ marginRight: 6, color: '#8c8c8c' }} />
-          {phone}
-        </span>
-      ),
-    },
+
     {
       title: 'Giới tính',
       dataIndex: 'gender',
@@ -296,22 +372,12 @@ const AccountPage = () => {
         return val;
       }
     },
-    {
-      title: 'Ngày sinh',
-      dataIndex: 'dateOfBirth',
-      key: 'dateOfBirth',
-      render: (val) => val ? dayjs(val).format('DD/MM/YYYY') : '—',
-    },
-    {
-      title: 'CCCD',
-      dataIndex: 'citizenIdCode',
-      key: 'citizenIdCode',
-      render: (val) => val || '—',
-    },
+
     {
       title: 'Vai trò',
       dataIndex: 'roleIds',
       key: 'roleIds',
+      width: 140,
       render: (roleIds) => (
         <Space size={4} wrap>
           {(roleIds || []).map((rid) => {
@@ -322,6 +388,28 @@ const AccountPage = () => {
         </Space>
       ),
     },
+    ...(isOwnerOrAdmin
+      ? [
+          {
+            title: 'Chi nhánh',
+            key: 'branch',
+            width: 170,
+            render: (_, record) => {
+              const activeContract = record.contracts?.find((c) => c.status === 'Active' || c.status === 1);
+              const branchId = activeContract?.branchId || record.branchId;
+              const branch = branches.find((b) => b.id === branchId);
+              const fullName = branch ? branch.name : branchId ? `Chi nhánh #${branchId}` : '—';
+              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+
+              return (
+                <Tooltip title={fullName}>
+                  <span>{displayName}</span>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
@@ -469,7 +557,11 @@ const AccountPage = () => {
             >
               {branches.map((b) => (
                 <Select.Option key={b.id} value={b.id}>
-                  {b.name}
+                  <Tooltip title={b.name}>
+                    <span style={{ display: 'inline-block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      {b.name}
+                    </span>
+                  </Tooltip>
                 </Select.Option>
               ))}
             </Select>
@@ -512,7 +604,7 @@ const AccountPage = () => {
           rowKey="id"
           loading={loading}
           pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 'max-content' }}
           bordered
         />
       </Card>
@@ -553,7 +645,15 @@ const AccountPage = () => {
             <Form.Item
               name="name"
               label="Họ và tên"
-              rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập họ tên!' },
+                { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự!' },
+                { max: 100, message: 'Họ tên không được vượt quá 100 ký tự!' },
+                {
+                  pattern: /^[a-zA-ZàáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠÂẦẤẨẪẬĂẰẮẲẴẶÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ\s]+$/,
+                  message: 'Họ tên chỉ được chứa chữ cái và khoảng trắng!',
+                },
+              ]}
               style={{ width: 330 }}
             >
               <Input prefix={<UserOutlined />} placeholder="Nhập họ và tên..." />
@@ -628,6 +728,7 @@ const AccountPage = () => {
             <Form.Item
               name="dateOfBirth"
               label="Ngày sinh"
+              rules={[{ required: true, message: 'Vui lòng chọn ngày sinh!' }]}
               style={{ width: 330 }}
             >
               <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày sinh" />
@@ -639,6 +740,10 @@ const AccountPage = () => {
             <Form.Item
               name="citizenIdCode"
               label="Số CMND/CCCD"
+              rules={[
+                { required: true, message: 'Vui lòng nhập số CMND/CCCD!' },
+                { pattern: /^\d{12}$/, message: 'Số CMND/CCCD phải bao gồm đúng 12 chữ số!' },
+              ]}
               style={{ width: 330 }}
             >
               <Input placeholder="Nhập số CMND/CCCD..." />
@@ -646,10 +751,39 @@ const AccountPage = () => {
 
             <Form.Item
               name="avatarImage"
-              label="Link ảnh đại diện"
+              label="Ảnh đại diện"
+              rules={[{ required: true, message: 'Vui lòng chọn ảnh đại diện!' }]}
               style={{ width: 330 }}
             >
-              <Input placeholder="Nhập URL ảnh đại diện..." />
+              <Input style={{ display: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                <Avatar
+                  size={46}
+                  src={avatarImageValue || undefined}
+                  icon={!avatarImageValue ? <UserOutlined /> : undefined}
+                  style={{ backgroundColor: avatarImageValue ? undefined : '#e8442a', flexShrink: 0, border: '1px solid #d9d9d9' }}
+                />
+                <Upload
+                  name="avatarFile"
+                  showUploadList={false}
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  beforeUpload={beforeAvatarUpload}
+                  customRequest={handleAvatarUpload}
+                >
+                  <Button
+                    icon={uploadingAvatar ? <LoadingOutlined /> : <UploadOutlined />}
+                    loading={uploadingAvatar}
+                    style={{ borderRadius: '6px' }}
+                  >
+                    {avatarImageValue ? 'Thay đổi ảnh' : 'Chọn ảnh JPG/PNG'}
+                  </Button>
+                </Upload>
+              </div>
+              {avatarImageValue && (
+                <div style={{ fontSize: '12px', color: '#52c41a', marginTop: 4 }}>
+                  ✓ Đã chọn ảnh đại diện
+                </div>
+              )}
             </Form.Item>
           </Space>
 
@@ -668,6 +802,15 @@ const AccountPage = () => {
           )}
         </Form>
       </Modal>
+
+      {/* Employee Detail Modal */}
+      <AccountDetailModal
+        open={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        account={detailRecord}
+        branches={branches}
+        onEdit={(rec) => handleOpenModal('edit', rec)}
+      />
     </div>
   );
 };

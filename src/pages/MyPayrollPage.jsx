@@ -289,7 +289,7 @@ const MyPayrollPage = () => {
                 }}
               >
                 <Text type="secondary" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' }}>
-                  THỰC LĨNH (NET SALARY)
+                  THỰC LĨNH
                 </Text>
                 <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#52c41a', margin: '6px 0' }}>
                   {new Intl.NumberFormat('vi-VN').format(selectedPayroll.netSalary)} đ

@@ -18,6 +18,7 @@ import {
   Statistic,
   Descriptions,
   Badge,
+  Avatar,
 } from 'antd';
 import {
   PlusOutlined,
@@ -87,6 +88,13 @@ const TYPE_OPTIONS = [
   { value: ADJUSTMENT_TYPES.Deduction, label: 'Khấu trừ (-)' },
   { value: ADJUSTMENT_TYPES.Penalty, label: 'Tiền phạt (-)' },
 ];
+
+const ROLES_MAP = {
+  3: { label: 'Quản lý', color: 'purple' },
+  4: { label: 'Thu ngân', color: 'blue' },
+  5: { label: 'Bếp trưởng', color: 'orange' },
+  6: { label: 'Phục vụ', color: 'green' },
+};
 
 const parseType = (val) => {
   if (typeof val === 'number') return val;
@@ -241,6 +249,29 @@ const SalaryDetailPage = () => {
       return true;
     });
   }, [payrolls, accounts, isOwner, isManager, managerBranchId]);
+
+  // Group draft payrolls by role for cleaner dropdown UX
+  const groupedDraftPayrolls = useMemo(() => {
+    const groups = {
+      3: { label: '👑 QUẢN LÝ', items: [] },
+      4: { label: '💳 THU NGÂN', items: [] },
+      5: { label: '👨‍🍳 BẾP TRƯỞNG', items: [] },
+      6: { label: '🤵 PHỤC VỤ', items: [] },
+      other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
+    };
+
+    draftPayrolls.forEach((p) => {
+      const acc = accounts.find((a) => a.id === p.accountId);
+      const primaryRoleId = acc?.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : (acc?.roleId || 'other');
+      if (groups[primaryRoleId]) {
+        groups[primaryRoleId].items.push(p);
+      } else {
+        groups.other.items.push(p);
+      }
+    });
+
+    return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
+  }, [draftPayrolls, accounts]);
 
   // Statistics calculation
   const stats = useMemo(() => {
@@ -414,24 +445,56 @@ const SalaryDetailPage = () => {
       dataIndex: 'accountId',
       key: 'accountId',
       render: (id, record) => (
-        <div>
-          <strong style={{ color: '#e8442a' }}>{record.accountName || getAccountName(id)}</strong>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>
-            <UserOutlined style={{ marginRight: 4 }} />
-            ID: {id}
+        <Tooltip title="Bấm để xem chi tiết chi tiết lương">
+          <div
+            onClick={() => handleOpenDetail(record)}
+            style={{ cursor: 'pointer', display: 'inline-block' }}
+          >
+            <strong
+              style={{
+                color: '#e8442a',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {record.accountName || getAccountName(id)}
+              <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
+            </strong>
+            <div style={{ fontSize: '11px', color: '#6b7280' }}>
+              <UserOutlined style={{ marginRight: 4 }} />
+              ID: {id}
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
     },
     {
-      title: 'Mã Bảng Lương',
+      title: 'Kỳ lương',
       dataIndex: 'payrollId',
       key: 'payrollId',
-      render: (payrollId) => (
-        <Tag color="blue">
-          #{payrollId}
-        </Tag>
-      ),
+      render: (payrollId) => {
+        const pr = payrolls.find((p) => p.id === payrollId);
+        if (pr) {
+          return (
+            <Tag color="blue" style={{ fontWeight: 600 }}>
+              Tháng {(pr.Month || pr.month)}/{(pr.Year || pr.year)}
+            </Tag>
+          );
+        }
+        return (
+          <Tag color="blue">
+            #{payrollId}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Tiêu đề / Khoản mục',
@@ -483,26 +546,12 @@ const SalaryDetailPage = () => {
       },
     },
     {
-      title: 'Ngày tạo',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => (date ? new Date(date).toLocaleString('vi-VN') : '—'),
-    },
-    {
       title: 'Hành động',
       key: 'actions',
       fixed: 'right',
-      width: 130,
+      width: 100,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="Xem chi tiết">
-            <Button
-              type="text"
-              icon={<EyeOutlined style={{ color: '#1890ff' }} />}
-              onClick={() => handleOpenDetail(record)}
-            />
-          </Tooltip>
-
           <Tooltip title="Sửa chi tiết lương">
             <Button
               type="text"
@@ -593,56 +642,7 @@ const SalaryDetailPage = () => {
         </div>
       </Card>
 
-      {/* Summary Statistics */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Tổng Tiền Phụ Cấp"
-              value={stats.totalAllowance}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#3f8600', fontWeight: 700, fontSize: '19px' }}
-              prefix={<PlusCircleOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
 
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Tổng Tiền Thưởng"
-              value={stats.totalBonus}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#722ed1', fontWeight: 700, fontSize: '19px' }}
-              prefix={<TrophyOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Tổng Khấu Trừ"
-              value={stats.totalDeduction}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#fa541c', fontWeight: 700, fontSize: '19px' }}
-              prefix={<MinusCircleOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} md={6}>
-          <Card borderRadius="12px" bodyStyle={{ padding: '16px 20px' }}>
-            <Statistic
-              title="Tổng Tiền Phạt"
-              value={stats.totalPenalty}
-              formatter={(val) => formatVND(val)}
-              valueStyle={{ color: '#cf1322', fontWeight: 700, fontSize: '19px' }}
-              prefix={<ExclamationCircleOutlined style={{ marginRight: 6 }} />}
-            />
-          </Card>
-        </Col>
-      </Row>
 
       {/* Filter and Table Card */}
       <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
@@ -658,17 +658,66 @@ const SalaryDetailPage = () => {
 
           <Select
             placeholder="Lọc theo bảng lương"
-            style={{ width: 220 }}
+            style={{ width: 260 }}
             allowClear
             showSearch
-            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
+            }
+            optionLabelProp="label"
+            dropdownStyle={{ maxHeight: 360 }}
             value={selectedPayroll}
             onChange={(val) => setSelectedPayroll(val)}
           >
-            {draftPayrolls.map((p) => (
-              <Select.Option key={p.id} value={p.id} label={`${p.accountName || getAccountName(p.accountId)}`}>
-                {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
-              </Select.Option>
+            {groupedDraftPayrolls.map(([roleKey, group]) => (
+              <Select.OptGroup
+                key={roleKey}
+                label={
+                  <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                    {group.label} ({group.items.length})
+                  </div>
+                }
+              >
+                {group.items.map((p) => {
+                  const acc = accounts.find((a) => a.id === p.accountId);
+                  const accName = p.accountName || (acc ? acc.name : getAccountName(p.accountId));
+                  const primaryRoleId = acc?.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : (acc?.roleId || 6);
+                  const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                  const periodStr = `Tháng ${p.Month || p.month}/${p.Year || p.year}`;
+                  const searchValue = `${accName} ${p.accountId} ${periodStr} ${roleInfo.label}`;
+
+                  return (
+                    <Select.Option
+                      key={p.id}
+                      value={p.id}
+                      label={`${accName} (${periodStr})`}
+                      searchValue={searchValue}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar
+                            size={28}
+                            src={acc?.avatarImage || undefined}
+                            icon={!acc?.avatarImage ? <UserOutlined /> : undefined}
+                            style={{ backgroundColor: acc?.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                          />
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                              {accName}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                              Kỳ: {periodStr} • Mã BL: #{p.id}
+                            </div>
+                          </div>
+                        </div>
+                        <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                          {roleInfo.label}
+                        </Tag>
+                      </div>
+                    </Select.Option>
+                  );
+                })}
+              </Select.OptGroup>
             ))}
           </Select>
 
@@ -763,19 +812,64 @@ const SalaryDetailPage = () => {
                   rules={[{ required: true, message: 'Vui lòng chọn bảng lương!' }]}
                 >
                   <Select
-                    placeholder="Chọn bảng lương"
+                    placeholder="Chọn bảng lương..."
                     showSearch
-                    optionFilterProp="label"
+                    filterOption={(input, option) =>
+                      (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    optionLabelProp="label"
+                    dropdownStyle={{ maxHeight: 360 }}
                     onChange={handlePayrollChangeInForm}
                   >
-                    {draftPayrolls.map((p) => (
-                      <Select.Option
-                        key={p.id}
-                        value={p.id}
-                        label={`${p.accountName || getAccountName(p.accountId)}`}
+                    {groupedDraftPayrolls.map(([roleKey, group]) => (
+                      <Select.OptGroup
+                        key={roleKey}
+                        label={
+                          <div style={{ color: '#e8442a', fontWeight: 700, fontSize: '12px', letterSpacing: '0.5px', padding: '2px 0' }}>
+                            {group.label} ({group.items.length})
+                          </div>
+                        }
                       >
-                        {p.accountName || getAccountName(p.accountId)} (Tháng {p.Month || p.month}/{p.Year || p.year})
-                      </Select.Option>
+                        {group.items.map((p) => {
+                          const acc = accounts.find((a) => a.id === p.accountId);
+                          const accName = p.accountName || (acc ? acc.name : getAccountName(p.accountId));
+                          const primaryRoleId = acc?.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : (acc?.roleId || 6);
+                          const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+                          const periodStr = `Tháng ${p.Month || p.month}/${p.Year || p.year}`;
+                          const searchValue = `${accName} ${p.accountId} ${periodStr} ${roleInfo.label}`;
+
+                          return (
+                            <Select.Option
+                              key={p.id}
+                              value={p.id}
+                              label={`${accName} (${periodStr})`}
+                              searchValue={searchValue}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <Avatar
+                                    size={28}
+                                    src={acc?.avatarImage || undefined}
+                                    icon={!acc?.avatarImage ? <UserOutlined /> : undefined}
+                                    style={{ backgroundColor: acc?.avatarImage ? undefined : '#e8442a', flexShrink: 0 }}
+                                  />
+                                  <div>
+                                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
+                                      {accName}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                      Kỳ: {periodStr} • Mã BL: #{p.id}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                                  {roleInfo.label}
+                                </Tag>
+                              </div>
+                            </Select.Option>
+                          );
+                        })}
+                      </Select.OptGroup>
                     ))}
                   </Select>
                 </Form.Item>
@@ -896,7 +990,9 @@ const SalaryDetailPage = () => {
               })()}
             </Descriptions.Item>
             <Descriptions.Item label="Ghi chú">{detailRecord.note || '—'}</Descriptions.Item>
-            <Descriptions.Item label="ID Người tạo">{detailRecord.createdBy || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Người tạo">
+              {detailRecord.createdByName || (detailRecord.createdBy ? `Tài khoản #${detailRecord.createdBy}` : '—')}
+            </Descriptions.Item>
             <Descriptions.Item label="Thời gian tạo">
               {detailRecord.createdAt ? new Date(detailRecord.createdAt).toLocaleString('vi-VN') : '—'}
             </Descriptions.Item>
