@@ -72,6 +72,7 @@ const getStatusOption = (status) =>
 const WorkSchedulePage = () => {
   const { user, role } = useAuth();
   const isManager = user?.roleId === 3 || role === 'Manager';
+  const isOwner = user?.roleId === 2 || role === 'Owner';
   const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
   const managerBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
@@ -123,6 +124,7 @@ const WorkSchedulePage = () => {
   }, [accounts]);
 
   // Filtering states
+  const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
@@ -143,7 +145,7 @@ const WorkSchedulePage = () => {
   const selectedBulkBranchId = Form.useWatch('branchId', bulkForm);
 
   // Active view tab
-  const [activeTab, setActiveTab] = useState('table');
+  const [activeTab, setActiveTab] = useState(isOwner ? 'calendar' : 'table');
 
   // Load all lists
   const loadData = useCallback(async () => {
@@ -185,10 +187,35 @@ const WorkSchedulePage = () => {
   const getShiftDetails = (id) => {
     const sh = shifts.find((s) => s.id === id);
     if (!sh) return { name: `Ca #${id}`, time: '' };
-    // StartTime / EndTime formatted as HH:mm
     const start = sh.startTime ? sh.startTime.substring(0, 5) : '--:--';
     const end = sh.endTime ? sh.endTime.substring(0, 5) : '--:--';
     return { name: sh.name, time: `${start} - ${end}` };
+  };
+
+  // Filter schedules
+  const filteredSchedules = schedules.filter((item) => {
+    if (selectedBranch && item.branchId !== selectedBranch) return false;
+    if (selectedAccount && item.accountId !== selectedAccount) return false;
+    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
+    if (selectedShift && item.shiftId !== selectedShift) return false;
+    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
+    if (searchDate) {
+      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
+      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
+      if (itemDate !== filterDate) return false;
+    }
+    return true;
+  });
+
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSelectedBranch(null);
+    setSelectedAccount(null);
+    setSelectedApprovalStatus(null);
+    setSelectedShift(null);
+    setSelectedStatus(null);
+    setSearchDate(null);
+    message.info('Đã xóa tất cả bộ lọc');
   };
 
   // Open Modal logic - Single Add/Edit
@@ -384,29 +411,7 @@ const WorkSchedulePage = () => {
     }
   };
 
-  // Filter schedules
-  const filteredSchedules = schedules.filter((item) => {
-    if (selectedAccount && item.accountId !== selectedAccount) return false;
-    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
-    if (selectedShift && item.shiftId !== selectedShift) return false;
-    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
-    if (searchDate) {
-      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
-      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
-      if (itemDate !== filterDate) return false;
-    }
-    return true;
-  });
 
-  // Reset Filters
-  const handleResetFilters = () => {
-    setSelectedAccount(null);
-    setSelectedApprovalStatus(null);
-    setSelectedShift(null);
-    setSelectedStatus(null);
-    setSearchDate(null);
-    message.info('Đã xóa tất cả bộ lọc');
-  };
 
   // Columns for Table
   const baseColumns = [
@@ -556,7 +561,7 @@ const WorkSchedulePage = () => {
   // Calendar render helper
   const dateCellRender = (value) => {
     const dateStr = value.format('YYYY-MM-DD');
-    const daySchedules = schedules.filter((item) => item.workDate === dateStr);
+    const daySchedules = filteredSchedules.filter((item) => item.workDate === dateStr);
 
     // Group by shiftId
     const shiftGroups = {};
@@ -729,134 +734,360 @@ const WorkSchedulePage = () => {
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key)}
         style={{ background: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
-        items={[
-          {
-            key: 'table',
-            label: (
-              <span>
-                <SolutionOutlined /> Danh sách lịch trực
-              </span>
-            ),
-            children: (
-              <>
-                {/* Advanced Search & Filtering Box */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
-                  <Select
-                    placeholder="Lọc nhân viên"
-                    style={{ width: 180 }}
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    value={selectedAccount}
-                    onChange={(val) => setSelectedAccount(val)}
-                  >
-                    {accounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+        items={
+          isOwner
+            ? [
+              {
+                key: 'calendar',
+                label: (
+                  <span>
+                    <CalendarOutlined /> Lịch trực quan (Lịch tháng)
+                  </span>
+                ),
+                children: (
+                  <div style={{ padding: '8px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                    {/* Advanced Search & Filtering Box */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
+                      {isOwnerOrAdmin && (
+                        <Select
+                          placeholder="Lọc chi nhánh"
+                          style={{ width: 180 }}
+                          allowClear
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(val)}
+                        >
+                          {branches.map((b) => (
+                            <Select.Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      )}
 
-                  <Select
-                    placeholder="Lọc trạng thái duyệt"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedApprovalStatus}
-                    onChange={(val) => setSelectedApprovalStatus(val)}
-                  >
-                    <Select.Option value={true}>Đã duyệt</Select.Option>
-                    <Select.Option value={false}>Chưa duyệt</Select.Option>
-                  </Select>
+                      <Select
+                        placeholder="Lọc nhân viên"
+                        style={{ width: 180 }}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        value={selectedAccount}
+                        onChange={(val) => setSelectedAccount(val)}
+                      >
+                        {accounts.map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            {a.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  <Select
-                    placeholder="Lọc ca làm việc"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedShift}
-                    onChange={(val) => setSelectedShift(val)}
-                  >
-                    {shifts.map((s) => (
-                      <Select.Option key={s.id} value={s.id}>
-                        {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
-                      </Select.Option>
-                    ))}
-                  </Select>
+                      <Select
+                        placeholder="Lọc trạng thái duyệt"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedApprovalStatus}
+                        onChange={(val) => setSelectedApprovalStatus(val)}
+                      >
+                        <Select.Option value={true}>Đã duyệt</Select.Option>
+                        <Select.Option value={false}>Chưa duyệt</Select.Option>
+                      </Select>
 
-                  <Select
-                    placeholder="Lọc trạng thái"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                  >
-                    {[
-                      { value: 'PENDING', label: 'Chờ thực hiện' },
-                      { value: 'APPROVED', label: 'Đã duyệt' },
-                      { value: 'Working', label: 'Đang làm việc' },
-                      { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT', label: 'Vắng mặt' },
-                    ].map((st) => (
-                      <Select.Option key={st.value} value={st.value}>
-                        {st.label}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                      <Select
+                        placeholder="Lọc ca làm việc"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedShift}
+                        onChange={(val) => setSelectedShift(val)}
+                      >
+                        {shifts.map((s) => (
+                          <Select.Option key={s.id} value={s.id}>
+                            {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  <DatePicker
-                    placeholder="Lọc ngày cụ thể"
-                    style={{ width: 160 }}
-                    value={searchDate}
-                    onChange={(date) => setSearchDate(date)}
-                    format="DD/MM/YYYY"
-                  />
+                      <Select
+                        placeholder="Lọc trạng thái"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedStatus}
+                        onChange={(val) => setSelectedStatus(val)}
+                      >
+                        {[
+                          { value: 'PENDING', label: 'Chờ thực hiện' },
+                          { value: 'APPROVED', label: 'Đã duyệt' },
+                          { value: 'Working', label: 'Đang làm việc' },
+                          { value: 'COMPLETED', label: 'Hoàn thành' },
+                          { value: 'ABSENT', label: 'Vắng mặt' },
+                        ].map((st) => (
+                          <Select.Option key={st.value} value={st.value}>
+                            {st.label}
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  {(selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
-                    <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
-                      Xóa lọc
-                    </Button>
-                  )}
-                </div>
+                      <DatePicker
+                        placeholder="Lọc ngày cụ thể"
+                        style={{ width: 160 }}
+                        value={searchDate}
+                        onChange={(date) => setSearchDate(date)}
+                        format="DD/MM/YYYY"
+                      />
 
-                {/* Table View */}
-                <Table
-                  columns={columns}
-                  dataSource={filteredSchedules}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-                  scroll={{ x: 1100 }}
-                  bordered
-                />
-              </>
-            ),
-          },
-          {
-            key: 'timetable',
-            label: (
-              <span>
-                <ClockCircleOutlined /> Lịch tuần (Timetable)
-              </span>
-            ),
-            children: <MyWorkSchedulePage />,
-          },
-          {
-            key: 'calendar',
-            label: (
-              <span>
-                <CalendarOutlined /> Lịch trực quan (Lịch tháng)
-              </span>
-            ),
-            children: (
-              <div style={{ padding: '8px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
-                <div style={{ marginBottom: 12, display: 'flex', gap: 16 }}>
-                  <span><Badge status="success" /> Đã phê duyệt</span>
-                  <span><Badge status="warning" /> Chờ phê duyệt</span>
-                </div>
-                <Calendar cellRender={dateCellRender} />
-              </div>
-            ),
-          },
-        ]}
+                      {(selectedBranch || selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                        <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
+                          Xóa lọc
+                        </Button>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: 12, display: 'flex', gap: 16 }}>
+                      <span><Badge status="success" /> Đã phê duyệt</span>
+                      <span><Badge status="warning" /> Chờ phê duyệt</span>
+                    </div>
+                    <Calendar cellRender={dateCellRender} />
+                  </div>
+                ),
+              },
+            ]
+            : [
+              {
+                key: 'table',
+                label: (
+                  <span>
+                    <SolutionOutlined /> Danh sách lịch trực
+                  </span>
+                ),
+                children: (
+                  <>
+                    {/* Advanced Search & Filtering Box */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
+                      {isOwnerOrAdmin && (
+                        <Select
+                          placeholder="Lọc chi nhánh"
+                          style={{ width: 180 }}
+                          allowClear
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(val)}
+                        >
+                          {branches.map((b) => (
+                            <Select.Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      )}
+
+                      <Select
+                        placeholder="Lọc nhân viên"
+                        style={{ width: 180 }}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        value={selectedAccount}
+                        onChange={(val) => setSelectedAccount(val)}
+                      >
+                        {accounts.map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            {a.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái duyệt"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedApprovalStatus}
+                        onChange={(val) => setSelectedApprovalStatus(val)}
+                      >
+                        <Select.Option value={true}>Đã duyệt</Select.Option>
+                        <Select.Option value={false}>Chưa duyệt</Select.Option>
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc ca làm việc"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedShift}
+                        onChange={(val) => setSelectedShift(val)}
+                      >
+                        {shifts.map((s) => (
+                          <Select.Option key={s.id} value={s.id}>
+                            {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedStatus}
+                        onChange={(val) => setSelectedStatus(val)}
+                      >
+                        {[
+                          { value: 'PENDING', label: 'Chờ thực hiện' },
+                          { value: 'APPROVED', label: 'Đã duyệt' },
+                          { value: 'Working', label: 'Đang làm việc' },
+                          { value: 'COMPLETED', label: 'Hoàn thành' },
+                          { value: 'ABSENT', label: 'Vắng mặt' },
+                        ].map((st) => (
+                          <Select.Option key={st.value} value={st.value}>
+                            {st.label}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <DatePicker
+                        placeholder="Lọc ngày cụ thể"
+                        style={{ width: 160 }}
+                        value={searchDate}
+                        onChange={(date) => setSearchDate(date)}
+                        format="DD/MM/YYYY"
+                      />
+
+                      {(selectedBranch || selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                        <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
+                          Xóa lọc
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Table View */}
+                    <Table
+                      columns={columns}
+                      dataSource={filteredSchedules}
+                      rowKey="id"
+                      loading={loading}
+                      pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
+                      scroll={{ x: 1100 }}
+                      bordered
+                    />
+                  </>
+                ),
+              },
+              {
+                key: 'timetable',
+                label: (
+                  <span>
+                    <ClockCircleOutlined /> Lịch tuần (Timetable)
+                  </span>
+                ),
+                children: <MyWorkSchedulePage />,
+              },
+              {
+                key: 'calendar',
+                label: (
+                  <span>
+                    <CalendarOutlined /> Lịch trực quan (Lịch tháng)
+                  </span>
+                ),
+                children: (
+                  <div style={{ padding: '8px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                    {/* Advanced Search & Filtering Box */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
+                      {isOwnerOrAdmin && (
+                        <Select
+                          placeholder="Lọc chi nhánh"
+                          style={{ width: 180 }}
+                          allowClear
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(val)}
+                        >
+                          {branches.map((b) => (
+                            <Select.Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      )}
+
+                      <Select
+                        placeholder="Lọc nhân viên"
+                        style={{ width: 180 }}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        value={selectedAccount}
+                        onChange={(val) => setSelectedAccount(val)}
+                      >
+                        {accounts.map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            {a.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái duyệt"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedApprovalStatus}
+                        onChange={(val) => setSelectedApprovalStatus(val)}
+                      >
+                        <Select.Option value={true}>Đã duyệt</Select.Option>
+                        <Select.Option value={false}>Chưa duyệt</Select.Option>
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc ca làm việc"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedShift}
+                        onChange={(val) => setSelectedShift(val)}
+                      >
+                        {shifts.map((s) => (
+                          <Select.Option key={s.id} value={s.id}>
+                            {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedStatus}
+                        onChange={(val) => setSelectedStatus(val)}
+                      >
+                        {[
+                          { value: 'PENDING', label: 'Chờ thực hiện' },
+                          { value: 'APPROVED', label: 'Đã duyệt' },
+                          { value: 'Working', label: 'Đang làm việc' },
+                          { value: 'COMPLETED', label: 'Hoàn thành' },
+                          { value: 'ABSENT', label: 'Vắng mặt' },
+                        ].map((st) => (
+                          <Select.Option key={st.value} value={st.value}>
+                            {st.label}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <DatePicker
+                        placeholder="Lọc ngày cụ thể"
+                        style={{ width: 160 }}
+                        value={searchDate}
+                        onChange={(date) => setSearchDate(date)}
+                        format="DD/MM/YYYY"
+                      />
+
+                      {(selectedBranch || selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                        <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
+                          Xóa lọc
+                        </Button>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: 12, display: 'flex', gap: 16 }}>
+                      <span><Badge status="success" /> Đã phê duyệt</span>
+                      <span><Badge status="warning" /> Chờ phê duyệt</span>
+                    </div>
+                    <Calendar cellRender={dateCellRender} />
+                  </div>
+                ),
+              },
+            ]
+        }
       />
 
       {/* SINGLE Create / Edit Modal Form */}
