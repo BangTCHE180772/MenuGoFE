@@ -4,7 +4,9 @@ import { CloseOutlined } from '@ant-design/icons';
 const PartnerModal = ({
   open,
   onClose,
-  onSuccess
+  onSuccess,
+  selectedBranchId,
+  editingPartner
 }) => {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
@@ -16,35 +18,71 @@ const PartnerModal = ({
 
   useEffect(() => {
     if (open) {
-      setName('');
-      setPhone('');
-      setEmail('');
-      setAddress('');
-      setType('Nhà cung cấp');
-      setNote('');
+      if (editingPartner) {
+        setName(editingPartner.name || '');
+        setPhone(editingPartner.phone || '');
+        setEmail(editingPartner.email || '');
+        setAddress(editingPartner.address || '');
+        
+        // Map from backend Enum (e.g. Supplier, Customer) to frontend string if needed
+        let typeStr = 'Nhà cung cấp';
+        if (editingPartner.type === 'Supplier' || editingPartner.type === 'Nhà cung cấp') typeStr = 'Nhà cung cấp';
+        else if (editingPartner.type === 'Customer' || editingPartner.type === 'Khách hàng') typeStr = 'Khách hàng';
+        else if (editingPartner.type === 'Transporter' || editingPartner.type === 'Vận chuyển') typeStr = 'Vận chuyển';
+        else if (editingPartner.type === 'Other' || editingPartner.type === 'Khác') typeStr = 'Khác';
+        setType(typeStr);
+
+        setNote(editingPartner.note || '');
+      } else {
+        setName('');
+        setPhone('');
+        setEmail('');
+        setAddress('');
+        setType('Nhà cung cấp');
+        setNote('');
+      }
     }
-  }, [open]);
+  }, [open, editingPartner]);
 
   if (!open) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (onSuccess) {
-        onSuccess({
-          id: Date.now(),
-          name,
-          phone,
-          email,
-          address,
-          type,
-          note
-        });
+    try {
+      const { createPartner, updatePartner } = await import('../../../../api/partnerApi');
+      
+      let mappedType = 1; // Supplier = 1
+      if (type === 'Khách hàng') mappedType = 2; // Customer = 2
+      else if (type === 'Vận chuyển') mappedType = 3; // Transporter = 3
+      else if (type === 'Khác') mappedType = 4; // Other = 4
+
+      const payload = {
+        name,
+        phone,
+        email,
+        address,
+        note,
+        type: mappedType
+      };
+
+      if (editingPartner) {
+        await updatePartner(editingPartner.id, payload);
+        alert('Cập nhật đối tác thành công!');
+      } else {
+        payload.branchId = selectedBranchId;
+        await createPartner(payload);
+        alert('Thêm đối tác thành công!');
       }
+      
+      if (onSuccess) onSuccess();
       onClose();
-    }, 300);
+    } catch (error) {
+      console.error('Error saving partner:', error);
+      alert('Không thể lưu đối tác. Vui lòng kiểm tra lại!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -186,8 +224,9 @@ const PartnerModal = ({
                   }}
                 >
                   <option value="Nhà cung cấp">Nhà cung cấp</option>
+                  <option value="Khách hàng">Khách hàng</option>
                   <option value="Vận chuyển">Vận chuyển</option>
-                  <option value="Đối tác dịch vụ">Đối tác dịch vụ</option>
+                  <option value="Khác">Khác</option>
                 </select>
               </div>
 

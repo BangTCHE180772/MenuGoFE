@@ -447,7 +447,9 @@ const OrderPage = ({ isWaiterMode }) => {
 
       <PaymentModal
         visible={isPaymentModalVisible}
+        branchId={selectedTable?.branchId || selectedTable?.area?.branchId || deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || user?.branchId || (user?.branchIds && user.branchIds[0])}
         orderId={orderSummary?.activeOrderId}
+        tableName={orderSummary?.tableName || selectedTable?.name}
         items={orderSummary?.items}
         onCancel={() => setIsPaymentModalVisible(false)}
         onSuccess={() => {

@@ -2,15 +2,28 @@ import React, { useState, useMemo } from 'react';
 import PartnerTable from './PartnerTable';
 import PartnerModal from './PartnerModal';
 
-const PartnerTab = ({ partners = [] }) => {
-  const [partnerList, setPartnerList] = useState(partners);
+const PartnerTab = ({ partners = [], fetchPartners, selectedBranchId }) => {
   const [searchText, setSearchText] = useState('');
   const [partnerType, setPartnerType] = useState('ALL');
   const [modalPartnerOpen, setModalPartnerOpen] = useState(false);
+  const [editingPartner, setEditingPartner] = useState(null);
 
   const filteredPartners = useMemo(() => {
-    return partnerList.filter((p) => {
-      if (partnerType !== 'ALL' && p.type !== partnerType) return false;
+    return partners.filter((p) => {
+      if (partnerType !== 'ALL') {
+        const normalizeType = (t) => {
+          if (t === 1 || t === '1' || t === 'Supplier' || t === 'Nhà cung cấp' || t === 'NCC') return 'NCC';
+          if (t === 2 || t === '2' || t === 'Customer' || t === 'Khách hàng' || t === 'KH') return 'KH';
+          if (t === 3 || t === '3' || t === 'Transporter' || t === 'Vận chuyển' || t === 'VC') return 'VC';
+          if (t === 4 || t === '4' || t === 'Other' || t === 'Khác' || t === 'OTHER') return 'OTHER';
+          return 'OTHER';
+        };
+
+        if (normalizeType(p.type) !== partnerType) {
+          return false;
+        }
+      }
+
       if (searchText) {
         const lower = searchText.toLowerCase();
         const matchName = p.name?.toLowerCase().includes(lower);
@@ -19,10 +32,31 @@ const PartnerTab = ({ partners = [] }) => {
       }
       return true;
     });
-  }, [partnerList, partnerType, searchText]);
+  }, [partners, partnerType, searchText]);
 
-  const handleAddPartnerSuccess = (newPartner) => {
-    setPartnerList((prev) => [newPartner, ...prev]);
+  const handleAddPartnerSuccess = () => {
+    if (fetchPartners && selectedBranchId) {
+      fetchPartners(selectedBranchId);
+    }
+  };
+
+  const handleEditPartner = (partner) => {
+    setEditingPartner(partner);
+    setModalPartnerOpen(true);
+  };
+
+  const handleDeletePartner = async (partnerId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đối tác này?')) return;
+    try {
+      const { deletePartner } = await import('../../../../api/partnerApi');
+      await deletePartner(partnerId);
+      if (fetchPartners && selectedBranchId) {
+        fetchPartners(selectedBranchId);
+      }
+    } catch (error) {
+      console.error('Error deleting partner:', error);
+      alert('Không thể xóa đối tác lúc này!');
+    }
   };
 
   return (
@@ -33,13 +67,23 @@ const PartnerTab = ({ partners = [] }) => {
         setSearchText={setSearchText}
         partnerType={partnerType}
         setPartnerType={setPartnerType}
-        setModalPartnerOpen={setModalPartnerOpen}
+        setModalPartnerOpen={(open) => {
+          if (open) setEditingPartner(null);
+          setModalPartnerOpen(open);
+        }}
+        onEdit={handleEditPartner}
+        onDelete={handleDeletePartner}
       />
 
       <PartnerModal
         open={modalPartnerOpen}
-        onClose={() => setModalPartnerOpen(false)}
+        onClose={() => {
+          setModalPartnerOpen(false);
+          setEditingPartner(null);
+        }}
         onSuccess={handleAddPartnerSuccess}
+        selectedBranchId={selectedBranchId}
+        editingPartner={editingPartner}
       />
     </div>
   );
