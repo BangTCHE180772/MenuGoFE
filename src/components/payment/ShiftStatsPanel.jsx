@@ -177,7 +177,7 @@ const ShiftStatsPanel = ({ shifts, paidTodayOrders, loading }) => {
               const m = record.paymentMethod || record.method || 'Cash';
               const isCash = m.toLowerCase().includes('cash') || m === 'Tiền mặt';
               return (
-                <Tag color={isCash ? 'cyan' : 'purple'} icon={isCash ? <DollarOutlined /> : <CreditCardOutlined />}>
+                <Tag color={isCash ? 'cyan' : 'purple'} icon={isCash ? <DollarCircleOutlined /> : <CreditCardOutlined />}>
                   {isCash ? 'Tiền mặt' : 'Chuyển khoản / PayOS'}
                 </Tag>
               );
