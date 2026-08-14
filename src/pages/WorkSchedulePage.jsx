@@ -49,6 +49,7 @@ import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
 import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
+import MyWorkSchedulePage from './MyWorkSchedulePage';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING',        label: 'Chờ thực hiện',  color: 'warning' },
@@ -811,6 +812,15 @@ const WorkSchedulePage = () => {
                 />
               </>
             ),
+          },
+          {
+            key: 'timetable',
+            label: (
+              <span>
+                <ClockCircleOutlined /> Lịch tuần (Timetable)
+              </span>
+            ),
+            children: <MyWorkSchedulePage />,
           },
           {
             key: 'calendar',
