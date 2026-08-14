@@ -108,6 +108,7 @@ const MyProfilePage = () => {
     try {
       const payload = {
         ...values,
+        id: profile.id,
         dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
         isActive: profile.isActive,
         addressId: profile.addressId ?? null,
@@ -122,7 +123,47 @@ const MyProfilePage = () => {
       });
       fetchProfile();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Cập nhật thất bại. Vui lòng thử lại.');
+      console.error('Submit Profile Error:', err);
+      const responseData = err.response?.data;
+      let fieldErrorSet = false;
+
+      if (responseData?.errors && typeof responseData.errors === 'object') {
+        const fieldsToSet = [];
+        const unmappedMessages = [];
+
+        Object.entries(responseData.errors).forEach(([fieldKey, messages]) => {
+          const fieldName = fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
+          const rawErrorList = Array.isArray(messages) ? messages : [messages];
+          const errorTextList = rawErrorList.filter(
+            (msg) => typeof msg === 'string' && !/^The\s+.*\s+field\b/i.test(msg) && !/field is required/i.test(msg)
+          );
+
+          if (errorTextList.length > 0) {
+            if (['name', 'email', 'phone', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
+              fieldsToSet.push({ name: fieldName, errors: errorTextList });
+              fieldErrorSet = true;
+            } else {
+              unmappedMessages.push(...errorTextList);
+            }
+          }
+        });
+
+        if (fieldsToSet.length > 0) {
+          form.setFields(fieldsToSet);
+        }
+        if (unmappedMessages.length > 0) {
+          unmappedMessages.forEach((msg) => message.error(msg));
+        }
+      }
+
+      if (!fieldErrorSet) {
+        const errorMsg = responseData?.message || (typeof responseData === 'string' ? responseData : null);
+        if (errorMsg && errorMsg !== 'One or more validation errors occurred.') {
+          message.error(errorMsg);
+        } else if (!responseData?.errors) {
+          message.error('Cập nhật thất bại. Vui lòng thử lại.');
+        }
+      }
     } finally {
       setSaving(false);
     }
@@ -229,7 +270,10 @@ const MyProfilePage = () => {
               </Form.Item>
             </Col>
             <Col xs={24}>
-              <Form.Item name="avatarImage" label="Ảnh đại diện">
+              <Form.Item label="Ảnh đại diện">
+                <Form.Item name="avatarImage" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
                 <Upload
                   name="file"
                   listType="picture-card"
