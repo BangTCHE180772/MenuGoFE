@@ -79,7 +79,8 @@ const MyWorkSchedulePage = () => {
       ]);
       setSchedules(scheds);
       setBranches(branchesRes.data || []);
-      setShifts(shiftsRes.data || []);
+      const rawShifts = shiftsRes.data || [];
+      setShifts([...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || '')));
       setAccounts(accountsRes.data || []);
     } catch (err) {
       console.error(err);
@@ -258,7 +259,7 @@ const MyWorkSchedulePage = () => {
     const hasCheckedIn = !!record.checkInAt;
     const hasCheckedOut = !!record.checkOutAt;
     const hasHours = record.actualHours !== null && record.actualHours !== undefined && Number(record.actualHours) > 0;
-    const isCompletedStatus = ['PRESENT', 'PRESENT_APPROVED', 'COMPLETED', 'HOAN_THANH', 'CÓ MẶT', 'ĐÃ HOÀN THÀNH'].includes(record.status);
+    const isCompletedStatus = ['PRESENT', 'PRESENT_APPROVED', 'COMPLETED', 'HOAN_THANH', 'CÓ MẶT', 'ĐÃ HOÀN THÀNH', 'HOÀN THÀNH'].includes(record.status?.toUpperCase());
 
     // 1. Completed Shift (Check in + Check out OR has worked hours OR PRESENT/COMPLETED status)
     if ((hasCheckedIn && hasCheckedOut) || (hasCheckedIn && isCompletedStatus) || hasHours || isCompletedStatus) {
@@ -270,7 +271,7 @@ const MyWorkSchedulePage = () => {
       return { text: 'ĐANG LÀM VIỆC', color: '#3b82f6', bg: '#3b82f6' };
     }
 
-    if (record.status === 'ABSENT' || record.status === 'VẮNG MẶT') {
+    if (record.status?.toUpperCase() === 'ABSENT' || record.status?.toUpperCase() === 'VẮNG MẶT') {
       return { text: 'VẮNG MẶT', color: '#ef4444', bg: '#ef4444' };
     }
 
@@ -723,7 +724,7 @@ const MyWorkSchedulePage = () => {
                       </Button>
                       <Button danger size="small" onClick={async () => {
                         try {
-                          await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
+                          await updateWorkSchedule({ ...item, status: 'Approved', managerApproved: true });
                           message.info(`❌ Đã từ chối đơn của ${empName}.`);
                           loadData();
                         } catch (e) { message.error('Lỗi từ chối!'); }
