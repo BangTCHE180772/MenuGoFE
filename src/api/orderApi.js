@@ -4,6 +4,9 @@ import axiosInstance from './axiosInstance';
 export const getAllOrders = () =>
   axiosInstance.get('/api/Order');
 
+export const getPaidInvoices = (branchId) =>
+  axiosInstance.get('/api/Order/invoices', { params: { branchId } });
+
 export const getOrderById = (id) =>
   axiosInstance.get(`/api/Order/${id}`);
 
