@@ -297,7 +297,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
                 return location.pathname === childBasePath;
               })
             : location.pathname === item.path ||
-              (item.path !== "/home" && location.pathname.startsWith(item.path));
+              (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
 
           const isSubOpen = openSubMenus[item.label] ?? true;
 

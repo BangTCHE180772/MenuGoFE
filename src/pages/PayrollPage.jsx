@@ -168,6 +168,9 @@ const PayrollPage = () => {
   const [batchForm] = Form.useForm();
   const [statusForm] = Form.useForm();
 
+  const currentSalaryType = Form.useWatch('salaryType', form);
+  const isHourlyForm = currentSalaryType === 'Hourly' || currentSalaryType === 'Theo giờ' || currentSalaryType === 'TheoGio';
+
   // Format Currency Utility
   const formatVND = (val) => {
     if (val === undefined || val === null) return '0 đ';
@@ -274,13 +277,14 @@ const PayrollPage = () => {
         type: typeof d.type === 'number' ? (TYPE_INT_TO_STRING[d.type] || d.typeName || d.type) : (d.typeName || d.type),
       }));
 
+      const isHourlyRecord = record.salaryType === 'Hourly' || record.salaryType === 'Theo giờ' || record.salaryType === 'TheoGio';
       form.setFieldsValue({
         accountId: record.accountId,
         branchId: record.branchId,
         monthYear: dayjs(`${record.year}-${record.Month || record.month}-01`),
         salaryType: record.salaryType || 'Monthly',
         baseSalary: record.baseSalary,
-        baseWorkDays: record.baseWorkDays || 26,
+        baseWorkDays: isHourlyRecord ? 0 : (record.baseWorkDays || 26),
         actualWorkDays: record.actualWorkDays || 0,
         actualWorkHours: record.actualWorkHours || 0,
         calculatedSalary: record.calculatedSalary || 0,
@@ -317,9 +321,13 @@ const PayrollPage = () => {
 
   // Recalculate salary in form dynamically when values change
   const handleFormValuesChange = (changedValues, allValues) => {
+    const salaryType = allValues.salaryType || 'Monthly';
+    const isHourly = salaryType === 'Hourly' || salaryType === 'Theo giờ' || salaryType === 'TheoGio';
+
     const baseSalary = allValues.baseSalary || 0;
-    const baseDays = allValues.baseWorkDays || 26;
+    const baseDays = isHourly ? 0 : (allValues.baseWorkDays || 26);
     const actualDays = allValues.actualWorkDays || 0;
+    const actualHours = allValues.actualWorkHours || 0;
     const details = allValues.salaryDetails || [];
 
     // Calculate sum of detail line items
@@ -340,7 +348,15 @@ const PayrollPage = () => {
     const selectedAcc = accounts.find((a) => a.id === allValues.accountId);
     const isManagerAcc = isOwnerOrAdmin && selectedAcc?.roleIds?.includes(3);
 
-    const calculatedSal = isManagerAcc ? baseSalary : Math.round((baseSalary / (baseDays || 1)) * actualDays);
+    let calculatedSal = 0;
+    if (isManagerAcc) {
+      calculatedSal = baseSalary;
+    } else if (isHourly) {
+      calculatedSal = Math.round(baseSalary * actualHours);
+    } else {
+      calculatedSal = Math.round((baseSalary / (baseDays || 1)) * actualDays);
+    }
+
     const netSal = calculatedSal + allowanceSum + bonusSum - deductionSum - penaltySum;
 
     form.setFieldsValue({
@@ -350,6 +366,7 @@ const PayrollPage = () => {
       totalDeduction: deductionSum,
       penaltyAmount: penaltySum,
       netSalary: Math.max(0, netSal),
+      ...(isHourly ? { baseWorkDays: 0 } : {}),
     });
   };
 
@@ -588,16 +605,23 @@ const PayrollPage = () => {
     {
       title: isOwnerOrAdmin ? 'Lương cơ bản' : 'Lương CB & Công',
       key: 'baseSalaryInfo',
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{formatVND(record.baseSalary)}</div>
-          {!isOwnerOrAdmin && (
-            <div style={{ fontSize: '11px', color: '#6b7280' }}>
-              {record.actualWorkDays}/{record.baseWorkDays || 26} ngày công ({record.actualWorkHours || 0} giờ)
-            </div>
-          )}
-        </div>
-      ),
+      render: (_, record) => {
+        const isHourly = record.salaryType === 'Hourly' || record.salaryType === 'Theo giờ' || record.salaryType === 'TheoGio';
+        return (
+          <div>
+            <div style={{ fontWeight: 500 }}>{formatVND(record.baseSalary)}</div>
+            {!isOwnerOrAdmin && (
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                {isHourly ? (
+                  <span>{record.actualWorkHours || 0} giờ làm</span>
+                ) : (
+                  <span>{record.actualWorkDays}/{record.baseWorkDays || 26} ngày công ({record.actualWorkHours || 0} giờ)</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Lương tính toán',
@@ -1163,24 +1187,37 @@ const PayrollPage = () => {
 
             {!isOwnerOrAdmin && (
               <>
-                <Col span={8}>
-                  <Form.Item
-                    name="baseWorkDays"
-                    label="Công chuẩn (ngày)"
-                    rules={[{ required: true, message: 'Nhập công chuẩn!' }]}
-                  >
-                    <InputNumber style={{ width: '100%' }} min={1} max={31} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
+                {!isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item
+                      name="baseWorkDays"
+                      label="Công chuẩn (ngày)"
+                      rules={[{ required: true, message: 'Nhập công chuẩn!' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={1} max={31} />
+                    </Form.Item>
+                  </Col>
+                )}
+                <Col span={isHourlyForm ? 8 : 8}>
                   <Form.Item
                     name="actualWorkDays"
                     label="Công thực tế (ngày)"
-                    rules={[{ required: true, message: 'Nhập công thực tế!' }]}
+                    rules={isHourlyForm ? [] : [{ required: true, message: 'Nhập công thực tế!' }]}
                   >
                     <InputNumber style={{ width: '100%' }} min={0} step={0.5} max={31} />
                   </Form.Item>
                 </Col>
+                {isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item
+                      name="actualWorkHours"
+                      label="Số giờ làm thực tế"
+                      rules={[{ required: true, message: 'Nhập số giờ làm!' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
+                    </Form.Item>
+                  </Col>
+                )}
               </>
             )}
 
@@ -1202,12 +1239,14 @@ const PayrollPage = () => {
           <Row gutter={16}>
             {!isOwnerOrAdmin && (
               <>
-                <Col span={8}>
-                  <Form.Item name="actualWorkHours" label="Số giờ làm thực tế">
-                    <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
+                {!isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item name="actualWorkHours" label="Số giờ làm thực tế">
+                      <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
+                    </Form.Item>
+                  </Col>
+                )}
+                <Col span={isHourlyForm ? 12 : 8}>
                   <Form.Item name="calculatedSalary" label="Lương tính toán">
                     <InputNumber
                       addonAfter="đ"
