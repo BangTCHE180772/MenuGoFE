@@ -1135,8 +1135,9 @@ const PayrollPage = () => {
             </Col>
             <Col span={12}>
               <Form.Item name="salaryType" label="Hình thức lương">
-                <Select placeholder="Chọn hình thức lương">
+                <Select disabled placeholder="Được cấu hình trong Hợp đồng">
                   <Select.Option value="Monthly">Theo tháng</Select.Option>
+                  <Select.Option value="Fixed">Theo tháng</Select.Option>
                   <Select.Option value="Hourly">Theo giờ</Select.Option>
                 </Select>
               </Form.Item>
