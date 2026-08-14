@@ -236,7 +236,7 @@ const MyWorkSchedulePage = () => {
   // - Past shift start/end without check in -> 'VẮNG MẶT'
   const getShiftStatusDetails = (record, shift) => {
     if (!shift) return { text: 'CHƯA ĐẾN GIỜ', color: '#64748b', bg: '#94a3b8' };
-    
+
     const now = dayjs();
     const workDateStr = dayjs(record.workDate).format('YYYY-MM-DD');
     const startStr = shift.startTime ? shift.startTime.substring(0, 5) : '00:00';

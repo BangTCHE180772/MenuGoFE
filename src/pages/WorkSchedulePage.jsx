@@ -52,14 +52,14 @@ import { useAuth } from '../context/AuthContext';
 import MyWorkSchedulePage from './MyWorkSchedulePage';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING',        label: 'Chờ thực hiện',  color: 'warning' },
-  { value: 'APPROVED',       label: 'Đã duyệt',        color: 'processing' },
-  { value: 'Đang làm việc',  label: 'Đang làm việc',   color: 'blue' },
-  { value: 'Hoàn thành',     label: 'Hoàn thành',      color: 'success' },
-  { value: 'Vắng mặt',       label: 'Vắng mặt',        color: 'error' },
+  { value: 'PENDING', label: 'Chờ thực hiện', color: 'warning' },
+  { value: 'APPROVED', label: 'Đã duyệt', color: 'processing' },
+  { value: 'Đang làm việc', label: 'Đang làm việc', color: 'blue' },
+  { value: 'Hoàn thành', label: 'Hoàn thành', color: 'success' },
+  { value: 'Vắng mặt', label: 'Vắng mặt', color: 'error' },
   // Giữ lại để tương thích với dữ liệu cũ trong DB
-  { value: 'COMPLETED',      label: 'Hoàn thành',      color: 'success' },
-  { value: 'ABSENT',         label: 'Vắng mặt',        color: 'error' },
+  { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
+  { value: 'ABSENT', label: 'Vắng mặt', color: 'error' },
 ];
 
 // Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
@@ -121,7 +121,7 @@ const WorkSchedulePage = () => {
 
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
   }, [accounts]);
-  
+
   // Filtering states
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
@@ -201,7 +201,7 @@ const WorkSchedulePage = () => {
       // Parse inputs
       const checkInVal = record.checkInAt ? dayjs(record.checkInAt) : null;
       const checkOutVal = record.checkOutAt ? dayjs(record.checkOutAt) : null;
-      
+
       form.setFieldsValue({
         accountId: record.accountId,
         branchId: record.branchId,
@@ -235,7 +235,7 @@ const WorkSchedulePage = () => {
   const handleSubmit = async (values) => {
     try {
       const workDateStr = values.workDate.format('YYYY-MM-DD');
-      
+
       // Combine date and time
       let checkInAt = null;
       if (values.checkInTime) {
@@ -250,6 +250,21 @@ const WorkSchedulePage = () => {
       // Validations
       if (checkInAt && checkOutAt && dayjs(checkOutAt).isBefore(dayjs(checkInAt))) {
         message.error('Giờ check-out không thể trước giờ check-in!');
+        return;
+      }
+
+      // Check if employee already has a schedule for this shift on this date
+      const duplicateExists = schedules.some((s) => {
+        if (modalType === 'edit' && editingRecord && s.id === editingRecord.id) return false;
+        const sameAccount = s.accountId === values.accountId;
+        const sameShift = s.shiftId === values.shiftId;
+        const sameDate = dayjs(s.workDate).format('YYYY-MM-DD') === workDateStr;
+        return sameAccount && sameShift && sameDate;
+      });
+
+      if (duplicateExists) {
+        const accName = getAccountName(values.accountId);
+        message.error(`Nhân viên ${accName} đã được phân công ca làm việc này vào ngày ${values.workDate.format('DD/MM/YYYY')}!`);
         return;
       }
 
@@ -358,7 +373,7 @@ const WorkSchedulePage = () => {
       const res = await assignWorkSchedules(payload);
       const assignedCount = res.data?.length || 0;
       message.success(`Đã phân ca thành công: tạo mới ${assignedCount} lịch làm việc!`);
-      
+
       setIsBulkModalOpen(false);
       bulkForm.resetFields();
       loadData();
@@ -399,8 +414,10 @@ const WorkSchedulePage = () => {
       title: 'Mã lịch',
       dataIndex: 'code',
       key: 'code',
+      defaultSortOrder: 'ascend',
       render: (code) => <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{code}</span>,
       width: 140,
+      sorter: (a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }),
     },
     {
       title: 'Nhân viên',
@@ -416,22 +433,22 @@ const WorkSchedulePage = () => {
     },
     ...(isOwnerOrAdmin
       ? [
-          {
-            title: 'Chi nhánh',
-            dataIndex: 'branchId',
-            key: 'branchId',
-            width: 170,
-            render: (id) => {
-              const fullName = getBranchName(id);
-              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
-              return (
-                <Tooltip title={fullName}>
-                  <span>{displayName}</span>
-                </Tooltip>
-              );
-            },
+        {
+          title: 'Chi nhánh',
+          dataIndex: 'branchId',
+          key: 'branchId',
+          width: 170,
+          render: (id) => {
+            const fullName = getBranchName(id);
+            const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+            return (
+              <Tooltip title={fullName}>
+                <span>{displayName}</span>
+              </Tooltip>
+            );
           },
-        ]
+        },
+      ]
       : []),
     {
       title: 'Ca trực',
@@ -773,11 +790,11 @@ const WorkSchedulePage = () => {
                     onChange={(val) => setSelectedStatus(val)}
                   >
                     {[
-                      { value: 'PENDING',   label: 'Chờ thực hiện' },
-                      { value: 'APPROVED',  label: 'Đã duyệt' },
-                      { value: 'Working',   label: 'Đang làm việc' },
+                      { value: 'PENDING', label: 'Chờ thực hiện' },
+                      { value: 'APPROVED', label: 'Đã duyệt' },
+                      { value: 'Working', label: 'Đang làm việc' },
                       { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT',    label: 'Vắng mặt' },
+                      { value: 'ABSENT', label: 'Vắng mặt' },
                     ].map((st) => (
                       <Select.Option key={st.value} value={st.value}>
                         {st.label}
@@ -865,10 +882,10 @@ const WorkSchedulePage = () => {
         }}
         cancelButtonProps={{ style: { borderRadius: '6px' } }}
       >
-        <Form 
-          form={form} 
-          layout="vertical" 
-          onFinish={handleSubmit} 
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
           style={{ marginTop: 16 }}
           onValuesChange={(changedValues, allValues) => {
             if (changedValues.checkInTime || changedValues.checkOutTime) {
@@ -1179,7 +1196,7 @@ const WorkSchedulePage = () => {
           >
             <DatePicker.RangePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
           </Form.Item>
-          
+
           <div style={{ padding: '8px 12px', background: '#e6f7ff', borderRadius: '4px', border: '1px solid #91d5ff', display: 'flex', gap: 8, alignItems: 'center' }}>
             <FileDoneOutlined style={{ color: '#1890ff', fontSize: 16 }} />
             <span style={{ fontSize: '13px', color: '#1890ff' }}>
