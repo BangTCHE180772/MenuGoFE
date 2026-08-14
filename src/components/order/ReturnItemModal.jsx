@@ -27,7 +27,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
       } else {
         await axiosInstance.put(`/api/Order/details/${item.orderDetailId}/request-return`, payload);
       }
-      
+
       message.success('Đã gửi yêu cầu trả món thành công!');
       form.resetFields();
       onSuccess();
@@ -69,6 +69,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           <InputNumber min={1} max={maxReturnable} style={{ width: '100%' }} />
         </Form.Item>
 
+        {/* Bỏ lý do trả vì hàng nguyên vẹn không cần lý do 
         <Form.Item
           name="returnReason"
           label="Lý do trả"
@@ -76,9 +77,9 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
         >
           <Input.TextArea rows={3} placeholder="Ví dụ: Khách chê món mặn, món bị hỏng..." />
         </Form.Item>
-
-        <Form.Item name="isIntact" valuePropName="checked">
-          <Checkbox>
+        */}
+        <Form.Item name="isIntact" valuePropName="checked" style={{ display: 'none' }}>
+          <Checkbox disabled>
             Hàng còn nguyên vẹn (Sẽ được nhập lại vào kho)
           </Checkbox>
         </Form.Item>
