@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AdjustmentTable from './AdjustmentTable';
 import AdjustmentDocumentModal from './AdjustmentDocumentModal';
 
@@ -10,7 +11,28 @@ const AdjustmentTab = ({
   fetchDocuments,
   handleDeleteDocument
 }) => {
-  const [searchText, setSearchText] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
+
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editDocumentId, setEditDocumentId] = useState(null);
@@ -59,7 +81,7 @@ const AdjustmentTab = ({
         loading={loading}
         selectedBranchId={selectedBranchId}
         searchText={searchText}
-        setSearchText={setSearchText}
+        setSearchText={handleSearchChange}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         fetchDocuments={fetchDocuments}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import TransferTable from './TransferTable';
 import TransferDocumentModal from './TransferDocumentModal';
 import ReceiveTransferDocumentModal from './ReceiveTransferDocumentModal';
@@ -15,7 +16,29 @@ const TransferTab = ({
 }) => {
   const [transferList, setTransferList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
+
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalTransferOpen, setModalTransferOpen] = useState(false);
   const [editDocumentId, setEditDocumentId] = useState(null);
@@ -109,7 +132,7 @@ const TransferTab = ({
         documents={transferDocuments}
         selectedBranchId={selectedBranchId}
         searchText={searchText}
-        setSearchText={setSearchText}
+        setSearchText={handleSearchChange}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         loading={loading || parentLoading}

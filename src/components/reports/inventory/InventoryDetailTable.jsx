@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Table, Tag, Input, Select, Button, Card, Typography, Modal, Descriptions, Tooltip, Dropdown, Space, message } from "antd";
+import { useNavigate } from "react-router-dom";
 import {
   SearchOutlined,
   DownloadOutlined,
@@ -14,19 +15,45 @@ import {
   EyeOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import { exportToExcelCSV, printReportTable } from "../../homePage/exportUtils";
 
 const { Title, Text } = Typography;
 
 const TRANSACTION_TYPES = [
   { value: "all", label: "Tất cả giao dịch" },
   { value: "Nhập kho", label: "Nhập kho" },
-  { value: "Xuất kho (Bếp)", label: "Xuất kho (Bếp)" },
+  { value: "Xuất kho", label: "Xuất kho" },
   { value: "Điều chỉnh", label: "Điều chỉnh" },
   { value: "Xuất hủy", label: "Xuất hủy" },
   { value: "Sản xuất", label: "Sản xuất" },
+  { value: "Chuyển kho", label: "Chuyển kho" },
+  { value: "Trả hàng", label: "Trả hàng" },
+  { value: "Khách trả hàng", label: "Khách trả hàng" },
 ];
 
+const mapTransactionTypeToTab = (type) => {
+  switch (type) {
+    case "Nhập kho":
+      return "Import";
+    case "Trả hàng":
+      return "ImportReturn";
+    case "Kiểm kho":
+      return "Check";
+    case "Xuất hủy":
+      return "ExportDelete";
+    case "Chuyển kho":
+      return "Transfer";
+    case "Sản xuất":
+      return "Production";
+    case "Điều chỉnh":
+      return "Adjustment";
+    default:
+      return "Import";
+  }
+};
+
 const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFullscreen }) => {
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -39,59 +66,34 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
   };
 
   const handleExportExcel = () => {
-    try {
-      const headers = [
-        "Thời Gian",
-        "Mã Phiếu",
-        "Loại Giao Dịch",
-        "Nguyên Liệu",
-        "Số Lượng",
-        "Đơn Vị",
-        "Nhập Kho",
-        "Xuất Kho",
-        "Điều Chỉnh",
-        "Người Tạo",
-        "Ghi Chú",
-      ];
-
-      const rows = filteredItems.map((item) => [
-        item.time,
-        item.docCode,
-        item.transactionType,
-        item.ingredientName,
-        item.quantity,
-        item.unit,
-        item.importQty || 0,
-        item.exportQty || 0,
-        item.adjustQty || 0,
-        item.createdBy,
-        item.note,
-      ]);
-
-      const csvContent =
-        "data:text/csv;charset=utf-8,\uFEFF" +
-        [headers.join(","), ...rows.map((r) => r.map((cell) => `"${cell}"`).join(","))].join("\n");
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Bao_Cao_Chi_Tiet_Kho_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      message.success("Đã xuất file báo cáo chi tiết kho!");
-    } catch (err) {
-      console.error(err);
-      message.error("Lỗi khi xuất dữ liệu.");
-    }
+    const columnDefs = [
+      { title: "Thời Gian", field: "time" },
+      { title: "Mã Phiếu", field: "docCode" },
+      { title: "Loại Giao Dịch", field: "transactionType" },
+      { title: "Nguyên Liệu", field: "ingredientName" },
+      { title: "Số Lượng Biến Động", field: (r) => `${r.quantity} ${r.unit}` },
+      { title: "Nhập Kho (+)", field: (r) => r.importQty > 0 ? `+${r.importQty} ${r.unit}` : "-" },
+      { title: "Xuất Kho (-)", field: (r) => r.exportQty > 0 ? `-${r.exportQty} ${r.unit}` : "-" },
+      { title: "Điều Chỉnh (±)", field: (r) => r.adjustQty !== 0 ? `${r.adjustQty > 0 ? "+" : ""}${r.adjustQty} ${r.unit}` : "-" },
+      { title: "Người Tạo", field: "createdBy" },
+      { title: "Ghi Chú", field: "note" },
+    ];
+    exportToExcelCSV("Nhat_Ky_Giao_Dich_Kho", columnDefs, filteredItems);
   };
 
   const handleExportPDF = () => {
-    message.info("Đang chuẩn bị file PDF nhật ký giao dịch kho...");
-    setTimeout(() => {
-      window.print();
-    }, 300);
+    const columnDefs = [
+      { title: "Thời Gian", field: "time" },
+      { title: "Mã Phiếu", field: "docCode" },
+      { title: "Loại Giao Dịch", field: "transactionType" },
+      { title: "Nguyên Liệu", field: "ingredientName" },
+      { title: "Số Lượng", field: (r) => `${r.quantity} ${r.unit}` },
+      { title: "Nhập Kho (+)", field: (r) => r.importQty > 0 ? `+${r.importQty} ${r.unit}` : "-" },
+      { title: "Xuất Kho (-)", field: (r) => r.exportQty > 0 ? `-${r.exportQty} ${r.unit}` : "-" },
+      { title: "Điều Chỉnh (±)", field: (r) => r.adjustQty !== 0 ? `${r.adjustQty > 0 ? "+" : ""}${r.adjustQty} ${r.unit}` : "-" },
+      { title: "Người Tạo", field: "createdBy" },
+    ];
+    printReportTable("Báo cáo Chi tiết Nhật ký Giao dịch Kho", columnDefs, filteredItems);
   };
 
   const handlePrint = () => {
@@ -148,14 +150,14 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       title: "Mã phiếu",
       dataIndex: "docCode",
       key: "docCode",
-      width: 115,
+      width: 180,
       render: (text, record) => (
         <Button
           type="link"
-          style={{ padding: 0, fontWeight: 600, fontSize: 12 }}
+          style={{ padding: 0, fontWeight: 600, fontSize: 12, color: "var(--color-primary)" }}
           onClick={() => {
-            setSelectedRecord(record);
-            setModalVisible(true);
+            const tab = mapTransactionTypeToTab(record.transactionType);
+            navigate(`/inventory-management?tab=${tab}&search=${text}`);
           }}
         >
           {text}
@@ -170,10 +172,13 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       render: (type) => {
         const typeConfig = {
           "Nhập kho": { color: "green", label: "Nhập kho" },
-          "Xuất kho (Bếp)": { color: "blue", label: "Xuất kho (Bếp)" },
+          "Xuất kho": { color: "blue", label: "Xuất kho" },
           "Điều chỉnh": { color: "purple", label: "Điều chỉnh" },
           "Xuất hủy": { color: "red", label: "Xuất hủy" },
           "Sản xuất": { color: "orange", label: "Sản xuất" },
+          "Chuyển kho": { color: "cyan", label: "Chuyển kho" },
+          "Trả hàng": { color: "volcano", label: "Trả hàng" },
+          "Khách trả hàng": { color: "magenta", label: "Khách trả" },
         };
         const cfg = typeConfig[type] || { color: "default", label: type };
         return <Tag color={cfg.color}>{cfg.label}</Tag>;
@@ -192,7 +197,7 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       dataIndex: "quantity",
       key: "quantity",
       align: "right",
-      width: 110,
+      width: 160,
       render: (qty, record) => (
         <span style={{ fontWeight: 600 }}>
           {qty} {record.unit}
@@ -204,7 +209,7 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       dataIndex: "importQty",
       key: "importQty",
       align: "right",
-      width: 120,
+      width: 170,
       render: (val, record) =>
         val > 0 ? (
           <span style={{ color: "#16a34a", fontWeight: 700 }}>
@@ -219,7 +224,7 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       dataIndex: "exportQty",
       key: "exportQty",
       align: "right",
-      width: 120,
+      width: 170,
       render: (val, record) =>
         val > 0 ? (
           <span style={{ color: "#dc2626", fontWeight: 700 }}>
@@ -397,7 +402,7 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
           showTotal: (total) => `Tổng số ${total} giao dịch`,
         }}
         bordered={false}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1650 }}
       />
 
       {/* Detail Modal */}

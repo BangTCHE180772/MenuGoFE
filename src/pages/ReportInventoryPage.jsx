@@ -19,7 +19,7 @@ import ShelfLifeMonitoring from "../components/reports/inventory/ShelfLifeMonito
 import InventoryDetailTable from "../components/reports/inventory/InventoryDetailTable";
 import OperationalAlerts from "../components/reports/inventory/OperationalAlerts";
 
-import { getBInventories } from "../api/binventoryApi";
+import { getBInventories, getConsumptionReport, getTransactionLedger } from "../api/binventoryApi";
 import { getBranchDashboardStats } from "../api/dashboardApi";
 import { getNotifications } from "../api/notificationApi";
 import { useBranch } from "../context/BranchContext";
@@ -131,48 +131,27 @@ const ReportInventoryPage = () => {
           varianceThresholdPercent: 5,
         });
 
-        // --- Map sang danh sách tiêu thụ (Consumption Items) ---
-        const mappedConsumption = rawBInventory.map((item, idx) => {
-          const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-          const stockQty = item.quantity || 0;
-          
-          const seed = (activeBranchId * 13 + idx * 7) % 20;
-          const importedQty = Math.round(stockQty * 1.5 + seed + 5);
-          const consumedQty = Math.max(0, importedQty - stockQty);
+        // --- Gọi API Lấy báo cáo tiêu thụ thực tế ---
+        let rawConsumption = [];
+        try {
+          rawConsumption = await getConsumptionReport(activeBranchId, dateRange[0].toDate(), dateRange[1].toDate());
+          console.log("[ReportInventoryPage] rawConsumption response success:", rawConsumption);
+        } catch (err) {
+          console.error("[ReportInventoryPage] Consumption API error:", err);
+          message.error("Không thể tải danh sách tiêu thụ thực tế.");
+        }
+        setConsumptionItems(rawConsumption);
 
-          const hasVariance = (seed % 3 === 0) && consumedQty > 0;
-          const excessQty = hasVariance ? Math.round(consumedQty * (0.05 + (seed % 5) * 0.03)) : 0;
-          const variancePercent = hasVariance && consumedQty > 0 ? Math.round((excessQty / consumedQty) * 100) : 0;
-
-          return {
-            id:              item.code || `NL-${item.id}`,
-            name:            item.name,
-            category:        item.groupName || "Chưa phân nhóm",
-            unit:            unitName,
-            importedQty,
-            stockQty,
-            consumedQty,
-            excessQty,
-            variancePercent,
-          };
-        });
-        setConsumptionItems(mappedConsumption);
-
-        // --- Map sang bảng giao dịch kho chi tiết ---
-        const mappedLedger = rawBInventory.map((item) => {
-          const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-          return {
-            id:          item.code || `NL-${item.id}`,
-            name:        item.name,
-            category:    item.groupName || "Chưa phân nhóm",
-            unit:        unitName,
-            avgCost:     item.purchasePrice || 0,
-            stockQty:    item.quantity || 0,
-            totalValue:  (item.quantity || 0) * (item.purchasePrice || 0),
-            lastUpdated: "Hôm nay",
-          };
-        });
-        setDetailLedgerItems(mappedLedger);
+        // --- Gọi API Lấy nhật ký giao dịch kho chi tiết ---
+        let rawLedger = [];
+        try {
+          rawLedger = await getTransactionLedger(activeBranchId, dateRange[0].toDate(), dateRange[1].toDate());
+          console.log("[ReportInventoryPage] rawLedger response success:", rawLedger);
+        } catch (err) {
+          console.error("[ReportInventoryPage] Ledger API error:", err);
+          message.error("Không thể tải nhật ký giao dịch kho.");
+        }
+        setDetailLedgerItems(rawLedger);
 
         // --- Map dữ liệu Nguyên liệu sắp hết hạn (Shelf-life Monitoring) đồng bộ theo thông báo ---
         const expiring = rawBInventory
@@ -274,8 +253,9 @@ const ReportInventoryPage = () => {
         });
 
         // --- Lấy top 10 sản phẩm có sai số tiêu hao lớn nhất để vẽ biểu đồ ---
-        const sortedTop = [...mappedConsumption]
-          .sort((a, b) => b.variancePercent - a.variancePercent)
+        const sortedTop = [...rawConsumption]
+          .filter(item => Math.abs(item.variancePercent) > 5)
+          .sort((a, b) => Math.abs(b.variancePercent) - Math.abs(a.variancePercent))
           .slice(0, 10);
         setTopVarianceData(sortedTop);
       }
@@ -323,15 +303,19 @@ const ReportInventoryPage = () => {
   };
 
   const columnDefs = [
-    { title: "Mã NL",          field: "id" },
-    { title: "Tên nguyên liệu", field: "name" },
-    { title: "Nhóm",          field: "category" },
-    { title: "Đơn vị",         field: "unit" },
-    { title: "Đã nhập",        field: (r) => `${r.importedQty} ${r.unit}`, align: "right" },
-    { title: "Tồn kho",        field: (r) => `${r.stockQty} ${r.unit}`,    align: "right" },
-    { title: "Đã tiêu thụ",    field: (r) => `${r.consumedQty} ${r.unit}`, align: "right" },
-    { title: "Tiêu hao vượt",  field: (r) => `${r.excessQty} ${r.unit}`,   align: "right" },
-    { title: "Sai số (%)",     field: (r) => `${r.variancePercent}%`,      align: "center" },
+    { title: "Mã NL",                       field: "id" },
+    { title: "Tên nguyên liệu",              field: "name" },
+    { title: "Nhóm",                        field: "category" },
+    { title: "Đơn vị",                      field: "unit" },
+    { title: "Tồn đầu kỳ",                  field: (r) => `${r.openingStock} ${r.unit}`, align: "right" },
+    { title: "Nhập",                        field: (r) => `${r.import} ${r.unit}`, align: "right" },
+    { title: "Chuyển vào",                  field: (r) => `${r.transferIn} ${r.unit}`, align: "right" },
+    { title: "Chuyển ra",                   field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
+    { title: "Hệ thống ghi nhận tiêu thụ",     field: (r) => `${r.systemConsumption} ${r.unit}`, align: "right" },
+    { title: "Tiêu thụ định mức",            field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
+    { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
+    { title: "Sai số (%)",                  field: (r) => `${r.variancePercent > 0 ? '+' : ''}${r.variancePercent}%`, align: "center" },
+    { title: "Tồn cuối",                    field: (r) => `${r.closingStock} ${r.unit}`, align: "right" },
   ];
 
   return (
