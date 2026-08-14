@@ -159,6 +159,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
       txnSummary: [
         {
           key: "txn_sales",
+          docType: "Phiếu thu",
           category: "Giao dịch hóa đơn",
           txnCount: salesCount,
           cash: salesCashCount,
@@ -168,6 +169,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
         },
         {
           key: "txn_thu",
+          docType: "Phiếu thu",
           category: "Giao dịch thu",
           txnCount: cfThuCount,
           cash: cfThuCashCount,
@@ -177,6 +179,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
         },
         {
           key: "txn_chi",
+          docType: "Phiếu chi",
           category: "Giao dịch chi",
           txnCount: cfChiCount,
           cash: cfChiCashCount,
@@ -186,6 +189,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
         },
         {
           key: "txn_total",
+          docType: "",
           category: "Tổng giao dịch",
           txnCount: totalTxnAll,
           cash: totalTxnCash,
@@ -271,6 +275,18 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
 
   // Bảng 3: Giao dịch
   const txnColumns = [
+    {
+      title: "Loại phiếu",
+      dataIndex: "docType",
+      key: "docType",
+      width: 120,
+      onCell: (_, index) => {
+        if (index === 0) return { rowSpan: 2 };
+        if (index === 1) return { rowSpan: 0 };
+        return { rowSpan: 1 };
+      },
+      render: (t) => <span>{t}</span>,
+    },
     { title: "Danh mục", dataIndex: "category", key: "category", width: 180, render: (t) => <strong style={{ color: t === "Tổng giao dịch" ? "var(--color-primary)" : "#334155" }}>{t}</strong> },
     { title: "Số giao dịch", dataIndex: "txnCount", key: "txnCount", align: "center", render: (v) => <span>{v} lượt</span> },
     { title: "Tiền mặt", dataIndex: "cash", key: "cash", align: "center", render: (v) => <span>{v} lượt</span> },
@@ -315,6 +331,7 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
     {
       title: "3. Tổng số lượng Giao dịch (Số lượt giao dịch)",
       columnDefs: [
+        { title: "Loại phiếu", field: "docType" },
         { title: "Danh mục", field: "category" },
         { title: "Số giao dịch", field: (r) => `${r.txnCount} lượt`, align: "center" },
         { title: "Tiền mặt", field: (r) => `${r.cash} lượt`, align: "center" },

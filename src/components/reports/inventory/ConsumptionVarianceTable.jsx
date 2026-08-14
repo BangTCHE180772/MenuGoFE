@@ -1,31 +1,19 @@
-import React, { useState } from "react";
-import { Table, Tag, Input, Select, Button, Card, Typography, Tooltip, Dropdown, Space, message } from "antd";
+import React from "react";
+import { Table, Tag, Button, Card, Typography, Tooltip, Dropdown, Space, message } from "antd";
 import {
-  SearchOutlined,
   DownloadOutlined,
   PrinterOutlined,
   FileExcelOutlined,
   FilePdfOutlined,
   ReloadOutlined,
-  UndoOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
-  FilterOutlined,
   AlertOutlined,
   CheckCircleOutlined,
   DownOutlined,
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
-
-const STATUS_FILTER_OPTIONS = [
-  { value: "all", label: "Tất cả trạng thái kho" },
-  { value: "Bình thường", label: "Bình thường" },
-  { value: "Sắp hết", label: "Sắp hết" },
-  { value: "Hết hàng", label: "Hết hàng" },
-  { value: "Cần kiểm tra", label: "Cần kiểm tra" },
-  { value: "Sắp hết hạn", label: "Sắp hết hạn" },
-];
 
 const ConsumptionVarianceTable = ({
   items = [],
@@ -34,19 +22,11 @@ const ConsumptionVarianceTable = ({
   isFullscreen,
   onToggleFullscreen,
 }) => {
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const handleResetFilters = () => {
-    setSearchText("");
-    setStatusFilter("all");
-    message.info("Đã đặt lại bộ lọc bảng tiêu thụ.");
-  };
 
   const handleExportExcel = () => {
     try {
       const headers = ["Mã NL", "Tên Nguyên Liệu", "Đơn Vị", "Đã Nhập", "Tồn Kho", "Đã Tiêu Thụ", "Tiêu Hao Vượt", "Sai Số (%)"];
-      const rows = filteredItems.map((item) => [
+      const rows = items.map((item) => [
         item.id,
         item.name,
         item.unit,
@@ -110,18 +90,6 @@ const ConsumptionVarianceTable = ({
       onClick: handlePrint,
     },
   ];
-
-  const filteredItems = items.filter((item) => {
-    const matchSearch =
-      !searchText ||
-      item.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchText.toLowerCase()) ||
-      (item.category && item.category.toLowerCase().includes(searchText.toLowerCase()));
-
-    const matchStatus = statusFilter === "all" || item.status === statusFilter;
-
-    return matchSearch && matchStatus;
-  });
 
   const columns = [
     {
@@ -241,7 +209,7 @@ const ConsumptionVarianceTable = ({
         </div>
       )}
 
-      {/* Toolbar: Search, Filter, Refresh, Reset, Export/PDF/Print Dropdown, Fullscreen */}
+      {/* Toolbar: Refresh, Export/PDF/Print Dropdown, Fullscreen */}
       <div
         style={{
           display: "flex",
@@ -257,30 +225,6 @@ const ConsumptionVarianceTable = ({
         }}
       >
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, flex: 1 }}>
-          {/* Search Input */}
-          <Input
-            placeholder="Tìm theo tên hoặc mã nguyên liệu..."
-            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 240, borderRadius: 8 }}
-            allowClear
-          />
-
-          {/* Status Filter Dropdown */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>
-              <FilterOutlined style={{ marginRight: 4 }} />
-              Trạng thái:
-            </span>
-            <Select
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={STATUS_FILTER_OPTIONS}
-              style={{ width: 180 }}
-            />
-          </div>
-
           {/* Refresh Button */}
           <Tooltip title="Làm mới bảng">
             <Button
@@ -289,14 +233,6 @@ const ConsumptionVarianceTable = ({
               style={{ borderRadius: 8 }}
             />
           </Tooltip>
-
-          {/* Reset Button */}
-          <Button
-            onClick={handleResetFilters}
-            style={{ borderRadius: 8 }}
-          >
-            Đặt lại
-          </Button>
         </div>
 
         {/* Right Toolbar Actions: Unified Export Excel / PDF / Print Dropdown & Fullscreen */}
@@ -329,7 +265,7 @@ const ConsumptionVarianceTable = ({
       {/* Consumption Table */}
       <Table
         columns={columns}
-        dataSource={filteredItems}
+        dataSource={items}
         rowKey="id"
         pagination={{
           pageSize: 6,

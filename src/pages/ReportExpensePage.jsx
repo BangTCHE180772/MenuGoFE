@@ -313,7 +313,6 @@ const ReportExpensePage = () => {
           {/* 2. Expense Charts */}
           <ExpenseCharts
             trendData={trendData}
-            breakdownData={breakdownData}
             topExpenseData={topExpenseData}
           />
 

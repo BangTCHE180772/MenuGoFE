@@ -5,19 +5,14 @@ import {
   ShoppingOutlined,
   RiseOutlined,
   FallOutlined,
-  ThunderboltOutlined,
   TrophyOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
-  CreditCardOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -45,7 +40,7 @@ const formatVND = (val) =>
  * - Top 5 món bán chạy & Món bán chậm nhất
  */
 const HomeDashboard = ({ data }) => {
-  const { kpis, hourlyTrends, topDishes, orderSummary, paymentMethods, alerts } = data;
+  const { kpis, hourlyTrends, topDishes, orderSummary, alerts } = data;
 
   const kpiItems = [
     {
@@ -55,22 +50,6 @@ const HomeDashboard = ({ data }) => {
       isGood: (kpis.revenue.changePct || 0) >= 0,
       icon: <DollarOutlined style={{ fontSize: 22, color: "#2563eb" }} />,
       bgIcon: "#eff6ff",
-    },
-    {
-      title: "Chi phí phát sinh",
-      value: kpis.expense.formatted,
-      changePct: kpis.expense.changePct || 0,
-      isGood: (kpis.expense.changePct || 0) <= 0,
-      icon: <FallOutlined style={{ fontSize: 22, color: "#ef4444" }} />,
-      bgIcon: "#fef2f2",
-    },
-    {
-      title: "Lợi nhuận ròng",
-      value: kpis.profit.formatted,
-      changePct: kpis.profit.changePct || 0,
-      isGood: (kpis.profit.changePct || 0) >= 0,
-      icon: <RiseOutlined style={{ fontSize: 22, color: "#10b981" }} />,
-      bgIcon: "#ecfdf5",
     },
     {
       title: "Tổng số đơn hàng",
@@ -104,7 +83,7 @@ const HomeDashboard = ({ data }) => {
         {kpiItems.map((kpi, index) => {
           const isUp = kpi.changePct >= 0;
           return (
-            <Col xs={24} sm={12} lg={6} key={index}>
+            <Col xs={24} sm={12} lg={12} key={index}>
               <Card
                 bordered={false}
                 style={{
@@ -157,12 +136,12 @@ const HomeDashboard = ({ data }) => {
         })}
       </Row>
 
-      {/* ── 2. ORDER SUMMARY & PAYMENT METHODS (BACKEND DATA) ─────────────── */}
-      {(orderSummary || (paymentMethods && paymentMethods.length > 0)) && (
+      {/* ── 2. ORDER SUMMARY (BACKEND DATA) ─────────────── */}
+      {orderSummary && (
         <Row gutter={[16, 16]}>
           {/* Order Status Breakdown Card */}
           {orderSummary && (
-            <Col xs={24} lg={paymentMethods && paymentMethods.length > 0 ? 12 : 24}>
+            <Col xs={24} lg={24}>
               <Card
                 title={
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -214,130 +193,8 @@ const HomeDashboard = ({ data }) => {
               </Card>
             </Col>
           )}
-
-          {/* Payment Methods Card */}
-          {paymentMethods && paymentMethods.length > 0 && (
-            <Col xs={24} lg={orderSummary ? 12 : 24}>
-              <Card
-                title={
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <CreditCardOutlined style={{ color: "#10b981" }} />
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>
-                      Phân bổ Phương thức Thanh toán
-                    </span>
-                  </div>
-                }
-                bordered={false}
-                style={{
-                  borderRadius: "var(--border-radius)",
-                  boxShadow: "var(--shadow-sm)",
-                  background: "var(--color-surface)",
-                  height: "100%",
-                }}
-                bodyStyle={{ padding: "16px 20px" }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {paymentMethods.map((method, idx) => {
-                    const totalVal = paymentMethods.reduce((acc, m) => acc + (m.value || 0), 0);
-                    const pct = totalVal ? Math.round((method.value / totalVal) * 100) : 0;
-                    return (
-                      <div key={idx}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ fontWeight: 600, color: "#334155" }}>{method.name}</span>
-                          <strong>{formatVND(method.value)} ({pct}%)</strong>
-                        </div>
-                        <Progress
-                          percent={pct}
-                          showInfo={false}
-                          strokeColor={idx === 0 ? "#16a34a" : idx === 1 ? "#2563eb" : "#7c3aed"}
-                          style={{ margin: 0 }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            </Col>
-          )}
         </Row>
       )}
-
-      {/* ── 3. Biểu đồ 3 Đường: Revenue, Expense, Profit Trend ─────────────── */}
-      <Card
-        title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ThunderboltOutlined style={{ color: "#2563eb" }} />
-            <span style={{ fontWeight: 700, fontSize: 15 }}>
-              Xu hướng Doanh thu, Chi phí & Lợi nhuận
-            </span>
-          </div>
-        }
-        bordered={false}
-        style={{
-          borderRadius: "var(--border-radius)",
-          boxShadow: "var(--shadow-sm)",
-          background: "var(--color-surface)",
-        }}
-        bodyStyle={{ padding: "16px 20px 24px 20px" }}
-      >
-        <div style={{ width: "100%", height: 320 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={hourlyTrends} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradProf" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="hour" tickLine={false} stroke="#94a3b8" fontSize={12} />
-              <YAxis
-                tickLine={false}
-                stroke="#94a3b8"
-                fontSize={12}
-                tickFormatter={(val) => `${val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val}`}
-              />
-              <Tooltip
-                formatter={(value, name) => [formatVND(value), name]}
-                labelStyle={{ fontWeight: 700, color: "#1e293b" }}
-                contentStyle={{ borderRadius: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", border: "none" }}
-              />
-              <Legend verticalAlign="top" height={36} />
-              <Area
-                type="monotone"
-                dataKey="revenue"
-                name="Doanh thu"
-                stroke="#2563eb"
-                strokeWidth={2.5}
-                fillOpacity={1}
-                fill="url(#gradRev)"
-              />
-              <Line
-                type="monotone"
-                dataKey="expense"
-                name="Chi phí"
-                stroke="#ef4444"
-                strokeWidth={2.5}
-                strokeDasharray="4 4"
-                dot={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="profit"
-                name="Lợi nhuận"
-                stroke="#10b981"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#gradProf)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
 
       {/* ── 4 & 5. Order Trend + Top 5 Best Selling Dishes ────────────────── */}
       <Row gutter={[16, 16]}>
