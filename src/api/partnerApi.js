@@ -23,3 +23,13 @@ export const createPartner = async (partnerData) => {
   return response.data;
 };
 
+export const updatePartner = async (id, partnerData) => {
+  const response = await axiosInstance.put(`/api/Partner/${id}`, partnerData);
+  return response.data;
+};
+
+export const deletePartner = async (id) => {
+  const response = await axiosInstance.delete(`/api/Partner/${id}`);
+  return response.data;
+};
+
