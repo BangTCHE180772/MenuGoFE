@@ -54,8 +54,8 @@ const CONTRACT_TYPES = [
 ];
 
 const SALARY_TYPES = [
-  { value: 'Fixed', label: 'Lương cố định' },
-  { value: 'Hourly', label: 'Lương theo giờ' },
+  { value: 'Monthly', label: 'Theo tháng' },
+  { value: 'Hourly', label: 'Theo giờ' },
 ];
 
 const STATUS_OPTIONS = [
@@ -187,7 +187,7 @@ const ContractPage = () => {
 
   // Handle Type Change to auto set salaryType
   const handleTypeChange = (val) => {
-    const salaryTypeVal = val === 'Full-time' ? 'Fixed' : 'Hourly';
+    const salaryTypeVal = val === 'Full-time' ? 'Monthly' : 'Hourly';
     form.setFieldsValue({
       type: val,
       salaryType: salaryTypeVal,
@@ -201,7 +201,7 @@ const ContractPage = () => {
     setIsModalOpen(true);
     
     if (type === 'edit' && record) {
-      const targetSalaryType = record.type === 'Full-time' ? 'Fixed' : 'Hourly';
+      const targetSalaryType = (record.salaryType === 'Fixed' || record.type === 'Full-time') ? 'Monthly' : (record.salaryType || 'Hourly');
       form.setFieldsValue({
         accountId: record.accountId,
         accountName: record.accountName || getAccountName(record.accountId),
@@ -222,7 +222,7 @@ const ContractPage = () => {
       form.setFieldsValue({
         status: 'Active',
         type: 'Full-time',
-        salaryType: 'Fixed',
+        salaryType: 'Monthly',
         baseWorkDay: 26,
         branchId: defaultBranchId,
         roleId: isOwnerOrAdmin ? 3 : undefined,
@@ -1087,7 +1087,7 @@ const ContractPage = () => {
                   <Col span={8}>
                     <div style={{ fontSize: '12px', color: '#6b7280' }}>Hình thức lương</div>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
-                      {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || detailRecord.salaryType}
+                      {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || (detailRecord.salaryType === 'Fixed' ? 'Theo tháng' : detailRecord.salaryType)}
                     </div>
                   </Col>
                   <Col span={8}>
