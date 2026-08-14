@@ -41,7 +41,7 @@ const InventoryManagementTab = () => {
 
   // Real Data states
   const [documents, setDocuments] = useState([]);
-  const [partners] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [products] = useState([]);
 
   const fetchDocuments = async (branchId) => {
@@ -63,11 +63,29 @@ const InventoryManagementTab = () => {
     }
   };
 
+  const fetchPartners = async (branchId) => {
+    if (!branchId || branchId <= 0) {
+      setPartners([]);
+      return;
+    }
+    try {
+      const { getPartnersByBranch } = await import('../../api/partnerApi');
+      const res = await getPartnersByBranch(branchId);
+      const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setPartners(data);
+    } catch (err) {
+      console.error('Error fetching branch partners:', err);
+      setPartners([]);
+    }
+  };
+
   useEffect(() => {
     if (currentBranchId && currentBranchId > 0) {
       fetchDocuments(currentBranchId);
+      fetchPartners(currentBranchId);
     } else {
       setDocuments([]);
+      setPartners([]);
     }
   }, [currentBranchId]);
 
@@ -174,7 +192,11 @@ const InventoryManagementTab = () => {
         )}
 
         {activeTab === 'Partner' && (
-          <PartnerTab partners={partners} />
+          <PartnerTab
+            partners={partners}
+            fetchPartners={fetchPartners}
+            selectedBranchId={currentBranchId}
+          />
         )}
 
         {activeTab === 'Product' && (
@@ -182,7 +204,7 @@ const InventoryManagementTab = () => {
         )}
 
         {activeTab === 'Invoice' && (
-          <InvoiceTab invoices={[]} />
+          <InvoiceTab selectedBranchId={currentBranchId} />
         )}
       </div>
     </div>

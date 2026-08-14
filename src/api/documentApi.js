@@ -415,3 +415,9 @@ export const getDocumentById = async (id) => {
   const response = await axiosInstance.get(`/api/Document/${id}`);
   return response.data;
 };
+
+export const getSaleById = async (id) => {
+  if (!id || id <= 0) return null;
+  const response = await axiosInstance.get(`/api/SaleDocument/${id}`);
+  return response.data;
+};

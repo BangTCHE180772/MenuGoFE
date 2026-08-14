@@ -78,6 +78,9 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           <Input.TextArea rows={3} placeholder="Ví dụ: Khách chê món mặn, món bị hỏng..." />
         </Form.Item>
         */}
+        <div style={{ color: 'orange', fontStyle: 'italic', marginBottom: 16 }}>
+          Lưu ý: hàng chỉ được trả khi là đồ đóng hộp và còn nguyên!
+        </div>
         <Form.Item name="isIntact" valuePropName="checked" style={{ display: 'none' }}>
           <Checkbox disabled>
             Hàng còn nguyên vẹn (Sẽ được nhập lại vào kho)
