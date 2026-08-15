@@ -36,6 +36,7 @@ import {
   ReloadOutlined,
   FileDoneOutlined,
   UserOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
