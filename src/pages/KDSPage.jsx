@@ -197,60 +197,46 @@ const KDSPage = () => {
 
 
 
-  // Group items by status for Filter Tabs & Columns
-  const unrollItems = (list) => {
-    const result = [];
-    list.forEach(item => {
-      if (item.quantity > 1) {
-        for (let i = 0; i < item.quantity; i++) {
-          result.push({ ...item, quantity: 1, _splitKey: `${item.orderDetailId}_${i}` });
+  const handleCompleteBatch = async (itemsInBatch) => {
+    try {
+      // Nhóm theo orderDetailId để tránh gọi API nhiều lần cho cùng 1 orderDetailId bị split
+      const groupedById = {};
+      itemsInBatch.forEach(item => {
+        if (!groupedById[item.orderDetailId]) {
+          groupedById[item.orderDetailId] = 0;
         }
-      } else {
-        result.push({ ...item, _splitKey: `${item.orderDetailId}_0` });
+        groupedById[item.orderDetailId] += item.quantity;
+      });
+
+      // Gọi API lần lượt để tránh race condition
+      for (const [id, qty] of Object.entries(groupedById)) {
+        await updateCookingStatus(id, COOKING_STATUS.READY, qty);
       }
-    });
-    return result;
+      message.success('Đã hoàn thành toàn bộ mẻ');
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi hoàn thành mẻ');
+    }
   };
 
-  const groupOrUnrollItems = (list) => {
-    const batchedGroups = {};
-    const result = [];
-    
-    list.forEach(item => {
-      if (item.batchId) {
-        if (!batchedGroups[item.batchId]) {
-          batchedGroups[item.batchId] = { 
-            ...item, 
-            _splitKey: `batch_${item.batchId}`, 
-            orderDetailIds: [item.orderDetailId] 
-          };
-        } else {
-          batchedGroups[item.batchId].quantity += item.quantity;
-          batchedGroups[item.batchId].orderDetailIds.push(item.orderDetailId);
-        }
-      } else {
-        if (item.quantity > 1) {
-          for (let i = 0; i < item.quantity; i++) {
-            result.push({ ...item, quantity: 1, _splitKey: `${item.orderDetailId}_${i}` });
-          }
-        } else {
-          result.push({ ...item, _splitKey: `${item.orderDetailId}_0` });
-        }
-      }
-    });
-
-    return [...result, ...Object.values(batchedGroups)].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  };
-
-  const waitingItems = useMemo(() => unrollItems(items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING)), [items]);
-  const acceptedItems = useMemo(() => unrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED)), [items]);
-  const cookingItems = useMemo(() => groupOrUnrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING)), [items]);
-  const readyItems = useMemo(() => groupOrUnrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.READY)), [items]);
+  const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
+  const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
+  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
+  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
 
   const batchableItems = useMemo(() => {
     const combined = [...waitingItems, ...acceptedItems];
     const grouped = {};
+    const now = new Date();
+    
     combined.forEach(item => {
+      // Bỏ qua các món đã tạo quá 30 phút (không cho vào mẻ nữa)
+      if (item.createdAt) {
+        const minutes = (now - new Date(item.createdAt)) / 60000;
+        if (minutes > 30) return;
+      }
+
       const key = item.productId || item.productName;
       if (!grouped[key]) {
         grouped[key] = {
@@ -313,13 +299,39 @@ const KDSPage = () => {
     }
     return groupItemsByDish(list).map((batch) => (
       <div key={`${batch.productId || batch.productName}_${batch.batchIndex}`} style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text strong style={{ color: '#000000', fontSize: 14 }}>{batch.productName}</Text>
-          {batch.items.length > 1 && (
-            <Tag color="cyan" style={{ margin: 0, fontWeight: 700 }}>
-              Mẻ {batch.batchIndex} • {batch.totalQty} phần
-            </Tag>
-          )}
+        <div style={{ marginBottom: 12, borderBottom: '2px dashed #d9d9d9', paddingBottom: 12 }}>
+          <div style={{ marginBottom: 8 }}>
+            <Text strong style={{ color: '#000000', fontSize: 18 }}>{batch.productName}</Text>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            {batch.items.length > 1 && (
+              <div style={{ 
+                backgroundColor: '#e6fffb', 
+                border: '2px solid #13c2c2', 
+                borderRadius: 8, 
+                padding: '4px 10px', 
+                color: '#006d75',
+                fontSize: 14,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                whiteSpace: 'nowrap'
+              }}>
+                Mẻ {batch.batchIndex} • {batch.totalQty} phần
+              </div>
+            )}
+            {batch.items.some(i => i.cookingStatus === COOKING_STATUS.COOKING) && (
+              <Button 
+                type="primary" 
+                size="middle"
+                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 800, borderRadius: 8 }}
+                onClick={() => handleCompleteBatch(batch.items)}
+                icon={<CheckCircleOutlined />}
+              >
+                Hoàn thành mẻ
+              </Button>
+            )}
+          </div>
         </div>
         {batch.items.map(renderKdsCard)}
       </div>
@@ -451,8 +463,13 @@ const KDSPage = () => {
             >
               {item.productName}
             </Title>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center' }}>
               Số lượng: x{item.quantity}
+              {item.batchId && (
+                <Tag color="magenta" style={{ marginLeft: 12, fontSize: 14, fontWeight: 800, padding: '2px 8px' }}>
+                  <ThunderboltOutlined /> MẺ
+                </Tag>
+              )}
             </div>
           </div>
         </div>
@@ -698,20 +715,23 @@ const KDSPage = () => {
               <Card
                 key={batch.productId}
                 size="small"
-                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 220, borderRadius: 8 }}
-                styles={{ body: { padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
+                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
+                styles={{ body: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
               >
                 <div>
-                  <Text strong style={{ fontSize: 15, color: '#000000' }}>{batch.productName}</Text>
-                  <div style={{ color: '#faad14', fontWeight: 700, fontSize: 14 }}>Tổng: {batch.totalQty} phần</div>
+                  <Text strong style={{ fontSize: 16, color: '#000000', display: 'block', marginBottom: 4 }}>{batch.productName}</Text>
+                  <div style={{ color: '#d4380d', fontWeight: 900, fontSize: 22, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Mẻ {batch.totalQty} phần
+                  </div>
                 </div>
                 <Button 
                   type="primary" 
+                  size="large"
                   onClick={() => handleBatchStatusChange(batch.productId, COOKING_STATUS.COOKING)}
-                  style={{ marginLeft: 16, backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 600 }}
-                  icon={<FireOutlined />}
+                  style={{ marginLeft: 20, backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 700, height: 48, borderRadius: 8 }}
+                  icon={<FireOutlined style={{ fontSize: 20 }} />}
                 >
-                  Xác nhận {batch.totalQty} phần
+                  Xác nhận
                 </Button>
               </Card>
             ))}
@@ -729,7 +749,7 @@ const KDSPage = () => {
         <Row gutter={[20, 20]}>
           {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -743,7 +763,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {waitingItems.length + acceptedItems.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món chờ chế biến</div>
                 ) : (
@@ -755,7 +775,7 @@ const KDSPage = () => {
 
           {/* Column 2: Đang nấu (Cooking) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -769,7 +789,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {renderGroupedColumn(cookingItems, 'Không có món đang làm')}
               </div>
             </div>
@@ -777,7 +797,7 @@ const KDSPage = () => {
 
           {/* Column 3: Hoàn thành (Ready) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -791,7 +811,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
               </div>
             </div>
