@@ -51,6 +51,29 @@ const STATUS_TAGS = {
   'Terminated': { label: 'Đã chấm dứt', color: 'error', icon: <InfoCircleOutlined /> },
 };
 
+const ROLE_NAMES = {
+  'Admin': 'Quản trị viên',
+  'Owner': 'Chủ sở hữu',
+  'Manager': 'Quản lý',
+  'Cashier': 'Thu ngân',
+  'Chef': 'Bếp trưởng',
+  'HeadChef': 'Bếp trưởng',
+  'Waiter': 'Phục vụ',
+  'Staff': 'Phục vụ',
+  1: 'Quản trị viên',
+  2: 'Chủ sở hữu',
+  3: 'Quản lý',
+  4: 'Thu ngân',
+  5: 'Bếp trưởng',
+  6: 'Phục vụ',
+};
+
+const getRoleDisplayName = (roleName, roleId) => {
+  if (roleName && ROLE_NAMES[roleName]) return ROLE_NAMES[roleName];
+  if (roleId && ROLE_NAMES[roleId]) return ROLE_NAMES[roleId];
+  return roleName || (roleId ? `Chức vụ #${roleId}` : '—');
+};
+
 const MyContractPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -190,7 +213,7 @@ const MyContractPage = () => {
                         {activeContract.accountName || user?.name || `Tài khoản #${activeContract.accountId}`}
                       </div>
                       <Tag color="blue" style={{ marginTop: '6px', borderRadius: '4px' }}>
-                        {activeContract.roleName || `Chức vụ #${activeContract.roleId}`}
+                        {getRoleDisplayName(activeContract.roleName, activeContract.roleId)}
                       </Tag>
                     </div>
                   </Col>
