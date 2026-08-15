@@ -29,6 +29,9 @@ import {
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
+import { useDevice } from '../context/DeviceContext';
+
+import { useBranch } from '../context/BranchContext';
 
 const { Title, Text } = Typography;
 
@@ -42,7 +45,10 @@ const COOKING_STATUS = {
 
 const KDSPage = () => {
   const { user } = useAuth();
-  const currentBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
+  const { deviceInfo } = useDevice();
+  const { currentBranchId: contextBranchId } = useBranch();
+  
+  const currentBranchId = deviceInfo?.branchId || contextBranchId || user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -93,7 +99,7 @@ const KDSPage = () => {
   const fetchItems = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await getKitchenItems();
+      const res = await getKitchenItems(currentBranchId);
       const data = res.data || [];
       // Sort chronologically from oldest to newest
       const sorted = [...data].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -104,7 +110,7 @@ const KDSPage = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     fetchItems(true);
@@ -148,7 +154,7 @@ const KDSPage = () => {
     return () => {
       signalRConnection.off('ReceiveNotification', handleNotification);
     };
-  }, [signalRConnection, fetchItems, playAlertSound]);
+  }, [signalRConnection, fetchItems, playAlertSound, currentBranchId]);
 
   // Single Item Status Change Handler
   const handleStatusChange = async (detailIdOrIds, nextStatus, quantity = null) => {

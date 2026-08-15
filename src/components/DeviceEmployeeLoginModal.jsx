@@ -54,7 +54,7 @@ const DeviceEmployeeLoginModal = ({ open, onCancel, onSuccess, prefillEmail }) =
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: 20, color: '#666' }}>
             {prefillEmail ? (
-              <p>Mã QR đã được quét! Vui lòng nhập mã 2FA để hoàn tất đăng nhập cho <strong>{prefillEmail}</strong>.</p>
+              <p>Mã QR đã được quét! Hệ thống sẽ tự động đăng nhập cho tài khoản <strong>{prefillEmail}</strong>.</p>
             ) : (
               <p>Vui lòng nhập Email và mã 2FA từ ứng dụng Authenticator để bắt đầu phiên làm việc.</p>
             )}
