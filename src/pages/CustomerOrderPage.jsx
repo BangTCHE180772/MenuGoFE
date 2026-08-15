@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { message, Spin, Spin as AntSpin, Modal } from 'antd';
 import { getTableOrderSummary } from '../api/tableMapApi';
-import { createOrder, createOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
+import { createOrder, createBulkOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
 import { useSignalR } from '../context/SignalRContext';
 import MenuPanel from '../components/order/MenuPanel';
@@ -205,6 +205,8 @@ const CustomerOrderPage = () => {
 
     isSubmittingRef.current = true;
     setOrderLoading(true);
+    let createdOrderId = null;
+
     try {
       let orderId = summary?.originalOrderId || summary?.activeOrderId;
 
@@ -220,21 +222,20 @@ const CustomerOrderPage = () => {
           createdBy: null,
         });
         orderId = orderRes?.data?.id ?? orderRes?.data;
+        createdOrderId = orderId;
       }
 
-      await Promise.all(
-        cartItems.map((item) =>
-          createOrderDetail(orderId, {
-            productId: item.id,
-            recipeId: null,
-            quantity: item.qty,
-            price: item.price,
-            note: item.note || '',
-            status: 'CustomerPending',
-            cookingStatus: 'Waiting',
-          })
-        )
-      );
+      const dtos = cartItems.map((item) => ({
+        productId: item.id,
+        recipeId: null,
+        quantity: item.qty,
+        price: item.price,
+        note: item.note || '',
+        status: 'CustomerPending',
+        cookingStatus: 'Waiting',
+      }));
+
+      await createBulkOrderDetail(orderId, dtos);
 
       message.success('Đặt món thành công! Nhân viên sẽ ra xác nhận sớm.');
       setCartItems([]);
@@ -242,8 +243,54 @@ const CustomerOrderPage = () => {
       setActiveTab('ordered');
       fetchTableSummary();
     } catch (err) {
+      if (createdOrderId) {
+        try {
+          await cancelOrder(createdOrderId);
+        } catch (e) {
+          console.error("Lỗi xoá order rỗng:", e);
+        }
+      }
       console.error(err);
-      message.error('Có lỗi xảy ra khi đặt món');
+      if (err.response?.status === 400 && err.response?.data?.errors?.length > 0) {
+        const errors = err.response.data.errors;
+        Modal.confirm({
+          title: 'Một số món không đủ số lượng',
+          content: (
+            <div>
+              <p>Bếp không đủ nguyên liệu cho các món sau:</p>
+              <ul style={{ paddingLeft: 20 }}>
+                {errors.map((e, idx) => (
+                  <li key={idx}>
+                    <strong>{e.productName}</strong>: Bạn chọn {e.requestedQuantity}, bếp chỉ còn {e.availableQuantity}
+                  </li>
+                ))}
+              </ul>
+              <p>Bạn có muốn tự động cập nhật giỏ hàng theo số lượng còn lại không?</p>
+            </div>
+          ),
+          okText: 'Cập nhật giỏ hàng',
+          cancelText: 'Hủy bỏ',
+          onOk: () => {
+            setCartItems(prev => {
+              let newCart = [...prev];
+              errors.forEach(errItem => {
+                const index = newCart.findIndex(c => c.id === errItem.productId);
+                if (index !== -1) {
+                  if (errItem.availableQuantity <= 0) {
+                    newCart.splice(index, 1);
+                  } else {
+                    newCart[index].qty = errItem.availableQuantity;
+                  }
+                }
+              });
+              return newCart;
+            });
+            message.info('Đã cập nhật giỏ hàng, vui lòng kiểm tra lại trước khi đặt món.');
+          }
+        });
+      } else {
+        message.error(err.response?.data?.message || 'Có lỗi xảy ra khi đặt món');
+      }
     } finally {
       setOrderLoading(false);
       isSubmittingRef.current = false;
@@ -362,14 +409,6 @@ const CustomerOrderPage = () => {
                           Hủy món
                         </button>
                       )}
-                      {isServed && returnableQty > 0 && (
-                        <button
-                          onClick={() => setReturnItem(item)}
-                          style={{ marginTop: '8px', color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                        >
-                          Trả món
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -414,8 +453,8 @@ const CustomerOrderPage = () => {
 
           <div className="co-cart-items">
             {cartItems.length > 0 ? cartItems.map(item => (
-              <div key={item.id} className="co-cart-item">
-                <div className="co-cart-item-info">
+              <div key={item.id} className="co-cart-item" style={{ position: 'relative' }}>
+                <div className="co-cart-item-info" style={{ paddingRight: '24px' }}>
                   <div className="co-cart-item-name">{item.name}</div>
                   <div className="co-cart-item-price">{formatPrice(item.price)}</div>
                 </div>
@@ -424,6 +463,22 @@ const CustomerOrderPage = () => {
                   <span style={{ fontWeight: '600', minWidth: '20px', textAlign: 'center' }}>{item.qty}</span>
                   <button className="co-qty-btn" onClick={() => handleUpdateQty(item.id, 1)}>+</button>
                 </div>
+                <button 
+                  onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} 
+                  style={{ 
+                    position: 'absolute', 
+                    top: '8px', 
+                    right: '8px', 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#9ca3af', 
+                    cursor: 'pointer',
+                    fontSize: '16px'
+                  }}
+                  title="Xóa món"
+                >
+                  ✕
+                </button>
               </div>
             )) : (
               <div className="co-empty-state" style={{ padding: '20px' }}>Giỏ hàng trống</div>

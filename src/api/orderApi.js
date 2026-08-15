@@ -41,6 +41,9 @@ export const getOrderDetailById = (orderId, id) =>
 export const createOrderDetail = (orderId, data) =>
   axiosInstance.post(`/api/Order/${orderId}/details`, data);
 
+export const createBulkOrderDetail = (orderId, data) =>
+  axiosInstance.post(`/api/Order/${orderId}/details/bulk`, data);
+
 export const updateOrderDetail = (orderId, id, data) =>
   axiosInstance.put(`/api/Order/${orderId}/details/${id}`, data);
 

@@ -19,7 +19,7 @@ import { FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
-import { createOrder, createOrderDetail, updateCookingStatus, cancelOrder } from '../api/orderApi';
+import { createOrder, createBulkOrderDetail, updateCookingStatus, cancelOrder } from '../api/orderApi';
 import { getTableOrderSummary, confirmOrderItem, rejectOrderItem } from '../api/tableMapApi';
 import { checkInReservation } from '../api/reservationApi';
 import { TABLE_STATUS } from '../data/tableConstants';
@@ -226,6 +226,9 @@ const OrderPage = ({ isWaiterMode }) => {
 
     isConfirmingRef.current = true;
     setOrderLoading(true);
+    let createdOrderId = null;
+    let wasTableEmpty = false;
+
     try {
       const summaryRes = await getTableOrderSummary(selectedTable.id);
       let orderId = summaryRes.data?.originalOrderId || summaryRes.data?.activeOrderId;
@@ -242,6 +245,7 @@ const OrderPage = ({ isWaiterMode }) => {
           const updated = { ...selectedTable, status: 'Occupied' };
           setSelectedTable(updated);
           setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
+          wasTableEmpty = true;
         } catch (err) {
           message.error('Lỗi khi cập nhật trạng thái bàn sang Có khách');
           setOrderLoading(false);
@@ -261,21 +265,20 @@ const OrderPage = ({ isWaiterMode }) => {
           createdBy: 1,
         });
         orderId = orderRes?.data?.id ?? orderRes?.data;
+        createdOrderId = orderId;
       }
 
-      await Promise.all(
-        cartItems.map((item) =>
-          createOrderDetail(orderId, {
-            productId: item.id,
-            recipeId: null,
-            quantity: item.qty,
-            price: item.price,
-            note: item.note || '',
-            status: 'Confirmed',
-            cookingStatus: 'Waiting',
-          })
-        )
-      );
+      const dtos = cartItems.map((item) => ({
+        productId: item.id,
+        recipeId: null,
+        quantity: item.qty,
+        price: item.price,
+        note: item.note || '',
+        status: 'Confirmed',
+        cookingStatus: 'Waiting',
+      }));
+
+      await createBulkOrderDetail(orderId, dtos);
 
       message.success(`Gọi thêm món thành công!`);
       setCartItems([]);
@@ -283,8 +286,70 @@ const OrderPage = ({ isWaiterMode }) => {
       const newSummaryRes = await getTableOrderSummary(selectedTable.id);
       setOrderSummary(newSummaryRes.data);
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Lỗi khi tạo/gọi thêm đơn hàng';
-      message.error(msg);
+      // Rollback nếu tạo Order mới nhưng thêm món lỗi
+      if (createdOrderId) {
+        try {
+          await deleteOrder(createdOrderId);
+        } catch (e) {
+          console.error("Lỗi khi xoá order rỗng:", e);
+        }
+      }
+      if (wasTableEmpty) {
+        try {
+          await updateTable({
+            id: selectedTable.id,
+            areaId: selectedTable.areaId,
+            name: selectedTable.name,
+            status: 'Empty',
+            isActive: selectedTable.isActive ?? true,
+          });
+          const reverted = { ...selectedTable, status: 'Empty' };
+          setSelectedTable(reverted);
+          setTables((prev) => prev.map((t) => String(t.id) === String(reverted.id) ? reverted : t));
+        } catch (e) {
+          console.error("Lỗi khi hoàn tác trạng thái bàn:", e);
+        }
+      }
+      if (err.response?.status === 400 && err.response?.data?.errors?.length > 0) {
+        const errors = err.response.data.errors;
+        Modal.confirm({
+          title: 'Một số món không đủ số lượng',
+          content: (
+            <div>
+              <p>Bếp không đủ nguyên liệu cho các món sau:</p>
+              <ul style={{ paddingLeft: 20 }}>
+                {errors.map((e, idx) => (
+                  <li key={idx}>
+                    <strong>{e.productName}</strong>: Chọn {e.requestedQuantity}, bếp còn {e.availableQuantity}
+                  </li>
+                ))}
+              </ul>
+              <p>Bạn có muốn tự động cập nhật giỏ hàng theo số lượng còn lại không?</p>
+            </div>
+          ),
+          okText: 'Cập nhật giỏ hàng',
+          cancelText: 'Hủy bỏ',
+          onOk: () => {
+            setCartItems(prev => {
+              let newCart = [...prev];
+              errors.forEach(errItem => {
+                const index = newCart.findIndex(c => c.id === errItem.productId);
+                if (index !== -1) {
+                  if (errItem.availableQuantity <= 0) {
+                    newCart.splice(index, 1);
+                  } else {
+                    newCart[index].qty = errItem.availableQuantity;
+                  }
+                }
+              });
+              return newCart;
+            });
+            message.info('Đã cập nhật giỏ hàng, vui lòng kiểm tra lại trước khi gọi món.');
+          }
+        });
+      } else {
+        message.error(err.response?.data?.message || 'Có lỗi khi đặt món!');
+      }
     } finally {
       setOrderLoading(false);
       isConfirmingRef.current = false;
