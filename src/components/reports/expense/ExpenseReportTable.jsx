@@ -1,5 +1,6 @@
 import React from "react";
-import { Table, Tag, Typography } from "antd";
+import { Table, Tag, Typography, Tooltip, Button } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -24,45 +25,46 @@ const ExpenseReportTable = ({
       title: "Mã Phiếu Chi",
       dataIndex: "expenseCode",
       key: "expenseCode",
-      width: 120,
       sorter: (a, b) => a.expenseCode.localeCompare(b.expenseCode),
       render: (text) => (
-        <strong style={{ color: "#ef4444", cursor: "pointer" }}>{text}</strong>
+        <strong 
+          style={{ color: "#ef4444", cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.location.href = `/cashflow?search=${text}`;
+          }}
+        >
+          {text}
+        </strong>
       ),
     },
     {
       title: "Ngày",
       dataIndex: "date",
       key: "date",
-      width: 100,
       sorter: (a, b) => a.date.localeCompare(b.date),
     },
     {
       title: "Giờ",
       dataIndex: "time",
       key: "time",
-      width: 80,
     },
-
     {
       title: "Nhà Cung Cấp / Đối tác",
       dataIndex: "supplier",
       key: "supplier",
-      width: 180,
       render: (s) => s || "-",
     },
     {
       title: "Người Tạo",
       dataIndex: "createdBy",
       key: "createdBy",
-      width: 140,
     },
     {
       title: "Giá Trị Chi",
       dataIndex: "amount",
       key: "amount",
       align: "right",
-      width: 140,
       sorter: (a, b) => a.amount - b.amount,
       render: (v) => (
         <strong style={{ color: "#dc2626", fontSize: 14 }}>
@@ -80,8 +82,26 @@ const ExpenseReportTable = ({
       title: "Trạng Thái",
       dataIndex: "status",
       key: "status",
-      width: 120,
       render: () => <Tag color="success">Đã chi tiền</Tag>,
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      width: 80,
+      align: "center",
+      fixed: "right",
+      render: (_, record) => (
+        <Tooltip title="Xem chi tiết phiếu chi">
+          <Button
+            type="text"
+            icon={<EyeOutlined style={{ color: "#2563eb", fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectExpense?.(record);
+            }}
+          />
+        </Tooltip>
+      ),
     },
   ];
 
@@ -93,7 +113,7 @@ const ExpenseReportTable = ({
       rowKey="id"
       size="middle"
       bordered
-      scroll={{ x: 1200 }}
+      scroll={{ x: "max-content" }}
       pagination={
         pagination ?? {
           defaultPageSize: 10,
@@ -104,10 +124,6 @@ const ExpenseReportTable = ({
         }
       }
       onChange={onTableChange}
-      onRow={(record) => ({
-        onClick: () => onSelectExpense?.(record),
-        style: { cursor: "pointer" },
-      })}
     />
   );
 };

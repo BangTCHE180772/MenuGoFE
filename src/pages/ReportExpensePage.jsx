@@ -381,14 +381,16 @@ const ReportExpensePage = () => {
             {filteredData.length === 0 ? (
               <Empty description="Không có khoản chi phí nào ghi nhận trong kỳ được chọn" />
             ) : (
-              <ExpenseReportTable
-                data={filteredData}
-                loading={loading}
-                onSelectExpense={(exp) => {
-                  setSelectedExpense(exp);
-                  setDrawerVisible(true);
-                }}
-              />
+              <div style={{ overflowX: "auto" }}>
+                <ExpenseReportTable
+                  data={filteredData}
+                  loading={loading}
+                  onSelectExpense={(exp) => {
+                    setSelectedExpense(exp);
+                    setDrawerVisible(true);
+                  }}
+                />
+              </div>
             )}
           </div>
 
@@ -422,14 +424,16 @@ const ReportExpensePage = () => {
             style={{ top: 12 }}
             bodyStyle={{ padding: 16 }}
           >
-            <ExpenseReportTable
-              data={filteredData}
-              loading={loading}
-              onSelectExpense={(exp) => {
-                setSelectedExpense(exp);
-                setDrawerVisible(true);
-              }}
-            />
+            <div style={{ overflowX: "auto" }}>
+              <ExpenseReportTable
+                data={filteredData}
+                loading={loading}
+                onSelectExpense={(exp) => {
+                  setSelectedExpense(exp);
+                  setDrawerVisible(true);
+                }}
+              />
+            </div>
           </Modal>
 
           {/* 4. Footer ERP Summary */}
