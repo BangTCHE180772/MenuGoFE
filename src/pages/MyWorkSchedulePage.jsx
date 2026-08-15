@@ -77,7 +77,13 @@ const MyWorkSchedulePage = () => {
         getAllShifts(),
         getAllAccounts(),
       ]);
-      setSchedules(scheds);
+      // Chỉ hiển thị các ca đã được Quản lý duyệt (managerApproved = true) ở giao diện nhân viên
+      const approvedScheds = (scheds || []).filter((s) =>
+        s.managerApproved === true ||
+        (isManagerOrAdmin && (s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING')))
+      );
+
+      setSchedules(approvedScheds);
       setBranches(branchesRes.data || []);
       const rawShifts = shiftsRes.data || [];
       setShifts([...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || '')));
@@ -960,16 +966,16 @@ const MyWorkSchedulePage = () => {
               </div>
             </div>
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>Phê duyệt của quản lý:</strong>
+              <strong>Trạng thái:</strong>
               {(() => {
                 const shiftDetails = getShiftDetails(selectedSchedule.shiftId);
-                const statusInfo = getShiftStatusTextAndColor(selectedSchedule, shiftDetails);
+                const statusInfo = getShiftStatusDetails(selectedSchedule, shiftDetails);
                 
-                if (statusInfo.text === 'Trễ/Vắng mặt' || statusInfo.text === 'Vắng mặt') {
-                  return <Tag color="error">Trễ/Vắng mặt</Tag>;
+                if (statusInfo.text === 'VẮNG MẶT' || statusInfo.text === 'Trễ/Vắng mặt') {
+                  return <Tag color="error">Vắng mặt</Tag>;
                 }
-                if (statusInfo.text === 'Chưa đến giờ') {
-                  return <Tag color="default">Chưa làm</Tag>;
+                if (statusInfo.text === 'CHƯA ĐẾN GIỜ') {
+                  return <Tag color="default">Chưa đến giờ</Tag>;
                 }
                 
                 if (selectedSchedule.managerApproved) {
@@ -1036,13 +1042,14 @@ const MyWorkSchedulePage = () => {
                   }
                   options={accounts
                     .filter((acc) => {
-                      if (acc.id === selectedSchedule.accountId) return false;
+                      if (!selectedSchedule || acc.id === selectedSchedule.accountId) return false;
                       const currentAccount = accounts.find(a => a.id === selectedSchedule.accountId);
                       const currentRoles = currentAccount?.roleIds || [];
                       const accRoles = acc.roleIds || [];
                       const isAdminOrManager = accRoles.some(r => [1, 2, 3].includes(r));
                       if (isAdminOrManager) return false;
-                      const hasSharedRole = userRoles.some(r => accRoles.includes(r));
+                      if (currentRoles.length === 0) return true;
+                      const hasSharedRole = currentRoles.some(r => accRoles.includes(r));
                       return hasSharedRole;
                     })
                     .map((acc) => ({
