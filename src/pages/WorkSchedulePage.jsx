@@ -117,6 +117,13 @@ const WorkSchedulePage = () => {
     6: { label: 'Phục vụ', color: 'green' },
   };
 
+  const contractedAccounts = useMemo(() => {
+    if (!accounts || accounts.length === 0) return [];
+    if (!contracts || contracts.length === 0) return accounts;
+    const contractedAccountIds = new Set(contracts.map((c) => c.accountId));
+    return accounts.filter((a) => contractedAccountIds.has(a.id));
+  }, [accounts, contracts]);
+
   const groupedStaffAccounts = useMemo(() => {
     const groups = {
       4: { label: '💳 THU NGÂN', items: [] },
@@ -125,7 +132,7 @@ const WorkSchedulePage = () => {
       other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
     };
 
-    accounts
+    contractedAccounts
       .filter((a) => {
         if (!a.roleIds || a.roleIds.length === 0) return false;
         return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
@@ -140,7 +147,7 @@ const WorkSchedulePage = () => {
       });
 
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
-  }, [accounts]);
+  }, [contractedAccounts]);
 
   // Filtering states
   const [selectedBranch, setSelectedBranch] = useState(null);
@@ -978,7 +985,7 @@ const WorkSchedulePage = () => {
                     value={selectedAccount}
                     onChange={(val) => setSelectedAccount(val)}
                   >
-                    {accounts.map((a) => (
+                    {contractedAccounts.map((a) => (
                       <Select.Option key={a.id} value={a.id} label={a.name}>
                         {a.name}
                       </Select.Option>
@@ -1097,7 +1104,7 @@ const WorkSchedulePage = () => {
                       value={selectedAccount}
                       onChange={(val) => setSelectedAccount(val)}
                     >
-                      {accounts.map((a) => (
+                      {contractedAccounts.map((a) => (
                         <Select.Option key={a.id} value={a.id} label={a.name}>
                           {a.name}
                         </Select.Option>
