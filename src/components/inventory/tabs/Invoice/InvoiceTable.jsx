@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { SearchOutlined, PlusOutlined, ReloadOutlined, InfoCircleOutlined, UserOutlined, ShoppingCartOutlined } from '@ant-design/icons';
@@ -13,7 +15,15 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
   const [loadedInvoiceMap, setLoadedInvoiceMap] = useState({});
   const [loadingInvoiceId, setLoadingInvoiceId] = useState(null);
+  const [printData, setPrintData] = useState(null);
   const pageSize = 20;
+
+  const handlePrint = (doc, items, sub, disc, pts, total) => {
+    setPrintData({ doc, items, sub, disc, pts, total });
+    setTimeout(() => {
+      window.print();
+    }, 180);
+  };
 
   useEffect(() => {
     const currentSearch = searchParams.get('search') || '';
@@ -128,7 +138,14 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
 
   const filtered = invoices.filter((inv) => {
     if (searchText) {
-      const lower = searchText.toLowerCase();
+      const lower = searchText.trim().toLowerCase();
+      if (lower.startsWith('pxbh-') || lower.startsWith('ptbh-') || lower.startsWith('pth-')) {
+        const parts = lower.split('-');
+        if (parts.length > 1 && parts[1]) {
+          const searchOrderId = parts[1];
+          return inv.id.toString() === searchOrderId || inv.code?.toLowerCase().includes(searchOrderId);
+        }
+      }
       return (
         inv.code?.toLowerCase().includes(lower) ||
         inv.customer?.toLowerCase().includes(lower) ||
@@ -394,6 +411,33 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
                                       <div>Phương thức: <strong style={{ color: '#1e293b' }}>{loadedDoc.paymentMethod || 'Tiền mặt'}</strong></div>
                                       <div>Thu ngân: <strong style={{ color: '#1e293b' }}>{loadedDoc.createdByName || 'Thu ngân'}</strong></div>
                                       {loadedDoc.note && <div>Ghi chú: <em>{loadedDoc.note}</em></div>}
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePrint(loadedDoc, consolidatedItems, subtotal, discountAmount, pointsDiscount, totalAmount)}
+                                        style={{
+                                          marginTop: 12,
+                                          width: '100%',
+                                          height: 32,
+                                          background: '#2563eb',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          borderRadius: 6,
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: 6,
+                                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                          transition: 'background-color 0.15s ease'
+                                        }}
+                                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                                        In hóa đơn
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -434,6 +478,135 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
           </button>
         </div>
       </div>
+
+      {printData && createPortal(
+        <div className="invoice-print-only">
+          <style dangerouslySetInnerHTML={{__html: `
+            @media screen {
+              .invoice-print-only {
+                display: none !important;
+              }
+            }
+            @media print {
+              #root {
+                display: none !important;
+              }
+              body {
+                background: #fff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .invoice-print-only {
+                display: block !important;
+                width: 80mm !important;
+                max-width: 80mm !important;
+                margin: 0 auto !important;
+                padding: 4mm 2mm !important;
+                color: #000 !important;
+                font-family: 'Courier New', Courier, monospace !important;
+                font-size: 11px !important;
+                line-height: 1.4 !important;
+              }
+              .text-center {
+                text-align: center !important;
+              }
+              .text-right {
+                text-align: right !important;
+              }
+              .text-left {
+                text-align: left !important;
+              }
+              .font-bold {
+                font-weight: bold !important;
+              }
+            }
+          `}} />
+          
+          <div className="text-center font-bold" style={{ fontSize: 13, textTransform: 'uppercase', marginBottom: 2 }}>
+            {printData.doc.branchName || 'Chi nhánh MenuGo'}
+          </div>
+          {printData.doc.branchAddress && (
+            <div className="text-center" style={{ fontSize: 10, marginBottom: 8, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+              {printData.doc.branchAddress}
+            </div>
+          )}
+          
+          <div className="text-center font-bold" style={{ fontSize: 14, margin: '10px 0 15px 0', letterSpacing: '0.5px' }}>
+            HÓA ĐƠN BÁN HÀNG
+          </div>
+
+          <div style={{ marginBottom: 10, fontSize: 10.5 }}>
+            <div>Mã HD: <span className="font-bold">{printData.doc.orderCode || printData.doc.code}</span></div>
+            <div>Thời gian: {dayjs(printData.doc.date || printData.doc.createdAt).format('DD/MM/YYYY HH:mm')}</div>
+            <div>Bàn: {printData.doc.tableName || 'Mang về'}</div>
+            <div style={{ height: 4 }} />
+            <div>Khách Hàng: {printData.doc.customer || 'Khách lẻ'}</div>
+            {printData.doc.customerPhone && <div>SDT: {printData.doc.customerPhone}</div>}
+            <div>NVBH: {printData.doc.createdByName || 'Thu ngân'}</div>
+          </div>
+
+          {/* ITEM TABLE */}
+          <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '5px 0', marginBottom: 10 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+              <thead>
+                <tr className="font-bold" style={{ borderBottom: '1px dashed #000' }}>
+                  <th className="text-left" style={{ width: '45%', paddingBottom: 4 }}>Tên món</th>
+                  <th className="text-right" style={{ width: '20%', paddingBottom: 4 }}>Giá</th>
+                  <th className="text-center" style={{ width: '15%', paddingBottom: 4 }}>SL</th>
+                  <th className="text-right" style={{ width: '20%', paddingBottom: 4 }}>T.Tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printData.items.map((item, idx) => (
+                  <tr key={item.id || idx}>
+                    <td className="text-left" style={{ padding: '4px 0', verticalAlign: 'top', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      {item.productName}
+                    </td>
+                    <td className="text-right" style={{ padding: '4px 0', verticalAlign: 'top' }}>
+                      {Math.round(item.unitPrice).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="text-center" style={{ padding: '4px 0', verticalAlign: 'top' }}>
+                      {item.quantity}
+                    </td>
+                    <td className="text-right" style={{ padding: '4px 0', verticalAlign: 'top', fontWeight: 'bold' }}>
+                      {Math.round(item.totalPrice).toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* FOOTER SECTION: QR & TOTALS */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', marginTop: 12 }}>
+            {/* Left: QR Code SVG */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: 8 }}>
+              <QRCodeSVG value={printData.doc.orderCode || printData.doc.code} size={85} />
+            </div>
+            
+            {/* Right: Totals list */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 10, paddingLeft: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Tổng tiền hàng</span>
+                <span className="font-bold">{Math.round(printData.sub > 0 ? printData.sub : printData.total).toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Trừ tiền</span>
+                <span>-{Math.round(printData.disc + printData.pts).toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #000', paddingTop: 4 }}>
+                <span className="font-bold">Tổng thanh toán</span>
+                <span className="font-bold" style={{ fontSize: 12 }}>{Math.round(printData.total).toLocaleString('vi-VN')} đ</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-center" style={{ marginTop: 25, fontSize: 9, fontStyle: 'italic', borderTop: '1px dashed #000', paddingTop: 8 }}>
+            Cảm ơn quý khách. Hẹn gặp lại!
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
