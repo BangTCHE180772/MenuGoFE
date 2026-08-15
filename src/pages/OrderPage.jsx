@@ -19,6 +19,7 @@ import { FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
+import { useBranch } from '../context/BranchContext';
 import { createOrder, createBulkOrderDetail, updateCookingStatus, cancelOrder, payOrder } from '../api/orderApi';
 import { getTableOrderSummary, confirmOrderItem, rejectOrderItem } from '../api/tableMapApi';
 import { checkInReservation } from '../api/reservationApi';
@@ -46,6 +47,7 @@ const OrderPage = ({ isWaiterMode }) => {
 
   const { user } = useAuth();
   const { deviceInfo } = useDevice();
+  const { currentBranchId } = useBranch();
 
   const loadTables = useCallback(async () => {
     setTableLoading(true);
@@ -57,6 +59,8 @@ const OrderPage = ({ isWaiterMode }) => {
         res = await getTablesByBranch(deviceInfo.branchId);
       } else if (shiftBranchId) {
         res = await getTablesByBranch(shiftBranchId);
+      } else if (currentBranchId) {
+        res = await getTablesByBranch(currentBranchId);
       } else {
         const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
         const branchIds = user?.branchIds || [];
@@ -80,7 +84,7 @@ const OrderPage = ({ isWaiterMode }) => {
     } finally {
       setTableLoading(false);
     }
-  }, [user, tableIdParam]);
+  }, [user, tableIdParam, deviceInfo, currentBranchId]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 

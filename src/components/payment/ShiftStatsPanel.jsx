@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Row, Col, Card, Statistic, Select, Table, Tag, Typography, Space } from 'antd';
-import { PayCircleOutlined, CreditCardOutlined, MoneyCollectOutlined, MoneyCollectFilled, DollarCircleOutlined } from '@ant-design/icons';
+import { PayCircleOutlined, CreditCardOutlined, MoneyCollectOutlined, MoneyCollectFilled, DollarCircleOutlined, WalletOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
@@ -104,7 +104,7 @@ const ShiftStatsPanel = ({ shifts, paidTodayOrders, loading }) => {
               title="Tổng Doanh Thu Ca"
               value={shiftStats.totalRevenue}
               formatter={(val) => new Intl.NumberFormat('vi-VN').format(val)}
-              suffix="VND"
+              suffix="đ"
               valueStyle={{ color: '#52c41a', fontWeight: 700 }}
             />
           </Card>
@@ -115,8 +115,8 @@ const ShiftStatsPanel = ({ shifts, paidTodayOrders, loading }) => {
               title="Doanh Thu Tiền Mặt"
               value={shiftStats.cashRevenue}
               formatter={(val) => new Intl.NumberFormat('vi-VN').format(val)}
-              suffix="VND"
-              prefix={<PayCircleOutlined style={{ color: '#1890ff' }} />}
+              suffix="đ"
+              prefix={<WalletOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ color: '#1890ff', fontWeight: 700 }}
             />
           </Card>
@@ -127,7 +127,7 @@ const ShiftStatsPanel = ({ shifts, paidTodayOrders, loading }) => {
               title="Doanh Thu Chuyển Khoản / PayOS"
               value={shiftStats.transferRevenue}
               formatter={(val) => new Intl.NumberFormat('vi-VN').format(val)}
-              suffix="VND"
+              suffix="đ"
               prefix={<CreditCardOutlined style={{ color: '#722ed1' }} />}
               valueStyle={{ color: '#722ed1', fontWeight: 700 }}
             />

@@ -111,10 +111,10 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
   }, [selectedBranch]);
 
   useEffect(() => {
-    if (isPosHub && currentBranchId && isBranchesLoaded) {
+    if (currentBranchId && isBranchesLoaded) {
       setSelectedBranch(currentBranchId);
     }
-  }, [currentBranchId, isPosHub, isBranchesLoaded]);
+  }, [currentBranchId, isBranchesLoaded]);
 
   const loadTables = useCallback(async () => {
     if (!isBranchesLoaded) return;
@@ -270,7 +270,7 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
                 </Button>
               </>
             )}
-            {branches.length > 1 && (
+            {!currentBranchId && branches.length > 1 && (
               <Select
                 style={{ width: 200 }}
                 value={selectedBranch}

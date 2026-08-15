@@ -58,3 +58,6 @@ export const cancelOrder = (id) =>
 
 export const cancelOrderDetail = (id) =>
   axiosInstance.put(`/api/Order/details/${id}/cancel`);
+
+export const getAvailableQuantities = (branchId, productIds) =>
+  axiosInstance.post(`/api/Order/available-quantities/${branchId}`, productIds);

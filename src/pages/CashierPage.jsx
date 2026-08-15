@@ -38,6 +38,7 @@ const CashierPage = () => {
   const [orders, setOrders] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { currentBranchId } = useBranch();
 
   // SignalR Connection
@@ -91,18 +92,18 @@ const CashierPage = () => {
   }, [signalRConnection, fetchData]);
 
   // Active / Pending Checkout Orders (ONLY Orders that are non-empty and in checkout state)
-  const pendingOrders = useMemo(() => {
-    return orders.filter(
-      (o) =>
-        (o.status === 'Active' ||
-          o.status === 'Serving' ||
-          o.status === 'Pending' ||
-          o.status === 'Unpaid' ||
-          o.status === 'CustomerPending') &&
-        (o.totalAmount > 0 || o.finalAmount > 0) &&
-        !o.fatherId
-    );
-  }, [orders]);
+  // const pendingOrders = useMemo(() => {
+  //   return orders.filter(
+  //     (o) =>
+  //       (o.status === 'Active' ||
+  //         o.status === 'Serving' ||
+  //         o.status === 'Pending' ||
+  //         o.status === 'Unpaid' ||
+  //         o.status === 'CustomerPending') &&
+  //       (o.totalAmount > 0 || o.finalAmount > 0) &&
+  //       !o.fatherId
+  //   );
+  // }, [orders]);
 
   // Paid Today Orders
   const paidTodayOrders = useMemo(() => {
@@ -125,7 +126,10 @@ const CashierPage = () => {
           <Tag icon={<SafetyCertificateOutlined />} color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
             Thiết bị đã xác thực
           </Tag>
-          <Button icon={<ReloadOutlined />} onClick={() => fetchData(true)}>
+          <Button icon={<ReloadOutlined />} onClick={() => {
+            fetchData(true);
+            setRefreshKey(prev => prev + 1);
+          }}>
             Làm mới
           </Button>
         </Space>
@@ -142,7 +146,7 @@ const CashierPage = () => {
             key: 'CHECKOUT',
             label: (
               <span>
-                <DollarOutlined /> Thanh Toán Hóa Đơn ({pendingOrders.length} bàn chờ)
+                <DollarOutlined /> Thanh Toán Hóa Đơn
               </span>
             ),
           },
@@ -168,14 +172,14 @@ const CashierPage = () => {
       {/* ── TAB 1: MÀN HÌNH THANH TOÁN HÓA ĐƠN (CHỈ DÙNG SƠ ĐỒ BÀN) ────────── */}
       {activeTab === 'CHECKOUT' && (
         <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 0 }}>
-          <TableMapPage isPosHub={true} />
+          <TableMapPage key={`tablemap-${refreshKey}`} isPosHub={true} />
         </Card>
       )}
 
       {/* ── TAB 2: QUẢN LÝ ĐẶT BÀN ───────────────────────────────────────────── */}
       {activeTab === 'RESERVATION' && (
         <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
-          <ReservationPage isPosHub={true} />
+          <ReservationPage key={`reservation-${refreshKey}`} isPosHub={true} />
         </Card>
       )}
 
