@@ -224,10 +224,10 @@ const ProfitCompareModal = ({ visible, onClose }) => {
 
         {/* Charts Row */}
         <Row gutter={[10, 10]}>
-          <Col span={14}>
+          <Col span={24}>
             <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
               <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
-                <LineChartOutlined style={{ color: "#10b981" }} /> Xu hướng Lợi nhuận Ròng
+                <LineChartOutlined style={{ color: "#10b981" }} /> Xu thái Lợi nhuận Ròng
               </Text>
               <div style={{ width: "100%", height: 160 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -261,7 +261,7 @@ const ProfitCompareModal = ({ visible, onClose }) => {
             </div>
           </Col>
 
-          <Col span={10}>
+          <Col span={24}>
             <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
               <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
                 <BarChartOutlined style={{ color: "#2563eb" }} /> Cơ cấu Tài chính

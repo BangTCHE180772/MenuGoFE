@@ -19,17 +19,13 @@ import ShelfLifeMonitoring from "../components/reports/inventory/ShelfLifeMonito
 import InventoryDetailTable from "../components/reports/inventory/InventoryDetailTable";
 import OperationalAlerts from "../components/reports/inventory/OperationalAlerts";
 
-import { getBInventories } from "../api/binventoryApi";
+import { getBInventories, getConsumptionReport, getTransactionLedger } from "../api/binventoryApi";
 import { getBranchDashboardStats } from "../api/dashboardApi";
+import { getNotifications } from "../api/notificationApi";
 import { useBranch } from "../context/BranchContext";
 import "../styles/ReportInventoryPage.css";
 
-import { MOCK_OPERATIONAL_ALERTS } from "../components/reports/inventory/InventoryReportData";
-
 const { Title, Text } = Typography;
-
-const formatVND = (val) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
 /**
  * Page: InventoryReportPage
@@ -70,8 +66,26 @@ const ReportInventoryPage = () => {
     
     let rawBInventory = [];
     let dashRes = null;
+    let unreadNotifications = [];
+
+    // 1. Fetch unread notifications
     try {
-      // 1. Fetch danh sách BInventory thực tế độc lập
+      const notifRes = await getNotifications({
+        branchId: activeBranchId,
+        isRead: false,
+        pageSize: 100
+      });
+      if (notifRes?.data?.items) {
+        unreadNotifications = notifRes.data.items;
+      } else if (notifRes?.items) {
+        unreadNotifications = notifRes.items;
+      }
+    } catch (err) {
+      console.error("[ReportInventoryPage] Error fetching unread notifications:", err);
+    }
+
+    try {
+      // 2. Fetch danh sách BInventory thực tế độc lập
       rawBInventory = await getBInventories(activeBranchId);
       console.log("[ReportInventoryPage] rawBInventory response success:", rawBInventory);
     } catch (err) {
@@ -80,7 +94,7 @@ const ReportInventoryPage = () => {
     }
 
     try {
-      // 2. Fetch Dashboard Stats của BE độc lập để lấy chi phí & doanh thu
+      // 3. Fetch Dashboard Stats của BE độc lập để lấy chi phí & doanh thu
       const [start, end] = dateRange;
       const startStr = start.format("YYYY-MM-DD");
       const endStr   = end.format("YYYY-MM-DD");
@@ -97,7 +111,6 @@ const ReportInventoryPage = () => {
       }
     } catch (err) {
       console.error("[ReportInventoryPage] Dashboard Stats API error:", err);
-      // Không block UI nếu API tài chính bị lỗi/timeout
       setDashRevenue(0);
       setDashExpense(0);
       setDashProfit(0);
@@ -118,82 +131,96 @@ const ReportInventoryPage = () => {
           varianceThresholdPercent: 5,
         });
 
-        // --- Map sang danh sách tiêu thụ (Consumption Items) ---
-        const mappedConsumption = rawBInventory.map((item, idx) => {
-          const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-          const stockQty = item.quantity || 0;
-          
-          // Giả định lượng nhập phụ thuộc vào activeBranchId để tạo biến thiên dữ liệu giữa các chi nhánh
-          const seed = (activeBranchId * 13 + idx * 7) % 20;
-          const importedQty = Math.round(stockQty * 1.5 + seed + 5);
-          const consumedQty = Math.max(0, importedQty - stockQty);
+        // --- Gọi API Lấy báo cáo tiêu thụ thực tế ---
+        let rawConsumption = [];
+        try {
+          rawConsumption = await getConsumptionReport(activeBranchId, dateRange[0].toDate(), dateRange[1].toDate());
+          console.log("[ReportInventoryPage] rawConsumption response success:", rawConsumption);
+        } catch (err) {
+          console.error("[ReportInventoryPage] Consumption API error:", err);
+          message.error("Không thể tải danh sách tiêu thụ thực tế.");
+        }
+        setConsumptionItems(rawConsumption);
 
-          // Sinh sai số ngẫu nhiên logic
-          const hasVariance = (seed % 3 === 0) && consumedQty > 0;
-          const excessQty = hasVariance ? Math.round(consumedQty * (0.05 + (seed % 5) * 0.03)) : 0;
-          const variancePercent = hasVariance && consumedQty > 0 ? Math.round((excessQty / consumedQty) * 100) : 0;
+        // --- Gọi API Lấy nhật ký giao dịch kho chi tiết ---
+        let rawLedger = [];
+        try {
+          rawLedger = await getTransactionLedger(activeBranchId, dateRange[0].toDate(), dateRange[1].toDate());
+          console.log("[ReportInventoryPage] rawLedger response success:", rawLedger);
+        } catch (err) {
+          console.error("[ReportInventoryPage] Ledger API error:", err);
+          message.error("Không thể tải nhật ký giao dịch kho.");
+        }
+        setDetailLedgerItems(rawLedger);
 
-          return {
-            id:              item.code || `NL-${item.id}`,
-            name:            item.name,
-            category:        item.groupName || "Chưa phân nhóm",
-            unit:            unitName,
-            importedQty,
-            stockQty,
-            consumedQty,
-            excessQty,
-            variancePercent,
-          };
-        });
-        setConsumptionItems(mappedConsumption);
+        // --- Map dữ liệu Nguyên liệu sắp hết hạn (Shelf-life Monitoring) đồng bộ theo thông báo ---
+        const expiring = rawBInventory
+          .filter((item) =>
+            unreadNotifications.some(
+              (n) =>
+                n.type === "ShelfLife" &&
+                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
+                  n.message.toLowerCase().includes(item.name.toLowerCase()))
+            )
+          )
+          .map((item) => {
+            const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
+            const notif = unreadNotifications.find(
+              (n) =>
+                n.type === "ShelfLife" &&
+                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
+                  n.message.toLowerCase().includes(item.name.toLowerCase()))
+            );
+            
+            let daysRemaining = 5;
+            if (notif) {
+              const matchDays = notif.message.match(/(\d+)\s*ngày/);
+              if (matchDays) {
+                daysRemaining = parseInt(matchDays[1], 10);
+              }
+            }
 
-        // --- Map sang bảng giao dịch kho chi tiết ---
-        const mappedLedger = rawBInventory.map((item) => {
-          const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-          return {
-            id:          item.code || `NL-${item.id}`,
-            name:        item.name,
-            category:    item.groupName || "Chưa phân nhóm",
-            unit:        unitName,
-            avgCost:     item.purchasePrice || 0,
-            stockQty:    item.quantity || 0,
-            totalValue:  (item.quantity || 0) * (item.purchasePrice || 0),
-            lastUpdated: "Hôm nay",
-          };
-        });
-        setDetailLedgerItems(mappedLedger);
-
-        // --- Map dữ liệu Nguyên liệu sắp hết hạn (Shelf-life Monitoring) bằng dữ liệu thật ---
-        const lowStockList = rawBInventory.filter((item) => (item.quantity || 0) <= (item.minStorage || 0));
-        const expiring = lowStockList.slice(0, 3).map((item, idx) => {
-          const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-          // daysLeft thay đổi dựa theo activeBranchId để tạo biến thiên
-          const daysLeft = ((activeBranchId * 3 + idx) % 8) + 2;
-          return {
-            id:        item.code || `NL-${item.id}`,
-            name:      item.name,
-            category:  item.groupName || "Nguyên liệu",
-            daysLeft,
-            stockQty:  item.quantity || 0,
-            unit:      unitName,
-            status:    "Sắp hết hạn",
-          };
-        });
+            return {
+              id:            item.code || `NL-${item.id}`,
+              name:          item.name,
+              quantity:      item.quantity || 0,
+              unit:          unitName,
+              expiryDate:    notif ? dayjs(notif.createdAt).add(daysRemaining, 'day').format('DD/MM/YYYY') : "N/A",
+              daysRemaining,
+              status:        "Sắp hết hạn",
+            };
+          });
         setExpiringItems(expiring);
 
-        // --- Map dữ liệu Nguyên liệu cần kiểm tra (Quality Inspection): Lọc đúng các mặt hàng có sai số lớn nhất ở bảng tiêu thụ ---
-        const highVarianceList = [...mappedConsumption]
-          .filter((item) => item.variancePercent > 0)
-          .sort((a, b) => b.variancePercent - a.variancePercent);
-
-        const inspection = highVarianceList.slice(0, 3).map((item) => ({
-          id:              item.id,
-          name:            item.name,
-          category:        item.category,
-          unit:            item.unit,
-          variancePercent: item.variancePercent,
-          status:          "Chờ kiểm định",
-        }));
+        // --- Map dữ liệu Nguyên liệu cần kiểm tra (Quality Inspection) đồng bộ theo thông báo ---
+        const inspection = rawBInventory
+          .filter((item) =>
+            unreadNotifications.some(
+              (n) =>
+                n.type === "Quality" &&
+                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
+                  n.message.toLowerCase().includes(item.name.toLowerCase()))
+            )
+          )
+          .map((item) => {
+            const notif = unreadNotifications.find(
+              (n) =>
+                n.type === "Quality" &&
+                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
+                  n.message.toLowerCase().includes(item.name.toLowerCase()))
+            );
+            return {
+              id:              item.code || `NL-${item.id}`,
+              name:            item.name,
+              category:        item.groupName || "Nguyên liệu",
+              unit:            item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần",
+              reason:          notif ? notif.message : "Cần kiểm tra chất lượng",
+              lastCheckedDate: notif ? dayjs(notif.createdAt).format('DD/MM/YYYY') : "N/A",
+              inspector:       "Hệ thống",
+              status:          "Chờ kiểm định",
+              isCheckedToday:  false,
+            };
+          });
         setInspectionItems(inspection);
 
         // --- Tính toán Phân bổ Trạng thái Nguyên liệu Kho (Status Chart Data) ---
@@ -203,7 +230,7 @@ const ReportInventoryPage = () => {
           const min = item.minStorage || 0;
           return qty > 0 && qty <= min;
         }).length;
-        const needCheck = highVarianceList.length;
+        const needCheck = inspection.length;
         const expiringSoon = expiring.length;
         const normal = Math.max(0, totalItems - lowStock - outOfStock);
 
@@ -218,7 +245,6 @@ const ReportInventoryPage = () => {
           }
         ]);
 
-        // Cập nhật lại statsData để đồng bộ KPIs Cards với trạng thái biểu đồ
         setStatsData({
           totalValue,
           totalItems,
@@ -227,47 +253,48 @@ const ReportInventoryPage = () => {
         });
 
         // --- Lấy top 10 sản phẩm có sai số tiêu hao lớn nhất để vẽ biểu đồ ---
-        const sortedTop = [...mappedConsumption]
-          .sort((a, b) => b.variancePercent - a.variancePercent)
+        const sortedTop = [...rawConsumption]
+          .filter(item => Math.abs(item.variancePercent) > 5)
+          .sort((a, b) => Math.abs(b.variancePercent) - Math.abs(a.variancePercent))
           .slice(0, 10);
         setTopVarianceData(sortedTop);
       }
 
-      // 3. Map Cảnh báo vận hành thực tế (Từ Backend & Tự sinh theo tồn kho thực của DB)
-      const lowStockItems = Array.isArray(rawBInventory)
-        ? rawBInventory.filter((item) => (item.quantity || 0) <= (item.minStorage || 0))
-        : [];
+      // 3. Map Cảnh báo vận hành thực tế (Đồng bộ trực tiếp từ unread notifications)
+      const dynamicAlerts = unreadNotifications
+        .filter((n) => n.type === "Operational" || n.type === "Inventory")
+        .map((n) => ({
+          id:             String(n.id),
+          severity:       n.priority === "Critical" ? "danger" : (n.priority === "Warning" ? "warning" : "info"),
+          title:          n.title,
+          timestamp:      dayjs(n.createdAt).format("HH:mm DD/MM/YYYY"),
+          message:        n.message,
+          actionRequired: n.priority === "Critical" ? "Xử lý ngay" : undefined,
+        }));
       
-      const dynamicAlerts = lowStockItems.map((item, idx) => ({
-        id:      `stock-alert-${idx + 1}`,
-        type:    (item.quantity || 0) === 0 ? "danger" : "warning",
-        message: (item.quantity || 0) === 0
-          ? `Nguyên liệu "${item.name}" đã HẾT HÀNG hoàn toàn trong kho.`
-          : `Nguyên liệu "${item.name}" sắp hết (Tồn kho: ${item.quantity}, Định mức tối thiểu: ${item.minStorage}).`,
-        time:    "Hệ thống",
-      }));
-
-      const beAlerts = dashRes?.data?.alerts
-        ? dashRes.data.alerts.map((a, idx) => ({
-            id:      `be-alert-${idx + 1}`,
-            type:    a.level === "danger" ? "danger" : "warning",
-            message: a.message,
-            time:    "Vừa xong",
-          }))
-        : [];
-
-      setAlerts([...dynamicAlerts, ...beAlerts]);
+      setAlerts(dynamicAlerts);
     } catch (err) {
       console.error("[ReportInventoryPage] API error:", err);
       message.warning("Không thể kết nối dữ liệu kho thật. Đang dùng dữ liệu demo.");
     } finally {
       setLoading(false);
     }
-  }, [dateRange, currentBranchId]);
+  }, [dateRange, currentBranchId, presetTime]);
 
   useEffect(() => {
     fetchReportData();
   }, [currentBranchId, fetchReportData]);
+
+  // Lắng nghe sự kiện notification-updated để làm mới dữ liệu
+  useEffect(() => {
+    const handleNotifUpdate = () => {
+      fetchReportData();
+    };
+    window.addEventListener('notification-updated', handleNotifUpdate);
+    return () => {
+      window.removeEventListener('notification-updated', handleNotifUpdate);
+    };
+  }, [fetchReportData]);
 
   const handleResetFilters = () => {
     setPresetTime("today");
@@ -276,18 +303,20 @@ const ReportInventoryPage = () => {
   };
 
   const columnDefs = [
-    { title: "Mã NL",          field: "id" },
-    { title: "Tên nguyên liệu", field: "name" },
-    { title: "Nhóm",          field: "category" },
-    { title: "Đơn vị",         field: "unit" },
-    { title: "Đã nhập",        field: (r) => `${r.importedQty} ${r.unit}`, align: "right" },
-    { title: "Tồn kho",        field: (r) => `${r.stockQty} ${r.unit}`,    align: "right" },
-    { title: "Đã tiêu thụ",    field: (r) => `${r.consumedQty} ${r.unit}`, align: "right" },
-    { title: "Tiêu hao vượt",  field: (r) => `${r.excessQty} ${r.unit}`,   align: "right" },
-    { title: "Sai số (%)",     field: (r) => `${r.variancePercent}%`,      align: "center" },
+    { title: "Mã NL",                       field: "id" },
+    { title: "Tên nguyên liệu",              field: "name" },
+    { title: "Nhóm",                        field: "category" },
+    { title: "Đơn vị",                      field: "unit" },
+    { title: "Tồn đầu kỳ",                  field: (r) => `${r.openingStock} ${r.unit}`, align: "right" },
+    { title: "Nhập",                        field: (r) => `${r.import} ${r.unit}`, align: "right" },
+    { title: "Chuyển vào",                  field: (r) => `${r.transferIn} ${r.unit}`, align: "right" },
+    { title: "Chuyển ra",                   field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
+    { title: "Hệ thống ghi nhận tiêu thụ",     field: (r) => `${r.systemConsumption} ${r.unit}`, align: "right" },
+    { title: "Tiêu thụ định mức",            field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
+    { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
+    { title: "Sai số (%)",                  field: (r) => `${r.variancePercent > 0 ? '+' : ''}${r.variancePercent}%`, align: "center" },
+    { title: "Tồn cuối",                    field: (r) => `${r.closingStock} ${r.unit}`, align: "right" },
   ];
-
-  const totalImportedValue = statsData.totalValue || 0;
 
   return (
     <div className="report-container">

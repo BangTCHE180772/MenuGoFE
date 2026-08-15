@@ -1,23 +1,18 @@
-import { useState } from "react";
+import React from "react";
 import { Row, Col, Card, Empty } from "antd";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   CartesianGrid,
 } from "recharts";
 import {
   LineChartOutlined,
-  PieChartOutlined,
   BarChartOutlined,
 } from "@ant-design/icons";
 
@@ -26,23 +21,10 @@ const formatVND = (val) =>
     val || 0,
   );
 
-const EXPENSE_COLORS = [
-  "#ef4444",
-  "#ea580c",
-  "#2563eb",
-  "#8b5cf6",
-  "#10b981",
-  "#64748b",
-];
-
 const ExpenseCharts = ({
   trendData,
-  breakdownData,
-  multiLineData = [],
   topExpenseData,
 }) => {
-  const [activeIndex, setActiveIndex] = useState(-1);
-
   const trendList = trendData !== undefined ? trendData : [
     { date: "01/08", expense: 3500000 },
     { date: "02/08", expense: 4200000 },
@@ -51,15 +33,6 @@ const ExpenseCharts = ({
     { date: "05/08", expense: 3900000 },
     { date: "06/08", expense: 4100000 },
     { date: "07/08", expense: 6200000 },
-  ];
-
-  const breakdownList = breakdownData !== undefined ? breakdownData : [
-    { name: "Nguyên liệu & Thực phẩm", value: 48000000 },
-    { name: "Lương nhân viên", value: 32000000 },
-    { name: "Thuê mặt bằng", value: 18000000 },
-    { name: "Điện, Nước & Gas", value: 8500000 },
-    { name: "Tiếp thị & Quảng cáo", value: 3500000 },
-    { name: "Chi phí khác", value: 2000000 },
   ];
 
   const topExpenseList = topExpenseData !== undefined ? topExpenseData : [
@@ -72,7 +45,8 @@ const ExpenseCharts = ({
 
   return (
     <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-      <Col xs={24} lg={12}>
+      {/* Chart 1: Expense Trend Line Chart */}
+      <Col xs={24} lg={24}>
         <Card
           title={
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -135,82 +109,7 @@ const ExpenseCharts = ({
         </Card>
       </Col>
 
-      <Col xs={24} lg={12}>
-        <Card
-          title={
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <PieChartOutlined style={{ color: "#8b5cf6" }} />
-              <span style={{ fontWeight: 700, fontSize: 14 }}>
-                Cơ cấu Chi phí theo Loại
-              </span>
-            </div>
-          }
-          bordered={false}
-          style={{
-            borderRadius: "var(--border-radius)",
-            boxShadow: "var(--shadow-sm)",
-            background: "var(--color-surface)",
-            height: "100%",
-          }}
-          bodyStyle={{ padding: "16px 20px" }}
-        >
-          <div style={{ width: "100%", height: 250 }}>
-            {breakdownList.length === 0 ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                <Empty description="Không có dữ liệu cơ cấu chi phí" />
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={breakdownList}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                    onMouseEnter={(_, index) => setActiveIndex(index)}
-                    onMouseLeave={() => setActiveIndex(-1)}
-                  >
-                    {breakdownList.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
-                        opacity={
-                          activeIndex === -1 || activeIndex === index ? 1 : 0.35
-                        }
-                        stroke={activeIndex === index ? "#000" : "none"}
-                        strokeWidth={2}
-                        style={{ cursor: "pointer", transition: "all 0.2s" }}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => [formatVND(v), "Chi phí"]} />
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    wrapperStyle={{ fontSize: 11 }}
-                    formatter={(value, entry, index) => (
-                      <span
-                        style={{
-                          fontWeight: activeIndex === index ? 700 : 500,
-                          color: activeIndex === index ? "#0f172a" : "#64748b",
-                          fontSize: activeIndex === index ? 12 : 11,
-                          transition: "all 0.2s",
-                        }}
-                      >
-                        {value}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
-      </Col>
-
+      {/* Chart 3: Top Expense Bar Chart */}
       <Col xs={24} lg={24}>
         <Card
           title={

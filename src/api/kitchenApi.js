@@ -15,8 +15,13 @@ export const updateCookingStatus = (detailId, cookingStatus) =>
 /**
  * Cập nhật trạng thái cho nhiều món cùng lúc (hỗ trợ Batch Processing - AF1)
  */
-export const batchUpdateCookingStatus = (detailIds, cookingStatus) =>
-  Promise.all(detailIds.map(id => updateCookingStatus(id, cookingStatus)));
+export const batchUpdateCookingStatus = async (detailIds, cookingStatus) => {
+  const results = [];
+  for (const id of detailIds) {
+    results.push(await updateCookingStatus(id, cookingStatus));
+  }
+  return results;
+};
 
 /**
  * Hủy món ăn chi tiết từ KDS

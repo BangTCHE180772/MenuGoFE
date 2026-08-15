@@ -15,16 +15,12 @@ import {
 import {
   SwapOutlined,
   LineChartOutlined,
-  PieChartOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -38,8 +34,6 @@ const { Text, Title } = Typography;
 
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
-
-const PAYMENT_COLORS = ["#16a34a", "#2563eb", "#0284c7", "#8b5cf6"];
 
 // ─── Fetch stats cho 1 kỳ từ BE ────────────────────────────────────────────
 const fetchPeriodStats = async (date, pickerType, branchId) => {
@@ -71,7 +65,7 @@ const fetchPeriodStats = async (date, pickerType, branchId) => {
 
 // ─── Map BE stats → period summary ─────────────────────────────────────────
 const mapToPeriod = (beData, dateLabel) => {
-  if (!beData) return { title: dateLabel, totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, avgRevenuePerDay: 1, payments: [], trendData: [] };
+  if (!beData) return { title: dateLabel, totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, avgRevenuePerDay: 1, trendData: [] };
 
   const revenue = beData.revenue || 0;
   const orders  = beData.completedBills || 0;
@@ -94,7 +88,6 @@ const mapToPeriod = (beData, dateLabel) => {
     totalOrders:     orders,
     avgOrderValue:   beData.avgOrderValue || 0,
     avgRevenuePerDay: revenue,   // 1 ngày = chính nó; 1 tháng tính sau
-    payments:        (beData.paymentMethods || []).map((m) => ({ name: m.name, value: m.value || 0 })),
     trendData:       trendData.length > 0 ? trendData : trendFallback,
   };
 };
@@ -105,8 +98,6 @@ const mapToPeriod = (beData, dateLabel) => {
  */
 const RevenueCompareModal = ({ visible, onClose }) => {
   const { currentBranchId } = useBranch();
-  const [hoveredPieIndexA, setHoveredPieIndexA] = useState(-1);
-  const [hoveredPieIndexB, setHoveredPieIndexB] = useState(-1);
   const [pickerType, setPickerType] = useState("date");
   const [dateA, setDateA] = useState(dayjs());
   const [dateB, setDateB] = useState(dayjs().subtract(1, "day"));
@@ -174,7 +165,7 @@ const RevenueCompareModal = ({ visible, onClose }) => {
   const diffOrdersDelta = periodA && periodB ? periodA.totalOrders - periodB.totalOrders : 0;
 
   // ── Render 1 khối kỳ ───────────────────────────────────────────────────
-  const renderPeriodBlock = (period, loading, isCurrent, hoveredIdx, setHoveredIdx) => (
+  const renderPeriodBlock = (period, loading, isCurrent) => (
     <Spin spinning={loading}>
       <Card
         bordered
@@ -202,14 +193,14 @@ const RevenueCompareModal = ({ visible, onClose }) => {
           ))}
         </Row>
 
-        {/* Charts: Trend + Pie */}
+        {/* Charts: Trend */}
         <Row gutter={[10, 10]}>
-          <Col span={14}>
+          <Col span={24}>
             <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
               <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
                 <LineChartOutlined style={{ color: "#2563eb" }} /> Xu hướng doanh thu
               </Text>
-              <div style={{ width: "100%", height: 160 }}>
+              <div style={{ width: "100%", height: 180 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={combinedTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -237,43 +228,6 @@ const RevenueCompareModal = ({ visible, onClose }) => {
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-          </Col>
-          <Col span={10}>
-            <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
-              <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
-                <PieChartOutlined style={{ color: "#16a34a" }} /> Tỷ trọng Phương thức thanh toán
-              </Text>
-              <div style={{ width: "100%", height: 160 }}>
-                {(period?.payments?.length || 0) === 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: 12 }}>
-                    Chưa có dữ liệu
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={period.payments}
-                        cx="50%" cy="40%"
-                        innerRadius={28} outerRadius={48}
-                        dataKey="value"
-                        onMouseEnter={(_, i) => setHoveredIdx(i)}
-                        onMouseLeave={() => setHoveredIdx(-1)}
-                      >
-                        {period.payments.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]}
-                            opacity={hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.35}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => [formatVND(v), "Số tiền"]} />
-                      <Legend wrapperStyle={{ fontSize: 10, paddingTop: 2 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
               </div>
             </div>
           </Col>
@@ -355,9 +309,9 @@ const RevenueCompareModal = ({ visible, onClose }) => {
 
       {/* ── 2 khối kỳ ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {renderPeriodBlock(periodA, loadingA, true,  hoveredPieIndexA, setHoveredPieIndexA)}
+        {renderPeriodBlock(periodA, loadingA, true)}
         <Divider style={{ margin: "4px 0" }}>⚡ So sánh đối chiếu trực tiếp ⚡</Divider>
-        {renderPeriodBlock(periodB, loadingB, false, hoveredPieIndexB, setHoveredPieIndexB)}
+        {renderPeriodBlock(periodB, loadingB, false)}
       </div>
     </Modal>
   );

@@ -60,10 +60,16 @@ const CustomerBranchCard = ({ branch, isMain }) => {
         <div className="info-row">
           <ClockCircleOutlined className="info-icon icon-clock" />
           <div className="info-content">
-            <span className="info-label">Giờ hoạt động</span>
-            <span className="info-value">
-              {openTime} - {closeTime}
-            </span>
+            <span className="info-label">Giờ mở cửa</span>
+            <span className="info-value">{openTime}</span>
+          </div>
+        </div>
+
+        <div className="info-row">
+          <ClockCircleOutlined className="info-icon icon-clock" />
+          <div className="info-content">
+            <span className="info-label">Giờ đóng cửa</span>
+            <span className="info-value">{closeTime}</span>
           </div>
         </div>
 

@@ -79,7 +79,11 @@ const CustomerFooter = ({ chainInfo }) => {
               </li>
               <li>
                 <ClockCircleOutlined className="contact-icon" />
-                <span>Giờ mở cửa: {openTime} - {closeTime}</span>
+                <span>Giờ mở cửa: {openTime}</span>
+              </li>
+              <li>
+                <ClockCircleOutlined className="contact-icon" />
+                <span>Giờ đóng cửa: {closeTime}</span>
               </li>
             </ul>
           </Col>
@@ -92,7 +96,7 @@ const CustomerFooter = ({ chainInfo }) => {
               <li><a href="#hero">Về Chuỗi Nhà Hàng</a></li>
               <li><a href="#menu">Thực Đơn Đặc Biệt</a></li>
               <li><a href="#branches">Danh Sách Chi Nhánh</a></li>
-              <li><a href="#qr-order">Đặt Món QR (Coming Soon)</a></li>
+              <li><a href="#qr-order">Đặt Món QR (Sắp ra mắt)</a></li>
               <li><a href="#feedback">Đánh Giá & Góp Ý</a></li>
             </ul>
           </Col>
@@ -101,7 +105,7 @@ const CustomerFooter = ({ chainInfo }) => {
         {/* Divider & Copyright */}
         <div className="footer-bottom">
           <Text className="copyright-text">
-            © {year} <strong>{name}</strong>. Powered by MenuGo Platform. All rights reserved.
+            © {year} <strong>{name}</strong>. Phát triển bởi Nền tảng MenuGo. Bảo lưu mọi quyền.
           </Text>
         </div>
       </div>

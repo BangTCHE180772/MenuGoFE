@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CheckTable from './CheckTable';
 import CheckDocumentModal from './CheckDocumentModal';
 import { getCheckDocuments } from '../../../../api/documentApi';
@@ -11,7 +12,28 @@ const CheckTab = ({
   fetchDocuments: parentFetchDocuments,
   handleDeleteDocument
 }) => {
-  const [searchText, setSearchText] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
+
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [modalCheckOpen, setModalCheckOpen] = useState(false);
   const [editDocumentId, setEditDocumentId] = useState(null);
@@ -88,7 +110,7 @@ const CheckTab = ({
       <CheckTable
         documents={checkDocuments}
         searchText={searchText}
-        setSearchText={setSearchText}
+        setSearchText={handleSearchChange}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         loading={loading || parentLoading}

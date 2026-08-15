@@ -92,6 +92,30 @@ const getProductTypeBadge = (item) => {
   );
 };
 
+const mapMethodToTab = (methodName, docCode) => {
+  if (methodName === "Bán hàng" || (docCode && docCode.startsWith("PXBH"))) {
+    return "Invoice";
+  }
+  switch (methodName) {
+    case "Nhập hàng":
+      return "Import";
+    case "Trả hàng nhập":
+      return "ImportReturn";
+    case "Kiểm kho":
+      return "Check";
+    case "Xuất hủy":
+      return "ExportDelete";
+    case "Xuất chuyển kho":
+      return "Transfer";
+    case "Sản xuất":
+      return "Production";
+    case "Điều chỉnh":
+      return "Adjustment";
+    default:
+      return null;
+  }
+};
+
 const ProductTable = ({
   dishes = [],
   selectedBranchId,
@@ -779,8 +803,27 @@ const ProductTable = ({
 
                                                 return (
                                                   <tr key={ldg.id || ldgIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
-                                                      {renderTruncatedText(docCode, 18)}
+                                                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>
+                                                      <button
+                                                        type="button"
+                                                        style={{
+                                                          background: 'none',
+                                                          border: 'none',
+                                                          padding: 0,
+                                                          color: '#2563eb',
+                                                          fontWeight: 700,
+                                                          cursor: 'pointer',
+                                                          textDecoration: 'underline'
+                                                        }}
+                                                        onClick={() => {
+                                                          const tab = mapMethodToTab(method, docCode);
+                                                          if (tab) {
+                                                            window.location.href = `/inventory-management?tab=${tab}&search=${docCode}`;
+                                                          }
+                                                        }}
+                                                      >
+                                                        {renderTruncatedText(docCode, 18)}
+                                                      </button>
                                                     </td>
                                                     <td style={{ padding: '8px 10px', color: '#334155' }}>
                                                       {renderTruncatedText(method, 22)}
