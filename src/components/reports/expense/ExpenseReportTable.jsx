@@ -43,21 +43,7 @@ const ExpenseReportTable = ({
       key: "time",
       width: 80,
     },
-    {
-      title: "Loại Chi Phí",
-      dataIndex: "category",
-      key: "category",
-      width: 170,
-      filters: [
-        { text: "Nguyên liệu & Thực phẩm", value: "Nguyên liệu & Thực phẩm" },
-        { text: "Lương nhân viên", value: "Lương nhân viên" },
-        { text: "Thuê mặt bằng", value: "Thuê mặt bằng" },
-        { text: "Điện, Nước & Gas", value: "Điện, Nước & Gas" },
-        { text: "Tiếp thị & Quảng cáo", value: "Tiếp thị & Quảng cáo" },
-      ],
-      onFilter: (val, record) => record.category === val,
-      render: (cat) => <Tag color="purple">{cat}</Tag>,
-    },
+
     {
       title: "Nhà Cung Cấp / Đối tác",
       dataIndex: "supplier",

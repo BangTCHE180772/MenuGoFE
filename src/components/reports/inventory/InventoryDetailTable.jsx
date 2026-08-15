@@ -297,7 +297,7 @@ const InventoryDetailTable = ({ items = [], onRefresh, isFullscreen, onToggleFul
       {!isFullscreen && (
         <div style={{ marginBottom: 16 }}>
           <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
-            📦 Báo cáo Chi tiết Nhật ký Giao dịch Kho (Inventory Detail Report)
+            📦 Báo cáo Chi tiết Nhật ký Giao dịch Kho
           </Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Nhật ký chi tiết các giao dịch xuất nhập tồn kho theo thời gian thực.

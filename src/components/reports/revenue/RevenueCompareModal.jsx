@@ -224,11 +224,11 @@ const RevenueCompareModal = ({ visible, onClose }) => {
           {[
             { label: "Doanh Thu",   value: formatVND(period?.totalRevenue),    color: "#2563eb" },
             { label: "Số Đơn",      value: `${period?.totalOrders || 0} đơn`,  color: "#ea580c" },
-            { label: "Giá Trị AOV", value: formatVND(period?.avgOrderValue),   color: "#10b981" },
+            { label: "Giá Trị Đơn Trung Bình", value: formatVND(period?.avgOrderValue),   color: "#10b981" },
           ].map((kpi) => (
             <Col key={kpi.label} xs={8}>
               <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid #e2e8f0" }}>
-                <Text type="secondary" style={{ fontSize: 11, display: "block" }}>{kpi.label}</Text>
+                <Text type="secondary" style={{ fontSize: 10, display: "block", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{kpi.label}</Text>
                 <div style={{ fontWeight: 700, fontSize: 13, color: kpi.color }}>{kpi.value}</div>
               </div>
             </Col>

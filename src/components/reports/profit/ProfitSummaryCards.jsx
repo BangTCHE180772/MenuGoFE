@@ -34,7 +34,7 @@ const ProfitSummaryCards = ({ data = {}, onOpenCompare }) => {
 
   const kpis = [
     {
-      title: "Lợi Nhuận Ròng (Net Profit)",
+      title: "Lợi Nhuận Ròng",
       value: formatVND(profit),
       subText: "Doanh thu trừ Chi phí thực tế",
       icon: <RiseOutlined style={{ fontSize: 20, color: "#10b981" }} />,
@@ -42,7 +42,7 @@ const ProfitSummaryCards = ({ data = {}, onOpenCompare }) => {
       borderColor: "#10b981",
     },
     {
-      title: "Tỷ Suất Lợi Nhuận (Margin)",
+      title: "Tỷ Suất Lợi Nhuận",
       value: `${profitMargin}%`,
       subText: "Lợi nhuận trên tổng Doanh thu",
       icon: <PieChartOutlined style={{ fontSize: 20, color: "#2563eb" }} />,

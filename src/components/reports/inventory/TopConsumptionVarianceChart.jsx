@@ -74,7 +74,7 @@ const TopConsumptionVarianceChart = ({ data }) => {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
-            🔥 Top 10 Nguyên liệu Sai số Tiêu hao Lớn nhất (Top Consumption Variance)
+            🔥 Top 10 Nguyên liệu Sai số Tiêu hao Lớn nhất
           </Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Hiển thị trực quan chỉ số sai số tiêu hao % trên từng cột nguyên liệu.

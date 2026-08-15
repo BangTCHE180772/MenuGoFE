@@ -15,7 +15,6 @@ import InventoryOverviewCards from "../components/reports/inventory/InventoryOve
 import InventoryStatusChart from "../components/reports/inventory/InventoryStatusChart";
 import ConsumptionVarianceTable from "../components/reports/inventory/ConsumptionVarianceTable";
 import TopConsumptionVarianceChart from "../components/reports/inventory/TopConsumptionVarianceChart";
-import ShelfLifeMonitoring from "../components/reports/inventory/ShelfLifeMonitoring";
 import InventoryDetailTable from "../components/reports/inventory/InventoryDetailTable";
 import OperationalAlerts from "../components/reports/inventory/OperationalAlerts";
 
@@ -50,8 +49,6 @@ const ReportInventoryPage = () => {
   const [statusChartData, setStatusChartData]   = useState([]);
   const [consumptionItems, setConsumptionItems] = useState([]);
   const [topVarianceData, setTopVarianceData]   = useState([]);
-  const [expiringItems, setExpiringItems]       = useState([]);
-  const [inspectionItems, setInspectionItems]   = useState([]);
   const [detailLedgerItems, setDetailLedgerItems] = useState([]);
   const [alerts, setAlerts]                     = useState([]);
   const [dashRevenue, setDashRevenue]           = useState(0);
@@ -153,76 +150,6 @@ const ReportInventoryPage = () => {
         }
         setDetailLedgerItems(rawLedger);
 
-        // --- Map dữ liệu Nguyên liệu sắp hết hạn (Shelf-life Monitoring) đồng bộ theo thông báo ---
-        const expiring = rawBInventory
-          .filter((item) =>
-            unreadNotifications.some(
-              (n) =>
-                n.type === "ShelfLife" &&
-                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
-                  n.message.toLowerCase().includes(item.name.toLowerCase()))
-            )
-          )
-          .map((item) => {
-            const unitName = item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần";
-            const notif = unreadNotifications.find(
-              (n) =>
-                n.type === "ShelfLife" &&
-                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
-                  n.message.toLowerCase().includes(item.name.toLowerCase()))
-            );
-            
-            let daysRemaining = 5;
-            if (notif) {
-              const matchDays = notif.message.match(/(\d+)\s*ngày/);
-              if (matchDays) {
-                daysRemaining = parseInt(matchDays[1], 10);
-              }
-            }
-
-            return {
-              id:            item.code || `NL-${item.id}`,
-              name:          item.name,
-              quantity:      item.quantity || 0,
-              unit:          unitName,
-              expiryDate:    notif ? dayjs(notif.createdAt).add(daysRemaining, 'day').format('DD/MM/YYYY') : "N/A",
-              daysRemaining,
-              status:        "Sắp hết hạn",
-            };
-          });
-        setExpiringItems(expiring);
-
-        // --- Map dữ liệu Nguyên liệu cần kiểm tra (Quality Inspection) đồng bộ theo thông báo ---
-        const inspection = rawBInventory
-          .filter((item) =>
-            unreadNotifications.some(
-              (n) =>
-                n.type === "Quality" &&
-                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
-                  n.message.toLowerCase().includes(item.name.toLowerCase()))
-            )
-          )
-          .map((item) => {
-            const notif = unreadNotifications.find(
-              (n) =>
-                n.type === "Quality" &&
-                (n.title.toLowerCase().includes(item.name.toLowerCase()) ||
-                  n.message.toLowerCase().includes(item.name.toLowerCase()))
-            );
-            return {
-              id:              item.code || `NL-${item.id}`,
-              name:            item.name,
-              category:        item.groupName || "Nguyên liệu",
-              unit:            item.unitConversions?.find((uc) => uc.isBaseUnit)?.unitName || "Phần",
-              reason:          notif ? notif.message : "Cần kiểm tra chất lượng",
-              lastCheckedDate: notif ? dayjs(notif.createdAt).format('DD/MM/YYYY') : "N/A",
-              inspector:       "Hệ thống",
-              status:          "Chờ kiểm định",
-              isCheckedToday:  false,
-            };
-          });
-        setInspectionItems(inspection);
-
         // --- Tính toán Phân bổ Trạng thái Nguyên liệu Kho (Status Chart Data) ---
         const outOfStock = rawBInventory.filter((item) => (item.quantity || 0) === 0).length;
         const lowStock = rawBInventory.filter((item) => {
@@ -230,8 +157,6 @@ const ReportInventoryPage = () => {
           const min = item.minStorage || 0;
           return qty > 0 && qty <= min;
         }).length;
-        const needCheck = inspection.length;
-        const expiringSoon = expiring.length;
         const normal = Math.max(0, totalItems - lowStock - outOfStock);
 
         setStatusChartData([
@@ -240,8 +165,6 @@ const ReportInventoryPage = () => {
             normal,
             lowStock,
             outOfStock,
-            needCheck,
-            expiringSoon,
           }
         ]);
 
@@ -392,13 +315,7 @@ const ReportInventoryPage = () => {
           {/* SECTION 4: TOP CONSUMPTION VARIANCE (BAR CHART) */}
           <TopConsumptionVarianceChart data={topVarianceData} />
 
-          {/* SECTION 5: SHELF-LIFE MONITORING (Thực tế hóa 100%) */}
-          <ShelfLifeMonitoring
-            expiringItems={expiringItems}
-            inspectionItems={inspectionItems}
-          />
-
-          {/* SECTION 6: INVENTORY DETAIL REPORT (LEDGER TABLE) */}
+          {/* SECTION 5: INVENTORY DETAIL REPORT (LEDGER TABLE) */}
           <InventoryDetailTable
             items={detailLedgerItems}
             onRefresh={fetchReportData}

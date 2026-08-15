@@ -59,7 +59,6 @@ const ReportExpensePage = () => {
     dayjs().endOf("month"),
   ]);
   const [searchText, setSearchText]           = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [selectedCreatedBy, setSelectedCreatedBy] = useState("all");
 
@@ -203,7 +202,6 @@ const ReportExpensePage = () => {
     setPresetTime("this_month");
     setDateRange([dayjs().startOf("month"), dayjs().endOf("month")]);
     setSearchText("");
-    setSelectedCategory("all");
     setSelectedSupplier("all");
     setSelectedCreatedBy("all");
   };
@@ -213,29 +211,20 @@ const ReportExpensePage = () => {
     const matchSearch =
       !searchText ||
       item.expenseCode.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchText.toLowerCase()) ||
       item.notes.toLowerCase().includes(searchText.toLowerCase());
 
-    const matchCategory = selectedCategory === "all" || item.category === selectedCategory;
     const matchSupplier = selectedSupplier === "all" || item.supplier === selectedSupplier;
     const matchCreatedBy = selectedCreatedBy === "all" || item.createdBy === selectedCreatedBy;
 
-    return matchSearch && matchCategory && matchSupplier && matchCreatedBy;
+    return matchSearch && matchSupplier && matchCreatedBy;
   });
 
   const lowestVal = 0;
-
-  // Lấy các option động cho category filter
-  const categoryOptions = [
-    { label: "Tất cả loại chi phí", value: "all" },
-    ...breakdownData.map((b) => ({ label: b.name, value: b.name })),
-  ];
 
   const columnDefs = [
     { title: "Mã Phiếu Chi", field: "expenseCode" },
     { title: "Ngày",         field: "date" },
     { title: "Giờ",         field: "time" },
-    { title: "Loại Chi Phí", field: "category" },
     { title: "Nhà Cung Cấp", field: "supplier" },
     { title: "Người Tạo",    field: "createdBy" },
     { title: "Giá Trị Chi",  field: (r) => `-${formatVND(r.amount)}`, align: "right" },
@@ -331,14 +320,14 @@ const ReportExpensePage = () => {
               boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            {/* Hàng 1: Tiêu đề + Khung tìm kiếm */}
+            {/* Tiêu đề + Toolbar trên cùng 1 hàng */}
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 flexWrap: "wrap",
-                marginBottom: 12,
+                marginBottom: 16,
                 gap: 12,
               }}
             >
@@ -346,33 +335,14 @@ const ReportExpensePage = () => {
                 Danh Sách Chứng Từ & Phiếu Chi Chi Tiết ({filteredData.length} chứng từ)
               </Title>
 
-              <Input
-                placeholder="Tìm mã phiếu chi, nhà cung cấp, ghi chú..."
-                prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: 300, borderRadius: 6 }}
-                allowClear
-              />
-            </div>
-
-            {/* Hàng 2: Các bộ lọc */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                flexWrap: "wrap",
-                marginBottom: 16,
-                gap: 8,
-              }}
-            >
-              <Space wrap size="small">
-                <Select
-                  value={selectedCategory}
-                  onChange={setSelectedCategory}
-                  style={{ width: 180 }}
-                  options={categoryOptions}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <Input
+                  placeholder="Tìm mã phiếu chi, nhà cung cấp, ghi chú..."
+                  prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 260, borderRadius: 6 }}
+                  allowClear
                 />
 
                 <Tooltip title="Làm mới dữ liệu phiếu chi">
@@ -394,8 +364,7 @@ const ReportExpensePage = () => {
                   columnDefs={columnDefs}
                   data={filteredData}
                   summaryRow={[
-                    "Tổng cộng", "-", "-", "-", "-", "-",
-                    `-${formatVND(totalExpense)}`, "-",
+                    "Tổng cộng", "-", "-", "-", "-", `-${formatVND(totalExpense)}`, "-",
                   ]}
                 />
 
@@ -406,7 +375,7 @@ const ReportExpensePage = () => {
                     style={{ borderRadius: 6 }}
                   />
                 </Tooltip>
-              </Space>
+              </div>
             </div>
 
             {filteredData.length === 0 ? (
