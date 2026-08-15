@@ -182,8 +182,22 @@ const KDSPage = () => {
 
 
   // Group items by status for Filter Tabs & Columns
-  const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
-  const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
+  const unrollItems = (list) => {
+    const result = [];
+    list.forEach(item => {
+      if (item.quantity > 1) {
+        for (let i = 0; i < item.quantity; i++) {
+          result.push({ ...item, quantity: 1, _splitKey: `${item.orderDetailId}_${i}` });
+        }
+      } else {
+        result.push({ ...item, _splitKey: `${item.orderDetailId}_0` });
+      }
+    });
+    return result;
+  };
+
+  const waitingItems = useMemo(() => unrollItems(items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING)), [items]);
+  const acceptedItems = useMemo(() => unrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED)), [items]);
   const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
   const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
 
@@ -294,7 +308,7 @@ const KDSPage = () => {
 
     return (
       <Card
-        key={item.orderDetailId}
+        key={item._splitKey || item.orderDetailId}
         hoverable
         style={{
           backgroundColor: '#ffffff',
@@ -739,7 +753,7 @@ const KDSPage = () => {
           ) : (
             <Row gutter={[16, 16]}>
               {filteredItems.map((item) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={item.orderDetailId}>
+                <Col xs={24} sm={12} md={8} lg={6} key={item._splitKey || item.orderDetailId}>
                   {renderKdsCard(item)}
                 </Col>
               ))}
