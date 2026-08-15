@@ -38,8 +38,11 @@ import { useAuth } from '../context/AuthContext';
 const { Title, Text } = Typography;
 
 const STATUS_CONFIG = {
+  1: { label: 'Bản nháp', color: 'default', icon: <ClockCircleOutlined /> },
+  4: { label: 'Đã thanh toán', color: 'success', icon: <CheckCircleOutlined /> },
+  5: { label: 'Đã hủy', color: 'error', icon: <WarningOutlined /> },
+
   Draft: { label: 'Bản nháp', color: 'default', icon: <ClockCircleOutlined /> },
-  Approved: { label: 'Đã duyệt', color: 'processing', icon: <ClockCircleOutlined /> },
   Paid: { label: 'Đã thanh toán', color: 'success', icon: <CheckCircleOutlined /> },
   Cancelled: { label: 'Đã hủy', color: 'error', icon: <WarningOutlined /> },
 };
@@ -303,72 +306,79 @@ const MyPayrollPage = () => {
               </div>
 
               {/* Key Metrics Grid */}
-              <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
-                <Col xs={12} sm={8}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Lương cơ bản</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#262626', marginTop: '2px' }}>
-                      {new Intl.NumberFormat('vi-VN').format(selectedPayroll.baseSalary)} đ
-                    </div>
-                  </div>
-                </Col>
+              {(() => {
+                const isManagerUser = user?.roleId === 3 || user?.role === 'Manager' || user?.role === 'Quản lý' || selectedPayroll?.roleId === 3 || selectedPayroll?.roleName === 'Manager' || selectedPayroll?.roleName === 'Quản lý';
+                return (
+                  <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+                    <Col xs={12} sm={isManagerUser ? 12 : 8}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>Lương cơ bản</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#262626', marginTop: '2px' }}>
+                          {new Intl.NumberFormat('vi-VN').format(selectedPayroll.baseSalary)} đ
+                        </div>
+                      </div>
+                    </Col>
 
-                <Col xs={12} sm={8}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Công / Giờ làm thực tế</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff', marginTop: '2px' }}>
-                      {selectedPayroll.salaryType === 'Hourly' || selectedPayroll.salaryType === 'Theo giờ' || selectedPayroll.salaryType === 'TheoGio'
-                        ? `${selectedPayroll.actualWorkHours || 0} giờ làm`
-                        : `${selectedPayroll.actualWorkDays} / ${selectedPayroll.baseWorkDays || 26} ngày (${selectedPayroll.actualWorkHours || 0}h)`}
-                    </div>
-                  </div>
-                </Col>
+                    {!isManagerUser && (
+                      <Col xs={12} sm={8}>
+                        <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                          <Text type="secondary" style={{ fontSize: '12px' }}>Công / Giờ làm thực tế</Text>
+                          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff', marginTop: '2px' }}>
+                            {selectedPayroll.salaryType === 'Hourly' || selectedPayroll.salaryType === 'Theo giờ' || selectedPayroll.salaryType === 'TheoGio'
+                              ? `${selectedPayroll.actualWorkHours || 0} giờ làm`
+                              : `${selectedPayroll.actualWorkDays} / ${selectedPayroll.baseWorkDays || 26} ngày (${selectedPayroll.actualWorkHours || 0}h)`}
+                          </div>
+                        </div>
+                      </Col>
+                    )}
 
-                <Col xs={12} sm={8}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Lương theo công</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#262626', marginTop: '2px' }}>
-                      {new Intl.NumberFormat('vi-VN').format(selectedPayroll.calculatedSalary)} đ
-                    </div>
-                  </div>
-                </Col>
+                    <Col xs={12} sm={isManagerUser ? 12 : 8}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>{isManagerUser ? 'Lương theo hợp đồng' : 'Lương theo công'}</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#262626', marginTop: '2px' }}>
+                          {new Intl.NumberFormat('vi-VN').format(selectedPayroll.calculatedSalary)} đ
+                        </div>
+                      </div>
+                    </Col>
 
-                <Col xs={12} sm={6}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Tổng Phụ cấp</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff', marginTop: '2px' }}>
-                      +{new Intl.NumberFormat('vi-VN').format(selectedPayroll.totalAllowance)} đ
-                    </div>
-                  </div>
-                </Col>
+                    <Col xs={12} sm={6}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>Tổng Phụ cấp</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff', marginTop: '2px' }}>
+                          +{new Intl.NumberFormat('vi-VN').format(selectedPayroll.totalAllowance)} đ
+                        </div>
+                      </div>
+                    </Col>
 
-                <Col xs={12} sm={6}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Tổng Khen thưởng</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#52c41a', marginTop: '2px' }}>
-                      +{new Intl.NumberFormat('vi-VN').format(selectedPayroll.bonusAmount)} đ
-                    </div>
-                  </div>
-                </Col>
+                    <Col xs={12} sm={6}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>Tổng Khen thưởng</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#52c41a', marginTop: '2px' }}>
+                          +{new Intl.NumberFormat('vi-VN').format(selectedPayroll.bonusAmount)} đ
+                        </div>
+                      </div>
+                    </Col>
 
-                <Col xs={12} sm={6}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Khấu trừ</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fa8c16', marginTop: '2px' }}>
-                      -{new Intl.NumberFormat('vi-VN').format(selectedPayroll.totalDeduction)} đ
-                    </div>
-                  </div>
-                </Col>
+                    <Col xs={12} sm={6}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>Khấu trừ</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fa8c16', marginTop: '2px' }}>
+                          -{new Intl.NumberFormat('vi-VN').format(selectedPayroll.totalDeduction)} đ
+                        </div>
+                      </div>
+                    </Col>
 
-                <Col xs={12} sm={6}>
-                  <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>Xử phạt</Text>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff4d4f', marginTop: '2px' }}>
-                      -{new Intl.NumberFormat('vi-VN').format(selectedPayroll.penaltyAmount)} đ
-                    </div>
-                  </div>
-                </Col>
-              </Row>
+                    <Col xs={12} sm={6}>
+                      <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>Xử phạt</Text>
+                        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff4d4f', marginTop: '2px' }}>
+                          -{new Intl.NumberFormat('vi-VN').format(selectedPayroll.penaltyAmount)} đ
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+                );
+              })()}
 
               {/* Salary Breakdown Details */}
               <Card

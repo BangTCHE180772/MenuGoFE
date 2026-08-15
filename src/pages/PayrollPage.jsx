@@ -56,24 +56,31 @@ import { useAuth } from '../context/AuthContext';
 // Payroll status definitions
 const PAYROLL_STATUS = {
   Draft: 1,
-  Pending: 2,
-  Approved: 3,
   Paid: 4,
   Cancelled: 5,
 };
 
 const STATUS_CONFIG = {
   [PAYROLL_STATUS.Draft]: { label: 'Bản nháp', color: 'default', badge: 'default' },
-  [PAYROLL_STATUS.Pending]: { label: 'Chờ duyệt', color: 'processing', badge: 'processing' },
-  [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt', color: 'cyan', badge: 'warning' },
   [PAYROLL_STATUS.Paid]: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   [PAYROLL_STATUS.Cancelled]: { label: 'Đã hủy', color: 'error', badge: 'error' },
+
+  Draft: { label: 'Bản nháp', color: 'default', badge: 'default' },
+  Paid: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
+  Cancelled: { label: 'Đã hủy', color: 'error', badge: 'error' },
+};
+
+const STATUS_TO_NUM = {
+  Draft: 1,
+  Paid: 4,
+  Cancelled: 5,
+  1: 1,
+  4: 4,
+  5: 5,
 };
 
 const STATUS_OPTIONS = [
   { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
-  { value: PAYROLL_STATUS.Pending, label: 'Chờ duyệt' },
-  { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt' },
   { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán' },
   { value: PAYROLL_STATUS.Cancelled, label: 'Đã hủy' },
 ];
@@ -284,7 +291,7 @@ const PayrollPage = () => {
         monthYear: dayjs(`${record.year}-${record.Month || record.month}-01`),
         salaryType: record.salaryType || 'Monthly',
         baseSalary: record.baseSalary,
-        baseWorkDays: isHourlyRecord ? 0 : (record.baseWorkDays || 26),
+        baseWorkDays: isHourlyRecord ? 0 : (record.baseWorkDays || 0),
         actualWorkDays: record.actualWorkDays || 0,
         actualWorkHours: record.actualWorkHours || 0,
         calculatedSalary: record.calculatedSalary || 0,
@@ -293,7 +300,7 @@ const PayrollPage = () => {
         totalDeduction: record.totalDeduction || 0,
         penaltyAmount: record.penaltyAmount || 0,
         netSalary: record.netSalary || 0,
-        status: record.status || PAYROLL_STATUS.Draft,
+        status: STATUS_TO_NUM[record.status] || record.status || PAYROLL_STATUS.Draft,
         note: record.note || '',
         salaryDetails: mappedDetails,
       });
@@ -304,9 +311,9 @@ const PayrollPage = () => {
         monthYear: dayjs(),
         salaryType: 'Monthly',
         baseSalary: 5000000,
-        baseWorkDays: 26,
-        actualWorkDays: 26,
-        actualWorkHours: 208,
+        baseWorkDays: 0,
+        actualWorkDays: 0,
+        actualWorkHours: 0,
         calculatedSalary: 5000000,
         totalAllowance: 0,
         bonusAmount: 0,
@@ -325,7 +332,7 @@ const PayrollPage = () => {
     const isHourly = salaryType === 'Hourly' || salaryType === 'Theo giờ' || salaryType === 'TheoGio';
 
     const baseSalary = allValues.baseSalary || 0;
-    const baseDays = isHourly ? 0 : (allValues.baseWorkDays || 26);
+    const baseDays = isHourly ? 0 : (allValues.baseWorkDays || 0);
     const actualDays = allValues.actualWorkDays || 0;
     const actualHours = allValues.actualWorkHours || 0;
     const details = allValues.salaryDetails || [];
@@ -346,7 +353,14 @@ const PayrollPage = () => {
     });
 
     const selectedAcc = accounts.find((a) => a.id === allValues.accountId);
-    const isManagerAcc = isOwnerOrAdmin && selectedAcc?.roleIds?.includes(3);
+    const isManagerAcc = selectedAcc && (
+      selectedAcc.roleIds?.includes(3) ||
+      selectedAcc.roleId === 3 ||
+      selectedAcc.role === 'Manager' ||
+      selectedAcc.roleName === 'Manager' ||
+      selectedAcc.role === 'Quản lý' ||
+      selectedAcc.roleName === 'Quản lý'
+    );
 
     let calculatedSal = 0;
     if (isManagerAcc) {
@@ -394,12 +408,16 @@ const PayrollPage = () => {
         status: values.status,
         note: values.note || '',
         createdBy: user?.id || 1,
-        salaryDetails: (values.salaryDetails || []).map((d) => ({
-          type: d.type,
-          title: d.title,
-          amount: d.amount,
-          note: d.note || '',
-        })),
+        salaryDetails: (values.salaryDetails || []).map((d) => {
+          const TYPE_STRING_TO_INT = { Allowance: 1, Bonus: 2, Deduction: 3, Penalty: 4 };
+          const typeVal = typeof d.type === 'string' ? (TYPE_STRING_TO_INT[d.type] || Number(d.type) || 1) : (Number(d.type) || 1);
+          return {
+            type: typeVal,
+            title: d.title,
+            amount: Number(d.amount) || 0,
+            note: d.note || '',
+          };
+        }),
       };
 
       if (formModalType === 'create') {
@@ -492,7 +510,7 @@ const PayrollPage = () => {
   const handleOpenStatusModal = (record) => {
     setStatusTargetRecord(record);
     statusForm.setFieldsValue({
-      status: record.status,
+      status: STATUS_TO_NUM[record.status] || record.status || PAYROLL_STATUS.Draft,
       paymentDate: record.paymentDate ? dayjs(record.paymentDate) : dayjs(),
     });
     setIsStatusModalOpen(true);
@@ -501,8 +519,9 @@ const PayrollPage = () => {
   // Submit Status Update
   const handleStatusSubmit = async (values) => {
     try {
-      const pDate = values.status === PAYROLL_STATUS.Paid && values.paymentDate
-        ? values.paymentDate.toISOString()
+      const isPaidStatus = values.status === PAYROLL_STATUS.Paid || values.status === 4 || values.status === 'Paid';
+      const pDate = isPaidStatus
+        ? (values.paymentDate ? values.paymentDate.toISOString() : new Date().toISOString())
         : null;
 
       await updatePayrollStatus(statusTargetRecord.id, values.status, pDate);
@@ -615,7 +634,7 @@ const PayrollPage = () => {
                 {isHourly ? (
                   <span>{record.actualWorkHours || 0} giờ làm</span>
                 ) : (
-                  <span>{record.actualWorkDays}/{record.baseWorkDays || 26} ngày công ({record.actualWorkHours || 0} giờ)</span>
+                  <span>{record.actualWorkDays}{record.baseWorkDays > 0 ? `/${record.baseWorkDays}` : ''} ngày công ({record.actualWorkHours || 0} giờ)</span>
                 )}
               </div>
             )}
@@ -796,6 +815,7 @@ const PayrollPage = () => {
             format="MM/YYYY"
             value={selectedMonthYear}
             onChange={(val) => setSelectedMonthYear(val)}
+            disabledDate={(current) => current && current.isAfter(dayjs().endOf('month'))}
           />
 
           {isOwnerOrAdmin && (
@@ -999,7 +1019,12 @@ const PayrollPage = () => {
             label="Tháng/Năm tính lương"
             rules={[{ required: true, message: 'Vui lòng chọn tháng/năm!' }]}
           >
-            <DatePicker.MonthPicker style={{ width: '100%' }} format="MM/YYYY" placeholder="Chọn tháng/năm" />
+            <DatePicker.MonthPicker
+              style={{ width: '100%' }}
+              format="MM/YYYY"
+              placeholder="Chọn tháng/năm"
+              disabledDate={(current) => current && current.isAfter(dayjs().endOf('month'))}
+            />
           </Form.Item>
 
           <div
@@ -1154,7 +1179,11 @@ const PayrollPage = () => {
                 label="Tháng/Năm tính lương"
                 rules={[{ required: true, message: 'Vui lòng chọn tháng/năm!' }]}
               >
-                <DatePicker.MonthPicker style={{ width: '100%' }} format="MM/YYYY" />
+                <DatePicker.MonthPicker
+                  style={{ width: '100%' }}
+                  format="MM/YYYY"
+                  disabledDate={(current) => current && current.isAfter(dayjs().endOf('month'))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1406,7 +1435,7 @@ const PayrollPage = () => {
               {!isOwnerOrAdmin && (
                 <>
                   <Descriptions.Item label="Công chuẩn / Thực tế">
-                    {detailRecord.actualWorkDays} / {detailRecord.baseWorkDays || 26} ngày công ({detailRecord.actualWorkHours || 0} giờ)
+                    {detailRecord.actualWorkDays}{detailRecord.baseWorkDays > 0 ? ` / ${detailRecord.baseWorkDays}` : ''} ngày công ({detailRecord.actualWorkHours || 0} giờ)
                   </Descriptions.Item>
                   <Descriptions.Item label="Lương tính theo công">
                     {formatVND(detailRecord.calculatedSalary)}
@@ -1581,7 +1610,12 @@ const PayrollPage = () => {
                 label="Chọn Tháng / Năm"
                 rules={[{ required: true, message: 'Vui lòng chọn tháng năm!' }]}
               >
-                <DatePicker picker="month" format="MM/YYYY" style={{ width: '100%' }} />
+                <DatePicker
+                  picker="month"
+                  format="MM/YYYY"
+                  style={{ width: '100%' }}
+                  disabledDate={(current) => current && current.isAfter(dayjs().endOf('month'))}
+                />
               </Form.Item>
             </Col>
             {isOwnerOrAdmin && (
