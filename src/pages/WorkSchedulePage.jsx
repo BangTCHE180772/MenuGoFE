@@ -147,6 +147,7 @@ const WorkSchedulePage = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
 
   // Modal states - Single Add/Edit
@@ -1388,7 +1389,7 @@ const WorkSchedulePage = () => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <TeamOutlined />
-            <span>PHÂN CA HÀNG LOẠT (BULK SHIFT ASSIGNMENT)</span>
+            <span>PHÂN CA HÀNG LOẠT</span>
           </div>
         }
         open={isBulkModalOpen}
