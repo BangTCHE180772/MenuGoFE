@@ -68,56 +68,6 @@ const ProfitCharts = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
-      {/* 1. Tiến Độ Điểm Hòa Vốn (Break-even) */}
-      <Card
-        bordered={false}
-        style={{
-          borderRadius: "var(--border-radius)",
-          boxShadow: "var(--shadow-sm)",
-          background: "var(--color-surface)",
-        }}
-        bodyStyle={{ padding: "16px 20px" }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 8,
-          }}
-        >
-          <Space>
-            <CheckCircleOutlined style={{ color: "#10b981", fontSize: 18 }} />
-            <Text strong style={{ fontSize: 14 }}>
-              Tiến Độ Điểm Hòa Vốn (Break-even)
-            </Text>
-          </Space>
-          <Text style={{ fontWeight: 700, color: "#10b981", fontSize: 16 }}>{percent}%</Text>
-        </div>
-
-        <Progress
-          percent={Math.min(percent, 100)}
-          strokeColor={{ "0%": "#10b981", "100%": "#059669" }}
-          status={percent >= 100 ? "success" : "active"}
-          showInfo={false}
-        />
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 10,
-            fontSize: 12,
-          }}
-        >
-          <Text type="secondary">
-            Mục tiêu hòa vốn: <strong>{formatVND(target)}</strong>
-          </Text>
-          <Text type="success">
-            Đạt được: <strong>{formatVND(current)}</strong>
-          </Text>
-        </div>
-      </Card>
 
       {/* 2. Biến động Doanh thu, Chi phí & Lợi nhuận (Trend) */}
       <Card

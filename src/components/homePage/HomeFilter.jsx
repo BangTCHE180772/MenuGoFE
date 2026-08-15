@@ -64,22 +64,6 @@ const HomeFilter = ({
               style={{ width: 150, borderRadius: 8 }}
             />
           </div>
-
-          {/* Employee Select */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>
-              <UserOutlined style={{ marginRight: 4, color: "#64748b" }} />
-              Người tạo / Nhân viên:
-            </Text>
-            <Select
-              value={selectedEmployee || "all"}
-              onChange={(val) => {
-                onEmployeeChange(val);
-              }}
-              options={INITIAL_MOCK_EMPLOYEES}
-              style={{ width: 220 }}
-            />
-          </div>
         </div>
 
         {/* RIGHT: Reset Button */}

@@ -167,8 +167,8 @@ const CustomerHomePage = () => {
       if (!branchId) return;
       setLoadingMenu(true);
       try {
-        // Tải danh sách BInventory của chi nhánh
-        const rawBInventory = await getBInventories(branchId);
+        // Tải danh sách BInventory của chi nhánh (truyền mode 0 để lấy TẤT CẢ các món, không bị lọc mất Processed)
+        const rawBInventory = await getBInventories(branchId, '', '', 0);
         
         if (Array.isArray(rawBInventory)) {
           // Lọc lấy các sản phẩm bán được (Processed, Manufactured, Regular)
@@ -446,38 +446,51 @@ const CustomerHomePage = () => {
             <div className="title-underline"></div>
           </div>
 
-          <div className="menu-controls-bar" style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center", marginBottom: "20px" }}>
-            <div className="branch-menu-selector" style={{ minWidth: "200px" }}>
-              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Chi nhánh thực đơn:</span>
-              <Select
-                style={{ width: "100%" }}
-                value={activeBranchId}
-                onChange={handleBranchChange}
-                placeholder="Chọn chi nhánh"
-                size="large"
-                options={branches.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh").map(b => ({
-                  label: b.name,
-                  value: b.id
-                }))}
-              />
+          <div className="menu-controls-bar">
+            {/* Hàng 1: Bộ chọn chi nhánh, ô tìm kiếm và sắp xếp */}
+            <div className="controls-top-row" style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center", width: "100%" }}>
+              <div className="branch-menu-selector" style={{ minWidth: "220px", flex: "1 1 auto" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Chi nhánh thực đơn:</span>
+                <Select
+                  style={{ width: "100%" }}
+                  value={activeBranchId}
+                  onChange={handleBranchChange}
+                  placeholder="Chọn chi nhánh"
+                  size="large"
+                  options={branches.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh").map(b => ({
+                    label: b.name,
+                    value: b.id
+                  }))}
+                />
+              </div>
+
+              <div className="search-bar-container" style={{ flex: "2 1 300px", minWidth: "260px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Tìm kiếm món ăn:</span>
+                <CustomerSearchBar
+                  value={searchKeyword}
+                  onChange={handleSearchChange}
+                  onClear={handleSearchClear}
+                />
+              </div>
+
+              <div className="sort-container" style={{ flex: "1 1 180px", minWidth: "180px", display: "flex", justifyContent: "flex-end", alignSelf: "flex-end", marginBottom: "4px" }}>
+                <CustomerMenuSort
+                  value={sortOption}
+                  onChange={(val) => setSortOption(val)}
+                />
+              </div>
             </div>
 
-            <div style={{ flex: 1, display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
-              <CustomerSearchBar
-                value={searchKeyword}
-                onChange={handleSearchChange}
-                onClear={handleSearchClear}
-              />
+            {/* Đường phân cách nhẹ */}
+            <div style={{ height: "1px", backgroundColor: "#f1f5f9", width: "100%", margin: "8px 0" }}></div>
 
+            {/* Hàng 2: Bộ lọc danh mục (Cuộn ngang) */}
+            <div className="controls-bottom-row" style={{ width: "100%" }}>
+              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "8px", fontWeight: 600 }}>Danh mục món ăn:</span>
               <CustomerMenuFilter
                 categories={dynamicCategories}
                 activeCategory={selectedCategory}
                 onSelectCategory={handleCategorySelect}
-              />
-
-              <CustomerMenuSort
-                value={sortOption}
-                onChange={(val) => setSortOption(val)}
               />
             </div>
           </div>

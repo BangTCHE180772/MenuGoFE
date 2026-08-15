@@ -66,19 +66,6 @@ const ExpenseSummaryCards = ({ data = {}, onOpenCompare }) => {
       bgIcon: "#eff6ff",
       borderColor: "#2563eb",
     },
-    {
-      title: "Tăng Trưởng Chi Phí",
-      value: `${growthPct >= 0 ? "+" : ""}${growthPct}%`,
-      subText: "So với kỳ trước",
-      icon: isGrowthGood ? (
-        <FallOutlined style={{ fontSize: 20, color: "#16a34a" }} />
-      ) : (
-        <RiseOutlined style={{ fontSize: 20, color: "#dc2626" }} />
-      ),
-      bgIcon: isGrowthGood ? "#f0fdf4" : "#fef2f2",
-      borderColor: isGrowthGood ? "#16a34a" : "#dc2626",
-      isBadge: true,
-    },
   ];
 
   return (
@@ -113,7 +100,7 @@ const ExpenseSummaryCards = ({ data = {}, onOpenCompare }) => {
 
       <Row gutter={[16, 16]}>
         {kpis.map((kpi, idx) => (
-          <Col xs={24} sm={12} lg={4.8} key={idx} style={{ flex: "1 0 18%" }}>
+          <Col xs={24} sm={12} lg={6} key={idx}>
             <Card
               bordered={false}
               style={{

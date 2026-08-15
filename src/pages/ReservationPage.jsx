@@ -5,6 +5,7 @@ import { getReservations, checkInReservation, cancelReservation } from '../api/r
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
 import ReservationEditModal from '../components/reservation/ReservationEditModal';
 import dayjs from 'dayjs';
+import { useBranch } from '../context/BranchContext';
 import '../styles/ReservationPage.css';
 
 const { Title, Text } = Typography;
@@ -20,12 +21,15 @@ const ReservationPage = ({ isPosHub }) => {
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [activeTab, setActiveTab] = useState('All');
 
+  const { currentBranchId } = useBranch();
   const [now, setNow] = useState(dayjs());
 
   const fetchReservations = async () => {
     setLoading(true);
     try {
-      const data = await getReservations();
+      // For Admin, it uses currentBranchId. If not admin (or currentBranchId is null), we can still fetch all if backend permits, 
+      // but usually Admin selects branch from dropdown.
+      const data = await getReservations(currentBranchId);
       setReservations(data);
     } catch (error) {
       message.error('Không thể tải danh sách đặt bàn');
@@ -39,7 +43,7 @@ const ReservationPage = ({ isPosHub }) => {
 
     const interval = setInterval(() => setNow(dayjs()), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentBranchId]);
 
   const handleCheckIn = async (id) => {
     Modal.confirm({

@@ -20,7 +20,7 @@ const { Panel } = Collapse;
  * 3. Thu chi (Table Thu chi)
  * 4. Hàng hóa (Table Hàng hóa)
  */
-const HomeReport = ({ data }) => {
+const HomeReport = ({ data, onRefresh }) => {
   const { salesList, cashFlowList, inventoryList } = data;
 
   const tabItems = [
@@ -60,7 +60,7 @@ const HomeReport = ({ data }) => {
               overflow: "hidden",
             }}
           >
-            <SalesReportTable data={salesList} />
+            <SalesReportTable data={salesList} onRefresh={onRefresh} />
           </Panel>
 
           <Panel
@@ -79,7 +79,7 @@ const HomeReport = ({ data }) => {
               overflow: "hidden",
             }}
           >
-            <CashFlowReportTable data={cashFlowList} />
+            <CashFlowReportTable data={cashFlowList} onRefresh={onRefresh} />
           </Panel>
 
           <Panel
@@ -97,7 +97,7 @@ const HomeReport = ({ data }) => {
               overflow: "hidden",
             }}
           >
-            <InventoryReportTable data={inventoryList} />
+            <InventoryReportTable data={inventoryList} onRefresh={onRefresh} />
           </Panel>
         </Collapse>
       </div>
@@ -111,7 +111,7 @@ const HomeReport = ({ data }) => {
           <span>Bán hàng</span>
         </Space>
       ),
-      children: <SalesReportTable data={salesList} />,
+      children: <SalesReportTable data={salesList} onRefresh={onRefresh} />,
     },
     {
       key: "cashflow",
@@ -121,7 +121,7 @@ const HomeReport = ({ data }) => {
           <span>Thu chi</span>
         </Space>
       ),
-      children: <CashFlowReportTable data={cashFlowList} />,
+      children: <CashFlowReportTable data={cashFlowList} onRefresh={onRefresh} />,
     },
     {
       key: "inventory",
@@ -131,7 +131,7 @@ const HomeReport = ({ data }) => {
           <span>Hàng hóa</span>
         </Space>
       ),
-      children: <InventoryReportTable data={inventoryList} />,
+      children: <InventoryReportTable data={inventoryList} onRefresh={onRefresh} />,
     },
   ];
 

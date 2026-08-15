@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Table, Input, Button, Space, Progress, Card, Dropdown, Tooltip, message } from "antd";
 import {
   SearchOutlined,
@@ -17,12 +18,12 @@ const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
 
 const inventoryColumnDefs = [
-  { title: "Mã món", field: "itemCode" },
-  { title: "Tên món ăn / sản phẩm", field: "itemName" },
-  { title: "Số lượng bán", field: (r) => `${r.qtySold} phần`, align: "center" },
-  { title: "Giá bán", field: (r) => formatVND(r.unitPrice), align: "right" },
-  { title: "Doanh thu", field: (r) => formatVND(r.revenue), align: "right" },
-  { title: "Tỷ trọng doanh thu", field: (r) => `${r.sharePct}%`, align: "center" },
+  { title: "STT", field: (_, idx) => idx + 1 },
+  { title: "Tên món ăn", field: "itemName" },
+  { title: "Đơn giá", field: (r) => formatVND(r.unitPrice), align: "right" },
+  { title: "Số lượng", field: (r) => `${r.qtySold} phần`, align: "center" },
+  { title: "Thành tiền", field: (r) => formatVND(r.revenue), align: "right" },
+  { title: "Ghi chú", field: "note" },
 ];
 
 /**
@@ -30,68 +31,69 @@ const inventoryColumnDefs = [
  * Hỗ trợ Fullscreen mode, Horizontal Scroll, Export Dropdown, Search, Sort, Tỷ Trọng %, Phân trang
  */
 const InventoryReportTable = ({ data = [] }) => {
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const filteredData = useMemo(() => {
-    return data.filter(
-      (item) =>
-        item.itemCode.toLowerCase().includes(searchText.toLowerCase()) ||
-        item.itemName.toLowerCase().includes(searchText.toLowerCase())
-    );
+    return data.filter((item) => {
+      const matchSearch =
+        !searchText ||
+        item.itemName.toLowerCase().includes(searchText.toLowerCase()) ||
+        (item.itemCode && item.itemCode.toLowerCase().includes(searchText.toLowerCase()));
+
+      return matchSearch;
+    });
   }, [data, searchText]);
 
   const totals = useMemo(() => {
     let itemCount = filteredData.length;
     let totalQtySold = 0;
-    let totalUnitPrice = 0;
     let totalRevenue = 0;
 
     filteredData.forEach((item) => {
       totalQtySold += Number(item.qtySold || 0);
-      totalUnitPrice += Number(item.unitPrice || 0);
       totalRevenue += Number(item.revenue || 0);
     });
 
     return {
       itemCount,
       totalQtySold,
-      totalUnitPrice,
       totalRevenue,
     };
   }, [filteredData]);
 
   const handleExportExcel = () => {
     exportToExcelCSV("Bao_Cao_San_Pham_Hang_Hoa", inventoryColumnDefs, filteredData, [
-      `Tổng: ${totals.itemCount} món`,
+      "Tổng cộng",
+      "-",
       "-",
       `${totals.totalQtySold} phần`,
-      formatVND(totals.totalUnitPrice),
       formatVND(totals.totalRevenue),
-      "100%",
+      "-",
     ]);
   };
 
   const handleExportPDF = () => {
     printReportTable("BÁO CÁO SẢN PHẨM & HÀNG HÓA IN/PDF", inventoryColumnDefs, filteredData, [
-      `Tổng: ${totals.itemCount} món`,
+      "Tổng cộng",
+      "-",
       "-",
       `${totals.totalQtySold} phần`,
-      formatVND(totals.totalUnitPrice),
       formatVND(totals.totalRevenue),
-      "100%",
+      "-",
     ]);
   };
 
   const handlePrint = () => {
     printReportTable("BÁO CÁO SẢN PHẨM & HÀNG HÓA BÁN RA", inventoryColumnDefs, filteredData, [
-      `Tổng: ${totals.itemCount} món`,
+      "Tổng cộng",
+      "-",
       "-",
       `${totals.totalQtySold} phần`,
-      formatVND(totals.totalUnitPrice),
       formatVND(totals.totalRevenue),
-      "100%",
+      "-",
     ]);
   };
 
@@ -129,30 +131,28 @@ const InventoryReportTable = ({ data = [] }) => {
 
   const columns = [
     {
-      title: "Mã món",
-      dataIndex: "itemCode",
-      key: "itemCode",
-      width: 140,
-      render: (text) => <strong style={{ color: "#1e293b" }}>{text}</strong>,
+      title: "STT",
+      key: "index",
+      width: 80,
+      align: "center",
+      render: (_, __, index) => index + 1,
     },
     {
-      title: "Tên món ăn / sản phẩm",
+      title: "Tên món ăn",
       dataIndex: "itemName",
       key: "itemName",
       width: 240,
-      render: (text) => <span style={{ fontWeight: 600, color: "#334155" }}>{text}</span>,
+      render: (text) => (
+        <span
+          onClick={() => navigate(`/inventory-management?tab=Product&subTab=monan&search=${text}`)}
+          style={{ color: "#2563eb", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+        >
+          {text}
+        </span>
+      ),
     },
     {
-      title: "Số lượng bán",
-      dataIndex: "qtySold",
-      key: "qtySold",
-      width: 150,
-      align: "center",
-      sorter: (a, b) => a.qtySold - b.qtySold,
-      render: (val) => <strong style={{ fontSize: 14 }}>{val} phần</strong>,
-    },
-    {
-      title: "Giá bán",
+      title: "Đơn giá",
       dataIndex: "unitPrice",
       key: "unitPrice",
       width: 140,
@@ -160,32 +160,31 @@ const InventoryReportTable = ({ data = [] }) => {
       render: (val) => formatVND(val),
     },
     {
-      title: "Doanh thu",
+      title: "Số lượng",
+      dataIndex: "qtySold",
+      key: "qtySold",
+      width: 150,
+      align: "center",
+      sorter: (a, b) => a.qtySold - b.qtySold,
+      render: (val) => <strong style={{ fontSize: 13 }}>{val} phần</strong>,
+    },
+    {
+      title: "Thành tiền",
       dataIndex: "revenue",
       key: "revenue",
       width: 160,
       align: "right",
       sorter: (a, b) => a.revenue - b.revenue,
       render: (val) => (
-        <strong style={{ color: "var(--color-primary)", fontSize: 14 }}>{formatVND(val)}</strong>
+        <strong style={{ color: "#2563eb", fontSize: 13 }}>{formatVND(val)}</strong>
       ),
     },
     {
-      title: "Tỷ trọng doanh thu",
-      dataIndex: "sharePct",
-      key: "sharePct",
-      width: 220,
-      sorter: (a, b) => a.sharePct - b.sharePct,
-      render: (pct) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Progress
-            percent={pct}
-            size="small"
-            strokeColor="var(--color-primary)"
-            style={{ flex: 1, margin: 0 }}
-          />
-        </div>
-      ),
+      title: "Ghi chú",
+      dataIndex: "note",
+      key: "note",
+      width: 200,
+      render: (text) => text || "—",
     },
   ];
 
@@ -227,7 +226,7 @@ const InventoryReportTable = ({ data = [] }) => {
       >
         <Space wrap size="middle">
           <Input
-            placeholder="Tìm theo Mã món, Tên món..."
+            placeholder="Tìm theo Tên món ăn..."
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -297,36 +296,25 @@ const InventoryReportTable = ({ data = [] }) => {
                 borderBottom: "2px solid #3b82f6",
               }}
             >
-              <Table.Summary.Cell index={0}>
+              <Table.Summary.Cell index={0} align="center">-</Table.Summary.Cell>
+              <Table.Summary.Cell index={1}>
                 <span style={{ color: "#1d4ed8", fontWeight: 700 }}>
-                  Tổng: {totals.itemCount} món
+                  tổng món: {totals.itemCount}
                 </span>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={1}>-</Table.Summary.Cell>
-              <Table.Summary.Cell index={2} align="center">
-                <strong style={{ color: "#1e293b", fontSize: 14 }}>
+              <Table.Summary.Cell index={2}>-</Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="center">
+                <strong style={{ color: "#1d4ed8", fontSize: 13 }}>
                   {totals.totalQtySold} phần
                 </strong>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right">
-                <strong style={{ color: "#334155" }}>
-                  {formatVND(totals.totalUnitPrice)}
-                </strong>
-              </Table.Summary.Cell>
               <Table.Summary.Cell index={4} align="right">
-                <strong style={{ color: "var(--color-primary)", fontSize: 15 }}>
+                <strong style={{ color: "#2563eb", fontSize: 13 }}>
                   {formatVND(totals.totalRevenue)}
                 </strong>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={5}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Progress
-                    percent={100}
-                    size="small"
-                    strokeColor="#10b981"
-                    style={{ flex: 1, margin: 0 }}
-                  />
-                </div>
+              <Table.Summary.Cell index={5} align="center">
+                -
               </Table.Summary.Cell>
             </Table.Summary.Row>
           </Table.Summary>

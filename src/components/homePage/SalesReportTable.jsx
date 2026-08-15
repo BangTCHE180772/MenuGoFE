@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Table, Input, Select, Button, Space, Tag, Card, Dropdown, Tooltip, message } from "antd";
 import {
   SearchOutlined,
@@ -18,16 +19,17 @@ const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
 
 const salesColumnsDefs = [
-  { title: "Mã Bill", field: "billCode" },
-  { title: "Thời gian", field: "time" },
-  { title: "Bàn", field: "tableName" },
-  { title: "Thu ngân", field: "cashier" },
-  { title: "SL Món", field: "itemCount", align: "center" },
-  { title: "Tạm tính", field: (r) => formatVND(r.subtotal), align: "right" },
-  { title: "Phụ thu", field: (r) => (r.surcharge > 0 ? formatVND(r.surcharge) : "-"), align: "right" },
-  { title: "Giảm giá", field: (r) => (r.discount > 0 ? `-${formatVND(r.discount)}` : "-"), align: "right" },
-  { title: "Thành tiền", field: (r) => formatVND(r.total), align: "right" },
-  { title: "Phương thức thanh toán", field: "paymentMethod", align: "center" },
+  { title: "MÃ HÓA ĐƠN", field: "billCode" },
+  { title: "NGÀY LẬP", field: (r) => `${r.date} ${r.time}` },
+  { title: "BÀN / KHU VỰC", field: (r) => r.areaName ? `${r.tableName} (${r.areaName})` : r.tableName },
+  { title: "KHÁCH HÀNG", field: "customer" },
+  { title: "THU NGÂN", field: "cashier" },
+  { title: "TỔNG TIỀN (VNĐ)", field: (r) => formatVND(r.total), align: "right" },
+  { title: "TRẠNG THÁI", field: (r) => {
+      const isPaid = r.status === "Paid" || r.status === "Completed" || r.status === 1;
+      return isPaid ? "Đã thanh toán" : r.status;
+    }
+  },
 ];
 
 /**
@@ -35,61 +37,44 @@ const salesColumnsDefs = [
  * Hỗ trợ Fullscreen mode, Horizontal Scroll, Export Dropdown, Search, Filter PTTT, Sort, Phân trang
  */
 const SalesReportTable = ({ data = [] }) => {
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("all");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       const matchSearch =
+        !searchText ||
         item.billCode.toLowerCase().includes(searchText.toLowerCase()) ||
-        item.tableName.toLowerCase().includes(searchText.toLowerCase()) ||
+        item.customer?.toLowerCase().includes(searchText.toLowerCase()) ||
         item.cashier.toLowerCase().includes(searchText.toLowerCase());
 
-      const matchPayment =
-        paymentFilter === "all" || item.paymentMethod === paymentFilter;
-
-      return matchSearch && matchPayment;
+      return matchSearch;
     });
-  }, [data, searchText, paymentFilter]);
+  }, [data, searchText]);
 
   const totals = useMemo(() => {
     let billCount = filteredData.length;
-    let totalItemCount = 0;
-    let totalSubtotal = 0;
-    let totalSurcharge = 0;
-    let totalDiscount = 0;
     let totalAmount = 0;
 
     filteredData.forEach((item) => {
-      totalItemCount += Number(item.itemCount || 0);
-      totalSubtotal += Number(item.subtotal || 0);
-      totalSurcharge += Number(item.surcharge || 0);
-      totalDiscount += Number(item.discount || 0);
       totalAmount += Number(item.total || 0);
     });
 
     return {
       billCount,
-      totalItemCount,
-      totalSubtotal,
-      totalSurcharge,
-      totalDiscount,
       totalAmount,
     };
   }, [filteredData]);
 
   const handleExportExcel = () => {
     exportToExcelCSV("Bao_Cao_Ban_Hang", salesColumnsDefs, filteredData, [
-      `Tổng: ${totals.billCount} bill`,
+      "Tổng cộng",
       "-",
       "-",
       "-",
-      `${totals.totalItemCount} món`,
-      formatVND(totals.totalSubtotal),
-      totals.totalSurcharge > 0 ? formatVND(totals.totalSurcharge) : "-",
-      totals.totalDiscount > 0 ? `-${formatVND(totals.totalDiscount)}` : "-",
+      "-",
       formatVND(totals.totalAmount),
       "-",
     ]);
@@ -97,14 +82,11 @@ const SalesReportTable = ({ data = [] }) => {
 
   const handleExportPDF = () => {
     printReportTable("BÁO CÁO BÁN HÀNG CHI TIẾT IN/PDF", salesColumnsDefs, filteredData, [
-      `Tổng: ${totals.billCount} bill`,
+      "Tổng cộng",
       "-",
       "-",
       "-",
-      `${totals.totalItemCount} món`,
-      formatVND(totals.totalSubtotal),
-      totals.totalSurcharge > 0 ? formatVND(totals.totalSurcharge) : "-",
-      totals.totalDiscount > 0 ? `-${formatVND(totals.totalDiscount)}` : "-",
+      "-",
       formatVND(totals.totalAmount),
       "-",
     ]);
@@ -159,84 +141,72 @@ const SalesReportTable = ({ data = [] }) => {
 
   const columns = [
     {
-      title: "Mã Bill",
+      title: "STT",
+      key: "index",
+      width: 70,
+      align: "center",
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: "MÃ HÓA ĐƠN",
       dataIndex: "billCode",
       key: "billCode",
-      width: 150,
-      render: (text) => <strong style={{ color: "#1e293b" }}>{text}</strong>,
+      width: 160,
+      render: (text) => (
+        <span
+          onClick={() => navigate(`/inventory-management?tab=Invoice&search=${text}`)}
+          style={{ color: "#16a34a", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+        >
+          {text}
+        </span>
+      ),
     },
     {
-      title: "Thời gian",
-      dataIndex: "time",
-      key: "time",
-      width: 110,
-      sorter: (a, b) => a.time.localeCompare(b.time),
+      title: "NGÀY LẬP",
+      key: "createdAt",
+      width: 160,
+      render: (_, record) => `${record.date} ${record.time}`,
     },
     {
-      title: "Bàn",
-      dataIndex: "tableName",
+      title: "BÀN / KHU VỰC",
       key: "tableName",
-      width: 140,
+      width: 180,
+      render: (_, record) => record.areaName ? `${record.tableName} (${record.areaName})` : record.tableName,
     },
     {
-      title: "Thu ngân",
+      title: "KHÁCH HÀNG",
+      dataIndex: "customer",
+      key: "customer",
+      width: 160,
+    },
+    {
+      title: "THU NGÂN",
       dataIndex: "cashier",
       key: "cashier",
       width: 150,
     },
     {
-      title: "SL Món",
-      dataIndex: "itemCount",
-      key: "itemCount",
-      width: 100,
-      align: "center",
-      sorter: (a, b) => a.itemCount - b.itemCount,
-    },
-    {
-      title: "Tạm tính",
-      dataIndex: "subtotal",
-      key: "subtotal",
-      width: 130,
-      align: "right",
-      render: (val) => formatVND(val),
-    },
-    {
-      title: "Phụ thu",
-      dataIndex: "surcharge",
-      key: "surcharge",
-      width: 110,
-      align: "right",
-      render: (val) => (val > 0 ? formatVND(val) : "-"),
-    },
-    {
-      title: "Giảm giá",
-      dataIndex: "discount",
-      key: "discount",
-      width: 120,
-      align: "right",
-      render: (val) => (val > 0 ? <span style={{ color: "#ef4444" }}>-{formatVND(val)}</span> : "-"),
-    },
-    {
-      title: "Thành tiền",
+      title: "TỔNG TIỀN (VNĐ)",
       dataIndex: "total",
       key: "total",
-      width: 150,
+      width: 160,
       align: "right",
       sorter: (a, b) => a.total - b.total,
-      render: (val) => <strong style={{ color: "var(--color-primary)", fontSize: 14 }}>{formatVND(val)}</strong>,
+      render: (val) => <strong style={{ color: "#16a34a", fontSize: 13 }}>{formatVND(val)}</strong>,
     },
     {
-      title: "Phương thức thanh toán",
-      dataIndex: "paymentMethod",
-      key: "paymentMethod",
-      width: 190,
+      title: "TRẠNG THÁI",
+      dataIndex: "status",
+      key: "status",
+      width: 140,
       align: "center",
-      render: (method) => {
-        let color = "blue";
-        if (method === "Tiền mặt") color = "green";
-        if (method === "Chuyển khoản / QR") color = "orange";
-        if (method === "Thẻ Visa/Master") color = "purple";
-        return <Tag color={color} style={{ borderRadius: 6, fontWeight: 500 }}>{method}</Tag>;
+      render: (status) => {
+        const isPaid = status === "Paid" || status === "Completed" || status === 1;
+        return (
+          <Tag color={isPaid ? "success" : "warning"} style={{ borderRadius: 6, fontWeight: 600, padding: "2px 8px" }}>
+            {isPaid ? "Đã thanh toán" : status}
+          </Tag>
+        );
       },
     },
   ];
@@ -279,23 +249,12 @@ const SalesReportTable = ({ data = [] }) => {
       >
         <Space wrap size="middle">
           <Input
-            placeholder="Tìm theo Mã Bill, Bàn, Thu ngân..."
+            placeholder="Tìm theo Mã hóa đơn, Bàn, Thu ngân..."
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 260, borderRadius: 8 }}
+            style={{ width: 280, borderRadius: 8 }}
             allowClear
-          />
-          <Select
-            value={paymentFilter}
-            onChange={setPaymentFilter}
-            style={{ width: 200 }}
-            options={[
-              { value: "all", label: "Tất cả PTTT" },
-              { value: "Tiền mặt", label: "Tiền mặt" },
-              { value: "Chuyển khoản / QR", label: "Chuyển khoản / QR" },
-              { value: "Thẻ Visa/Master", label: "Thẻ Visa/Master" },
-            ]}
           />
         </Space>
 
@@ -312,10 +271,7 @@ const SalesReportTable = ({ data = [] }) => {
 
           {/* Reset Filters Button */}
           <Button
-            onClick={() => {
-              setSearchText("");
-              setPaymentFilter("all");
-            }}
+            onClick={() => setSearchText("")}
             style={{ borderRadius: 8 }}
           >
             Đặt lại
@@ -348,7 +304,7 @@ const SalesReportTable = ({ data = [] }) => {
       <Table
         columns={columns}
         dataSource={filteredData}
-        rowKey="id"
+        rowKey="billCode"
         sticky
         loading={loading}
         scroll={{ x: "max-content", y: isFullscreen ? "calc(100vh - 220px)" : undefined }}
@@ -356,45 +312,27 @@ const SalesReportTable = ({ data = [] }) => {
           <Table.Summary fixed="top">
             <Table.Summary.Row
               style={{
-                background: "#fff7ed",
+                background: "#f0fdf4",
                 fontWeight: 700,
-                borderBottom: "2px solid #fdba74",
+                borderBottom: "2px solid #86efac",
               }}
             >
-              <Table.Summary.Cell index={0}>
-                <span style={{ color: "#c2410c", fontWeight: 700 }}>
-                  Tổng: {totals.billCount} bill
+              <Table.Summary.Cell index={0} align="center">-</Table.Summary.Cell>
+              <Table.Summary.Cell index={1}>
+                <span style={{ color: "#16a34a", fontWeight: 700 }}>
+                  tổng hóa đơn: {totals.billCount}
                 </span>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={1}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={2}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={3}>-</Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="center">
-                <strong style={{ color: "#1e293b", fontSize: 14 }}>
-                  {totals.totalItemCount} món
-                </strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right">
-                <strong style={{ color: "#334155" }}>
-                  {formatVND(totals.totalSubtotal)}
-                </strong>
-              </Table.Summary.Cell>
+              <Table.Summary.Cell index={4}>-</Table.Summary.Cell>
+              <Table.Summary.Cell index={5}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={6} align="right">
-                {totals.totalSurcharge > 0 ? formatVND(totals.totalSurcharge) : "-"}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={7} align="right">
-                {totals.totalDiscount > 0 ? (
-                  <span style={{ color: "#ef4444" }}>-{formatVND(totals.totalDiscount)}</span>
-                ) : (
-                  "-"
-                )}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={8} align="right">
-                <strong style={{ color: "var(--color-primary)", fontSize: 15 }}>
+                <strong style={{ color: "#16a34a", fontSize: 14 }}>
                   {formatVND(totals.totalAmount)}
                 </strong>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={9} align="center">
+              <Table.Summary.Cell index={7} align="center">
                 -
               </Table.Summary.Cell>
             </Table.Summary.Row>

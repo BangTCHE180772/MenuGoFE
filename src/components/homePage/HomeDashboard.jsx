@@ -63,21 +63,6 @@ const HomeDashboard = ({ data }) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* ── ALERTS FROM BACKEND ───────────────────────────────────────────── */}
-      {alerts && alerts.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {alerts.map((alert, idx) => (
-            <Alert
-              key={idx}
-              message={alert.message}
-              type={alert.level === "warning" ? "warning" : alert.level === "danger" ? "error" : "info"}
-              showIcon
-              style={{ borderRadius: 10 }}
-            />
-          ))}
-        </div>
-      )}
-
       {/* ── 1. 4 CARD KPIs ────────────────────────────────────────────────── */}
       <Row gutter={[16, 16]}>
         {kpiItems.map((kpi, index) => {
@@ -147,7 +132,7 @@ const HomeDashboard = ({ data }) => {
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <ShoppingOutlined style={{ color: "#2563eb" }} />
                     <span style={{ fontWeight: 700, fontSize: 15 }}>
-                      Trạng thái Đơn hàng trong ngày ({orderSummary.total || 0} đơn)
+                      Trạng thái Đơn hàng trong ngày
                     </span>
                   </div>
                 }
@@ -161,32 +146,25 @@ const HomeDashboard = ({ data }) => {
                 bodyStyle={{ padding: "18px 20px" }}
               >
                 <Row gutter={[16, 16]}>
-                  <Col xs={12} sm={6}>
+                  <Col xs={24} sm={8}>
                     <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
-                      <ClockCircleOutlined style={{ fontSize: 22, color: "#2563eb", marginBottom: 6 }} />
-                      <div style={{ fontSize: 20, fontWeight: 800, color: "#1e40af" }}>{orderSummary.new || 0}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Mới tạo</div>
+                      <ShoppingOutlined style={{ fontSize: 22, color: "#2563eb", marginBottom: 6 }} />
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#1e40af" }}>{orderSummary.created || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã tạo</div>
                     </div>
                   </Col>
-                  <Col xs={12} sm={6}>
+                  <Col xs={24} sm={8}>
                     <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
                       <CheckCircleOutlined style={{ fontSize: 22, color: "#16a34a", marginBottom: 6 }} />
-                      <div style={{ fontSize: 20, fontWeight: 800, color: "#15803d" }}>{orderSummary.paid || 0}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã thanh toán</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#15803d" }}>{orderSummary.completed || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã hoàn thành</div>
                     </div>
                   </Col>
-                  <Col xs={12} sm={6}>
+                  <Col xs={24} sm={8}>
                     <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
                       <ExclamationCircleOutlined style={{ fontSize: 22, color: "#d97706", marginBottom: 6 }} />
-                      <div style={{ fontSize: 20, fontWeight: 800, color: "#b45309" }}>{orderSummary.unpaid || 0}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Chưa thanh toán</div>
-                    </div>
-                  </Col>
-                  <Col xs={12} sm={6}>
-                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
-                      <CloseCircleOutlined style={{ fontSize: 22, color: "#dc2626", marginBottom: 6 }} />
-                      <div style={{ fontSize: 20, fontWeight: 800, color: "#b91c1c" }}>{orderSummary.cancelled || 0}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Đã hủy</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "#b45309" }}>{orderSummary.uncompleted || 0}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Chưa hoàn thành</div>
                     </div>
                   </Col>
                 </Row>

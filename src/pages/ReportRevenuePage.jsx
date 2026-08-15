@@ -35,6 +35,8 @@ import BillDetailDrawer from "../components/reports/revenue/BillDetailDrawer";
 import RevenueCompareModal from "../components/reports/revenue/RevenueCompareModal";
 
 import { getBranchDashboardStats } from "../api/dashboardApi";
+import { getPaidInvoices } from "../api/orderApi";
+import { getCashFlows } from "../api/cashFlowApi";
 import { useBranch } from "../context/BranchContext";
 import "../styles/ReportRevenuePage.css";
 
@@ -43,51 +45,10 @@ const { Title, Text } = Typography;
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
-// ─── Map BE CashFlowList → Revenue bills table ─────────────────────────────
-// BE cashFlowList: [{ id, time:"yyyy-MM-dd HH:mm", type:"in"|"out", category, amount }]
-// RevenueReportTable expects: { id, billCode, date, time, customer, tableName, cashier,
-//   paymentMethod, dishTotal, surcharge, discount, vat, total, status }
-const mapCashFlowToBills = (cashFlowList = []) => {
-  return cashFlowList
-    .filter((cf) => cf.type === "in") // chỉ lấy Thu (Payment thành công)
-    .map((cf, idx) => {
-      const timeVal = cf.time || "";
-      const parsedTime = timeVal.length > 5 ? dayjs(timeVal) : null;
-      const dateStr = parsedTime ? parsedTime.format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY");
-      const timeStr = parsedTime ? parsedTime.format("HH:mm") : timeVal;
-      const amount  = Math.abs(cf.amount || 0);
-
-      return {
-        id:            String(cf.id || idx + 1),
-        billCode:      `HD${String(cf.id || idx + 1).padStart(6, "0")}`,
-        date:          dateStr,
-        time:          timeStr,
-        customer:      "Khách lẻ",
-        tableName:     "—",
-        cashier:       cf.category === "Thanh toán hóa đơn" ? "Hệ thống" : cf.category,
-        paymentMethod: "Hệ thống",   // BE Payment không lưu method riêng trong cashFlow
-        dishTotal:     amount,
-        surcharge:     0,
-        discount:      0,
-        vat:           0,
-        total:         amount,
-        status:        "Completed",
-        _raw:          cf,           // giữ nguyên để debug
-      };
-    });
-};
-
 /**
  * Page: ReportRevenuePage
- * Báo cáo Doanh thu — kết nối với BE qua GET /api/Dashboard/branch-stats
+ * Báo cáo Doanh thu — kết nối với BE qua GET /api/Order/invoices và /api/CashFlow
  * Đường dẫn: /reports/revenue
- *
- * Nguồn dữ liệu từ BE:
- *  - KPI cards    ← beStats.revenue, completedBills, avgOrderValue
- *  - Trend chart  ← beStats.dailyStats [{ date, revenue, expense, profit }]
- *  - Pie chart    ← beStats.paymentMethods [{ name, value }]
- *  - Bills table  ← beStats.cashFlowList lọc type=="in"
- *  - SummaryFooter← beStats.revenue, expenses, profit
  */
 const ReportRevenuePage = () => {
   const { currentBranchId } = useBranch();
@@ -105,10 +66,13 @@ const ReportRevenuePage = () => {
   const [compareModalVisible, setCompareModalVisible] = useState(false);
 
   // ── Raw data từ BE ──────────────────────────────────────────────────────
-  const [beStats, setBeStats]           = useState(null);
   const [allBills, setAllBills]         = useState([]);   // toàn bộ bills từ BE
   const [trendData, setTrendData]       = useState([]);   // dailyStats
   const [paymentMethodData, setPaymentMethodData] = useState([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalOrders, setTotalOrders]   = useState(0);
+  const [avgOrderValue, setAvgOrderValue] = useState(0);
+  const [avgPerDay, setAvgPerDay]       = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
 
   // ── Fetch từ BE ─────────────────────────────────────────────────────────
@@ -119,11 +83,9 @@ const ReportRevenuePage = () => {
       const startStr = start.format("YYYY-MM-DD");
       const endStr   = end.format("YYYY-MM-DD");
 
-      // Xác định range param
       const today = dayjs().startOf("day");
       const isToday = start.isSame(today, "day") && end.isSame(today, "day");
 
-      // Map preset key (snake_case từ ReportFilter) → range BE
       const presetToRange = {
         today:       "today",
         yesterday:   "yesterday",
@@ -136,40 +98,112 @@ const ReportRevenuePage = () => {
       };
       let range = isToday ? "today" : (presetToRange[presetTime] || "custom");
 
-      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
+      const [invoicesRes, cashFlowsRes] = await Promise.allSettled([
+        getPaidInvoices(currentBranchId),
+        getCashFlows(currentBranchId)
+      ]);
 
-      if (res?.data) {
-        const data = res.data;
-        setBeStats(data);
+      const allInvoices = invoicesRes.status === "fulfilled" ? (invoicesRes.value?.data || invoicesRes.value || []) : [];
+      const allCashFlows = cashFlowsRes.status === "fulfilled" ? (cashFlowsRes.value || []) : [];
 
-        // Bills table
-        const bills = mapCashFlowToBills(data.cashFlowList || []);
-        setAllBills(bills);
+      // Filter lists by selected date range
+      const filteredInvoices = allInvoices.filter((ord) => {
+        if (!ord.createdAt) return false;
+        const ordDate = dayjs(ord.createdAt);
+        return (ordDate.isSame(start, "day") || ordDate.isAfter(start, "day")) &&
+               (ordDate.isSame(end, "day") || ordDate.isBefore(end, "day"));
+      });
 
-        // Trend chart: dailyStats → { date, revenue }
-        if (data.dailyStats && data.dailyStats.length > 0) {
-          setTrendData(
-            data.dailyStats.map((s) => ({
-              date:    s.date,
-              revenue: s.revenue || 0,
-              expense: s.expense || 0,
-              profit:  s.profit  || 0,
-            }))
-          );
-        } else {
-          setTrendData([]);
-        }
+      const filteredCashFlows = allCashFlows.filter((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        if (!dateVal) return false;
+        const cfDate = dayjs(dateVal);
+        return (cfDate.isSame(start, "day") || cfDate.isAfter(start, "day")) &&
+               (cfDate.isSame(end, "day") || cfDate.isBefore(end, "day"));
+      });
 
-        // Pie chart: paymentMethods
-        setPaymentMethodData(
-          (data.paymentMethods || []).map((m) => ({
-            name:  m.name,
-            value: m.value || 0,
-          }))
-        );
+      // Calculate totals
+      const rev = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      const ords = filteredInvoices.length;
+      const aov = ords > 0 ? Math.round(rev / ords) : 0;
+      const daysInRange = Math.max(1, end.diff(start, "day") + 1);
+      const avgD = Math.round(rev / daysInRange);
+      const exp = filteredCashFlows
+        .filter(cf => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
+        .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
 
-        setTotalExpense(data.expenses || 0);
+      setTotalRevenue(rev);
+      setTotalOrders(ords);
+      setAvgOrderValue(aov);
+      setAvgPerDay(avgD);
+      setTotalExpense(exp);
+
+      // Map bills
+      const bills = filteredInvoices.map((inv) => ({
+        id:            String(inv.id),
+        billCode:      inv.code || `HD${inv.id}`,
+        date:          inv.createdAt ? dayjs(inv.createdAt).format("DD/MM/YYYY") : "—",
+        time:          inv.createdAt ? dayjs(inv.createdAt).format("HH:mm") : "00:00",
+        customer:      inv.customerName || (inv.customerId ? `Khách hàng #${inv.customerId}` : "Khách lẻ"),
+        tableName:     inv.tableName || (inv.tableId ? `Bàn #${inv.tableId}` : 'Mang về'),
+        cashier:       inv.createdByName || 'Thu ngân',
+        paymentMethod: inv.paymentMethod || 'Tiền mặt',
+        dishTotal:     (inv.totalAmount || 0) + (inv.discountAmount || 0),
+        surcharge:     0,
+        discount:      inv.discountAmount || 0,
+        vat:           0,
+        total:         inv.totalAmount || 0,
+        status:        inv.status || 'Completed',
+        _raw:          inv,
+      }));
+      setAllBills(bills);
+
+      // Create Daily Chart Map
+      const dailyMap = {};
+      let cur = dayjs(start);
+      while (cur.isBefore(end) || cur.isSame(end, "day")) {
+        const key = cur.format("YYYY-MM-DD");
+        dailyMap[key] = { date: cur.format("DD/MM"), revenue: 0, expense: 0, profit: 0 };
+        cur = cur.add(1, "day");
       }
+
+      filteredInvoices.forEach((inv) => {
+        const key = dayjs(inv.createdAt).format("YYYY-MM-DD");
+        if (dailyMap[key]) {
+          dailyMap[key].revenue += (inv.totalAmount || 0);
+        }
+      });
+
+      filteredCashFlows.forEach((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        const key = dayjs(dateVal).format("YYYY-MM-DD");
+        if (dailyMap[key]) {
+          const amt = cf.totalAmount || cf.amount || 0;
+          if (cf.directionValue === 2 || cf.type === "Chi") {
+            dailyMap[key].expense += amt;
+          }
+        }
+      });
+
+      Object.keys(dailyMap).forEach((key) => {
+        dailyMap[key].profit = dailyMap[key].revenue - dailyMap[key].expense;
+      });
+
+      setTrendData(Object.values(dailyMap));
+
+      // Pie chart payment breakdown
+      const methodMap = {};
+      filteredInvoices.forEach((inv) => {
+        const method = inv.paymentMethod || "Tiền mặt";
+        methodMap[method] = (methodMap[method] || 0) + (inv.totalAmount || 0);
+      });
+      setPaymentMethodData(
+        Object.keys(methodMap).map((key) => ({
+          name: key,
+          value: methodMap[key],
+        }))
+      );
+
     } catch (err) {
       console.error("[ReportRevenuePage] API error:", err);
       message.warning("Không thể tải dữ liệu doanh thu. Vui lòng thử lại.");
@@ -182,11 +216,9 @@ const ReportRevenuePage = () => {
     fetchReportData();
   }, [currentBranchId, fetchReportData]);
 
-  // ── Khi preset thay đổi → ReportFilter tự cập nhật dateRange (đã xử lý trong nó)
-  // handlePresetChange chỉ cần nhận value và cập nhật state tương ứng
+  // ── Khi preset thay đổi → ReportFilter tự cập nhật dateRange
   const handlePresetChange = (val) => {
     setPresetTime(val);
-    // ReportFilter tự gọi onDateRangeChange nên không cần set dateRange ở đây
   };
 
   const handleResetFilters = () => {
@@ -210,16 +242,8 @@ const ReportRevenuePage = () => {
     return matchSearch && matchMethod;
   });
 
-  // ── Summary tính từ filteredData ─────────────────────────────────────────
-  const totalRevenue   = beStats?.revenue || 0;
-  const totalOrders    = beStats?.completedBills || 0;
-  const avgOrderValue  = beStats?.avgOrderValue || 0;
-  const profit         = beStats?.profit || 0;
-
-  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
-  const avgPerDay   = Math.round(totalRevenue / daysInRange);
-
-  const dailyList = beStats?.dailyStats || [];
+  const profit = totalRevenue - totalExpense;
+  const dailyList = trendData;
   const revenueValues = dailyList.map((d) => d.revenue || 0);
   const highestVal = revenueValues.length ? Math.max(...revenueValues) : totalRevenue;
   const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
