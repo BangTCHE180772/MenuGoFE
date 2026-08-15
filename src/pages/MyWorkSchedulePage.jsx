@@ -791,15 +791,23 @@ const MyWorkSchedulePage = () => {
           }
           
           return [
-            <Button
-              key="leave"
-              type="primary"
-              icon={<FileTextOutlined />}
-              onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
-              style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }}
-            >
-              Xin nghỉ ca này
-            </Button>,
+            <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể xin nghỉ." : ""} key="leave-tooltip">
+              <Button
+                key="leave"
+                type="primary"
+                icon={<FileTextOutlined />}
+                onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
+                disabled={isShiftPast}
+                style={{ 
+                  background: isShiftPast ? '#d9d9d9' : '#722ed1', 
+                  borderColor: isShiftPast ? '#d9d9d9' : '#722ed1', 
+                  fontWeight: 'bold',
+                  color: isShiftPast ? '#8c8c8c' : '#fff'
+                }}
+              >
+                Xin nghỉ ca này
+              </Button>
+            </Tooltip>,
             <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể chuyển ca." : ""} key="transfer-tooltip">
               <Button
                 key="transfer"
@@ -852,11 +860,22 @@ const MyWorkSchedulePage = () => {
             </div>
             <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong>Phê duyệt của quản lý:</strong>
-              {selectedSchedule.managerApproved ? (
-                <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt công</Tag>
-              ) : (
-                <Tag icon={<CloseCircleOutlined />} color="warning">Chờ duyệt công</Tag>
-              )}
+              {(() => {
+                const shiftDetails = getShiftDetails(selectedSchedule.shiftId);
+                const statusInfo = getShiftStatusTextAndColor(selectedSchedule, shiftDetails);
+                
+                if (statusInfo.text === 'Trễ/Vắng mặt' || statusInfo.text === 'Vắng mặt') {
+                  return <Tag color="error">Trễ/Vắng mặt</Tag>;
+                }
+                if (statusInfo.text === 'Chưa đến giờ') {
+                  return <Tag color="default">Chưa làm</Tag>;
+                }
+                
+                if (selectedSchedule.managerApproved) {
+                  return <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt công</Tag>;
+                }
+                return <Tag icon={<CloseCircleOutlined />} color="warning">Chờ duyệt công</Tag>;
+              })()}
             </div>
           </div>
         )}
@@ -917,7 +936,8 @@ const MyWorkSchedulePage = () => {
                   options={accounts
                     .filter((acc) => {
                       if (acc.id === selectedSchedule.accountId) return false;
-                      const userRoles = user?.roleIds || [];
+                      const currentAccount = accounts.find(a => a.id === selectedSchedule.accountId);
+                      const currentRoles = currentAccount?.roleIds || [];
                       const accRoles = acc.roleIds || [];
                       
                       // Cannot swap with Admin(1), Owner(2), Manager(3)
@@ -925,7 +945,7 @@ const MyWorkSchedulePage = () => {
                       if (isAdminOrManager) return false;
 
                       // Must have at least one shared role
-                      const hasSharedRole = userRoles.some(r => accRoles.includes(r));
+                      const hasSharedRole = currentRoles.some(r => accRoles.includes(r));
                       return hasSharedRole;
                     })
                     .map((acc) => ({

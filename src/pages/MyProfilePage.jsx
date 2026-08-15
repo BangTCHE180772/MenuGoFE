@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Tag,
+  Upload,
 } from 'antd';
 import {
   UserOutlined,
@@ -22,9 +23,11 @@ import {
   IdcardOutlined,
   LockOutlined,
   SaveOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe, updateMe, changePassword } from '../api/accountApi';
+import { uploadImage } from '../api/imageApi';
 import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
@@ -44,6 +47,34 @@ const MyProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleCustomImageUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingImage(true);
+    try {
+      const res = await uploadImage(file);
+      if (res.data) {
+        const imgObj = res.data;
+        form.setFieldsValue({
+          avatarImage: imgObj.imageLink,
+        });
+        // We also need to update the form's internal state to trigger re-render of the Upload component
+        // so that it shows the uploaded image immediately. Form.Item will automatically read from form's value if we use shouldUpdate or if we force update.
+        // Actually, just setFieldsValue should be enough if the Form.Item listens properly, but sometimes it doesn't without a rerender.
+        // Let's also update the profile state locally so the header avatar updates instantly or rely on the form value.
+        setProfile((prev) => ({ ...prev, avatarImage: imgObj.imageLink }));
+        
+        message.success('Tải ảnh lên thành công!');
+        if (onSuccess) onSuccess(imgObj);
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      message.error('Không thể tải ảnh lên.');
+      if (onError) onError(err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -77,6 +108,7 @@ const MyProfilePage = () => {
     try {
       const payload = {
         ...values,
+        id: profile.id,
         dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null,
         isActive: profile.isActive,
         addressId: profile.addressId ?? null,
@@ -91,7 +123,47 @@ const MyProfilePage = () => {
       });
       fetchProfile();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Cập nhật thất bại. Vui lòng thử lại.');
+      console.error('Submit Profile Error:', err);
+      const responseData = err.response?.data;
+      let fieldErrorSet = false;
+
+      if (responseData?.errors && typeof responseData.errors === 'object') {
+        const fieldsToSet = [];
+        const unmappedMessages = [];
+
+        Object.entries(responseData.errors).forEach(([fieldKey, messages]) => {
+          const fieldName = fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
+          const rawErrorList = Array.isArray(messages) ? messages : [messages];
+          const errorTextList = rawErrorList.filter(
+            (msg) => typeof msg === 'string' && !/^The\s+.*\s+field\b/i.test(msg) && !/field is required/i.test(msg)
+          );
+
+          if (errorTextList.length > 0) {
+            if (['name', 'email', 'phone', 'gender', 'dateOfBirth', 'citizenIdCode', 'avatarImage'].includes(fieldName)) {
+              fieldsToSet.push({ name: fieldName, errors: errorTextList });
+              fieldErrorSet = true;
+            } else {
+              unmappedMessages.push(...errorTextList);
+            }
+          }
+        });
+
+        if (fieldsToSet.length > 0) {
+          form.setFields(fieldsToSet);
+        }
+        if (unmappedMessages.length > 0) {
+          unmappedMessages.forEach((msg) => message.error(msg));
+        }
+      }
+
+      if (!fieldErrorSet) {
+        const errorMsg = responseData?.message || (typeof responseData === 'string' ? responseData : null);
+        if (errorMsg && errorMsg !== 'One or more validation errors occurred.') {
+          message.error(errorMsg);
+        } else if (!responseData?.errors) {
+          message.error('Cập nhật thất bại. Vui lòng thử lại.');
+        }
+      }
     } finally {
       setSaving(false);
     }
@@ -198,8 +270,29 @@ const MyProfilePage = () => {
               </Form.Item>
             </Col>
             <Col xs={24}>
-              <Form.Item name="avatarImage" label="Link ảnh đại diện">
-                <Input placeholder="Nhập URL ảnh đại diện..." />
+              <Form.Item label="Ảnh đại diện">
+                <Form.Item name="avatarImage" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+                <Upload
+                  name="file"
+                  listType="picture-card"
+                  showUploadList={false}
+                  customRequest={handleCustomImageUpload}
+                >
+                  {form.getFieldValue('avatarImage') || profile?.avatarImage ? (
+                    <img
+                      src={form.getFieldValue('avatarImage') || profile?.avatarImage}
+                      alt="avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div>
+                      {uploadingImage ? <Spin /> : <UploadOutlined style={{ fontSize: 26, color: '#1890ff' }} />}
+                      <div style={{ marginTop: 8 }}>{uploadingImage ? 'Đang tải...' : 'Tải ảnh lên'}</div>
+                    </div>
+                  )}
+                </Upload>
               </Form.Item>
             </Col>
           </Row>

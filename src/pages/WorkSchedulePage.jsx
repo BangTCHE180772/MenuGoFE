@@ -51,14 +51,14 @@ import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING',        label: 'Chờ thực hiện',  color: 'warning' },
-  { value: 'APPROVED',       label: 'Đã duyệt',        color: 'processing' },
-  { value: 'Đang làm việc',  label: 'Đang làm việc',   color: 'blue' },
-  { value: 'Hoàn thành',     label: 'Hoàn thành',      color: 'success' },
-  { value: 'Vắng mặt',       label: 'Vắng mặt',        color: 'error' },
+  { value: 'PENDING', label: 'Chờ thực hiện', color: 'warning' },
+  { value: 'APPROVED', label: 'Đã duyệt', color: 'processing' },
+  { value: 'Đang làm việc', label: 'Đang làm việc', color: 'blue' },
+  { value: 'Hoàn thành', label: 'Hoàn thành', color: 'success' },
+  { value: 'Vắng mặt', label: 'Vắng mặt', color: 'error' },
   // Giữ lại để tương thích với dữ liệu cũ trong DB
-  { value: 'COMPLETED',      label: 'Hoàn thành',      color: 'success' },
-  { value: 'ABSENT',         label: 'Vắng mặt',        color: 'error' },
+  { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
+  { value: 'ABSENT', label: 'Vắng mặt', color: 'error' },
 ];
 
 // Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
@@ -120,7 +120,7 @@ const WorkSchedulePage = () => {
 
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
   }, [accounts]);
-  
+
   // Filtering states
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
@@ -200,7 +200,7 @@ const WorkSchedulePage = () => {
       // Parse inputs
       const checkInVal = record.checkInAt ? dayjs(record.checkInAt) : null;
       const checkOutVal = record.checkOutAt ? dayjs(record.checkOutAt) : null;
-      
+
       form.setFieldsValue({
         accountId: record.accountId,
         branchId: record.branchId,
@@ -234,7 +234,7 @@ const WorkSchedulePage = () => {
   const handleSubmit = async (values) => {
     try {
       const workDateStr = values.workDate.format('YYYY-MM-DD');
-      
+
       // Combine date and time
       let checkInAt = null;
       if (values.checkInTime) {
@@ -357,7 +357,7 @@ const WorkSchedulePage = () => {
       const res = await assignWorkSchedules(payload);
       const assignedCount = res.data?.length || 0;
       message.success(`Đã phân ca thành công: tạo mới ${assignedCount} lịch làm việc!`);
-      
+
       setIsBulkModalOpen(false);
       bulkForm.resetFields();
       loadData();
@@ -415,22 +415,22 @@ const WorkSchedulePage = () => {
     },
     ...(isOwnerOrAdmin
       ? [
-          {
-            title: 'Chi nhánh',
-            dataIndex: 'branchId',
-            key: 'branchId',
-            width: 170,
-            render: (id) => {
-              const fullName = getBranchName(id);
-              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
-              return (
-                <Tooltip title={fullName}>
-                  <span>{displayName}</span>
-                </Tooltip>
-              );
-            },
+        {
+          title: 'Chi nhánh',
+          dataIndex: 'branchId',
+          key: 'branchId',
+          width: 170,
+          render: (id) => {
+            const fullName = getBranchName(id);
+            const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+            return (
+              <Tooltip title={fullName}>
+                <span>{displayName}</span>
+              </Tooltip>
+            );
           },
-        ]
+        },
+      ]
       : []),
     {
       title: 'Ca trực',
@@ -486,8 +486,26 @@ const WorkSchedulePage = () => {
       title: 'Quản lý duyệt',
       key: 'approved',
       align: 'center',
-      render: (_, record) => (
-        isManager ? (
+      render: (_, record) => {
+        const now = dayjs();
+        const workDateStr = dayjs(record.workDate).format('YYYY-MM-DD');
+        const shift = shifts.find((s) => s.id === record.shiftId);
+
+        const startStr = shift?.startTime ? shift.startTime.substring(0, 5) : '00:00';
+        const shiftStart = dayjs(`${workDateStr} ${startStr}`);
+
+        const endStr = shift?.endTime ? shift.endTime.substring(0, 5) : '23:59';
+        const shiftEnd = dayjs(`${workDateStr} ${endStr}`);
+
+        const isAbsent = record.status === 'ABSENT';
+        const isMissed = !record.checkInAt && now.isAfter(shiftEnd);
+        const isLate = !record.checkInAt && now.isAfter(shiftStart);
+
+        if (isAbsent || isMissed || isLate) {
+          return <Tag color="error">Trễ/Vắng mặt</Tag>;
+        }
+
+        return isManager ? (
           <Tooltip title={record.managerApproved ? 'Đã phê duyệt - Click để hủy' : 'Chưa phê duyệt - Click để phê duyệt'}>
             <Switch
               checkedChildren={<CheckCircleOutlined />}
@@ -500,8 +518,8 @@ const WorkSchedulePage = () => {
           <Tag color={record.managerApproved ? 'success' : 'default'}>
             {record.managerApproved ? 'Đã duyệt' : 'Chưa duyệt'}
           </Tag>
-        )
-      ),
+        );
+      },
     },
   ];
 
@@ -706,6 +724,113 @@ const WorkSchedulePage = () => {
         </div>
       </Card>
 
+      {/* 👑 Khu vực Admin / Quản lý Phê duyệt Đơn xin nghỉ & Đổi ca */}
+      {(isManager || isOwnerOrAdmin) && (schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING'))) && (
+        <Card
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#cf1322', fontSize: '15px', fontWeight: 'bold' }}>
+              <SafetyCertificateOutlined />
+              <span>DUYỆT ĐƠN XIN NGHỈ & ĐỔI CA (ADMIN / QUẢN LÝ)</span>
+            </div>
+          }
+          style={{ marginBottom: '20px', border: '2px solid #cf1322', borderRadius: '8px', background: '#fff1f0' }}
+          bodyStyle={{ padding: '12px 16px' }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Đơn xin nghỉ */}
+            {schedules.filter((s) => s.status?.startsWith('LEAVE_REQUEST')).map((item) => {
+              const parts = (item.status || '').split(':');
+              const reason = parts.slice(1).join(':') || 'Xin nghỉ phép';
+              const empName = getAccountName(item.accountId);
+              const shiftInfo = getShiftDetails(item.shiftId);
+              return (
+                <div key={item.id} style={{
+                  background: '#fff', border: '1px solid #ffccc7', borderRadius: '6px', padding: '10px 14px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+                }}>
+                  <div>
+                    <Tag color="purple">🕒 XIN NGHỈ</Tag>
+                    <strong>{empName}</strong> xin nghỉ ca <strong>{shiftInfo.name} ({shiftInfo.time})</strong> ngày <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong>.
+                    <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>💬 Lý do: <em>{reason}</em></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button type="primary" size="small" style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }} onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, status: 'LEAVE_APPROVED', managerApproved: true });
+                        message.success(`🟢 Đã duyệt cho nhân viên ${empName} nghỉ làm ca này!`);
+                        loadData();
+                      } catch (e) { message.error('Lỗi khi duyệt nghỉ!'); }
+                    }}>
+                      Duyệt nghỉ
+                    </Button>
+                    <Button danger size="small" onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
+                        message.info(`❌ Đã từ chối đơn xin nghỉ của ${empName}.`);
+                        loadData();
+                      } catch (e) { message.error('Lỗi từ chối!'); }
+                    }}>
+                      Từ chối
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Đơn đổi ca (đang xử lý) */}
+            {schedules.filter((s) => s.status?.startsWith('TRANSFER_PENDING')).map((item) => {
+              const parts = (item.status || '').split(':');
+              const isPendingEmp = item.status.startsWith('TRANSFER_PENDING_EMP');
+              const senderId = Number(parts[1]) || (isPendingEmp ? undefined : item.accountId);
+              const senderName = getAccountName(senderId);
+              const receiverName = getAccountName(item.accountId);
+              const shiftInfo = getShiftDetails(item.shiftId);
+              return (
+                <div key={item.id} style={{
+                  background: '#fff', border: '1px solid #ffe58f', borderRadius: '6px', padding: '10px 14px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+                }}>
+                  <div>
+                    <Tag color="gold">🔄 ĐỔI CA LÀM</Tag>
+                    <strong>{senderName}</strong> ➔ <strong>{receiverName}</strong>
+                    {isPendingEmp ? (
+                      <span style={{ color: '#fa8c16', marginLeft: 8 }}>(Đang chờ {receiverName} xác nhận)</span>
+                    ) : (
+                      <span style={{ color: '#52c41a', marginLeft: 8 }}>(2 NV đã đồng ý)</span>
+                    )}
+                    <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>
+                      📅 Ca: <strong>{shiftInfo.name} ({shiftInfo.time})</strong> - Ngày: <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button type="primary" size="small" style={{ background: '#fa8c16', borderColor: '#fa8c16', fontWeight: 'bold' }}
+                      disabled={isPendingEmp}
+                      onClick={async () => {
+                        try {
+                          await updateWorkSchedule({ ...item, status: 'APPROVED', managerApproved: true });
+                          message.success(`🟢 Đã duyệt đổi ca chính thức cho ${receiverName}!`);
+                          loadData();
+                        } catch (e) { message.error('Lỗi khi duyệt đổi ca!'); }
+                      }}>
+                      Duyệt đổi ca
+                    </Button>
+                    <Button danger size="small" onClick={async () => {
+                      try {
+                        await updateWorkSchedule({ ...item, accountId: senderId, status: 'APPROVED', managerApproved: true });
+                        message.info('❌ Đã hủy/từ chối yêu cầu đổi ca.');
+                        loadData();
+                      } catch (e) { message.error('Lỗi từ chối!'); }
+                    }}>
+                      {isPendingEmp ? 'Hủy yêu cầu' : 'Từ chối'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Main Container Tabs */}
       <Tabs
         activeKey={activeTab}
@@ -772,11 +897,11 @@ const WorkSchedulePage = () => {
                     onChange={(val) => setSelectedStatus(val)}
                   >
                     {[
-                      { value: 'PENDING',   label: 'Chờ thực hiện' },
-                      { value: 'APPROVED',  label: 'Đã duyệt' },
-                      { value: 'Working',   label: 'Đang làm việc' },
+                      { value: 'PENDING', label: 'Chờ thực hiện' },
+                      { value: 'APPROVED', label: 'Đã duyệt' },
+                      { value: 'Working', label: 'Đang làm việc' },
                       { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT',    label: 'Vắng mặt' },
+                      { value: 'ABSENT', label: 'Vắng mặt' },
                     ].map((st) => (
                       <Select.Option key={st.value} value={st.value}>
                         {st.label}
@@ -855,10 +980,10 @@ const WorkSchedulePage = () => {
         }}
         cancelButtonProps={{ style: { borderRadius: '6px' } }}
       >
-        <Form 
-          form={form} 
-          layout="vertical" 
-          onFinish={handleSubmit} 
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
           style={{ marginTop: 16 }}
           onValuesChange={(changedValues, allValues) => {
             if (changedValues.checkInTime || changedValues.checkOutTime) {
@@ -1169,7 +1294,7 @@ const WorkSchedulePage = () => {
           >
             <DatePicker.RangePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
           </Form.Item>
-          
+
           <div style={{ padding: '8px 12px', background: '#e6f7ff', borderRadius: '4px', border: '1px solid #91d5ff', display: 'flex', gap: 8, alignItems: 'center' }}>
             <FileDoneOutlined style={{ color: '#1890ff', fontSize: 16 }} />
             <span style={{ fontSize: '13px', color: '#1890ff' }}>

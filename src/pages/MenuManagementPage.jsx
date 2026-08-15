@@ -295,14 +295,10 @@ const MenuManagementPage = () => {
       ];
 
       // Setup recipe payload
-      const recipe = {
-        versionName: values.recipeVersionName || 'Công thức 1',
-        isActive: true,
-        details: validIngredients.map(i => ({
-          productId: i.productId,
-          quantity: i.quantity,
-        })),
-      };
+      const recipe = validIngredients.map(i => ({
+        productId: i.productId,
+        quantity: i.quantity,
+      }));
 
       // Construct request body
       const payload = {
@@ -395,14 +391,10 @@ const MenuManagementPage = () => {
             conversionPoint: 1.0,
           }
         ],
-        recipe: {
-          versionName: activeRecipe?.versionName || 'Công thức 1',
-          isActive: true,
-          details: recipeDetails.map(d => ({
-            productId: d.productId,
-            quantity: d.quantity,
-          })),
-        }
+        recipe: recipeDetails.map(d => ({
+          productId: d.productId,
+          quantity: d.quantity,
+        }))
       };
 
       await updateProcessed(payload);
