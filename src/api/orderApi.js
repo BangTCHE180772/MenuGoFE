@@ -1,8 +1,8 @@
 import axiosInstance from './axiosInstance';
 
 // ─── Order ────────────────────────────────────────────────────────────────
-export const getAllOrders = () =>
-  axiosInstance.get('/api/Order');
+export const getAllOrders = (branchId) =>
+  axiosInstance.get('/api/Order', { params: { branchId } });
 
 export const getPaidInvoices = (branchId) =>
   axiosInstance.get('/api/Order/invoices', { params: { branchId } });

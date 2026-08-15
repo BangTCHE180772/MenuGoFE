@@ -28,6 +28,7 @@ import TableMapPage from './TableMapPage';
 import ReservationPage from './ReservationPage';
 import ShiftStatsPanel from '../components/payment/ShiftStatsPanel';
 import { useSignalR } from '../context/SignalRContext';
+import { useBranch } from '../context/BranchContext';
 
 const { Title, Text } = Typography;
 
@@ -37,6 +38,7 @@ const CashierPage = () => {
   const [orders, setOrders] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { currentBranchId } = useBranch();
 
   // SignalR Connection
   const signalRConnection = useSignalR();
@@ -46,7 +48,7 @@ const CashierPage = () => {
     if (showLoading) setLoading(true);
     try {
       const [oRes, sRes] = await Promise.allSettled([
-        getAllOrders(),
+        getAllOrders(currentBranchId),
         getAllShifts(),
       ]);
 
@@ -58,7 +60,7 @@ const CashierPage = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     fetchData(true);

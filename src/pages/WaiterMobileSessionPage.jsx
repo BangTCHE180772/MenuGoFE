@@ -23,7 +23,8 @@ const WaiterMobileSessionPage = () => {
     try {
       setLoading(true);
 
-      const isManager = user?.roles?.includes('Manager') || user?.role === 'Manager' || user?.roleName === 'Manager';
+      const isManager = user?.roles?.includes('Manager') || user?.role === 'Manager' || user?.roleName === 'Manager' || 
+                        user?.roles?.includes('Admin') || user?.role === 'Admin' || user?.roleName === 'Admin';
       if (isManager) {
         setAuthorized(true);
         setShiftInfo({
