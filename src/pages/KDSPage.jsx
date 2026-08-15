@@ -673,7 +673,7 @@ const KDSPage = () => {
                 marginBottom: 8,
                 backgroundColor: '#2a1215',
                 borderColor: '#ff4d4f',
-                color: '#000000',
+                color: '#ffffff',
                 borderRadius: 8,
               }}
             />
@@ -782,7 +782,7 @@ const KDSPage = () => {
                         }
                         style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
                       >
-                        Xác nhận làm mẻ ({batchWaitingIds.length + batchAcceptedIds.length} món)
+                        Xác nhận làm mẻ
                       </Button>
                     </Space>
                   </div>
