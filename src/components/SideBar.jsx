@@ -31,6 +31,7 @@ import {
   DownOutlined,
   RightOutlined,
   WalletOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -57,6 +58,11 @@ const REPORTS_SUB_MENU = [
   { label: "Báo cáo Nguyên liệu", path: "/reports/inventory" },
 ];
 
+const MY_INFO_SUB_MENU = [
+  { label: "Hợp đồng của tôi", path: "/my-contract" },
+  { label: "Bảng lương của tôi", path: "/my-payroll" },
+];
+
 // ─── Menu items theo từng role ─────────────────────────────────────────────
 const ROLE_MENUS = {
   [ROLES.ADMIN]: [
@@ -81,9 +87,9 @@ const ROLE_MENUS = {
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
-    { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
     { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -103,6 +109,7 @@ const ROLE_MENUS = {
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.MANAGER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
@@ -111,7 +118,6 @@ const ROLE_MENUS = {
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
-    { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
     { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -123,15 +129,16 @@ const ROLE_MENUS = {
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Cá nhân", path: "/my-contract", icon: <UserOutlined />, children: MY_INFO_SUB_MENU },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CASHIER]: [
-    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CHEF]: [
-    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
@@ -139,13 +146,14 @@ const ROLE_MENUS = {
     },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.WAITER]: [
-    { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
+    { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
 };
 

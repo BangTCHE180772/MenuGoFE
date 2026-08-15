@@ -99,7 +99,17 @@ const AppRouter = () => {
 
             <Route element={<MainLayout />}>
               <Route index element={<Navigate to="/home" replace />} />
-              <Route path="/home" element={<HomePage />} />
+              <Route
+                path="/home"
+                element={
+                  ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+                  [1, 2, 3].includes(user?.roleId) ? (
+                    <HomePage />
+                  ) : (
+                    <Navigate to="/work-schedule" replace />
+                  )
+                }
+              />
               <Route path="/my-profile" element={<MyProfilePage />} />
               <Route path="/notifications" element={<NotificationPage />} />
 

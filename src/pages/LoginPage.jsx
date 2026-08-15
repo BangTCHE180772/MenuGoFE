@@ -6,13 +6,13 @@ import {
   DesktopOutlined,
   EyeInvisibleOutlined,
   EyeTwoTone,
+  HomeOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../context/AuthContext";
 import { useDevice } from "../context/DeviceContext";
 import { login, setup2FA, confirmSetup2FA, verify2FA } from "../api/authApi";
-import { Link } from "react-router-dom";
 import ForgotPasswordModal from "../components/auth/ForgotPasswordModal";
 
 const LoginPage = () => {
@@ -128,16 +128,18 @@ const LoginPage = () => {
       {/*=============================================================================================== Login card information */}
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-icon-name">
-            <div className="login-logo-icon">
-              {logoUrl && logoUrl.trim() !== "" ? (
-                <img src={logoUrl} alt="Logo" />
-              ) : (
-                "🍜"
-              )}
+          <Link to="/welcome" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="login-logo-icon-name" style={{ cursor: "pointer" }}>
+              <div className="login-logo-icon">
+                {logoUrl && logoUrl.trim() !== "" ? (
+                  <img src={logoUrl} alt="Logo" />
+                ) : (
+                  "🍜"
+                )}
+              </div>
+              <h1 className="login-logo-name">MenuGo</h1>
             </div>
-            <h1 className="login-logo-name">MenuGo</h1>
-          </div>
+          </Link>
           <p className="login-logo-subtitle">Hệ thống quản lý nhà hàng</p>
         </div>
 
@@ -193,12 +195,15 @@ const LoginPage = () => {
               {loading ? "Đang đăng nhập" : "Đăng nhập"}
             </Button>
 
-            {/*============================================================================= Forgot Password and Register Links */}
-            <div className="forgot-password-links-div">
+            {/*============================================================================= Forgot Password and Welcome Links */}
+            <div className="forgot-password-links-div" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+              <Link to="/welcome" style={{ color: "#e8442a", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 500 }}>
+                <HomeOutlined /> Trang chào mừng
+              </Link>
               <span 
                 onClick={() => setForgotModalVisible(true)} 
                 className="forgot-password-link" 
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", fontSize: 13 }}
               >
                 Quên mật khẩu?
               </span>
