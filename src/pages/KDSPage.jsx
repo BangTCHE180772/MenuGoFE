@@ -228,7 +228,15 @@ const KDSPage = () => {
   const batchableItems = useMemo(() => {
     const combined = [...waitingItems, ...acceptedItems];
     const grouped = {};
+    const now = new Date();
+    
     combined.forEach(item => {
+      // Bỏ qua các món đã tạo quá 30 phút (không cho vào mẻ nữa)
+      if (item.createdAt) {
+        const minutes = (now - new Date(item.createdAt)) / 60000;
+        if (minutes > 30) return;
+      }
+
       const key = item.productId || item.productName;
       if (!grouped[key]) {
         grouped[key] = {
