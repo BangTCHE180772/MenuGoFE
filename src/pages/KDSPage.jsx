@@ -151,9 +151,14 @@ const KDSPage = () => {
   }, [signalRConnection, fetchItems, playAlertSound]);
 
   // Single Item Status Change Handler
-  const handleStatusChange = async (detailId, nextStatus) => {
+  const handleStatusChange = async (detailIdOrIds, nextStatus, quantity = null) => {
     try {
-      await updateCookingStatus(detailId, nextStatus);
+      if (Array.isArray(detailIdOrIds)) {
+        await Promise.all(detailIdOrIds.map(id => updateCookingStatus(id, nextStatus)));
+      } else {
+        await updateCookingStatus(detailIdOrIds, nextStatus, quantity);
+      }
+      
       const statusLabels = {
         [COOKING_STATUS.ACCEPTED]: 'Đã nhận món',
         [COOKING_STATUS.COOKING]: 'Đã chuyển sang Đang nấu',
@@ -164,6 +169,17 @@ const KDSPage = () => {
     } catch (err) {
       console.error(err);
       message.error('Lỗi khi cập nhật trạng thái món.');
+    }
+  };
+
+  const handleBatchStatusChange = async (productId, nextStatus) => {
+    try {
+      await batchUpdateCookingStatus(productId, nextStatus);
+      message.success('Đã xác nhận toàn bộ mẻ thành công');
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi cập nhật trạng thái mẻ.');
     }
   };
 
@@ -196,10 +212,58 @@ const KDSPage = () => {
     return result;
   };
 
+  const groupOrUnrollItems = (list) => {
+    const batchedGroups = {};
+    const result = [];
+    
+    list.forEach(item => {
+      if (item.batchId) {
+        if (!batchedGroups[item.batchId]) {
+          batchedGroups[item.batchId] = { 
+            ...item, 
+            _splitKey: `batch_${item.batchId}`, 
+            orderDetailIds: [item.orderDetailId] 
+          };
+        } else {
+          batchedGroups[item.batchId].quantity += item.quantity;
+          batchedGroups[item.batchId].orderDetailIds.push(item.orderDetailId);
+        }
+      } else {
+        if (item.quantity > 1) {
+          for (let i = 0; i < item.quantity; i++) {
+            result.push({ ...item, quantity: 1, _splitKey: `${item.orderDetailId}_${i}` });
+          }
+        } else {
+          result.push({ ...item, _splitKey: `${item.orderDetailId}_0` });
+        }
+      }
+    });
+
+    return [...result, ...Object.values(batchedGroups)].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  };
+
   const waitingItems = useMemo(() => unrollItems(items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING)), [items]);
   const acceptedItems = useMemo(() => unrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED)), [items]);
-  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
-  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
+  const cookingItems = useMemo(() => groupOrUnrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING)), [items]);
+  const readyItems = useMemo(() => groupOrUnrollItems(items.filter((i) => i.cookingStatus === COOKING_STATUS.READY)), [items]);
+
+  const batchableItems = useMemo(() => {
+    const combined = [...waitingItems, ...acceptedItems];
+    const grouped = {};
+    combined.forEach(item => {
+      const key = item.productId || item.productName;
+      if (!grouped[key]) {
+        grouped[key] = {
+          productId: item.productId,
+          productName: item.productName || item.ProductName,
+          totalQty: 0,
+        };
+      }
+      grouped[key].totalQty += item.quantity;
+    });
+    // Lọc ra những món có số lượng >= 2 để gộp mẻ
+    return Object.values(grouped).filter(g => g.totalQty >= 2);
+  }, [waitingItems, acceptedItems]);
 
 
 
@@ -426,10 +490,10 @@ const KDSPage = () => {
               block
               size="large"
               icon={<FireOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
-              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff' }}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING, 1)}
+              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff', marginBottom: 8 }}
             >
-              Xác nhận
+              Xác nhận chế biến
             </Button>
           )}
 
@@ -439,7 +503,7 @@ const KDSPage = () => {
               block
               size="large"
               icon={<CheckCircleOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
+              onClick={() => handleStatusChange(item.orderDetailIds || item.orderDetailId, COOKING_STATUS.READY)}
               style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600, color: '#ffffff' }}
             >
               Hoàn thành
@@ -456,7 +520,13 @@ const KDSPage = () => {
           {status !== COOKING_STATUS.READY && (
             <Popconfirm
               title="Bạn có chắc chắn muốn hủy món này không?"
-              onConfirm={() => handleCancelItem(item.orderDetailId)}
+              onConfirm={() => {
+                  if (item.orderDetailIds) {
+                      item.orderDetailIds.forEach(id => handleCancelItem(id));
+                  } else {
+                      handleCancelItem(item.orderDetailId);
+                  }
+              }}
               okText="Đồng ý"
               cancelText="Hủy bỏ"
               okButtonProps={{ danger: true }}
@@ -613,6 +683,41 @@ const KDSPage = () => {
           ))}
         </div>
       )}
+
+      {/* ── BATCH PROCESSING BAR ────────────────────────────────── */}
+      <div style={{ marginBottom: 20, backgroundColor: '#f0f5ff', padding: '16px 20px', borderRadius: 12, border: '1px solid #adc6ff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
+        <Title level={5} style={{ margin: '0 0 12px 0', color: '#1d39c4', display: 'flex', alignItems: 'center' }}>
+          <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8, fontSize: 18 }} />
+          Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar)
+        </Title>
+        {batchableItems.length === 0 ? (
+          <Text style={{ color: '#8c8c8c' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
+        ) : (
+          <Space size="middle" wrap style={{ width: '100%' }}>
+            {batchableItems.map(batch => (
+              <Card
+                key={batch.productId}
+                size="small"
+                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 220, borderRadius: 8 }}
+                styles={{ body: { padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
+              >
+                <div>
+                  <Text strong style={{ fontSize: 15, color: '#000000' }}>{batch.productName}</Text>
+                  <div style={{ color: '#faad14', fontWeight: 700, fontSize: 14 }}>Tổng: {batch.totalQty} phần</div>
+                </div>
+                <Button 
+                  type="primary" 
+                  onClick={() => handleBatchStatusChange(batch.productId, COOKING_STATUS.COOKING)}
+                  style={{ marginLeft: 16, backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 600 }}
+                  icon={<FireOutlined />}
+                >
+                  Xác nhận {batch.totalQty} phần
+                </Button>
+              </Card>
+            ))}
+          </Space>
+        )}
+      </div>
 
       {/* ── MAIN KITCHEN QUEUE ───────────────────────────────── */}
       {loading ? (
