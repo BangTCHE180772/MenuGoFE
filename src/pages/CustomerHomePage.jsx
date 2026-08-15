@@ -167,8 +167,8 @@ const CustomerHomePage = () => {
       if (!branchId) return;
       setLoadingMenu(true);
       try {
-        // Tải danh sách BInventory của chi nhánh
-        const rawBInventory = await getBInventories(branchId);
+        // Tải danh sách BInventory của chi nhánh (truyền mode 0 để lấy TẤT CẢ các món, không bị lọc mất Processed)
+        const rawBInventory = await getBInventories(branchId, '', '', 0);
         
         if (Array.isArray(rawBInventory)) {
           // Lọc lấy các sản phẩm bán được (Processed, Manufactured, Regular)

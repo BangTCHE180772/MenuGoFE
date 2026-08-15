@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Result, Button, Spin, Alert, Tabs, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { TableOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { TableOutlined, ShoppingCartOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import TableMapPage from './TableMapPage';
 import OrderPage from './OrderPage';
@@ -18,12 +18,14 @@ const WaiterMobileSessionPage = () => {
   const [shiftInfo, setShiftInfo] = useState(null);
   const [denyReason, setDenyReason] = useState('');
   const [activeTab, setActiveTab] = useState('tablemap');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const checkAttendanceAndShift = useCallback(async () => {
     try {
       setLoading(true);
 
-      const isManager = user?.roles?.includes('Manager') || user?.role === 'Manager' || user?.roleName === 'Manager';
+      const isManager = user?.roles?.includes('Manager') || user?.role === 'Manager' || user?.roleName === 'Manager' || 
+                        user?.roles?.includes('Admin') || user?.role === 'Admin' || user?.roleName === 'Admin';
       if (isManager) {
         setAuthorized(true);
         setShiftInfo({
@@ -156,9 +158,14 @@ const WaiterMobileSessionPage = () => {
       {shiftInfo && (
         <Alert
           message={
-            <span>
-              <strong> Phiên Phục Vụ Cá Nhân (Mobile)</strong> | Nhân viên: {user?.name} | Ca: {shiftInfo.name} ({shiftInfo.time}) | Ngắt kết nối lúc: {shiftInfo.disconnectTime.format('HH:mm')}
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>
+                <strong> Phiên Phục Vụ Cá Nhân (Mobile)</strong> | Nhân viên: {user?.name} | Ca: {shiftInfo.name} ({shiftInfo.time}) | Ngắt kết nối lúc: {shiftInfo.disconnectTime.format('HH:mm')}
+              </span>
+              <Button size="small" icon={<ReloadOutlined />} onClick={() => setRefreshKey(prev => prev + 1)}>
+                Làm mới
+              </Button>
+            </div>
           }
           type="info"
           showIcon
@@ -183,7 +190,7 @@ const WaiterMobileSessionPage = () => {
             ),
             children: (
               <div style={{ height: 'calc(100vh - 160px)', overflowY: 'auto' }}>
-                <TableMapPage isWaiterMode={true} />
+                <TableMapPage key={`tablemap-${refreshKey}`} isWaiterMode={true} />
               </div>
             )
           },
@@ -197,7 +204,7 @@ const WaiterMobileSessionPage = () => {
             ),
             children: (
               <div style={{ height: 'calc(100vh - 160px)', overflowY: 'auto' }}>
-                <OrderPage isWaiterMode={true} />
+                <OrderPage key={`order-${refreshKey}`} isWaiterMode={true} />
               </div>
             )
           }

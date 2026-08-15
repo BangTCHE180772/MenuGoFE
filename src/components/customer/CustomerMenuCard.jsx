@@ -22,7 +22,17 @@ const CustomerMenuCard = ({ product, onViewDetail }) => {
   return (
     <div className="customer-menu-card">
       <div className="card-image-wrapper">
-        <img src={image} alt={name} className="card-img" loading="lazy" />
+        <img 
+          src={image} 
+          alt={name} 
+          className="card-img" 
+          loading="lazy" 
+          style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+          onError={(e) => { 
+            e.target.onerror = null; 
+            e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'; 
+          }}
+        />
         <div className="card-overlay">
           <Button
             type="primary"
