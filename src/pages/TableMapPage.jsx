@@ -10,6 +10,7 @@ import { getTableOrderSummary, confirmOrderItem, updateCookingStatus, rejectOrde
 import { cancelOrderDetail } from '../api/orderApi';
 import { useAuth } from '../context/AuthContext';
 import { useSignalR } from '../context/SignalRContext';
+import { useBranch } from '../context/BranchContext';
 import { getStatusConfig } from '../data/tableConstants';
 import TableDetailPanel from '../components/tablemap/TableDetailPanel';
 import WaiterActionFeed from '../components/tablemap/WaiterActionFeed';
@@ -17,6 +18,7 @@ import { useDevice } from '../context/DeviceContext';
 import '../styles/tablemap.css';
 
 const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
+  const { currentBranchId } = useBranch();
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [selectedArea, setSelectedArea] = useState('all');
@@ -71,13 +73,18 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
         }
 
         let availableBranches = allBranches;
-        const isAdminOrOwner = user?.roles?.some(r => r === 'Admin' || r === 'Owner');
+        const isAdminOrOwner = user?.roles?.includes('Admin') || user?.roles?.includes('Owner') || 
+                               user?.role === 'Admin' || user?.role === 'Owner' || 
+                               user?.roleName === 'Admin' || user?.roleName === 'Owner';
+
         if (!isAdminOrOwner && user?.branchIds && user.branchIds.length > 0) {
           availableBranches = allBranches.filter(b => user.branchIds.includes(b.id));
         }
 
         setBranches(availableBranches);
-        if (availableBranches.length > 0) {
+        if (isPosHub && currentBranchId) {
+          setSelectedBranch(currentBranchId);
+        } else if (availableBranches.length > 0) {
           setSelectedBranch(availableBranches[0].id);
         }
       } catch (err) {
@@ -102,6 +109,12 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
       fetchAreas();
     }
   }, [selectedBranch]);
+
+  useEffect(() => {
+    if (currentBranchId && isBranchesLoaded) {
+      setSelectedBranch(currentBranchId);
+    }
+  }, [currentBranchId, isBranchesLoaded]);
 
   const loadTables = useCallback(async () => {
     if (!isBranchesLoaded) return;
@@ -257,7 +270,7 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
                 </Button>
               </>
             )}
-            {branches.length > 1 && (
+            {!currentBranchId && branches.length > 1 && (
               <Select
                 style={{ width: 200 }}
                 value={selectedBranch}

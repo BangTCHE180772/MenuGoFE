@@ -40,7 +40,8 @@ const CONTRACT_TYPES = {
 };
 
 const SALARY_TYPES = {
-  'Fixed': 'Lương cố định',
+  'Monthly': 'Theo tháng',
+  'Fixed': 'Theo tháng',
   'Hourly': 'Lương theo giờ',
 };
 

@@ -5,8 +5,9 @@ import {
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined,
-  AppstoreOutlined, TableOutlined
+  AppstoreOutlined, TableOutlined, QrcodeOutlined, PrinterOutlined
 } from '@ant-design/icons';
+import { QRCodeSVG } from 'qrcode.react';
 
 import { useAuth, ROLES } from '../context/AuthContext';
 import { getAllBranches } from '../api/branchApi';
@@ -39,6 +40,9 @@ const TableManagementPage = () => {
   const [isTableModalVisible, setIsTableModalVisible] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
   const [tableForm] = Form.useForm();
+
+  const [isQrModalVisible, setIsQrModalVisible] = useState(false);
+  const [selectedTableForQr, setSelectedTableForQr] = useState(null);
 
   useEffect(() => {
     if (role) {
@@ -305,6 +309,10 @@ const TableManagementPage = () => {
                           hoverable
                           style={{ textAlign: 'center', borderColor: table.isActive ? '#d9d9d9' : '#ffccc7' }}
                           actions={[
+                            <QrcodeOutlined key="qrcode" onClick={() => {
+                              setSelectedTableForQr(table);
+                              setIsQrModalVisible(true);
+                            }} />,
                             <EditOutlined key="edit" onClick={() => openTableModal(table)} />,
                             <Popconfirm
                               title="Chắc chắn xoá?"
@@ -384,6 +392,67 @@ const TableManagementPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* MODAL QR CODE */}
+      <Modal
+        title="In Mã QR Bàn"
+        open={isQrModalVisible}
+        onCancel={() => setIsQrModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsQrModalVisible(false)}>Đóng</Button>,
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={() => window.print()}>
+            In Mã QR
+          </Button>
+        ]}
+        width={400}
+      >
+        {selectedTableForQr && (
+          <div className="printable-qr-section" style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Title level={4} style={{ margin: 0, color: '#f97316' }}>MenuGo</Title>
+            <Text strong style={{ fontSize: '16px' }}>{branches.find(b => b.id === selectedBranch)?.name}</Text>
+            <div style={{ margin: '8px 0' }}>
+              <Text type="secondary">{selectedArea?.name}</Text>
+            </div>
+            <Title level={3} style={{ margin: '0 0 20px 0' }}>{selectedTableForQr.name}</Title>
+            
+            <div style={{ background: '#fff', padding: '16px', display: 'inline-block', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <QRCodeSVG 
+                value={`${window.location.origin}/customer-order/${selectedTableForQr.id}`} 
+                size={220}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            
+            <div style={{ marginTop: '16px' }}>
+              <Text type="secondary">Quét mã để xem Menu & Gọi món</Text>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .printable-qr-section, .printable-qr-section * {
+            visibility: visible;
+          }
+          .printable-qr-section {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            text-align: center;
+          }
+          .ant-modal-content, .ant-modal, .ant-modal-mask, .ant-layout, .table-management-page {
+            background: transparent !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

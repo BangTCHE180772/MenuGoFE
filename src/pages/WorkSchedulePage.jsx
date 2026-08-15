@@ -49,29 +49,40 @@ import {
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
 import { getAllShifts } from '../api/shiftApi';
+import { getContracts } from '../api/contractApi';
 import { useAuth } from '../context/AuthContext';
+import MyWorkSchedulePage from './MyWorkSchedulePage';
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Chờ thực hiện', color: 'warning' },
-  { value: 'APPROVED', label: 'Đã duyệt', color: 'processing' },
-  { value: 'Đang làm việc', label: 'Đang làm việc', color: 'blue' },
-  { value: 'Hoàn thành', label: 'Hoàn thành', color: 'success' },
-  { value: 'Vắng mặt', label: 'Vắng mặt', color: 'error' },
-  // Giữ lại để tương thích với dữ liệu cũ trong DB
-  { value: 'COMPLETED', label: 'Hoàn thành', color: 'success' },
-  { value: 'ABSENT', label: 'Vắng mặt', color: 'error' },
+  { value: 'Pending', label: 'Chờ thực hiện', color: 'warning' },
+  { value: 'Approved', label: 'Đã duyệt', color: 'processing' },
+  { value: 'Working', label: 'Đang làm việc', color: 'blue' },
+  { value: 'Completed', label: 'Hoàn thành', color: 'success' },
+  { value: 'Absent', label: 'Vắng mặt', color: 'error' },
 ];
 
+const normalizeStatusString = (status) => {
+  if (!status) return 'Pending';
+  const s = status.toUpperCase();
+  if (s === 'PENDING') return 'Pending';
+  if (s === 'APPROVED') return 'Approved';
+  if (s === 'WORKING' || s === 'ĐANG LÀM VIỆC') return 'Working';
+  if (s === 'COMPLETED' || s === 'HOÀN THÀNH' || s === 'ĐÃ HOÀN THÀNH') return 'Completed';
+  if (s === 'ABSENT' || s === 'VẮNG MẶT') return 'Absent';
+  return status;
+};
+
 // Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
-const getStatusOption = (status) =>
-  STATUS_OPTIONS.find((s) => s.value === status) ||
-  STATUS_OPTIONS.find((s) => s.value.toLowerCase() === (status || '').toLowerCase()) ||
-  { label: status, color: 'default' };
+const getStatusOption = (status) => {
+  const norm = normalizeStatusString(status);
+  return STATUS_OPTIONS.find((s) => s.value === norm) || { label: status, color: 'default' };
+};
 
 
 const WorkSchedulePage = () => {
   const { user, role } = useAuth();
   const isManager = user?.roleId === 3 || role === 'Manager';
+  const isOwner = user?.roleId === 2 || role === 'Owner';
   const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
   const managerBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
@@ -79,6 +90,7 @@ const WorkSchedulePage = () => {
   const [branches, setBranches] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const allowedBranches = useMemo(() => {
@@ -123,6 +135,7 @@ const WorkSchedulePage = () => {
   }, [accounts]);
 
   // Filtering states
+  const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
@@ -149,16 +162,20 @@ const WorkSchedulePage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schedulesRes, branchesRes, accountsRes, shiftsRes] = await Promise.all([
+      const [schedulesRes, branchesRes, accountsRes, shiftsRes, contractsRes] = await Promise.all([
         getAllWorkSchedules(),
         getAllBranches(),
         getRoleRange(),
         getAllShifts(),
+        getContracts().catch(() => ({ data: [] })),
       ]);
       setSchedules(schedulesRes.data || []);
       setBranches(branchesRes.data || []);
       setAccounts(accountsRes.data || []);
-      setShifts(shiftsRes.data || []);
+      setContracts(contractsRes.data || []);
+      const rawShifts = shiftsRes.data || [];
+      const sortedShifts = [...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || ''));
+      setShifts(sortedShifts);
     } catch (err) {
       console.error(err);
       message.error('Không thể tải dữ liệu lịch làm việc / chi nhánh / nhân viên / ca trực!');
@@ -185,10 +202,35 @@ const WorkSchedulePage = () => {
   const getShiftDetails = (id) => {
     const sh = shifts.find((s) => s.id === id);
     if (!sh) return { name: `Ca #${id}`, time: '' };
-    // StartTime / EndTime formatted as HH:mm
     const start = sh.startTime ? sh.startTime.substring(0, 5) : '--:--';
     const end = sh.endTime ? sh.endTime.substring(0, 5) : '--:--';
     return { name: sh.name, time: `${start} - ${end}` };
+  };
+
+  // Filter schedules
+  const filteredSchedules = schedules.filter((item) => {
+    if (selectedBranch && item.branchId !== selectedBranch) return false;
+    if (selectedAccount && item.accountId !== selectedAccount) return false;
+    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
+    if (selectedShift && item.shiftId !== selectedShift) return false;
+    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
+    if (searchDate) {
+      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
+      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
+      if (itemDate !== filterDate) return false;
+    }
+    return true;
+  });
+
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSelectedBranch(null);
+    setSelectedAccount(null);
+    setSelectedApprovalStatus(null);
+    setSelectedShift(null);
+    setSelectedStatus(null);
+    setSearchDate(null);
+    message.info('Đã xóa tất cả bộ lọc');
   };
 
   // Open Modal logic - Single Add/Edit
@@ -211,13 +253,13 @@ const WorkSchedulePage = () => {
         checkInTime: checkInVal,
         checkOutTime: checkOutVal,
         actualHours: record.actualHours,
-        status: record.status,
+        status: normalizeStatusString(record.status),
         managerApproved: record.managerApproved,
       });
     } else {
       form.resetFields();
       form.setFieldsValue({
-        status: 'PENDING',
+        status: 'Pending',
         managerApproved: true,
         workDate: dayjs(),
         branchId: defaultBranchId,
@@ -248,8 +290,64 @@ const WorkSchedulePage = () => {
       }
 
       // Validations
+      const currentStatusNorm = (values.status || '').toLowerCase();
+      if (['working', 'đang làm việc'].includes(currentStatusNorm)) {
+        if (!values.checkInTime && !checkInAt) {
+          message.error('Vui lòng chọn giờ Check-in để chuyển trạng thái sang "Đang làm việc"!');
+          return;
+        }
+      }
+
+      if (['completed', 'hoàn thành', 'đã hoàn thành'].includes(currentStatusNorm)) {
+        if (!values.checkInTime && !checkInAt) {
+          message.error('Vui lòng chọn giờ Check-in để chuyển trạng thái sang "Hoàn thành"!');
+          return;
+        }
+        if (!values.checkOutTime && !checkOutAt) {
+          message.error('Vui lòng chọn giờ Check-out để chuyển trạng thái sang "Hoàn thành"!');
+          return;
+        }
+      }
+
       if (checkInAt && checkOutAt && dayjs(checkOutAt).isBefore(dayjs(checkInAt))) {
         message.error('Giờ check-out không thể trước giờ check-in!');
+        return;
+      }
+
+      // Check if workDate exceeds contract validity period
+      const activeContract = contracts.find(
+        (c) => c.accountId === values.accountId &&
+          (c.branchId === values.branchId || !c.branchId) &&
+          (['active', 'hiệu lực'].includes((c.status || '').toLowerCase()))
+      );
+
+      if (activeContract) {
+        const workDate = values.workDate;
+        if (activeContract.startDate && workDate.isBefore(dayjs(activeContract.startDate), 'day')) {
+          const accName = getAccountName(values.accountId);
+          message.error(`Ngày làm việc (${workDate.format('DD/MM/YYYY')}) trước ngày bắt đầu hợp đồng (${dayjs(activeContract.startDate).format('DD/MM/YYYY')}) của nhân viên ${accName}!`);
+          return;
+        }
+        if (activeContract.endDate && workDate.isAfter(dayjs(activeContract.endDate), 'day')) {
+          const accName = getAccountName(values.accountId);
+          message.error(`Ngày làm việc (${workDate.format('DD/MM/YYYY')}) vượt quá ngày hết hạn hợp đồng (${dayjs(activeContract.endDate).format('DD/MM/YYYY')}) của nhân viên ${accName}! Không thể tạo lịch làm việc.`);
+          return;
+        }
+      }
+
+      // Check if employee already has a schedule for this shift on this date
+      const duplicateExists = schedules.some((s) => {
+        if (modalType === 'edit' && editingRecord && s.id === editingRecord.id) return false;
+        const sameAccount = s.accountId === values.accountId;
+        const sameShift = s.shiftId === values.shiftId;
+        const sameDate = dayjs(s.workDate).format('YYYY-MM-DD') === workDateStr;
+        return sameAccount && sameShift && sameDate;
+      });
+
+      if (duplicateExists) {
+        const accName = getAccountName(values.accountId);
+        const shiftDetails = getShiftDetails(values.shiftId);
+        message.error(`Nhân viên ${accName} đã được phân công ca ${shiftDetails.name || ''} vào ngày ${values.workDate.format('DD/MM/YYYY')}! Không thể tạo trùng lịch làm việc.`);
         return;
       }
 
@@ -304,7 +402,7 @@ const WorkSchedulePage = () => {
         checkInAt: record.checkInAt,
         checkOutAt: record.checkOutAt,
         actualHours: record.actualHours,
-        status: checked ? 'APPROVED' : record.status === 'APPROVED' ? 'PENDING' : record.status,
+        status: checked ? 'Approved' : record.status === 'Approved' ? 'Pending' : record.status,
         managerApproved: checked,
       };
       await updateWorkSchedule(updatePayload);
@@ -340,6 +438,42 @@ const WorkSchedulePage = () => {
 
       const start = dateRange[0];
       const end = dateRange[1];
+
+      // Check contract validity for bulk assign
+      for (const accId of accountIds) {
+        const activeContract = contracts.find(
+          (c) => c.accountId === accId &&
+            (c.branchId === branchId || !c.branchId) &&
+            (['active', 'hiệu lực'].includes((c.status || '').toLowerCase()))
+        );
+
+        const accName = getAccountName(accId);
+
+        if (!activeContract) {
+          message.error(`Nhân viên ${accName} chưa có hợp đồng còn hiệu lực tại chi nhánh này!`);
+          return;
+        }
+
+        const startDay = dayjs(start);
+        const endDay = dayjs(end);
+
+        if (activeContract.endDate) {
+          const contractEndDate = dayjs(activeContract.endDate);
+          if (startDay.isAfter(contractEndDate, 'day')) {
+            message.error(`Khoảng ngày phân ca (${startDay.format('DD/MM/YYYY')} - ${endDay.format('DD/MM/YYYY')}) nằm ngoài thời hạn hợp đồng (hết hạn ngày ${contractEndDate.format('DD/MM/YYYY')}) của nhân viên ${accName}! Chỉ được phân ca trong thời hạn hợp đồng.`);
+            return;
+          }
+        }
+
+        if (activeContract.startDate) {
+          const contractStartDate = dayjs(activeContract.startDate);
+          if (endDay.isBefore(contractStartDate, 'day')) {
+            message.error(`Khoảng ngày phân ca (${startDay.format('DD/MM/YYYY')} - ${endDay.format('DD/MM/YYYY')}) nằm trước ngày bắt đầu hợp đồng (${contractStartDate.format('DD/MM/YYYY')}) của nhân viên ${accName}! Chỉ được phân ca trong thời hạn hợp đồng.`);
+            return;
+          }
+        }
+      }
+
       const workDates = [];
       let current = dayjs(start);
       while (current.isBefore(end) || current.isSame(end, 'day')) {
@@ -357,7 +491,11 @@ const WorkSchedulePage = () => {
 
       const res = await assignWorkSchedules(payload);
       const assignedCount = res.data?.length || 0;
-      message.success(`Đã phân ca thành công: tạo mới ${assignedCount} lịch làm việc!`);
+      if (assignedCount === 0) {
+        message.warning('Tất cả lịch làm việc trong thời hạn hợp đồng của nhân viên đã được phân công hoặc nằm ngoài thời hạn hợp đồng!');
+      } else {
+        message.success(`Đã phân ca thành công: tạo mới ${assignedCount} lịch làm việc trong thời hạn hợp đồng!`);
+      }
 
       setIsBulkModalOpen(false);
       bulkForm.resetFields();
@@ -369,39 +507,10 @@ const WorkSchedulePage = () => {
     }
   };
 
-  // Filter schedules
-  const filteredSchedules = schedules.filter((item) => {
-    if (selectedAccount && item.accountId !== selectedAccount) return false;
-    if (selectedApprovalStatus !== null && item.managerApproved !== selectedApprovalStatus) return false;
-    if (selectedShift && item.shiftId !== selectedShift) return false;
-    if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
-    if (searchDate) {
-      const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
-      const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
-      if (itemDate !== filterDate) return false;
-    }
-    return true;
-  });
 
-  // Reset Filters
-  const handleResetFilters = () => {
-    setSelectedAccount(null);
-    setSelectedApprovalStatus(null);
-    setSelectedShift(null);
-    setSelectedStatus(null);
-    setSearchDate(null);
-    message.info('Đã xóa tất cả bộ lọc');
-  };
 
   // Columns for Table
   const baseColumns = [
-    {
-      title: 'Mã lịch',
-      dataIndex: 'code',
-      key: 'code',
-      render: (code) => <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{code}</span>,
-      width: 140,
-    },
     {
       title: 'Nhân viên',
       dataIndex: 'accountId',
@@ -557,7 +666,7 @@ const WorkSchedulePage = () => {
   // Calendar render helper
   const dateCellRender = (value) => {
     const dateStr = value.format('YYYY-MM-DD');
-    const daySchedules = schedules.filter((item) => item.workDate === dateStr);
+    const daySchedules = filteredSchedules.filter((item) => item.workDate === dateStr);
 
     // Group by shiftId
     const shiftGroups = {};
@@ -846,116 +955,226 @@ const WorkSchedulePage = () => {
               </span>
             ),
             children: (
-              <>
-                {/* Advanced Search & Filtering Box */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
-                  <Select
-                    placeholder="Lọc nhân viên"
-                    style={{ width: 180 }}
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    value={selectedAccount}
-                    onChange={(val) => setSelectedAccount(val)}
-                  >
-                    {accounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                  <>
+                    {/* Advanced Search & Filtering Box */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
+                      {isOwnerOrAdmin && (
+                        <Select
+                          placeholder="Lọc chi nhánh"
+                          style={{ width: 180 }}
+                          allowClear
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(val)}
+                        >
+                          {branches.map((b) => (
+                            <Select.Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      )}
 
-                  <Select
-                    placeholder="Lọc trạng thái duyệt"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedApprovalStatus}
-                    onChange={(val) => setSelectedApprovalStatus(val)}
-                  >
-                    <Select.Option value={true}>Đã duyệt</Select.Option>
-                    <Select.Option value={false}>Chưa duyệt</Select.Option>
-                  </Select>
+                      <Select
+                        placeholder="Lọc nhân viên"
+                        style={{ width: 180 }}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        value={selectedAccount}
+                        onChange={(val) => setSelectedAccount(val)}
+                      >
+                        {accounts.map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            {a.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  <Select
-                    placeholder="Lọc ca làm việc"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedShift}
-                    onChange={(val) => setSelectedShift(val)}
-                  >
-                    {shifts.map((s) => (
-                      <Select.Option key={s.id} value={s.id}>
-                        {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
-                      </Select.Option>
-                    ))}
-                  </Select>
+                      <Select
+                        placeholder="Lọc trạng thái duyệt"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedApprovalStatus}
+                        onChange={(val) => setSelectedApprovalStatus(val)}
+                      >
+                        <Select.Option value={true}>Đã duyệt</Select.Option>
+                        <Select.Option value={false}>Chưa duyệt</Select.Option>
+                      </Select>
 
-                  <Select
-                    placeholder="Lọc trạng thái"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                  >
-                    {[
-                      { value: 'PENDING', label: 'Chờ thực hiện' },
-                      { value: 'APPROVED', label: 'Đã duyệt' },
-                      { value: 'Working', label: 'Đang làm việc' },
-                      { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT', label: 'Vắng mặt' },
-                    ].map((st) => (
-                      <Select.Option key={st.value} value={st.value}>
-                        {st.label}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                      <Select
+                        placeholder="Lọc ca làm việc"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedShift}
+                        onChange={(val) => setSelectedShift(val)}
+                      >
+                        {shifts.map((s) => (
+                          <Select.Option key={s.id} value={s.id}>
+                            {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  <DatePicker
-                    placeholder="Lọc ngày cụ thể"
-                    style={{ width: 160 }}
-                    value={searchDate}
-                    onChange={(date) => setSearchDate(date)}
-                    format="DD/MM/YYYY"
-                  />
+                      <Select
+                        placeholder="Lọc trạng thái"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedStatus}
+                        onChange={(val) => setSelectedStatus(val)}
+                      >
+                        {[
+                          { value: 'PENDING', label: 'Chờ thực hiện' },
+                          { value: 'APPROVED', label: 'Đã duyệt' },
+                          { value: 'Working', label: 'Đang làm việc' },
+                          { value: 'COMPLETED', label: 'Hoàn thành' },
+                          { value: 'ABSENT', label: 'Vắng mặt' },
+                        ].map((st) => (
+                          <Select.Option key={st.value} value={st.value}>
+                            {st.label}
+                          </Select.Option>
+                        ))}
+                      </Select>
 
-                  {(selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
-                    <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
-                      Xóa lọc
-                    </Button>
-                  )}
-                </div>
+                      <DatePicker
+                        placeholder="Lọc ngày cụ thể"
+                        style={{ width: 160 }}
+                        value={searchDate}
+                        onChange={(date) => setSearchDate(date)}
+                        format="DD/MM/YYYY"
+                      />
 
-                {/* Table View */}
-                <Table
-                  columns={columns}
-                  dataSource={filteredSchedules}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-                  scroll={{ x: 1100 }}
-                  bordered
-                />
-              </>
-            ),
-          },
-          {
-            key: 'calendar',
-            label: (
-              <span>
-                <CalendarOutlined /> Lịch trực quan (Lịch tháng)
-              </span>
-            ),
-            children: (
-              <div style={{ padding: '8px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
-                <div style={{ marginBottom: 12, display: 'flex', gap: 16 }}>
-                  <span><Badge status="success" /> Đã phê duyệt</span>
-                  <span><Badge status="warning" /> Chờ phê duyệt</span>
-                </div>
-                <Calendar cellRender={dateCellRender} />
-              </div>
-            ),
-          },
-        ]}
+                      {(selectedBranch || selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                        <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
+                          Xóa lọc
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Table View */}
+                    <Table
+                      columns={columns}
+                      dataSource={filteredSchedules}
+                      rowKey="id"
+                      loading={loading}
+                      pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
+                      scroll={{ x: 1100 }}
+                      bordered
+                    />
+                  </>
+                ),
+              },
+              {
+                key: 'calendar',
+                label: (
+                  <span>
+                    <CalendarOutlined /> Lịch trực quan (Lịch tháng)
+                  </span>
+                ),
+                children: (
+                  <div style={{ padding: '8px', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                    {/* Advanced Search & Filtering Box */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
+                      {isOwnerOrAdmin && (
+                        <Select
+                          placeholder="Lọc chi nhánh"
+                          style={{ width: 180 }}
+                          allowClear
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(val)}
+                        >
+                          {branches.map((b) => (
+                            <Select.Option key={b.id} value={b.id}>
+                              {b.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      )}
+
+                      <Select
+                        placeholder="Lọc nhân viên"
+                        style={{ width: 180 }}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        value={selectedAccount}
+                        onChange={(val) => setSelectedAccount(val)}
+                      >
+                        {accounts.map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            {a.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái duyệt"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedApprovalStatus}
+                        onChange={(val) => setSelectedApprovalStatus(val)}
+                      >
+                        <Select.Option value={true}>Đã duyệt</Select.Option>
+                        <Select.Option value={false}>Chưa duyệt</Select.Option>
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc ca làm việc"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedShift}
+                        onChange={(val) => setSelectedShift(val)}
+                      >
+                        {shifts.map((s) => (
+                          <Select.Option key={s.id} value={s.id}>
+                            {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        placeholder="Lọc trạng thái"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={selectedStatus}
+                        onChange={(val) => setSelectedStatus(val)}
+                      >
+                        {[
+                          { value: 'PENDING', label: 'Chờ thực hiện' },
+                          { value: 'APPROVED', label: 'Đã duyệt' },
+                          { value: 'Working', label: 'Đang làm việc' },
+                          { value: 'COMPLETED', label: 'Hoàn thành' },
+                          { value: 'ABSENT', label: 'Vắng mặt' },
+                        ].map((st) => (
+                          <Select.Option key={st.value} value={st.value}>
+                            {st.label}
+                          </Select.Option>
+                        ))}
+                      </Select>
+
+                      <DatePicker
+                        placeholder="Lọc ngày cụ thể"
+                        style={{ width: 160 }}
+                        value={searchDate}
+                        onChange={(date) => setSearchDate(date)}
+                        format="DD/MM/YYYY"
+                      />
+
+                      {(selectedBranch || selectedAccount || selectedApprovalStatus !== null || selectedShift || selectedStatus || searchDate) && (
+                        <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
+                          Xóa lọc
+                        </Button>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: 12, display: 'flex', gap: 16 }}>
+                      <span><Badge status="success" /> Đã phê duyệt</span>
+                      <span><Badge status="warning" /> Chờ phê duyệt</span>
+                    </div>
+                    <Calendar cellRender={dateCellRender} />
+                  </div>
+                ),
+              },
+            ]}
       />
 
       {/* SINGLE Create / Edit Modal Form */}

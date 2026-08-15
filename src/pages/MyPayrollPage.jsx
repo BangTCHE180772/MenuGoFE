@@ -317,7 +317,9 @@ const MyPayrollPage = () => {
                   <div style={{ background: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>Công / Giờ làm thực tế</Text>
                     <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff', marginTop: '2px' }}>
-                      {selectedPayroll.actualWorkDays} / {selectedPayroll.baseWorkDays} ngày ({selectedPayroll.actualWorkHours}h)
+                      {selectedPayroll.salaryType === 'Hourly' || selectedPayroll.salaryType === 'Theo giờ' || selectedPayroll.salaryType === 'TheoGio'
+                        ? `${selectedPayroll.actualWorkHours || 0} giờ làm`
+                        : `${selectedPayroll.actualWorkDays} / ${selectedPayroll.baseWorkDays || 26} ngày (${selectedPayroll.actualWorkHours || 0}h)`}
                     </div>
                   </div>
                 </Col>

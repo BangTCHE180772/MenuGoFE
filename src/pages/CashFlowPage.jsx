@@ -71,7 +71,6 @@ const CashFlowPage = () => {
 
   /* ── Fetch ── */
   const fetchData = async () => {
-    if (!currentBranchId || currentBranchId <= 0) { setData([]); return; }
     setLoading(true);
     try {
       const list = await getCashFlows(currentBranchId);
@@ -346,9 +345,17 @@ const CashFlowPage = () => {
                   </td>
                   <td>{METHOD_LABELS[row.paymentMethod] || row.paymentMethod || '—'}</td>
                   <td>
-                    {row.partnerName
-                      ? <span className="partner-text">{row.partnerName}</span>
-                      : <span className="empty-text">—</span>}
+                    {row.partnerName ? (
+                      <span className="partner-text">{row.partnerName}</span>
+                    ) : row.note && (row.note.includes('cho nhân viên') || row.note.includes('lương tháng')) ? (
+                      <span className="partner-text" style={{ color: '#1677ff', fontWeight: 500 }}>
+                        {row.note.includes('cho nhân viên')
+                          ? 'NV: ' + row.note.substring(row.note.indexOf('cho nhân viên') + 14).trim()
+                          : 'NV (Chi lương)'}
+                      </span>
+                    ) : (
+                      <span className="empty-text">—</span>
+                    )}
                   </td>
                   <td>
                     {row.documentCode ? (

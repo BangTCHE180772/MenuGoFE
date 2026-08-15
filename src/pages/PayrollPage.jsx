@@ -168,6 +168,9 @@ const PayrollPage = () => {
   const [batchForm] = Form.useForm();
   const [statusForm] = Form.useForm();
 
+  const currentSalaryType = Form.useWatch('salaryType', form);
+  const isHourlyForm = currentSalaryType === 'Hourly' || currentSalaryType === 'Theo giờ' || currentSalaryType === 'TheoGio';
+
   // Format Currency Utility
   const formatVND = (val) => {
     if (val === undefined || val === null) return '0 đ';
@@ -274,13 +277,14 @@ const PayrollPage = () => {
         type: typeof d.type === 'number' ? (TYPE_INT_TO_STRING[d.type] || d.typeName || d.type) : (d.typeName || d.type),
       }));
 
+      const isHourlyRecord = record.salaryType === 'Hourly' || record.salaryType === 'Theo giờ' || record.salaryType === 'TheoGio';
       form.setFieldsValue({
         accountId: record.accountId,
         branchId: record.branchId,
         monthYear: dayjs(`${record.year}-${record.Month || record.month}-01`),
         salaryType: record.salaryType || 'Monthly',
         baseSalary: record.baseSalary,
-        baseWorkDays: record.baseWorkDays || 26,
+        baseWorkDays: isHourlyRecord ? 0 : (record.baseWorkDays || 26),
         actualWorkDays: record.actualWorkDays || 0,
         actualWorkHours: record.actualWorkHours || 0,
         calculatedSalary: record.calculatedSalary || 0,
@@ -317,9 +321,13 @@ const PayrollPage = () => {
 
   // Recalculate salary in form dynamically when values change
   const handleFormValuesChange = (changedValues, allValues) => {
+    const salaryType = allValues.salaryType || 'Monthly';
+    const isHourly = salaryType === 'Hourly' || salaryType === 'Theo giờ' || salaryType === 'TheoGio';
+
     const baseSalary = allValues.baseSalary || 0;
-    const baseDays = allValues.baseWorkDays || 26;
+    const baseDays = isHourly ? 0 : (allValues.baseWorkDays || 26);
     const actualDays = allValues.actualWorkDays || 0;
+    const actualHours = allValues.actualWorkHours || 0;
     const details = allValues.salaryDetails || [];
 
     // Calculate sum of detail line items
@@ -337,7 +345,18 @@ const PayrollPage = () => {
       else if (item.type === 'Penalty') penaltySum += amt;
     });
 
-    const calculatedSal = Math.round((baseSalary / (baseDays || 1)) * actualDays);
+    const selectedAcc = accounts.find((a) => a.id === allValues.accountId);
+    const isManagerAcc = isOwnerOrAdmin && selectedAcc?.roleIds?.includes(3);
+
+    let calculatedSal = 0;
+    if (isManagerAcc) {
+      calculatedSal = baseSalary;
+    } else if (isHourly) {
+      calculatedSal = Math.round(baseSalary * actualHours);
+    } else {
+      calculatedSal = Math.round((baseSalary / (baseDays || 1)) * actualDays);
+    }
+
     const netSal = calculatedSal + allowanceSum + bonusSum - deductionSum - penaltySum;
 
     form.setFieldsValue({
@@ -347,6 +366,7 @@ const PayrollPage = () => {
       totalDeduction: deductionSum,
       penaltyAmount: penaltySum,
       netSalary: Math.max(0, netSal),
+      ...(isHourly ? { baseWorkDays: 0 } : {}),
     });
   };
 
@@ -583,16 +603,25 @@ const PayrollPage = () => {
       ),
     },
     {
-      title: 'Lương CB & Công',
+      title: isOwnerOrAdmin ? 'Lương cơ bản' : 'Lương CB & Công',
       key: 'baseSalaryInfo',
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{formatVND(record.baseSalary)}</div>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>
-            {record.actualWorkDays}/{record.baseWorkDays || 26} ngày công ({record.actualWorkHours || 0} giờ)
+      render: (_, record) => {
+        const isHourly = record.salaryType === 'Hourly' || record.salaryType === 'Theo giờ' || record.salaryType === 'TheoGio';
+        return (
+          <div>
+            <div style={{ fontWeight: 500 }}>{formatVND(record.baseSalary)}</div>
+            {!isOwnerOrAdmin && (
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                {isHourly ? (
+                  <span>{record.actualWorkHours || 0} giờ làm</span>
+                ) : (
+                  <span>{record.actualWorkDays}/{record.baseWorkDays || 26} ngày công ({record.actualWorkHours || 0} giờ)</span>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Lương tính toán',
@@ -948,10 +977,10 @@ const PayrollPage = () => {
           {isOwnerOrAdmin ? (
             <Form.Item
               name="branchId"
-              label="Chi nhánh làm việc"
+              label="Chi nhánh làm việc (tự động theo Quản lý)"
               rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
             >
-              <Select placeholder="Chọn chi nhánh...">
+              <Select placeholder="Tự động theo Quản lý..." disabled>
                 {branches.map((b) => (
                   <Select.Option key={b.id} value={b.id}>
                     {b.name}
@@ -983,7 +1012,9 @@ const PayrollPage = () => {
               color: '#0050b3',
             }}
           >
-            💡 System will calculate: Base salary from active contract, actual work days & hours from approved attendance/work schedules, and auto apply allowance or deduction items.
+            {isOwnerOrAdmin
+              ? '💡 Hệ thống sẽ tự động tính toán: Lương cơ bản từ hợp đồng đang hiệu lực của Quản lý và tự động áp dụng các khoản phụ cấp, thưởng, phạt.'
+              : '💡 Hệ thống sẽ tự động tính toán: Lương cơ bản từ hợp đồng, ngày công & giờ làm thực tế từ lịch làm việc đã hoàn thành, và áp dụng phụ cấp/khấu trừ.'}
           </div>
         </Form>
       </Modal>
@@ -1097,10 +1128,10 @@ const PayrollPage = () => {
               <Col span={12}>
                 <Form.Item
                   name="branchId"
-                  label="Chi nhánh"
+                  label="Chi nhánh (tự động theo Quản lý)"
                   rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
                 >
-                  <Select placeholder="Chọn chi nhánh...">
+                  <Select placeholder="Tự động theo Quản lý..." disabled>
                     {branches.map((b) => (
                       <Select.Option key={b.id} value={b.id}>
                         {b.name}
@@ -1128,8 +1159,9 @@ const PayrollPage = () => {
             </Col>
             <Col span={12}>
               <Form.Item name="salaryType" label="Hình thức lương">
-                <Select placeholder="Chọn hình thức lương">
+                <Select disabled placeholder="Được cấu hình trong Hợp đồng">
                   <Select.Option value="Monthly">Theo tháng</Select.Option>
+                  <Select.Option value="Fixed">Theo tháng</Select.Option>
                   <Select.Option value="Hourly">Theo giờ</Select.Option>
                 </Select>
               </Form.Item>
@@ -1137,7 +1169,7 @@ const PayrollPage = () => {
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={isOwnerOrAdmin ? 12 : 8}>
               <Form.Item
                 name="baseSalary"
                 label="Lương cơ bản (VND)"
@@ -1152,44 +1184,82 @@ const PayrollPage = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item
-                name="baseWorkDays"
-                label="Công chuẩn (ngày)"
-                rules={[{ required: true, message: 'Nhập công chuẩn!' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={1} max={31} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="actualWorkDays"
-                label="Công thực tế (ngày)"
-                rules={[{ required: true, message: 'Nhập công thực tế!' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={0} step={0.5} max={31} />
-              </Form.Item>
-            </Col>
+
+            {!isOwnerOrAdmin && (
+              <>
+                {!isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item
+                      name="baseWorkDays"
+                      label="Công chuẩn (ngày)"
+                      rules={[{ required: true, message: 'Nhập công chuẩn!' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={1} max={31} />
+                    </Form.Item>
+                  </Col>
+                )}
+                <Col span={isHourlyForm ? 8 : 8}>
+                  <Form.Item
+                    name="actualWorkDays"
+                    label="Công thực tế (ngày)"
+                    rules={isHourlyForm ? [] : [{ required: true, message: 'Nhập công thực tế!' }]}
+                  >
+                    <InputNumber style={{ width: '100%' }} min={0} step={0.5} max={31} />
+                  </Form.Item>
+                </Col>
+                {isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item
+                      name="actualWorkHours"
+                      label="Số giờ làm thực tế"
+                      rules={[{ required: true, message: 'Nhập số giờ làm!' }]}
+                    >
+                      <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
+                    </Form.Item>
+                  </Col>
+                )}
+              </>
+            )}
+
+            {isOwnerOrAdmin && (
+              <Col span={12}>
+                <Form.Item name="calculatedSalary" label="Lương tính toán">
+                  <InputNumber
+                    addonAfter="đ"
+                    style={{ width: '100%' }}
+                    formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                    parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
+                    readOnly
+                  />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="actualWorkHours" label="Số giờ làm thực tế">
-                <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="calculatedSalary" label="Lương tính toán">
-                <InputNumber
-                  addonAfter="đ"
-                  style={{ width: '100%' }}
-                  formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
-                  parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
-                  readOnly
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
+            {!isOwnerOrAdmin && (
+              <>
+                {!isHourlyForm && (
+                  <Col span={8}>
+                    <Form.Item name="actualWorkHours" label="Số giờ làm thực tế">
+                      <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
+                    </Form.Item>
+                  </Col>
+                )}
+                <Col span={isHourlyForm ? 12 : 8}>
+                  <Form.Item name="calculatedSalary" label="Lương tính toán">
+                    <InputNumber
+                      addonAfter="đ"
+                      style={{ width: '100%' }}
+                      formatter={(val) => (val != null && val !== '' ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
+                      parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
+                      readOnly
+                    />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+            <Col span={isOwnerOrAdmin ? 24 : 8}>
               <Form.Item name="status" label="Trạng thái">
                 <Select placeholder="Chọn trạng thái">
                   {STATUS_OPTIONS.map((s) => (
@@ -1333,12 +1403,16 @@ const PayrollPage = () => {
               <Descriptions.Item label="Lương cơ bản">
                 {formatVND(detailRecord.baseSalary)}
               </Descriptions.Item>
-              <Descriptions.Item label="Công chuẩn / Thực tế">
-                {detailRecord.actualWorkDays} / {detailRecord.baseWorkDays || 26} ngày công ({detailRecord.actualWorkHours || 0} giờ)
-              </Descriptions.Item>
-              <Descriptions.Item label="Lương tính theo công">
-                {formatVND(detailRecord.calculatedSalary)}
-              </Descriptions.Item>
+              {!isOwnerOrAdmin && (
+                <>
+                  <Descriptions.Item label="Công chuẩn / Thực tế">
+                    {detailRecord.actualWorkDays} / {detailRecord.baseWorkDays || 26} ngày công ({detailRecord.actualWorkHours || 0} giờ)
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Lương tính theo công">
+                    {formatVND(detailRecord.calculatedSalary)}
+                  </Descriptions.Item>
+                </>
+              )}
               <Descriptions.Item label="Ngày thanh toán">
                 {detailRecord.paymentDate ? dayjs(detailRecord.paymentDate).format('DD/MM/YYYY HH:mm') : 'Chưa thanh toán'}
               </Descriptions.Item>

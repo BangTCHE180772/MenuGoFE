@@ -1,7 +1,7 @@
 import axiosInstance from './axiosInstance';
 
-export const getReservations = async () => {
-  const response = await axiosInstance.get('/api/Reservation');
+export const getReservations = async (branchId) => {
+  const response = await axiosInstance.get('/api/Reservation', { params: { branchId } });
   return response.data;
 };
 

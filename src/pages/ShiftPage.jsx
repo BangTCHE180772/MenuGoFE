@@ -136,12 +136,15 @@ const ShiftPage = () => {
     }
   };
 
-  // Filter
-  const filteredShifts = shifts.filter((s) => {
-    const search = searchText.toLowerCase();
-    const name = s.name?.toLowerCase() || '';
-    return name.includes(search);
-  });
+  // Filter & Default Sort by Shift ID Ascending (1, 2, 3...)
+  const filteredShifts = shifts
+    .filter((s) => {
+      const search = searchText.toLowerCase();
+      const name = s.name?.toLowerCase() || '';
+      const code = String(s.id);
+      return name.includes(search) || code.includes(search);
+    })
+    .sort((a, b) => a.id - b.id);
 
   // Columns
   const baseColumns = [
@@ -149,7 +152,11 @@ const ShiftPage = () => {
       title: 'Mã ca',
       dataIndex: 'id',
       key: 'id',
-      width: 80,
+      width: 90,
+      defaultSortOrder: 'ascend',
+      render: (id) => (
+        <strong style={{ color: '#1890ff' }}>{id}</strong>
+      ),
       sorter: (a, b) => a.id - b.id,
     },
     {
