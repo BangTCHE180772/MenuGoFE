@@ -309,13 +309,15 @@ const ReportInventoryPage = () => {
     { title: "Đơn vị",                      field: "unit" },
     { title: "Tồn đầu kỳ",                  field: (r) => `${r.openingStock} ${r.unit}`, align: "right" },
     { title: "Nhập",                        field: (r) => `${r.import} ${r.unit}`, align: "right" },
-    { title: "Chuyển vào",                  field: (r) => `${r.transferIn} ${r.unit}`, align: "right" },
-    { title: "Chuyển ra",                   field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
-    { title: "Hệ thống ghi nhận tiêu thụ",     field: (r) => `${r.systemConsumption} ${r.unit}`, align: "right" },
-    { title: "Tiêu thụ định mức",            field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
-    { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
-    { title: "Sai số (%)",                  field: (r) => `${r.variancePercent > 0 ? '+' : ''}${r.variancePercent}%`, align: "center" },
+    { title: "Nhận",                        field: (r) => `${r.transferIn} ${r.unit}`, align: "right" },
+    { title: "Gửi",                         field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
+    { title: "Tiêu hao định mức",           field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
+    { title: "Xuất hủy",                    field: (r) => `${(r.destruction || 0)} ${r.unit}`, align: "right" },
+    { title: "Điều chỉnh",                  field: (r) => `${(r.adjustment || 0) > 0 ? '+' : ''}${r.adjustment} ${r.unit}`, align: "right" },
     { title: "Tồn cuối",                    field: (r) => `${r.closingStock} ${r.unit}`, align: "right" },
+    { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
+    { title: "Tồn lý thuyết",               field: (r) => `${r.theoreticalStock} ${r.unit}`, align: "right" },
+    { title: "Sai số (%)",                  field: (r) => `${r.variancePercent > 0 ? '+' : ''}${r.variancePercent}%`, align: "center" },
   ];
 
   return (
@@ -349,7 +351,7 @@ const ReportInventoryPage = () => {
           columnDefs={columnDefs}
           data={consumptionItems}
           summaryRow={[
-            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-",
+            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
           ]}
         />
       </div>

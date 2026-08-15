@@ -31,7 +31,7 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts";
-import { getBranchDashboardStats } from "../../../api/dashboardApi";
+import { getCashFlows } from "../../../api/cashFlowApi";
 import { useBranch } from "../../../context/BranchContext";
 
 const { Title, Text } = Typography;
@@ -39,32 +39,87 @@ const { Title, Text } = Typography;
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
-// Fetch data lợi nhuận từ BE
+// Fetch data lợi nhuận từ getCashFlows
 const fetchPeriodStats = async (date, pickerType, branchId) => {
-  let start, end, range;
   const d = dayjs(date);
-
+  let start, end;
   if (pickerType === "date") {
-    const isToday = d.isSame(dayjs(), "day");
-    const isYesterday = d.isSame(dayjs().subtract(1, "day"), "day");
-    start = d.format("YYYY-MM-DD");
-    end   = d.format("YYYY-MM-DD");
-    range = isToday ? "today" : isYesterday ? "yesterday" : "custom";
+    start = d.startOf("day");
+    end   = d.endOf("day");
   } else if (pickerType === "month") {
-    start = d.startOf("month").format("YYYY-MM-DD");
-    end   = d.endOf("month").format("YYYY-MM-DD");
-    const isThisMonth = d.isSame(dayjs(), "month");
-    const isLastMonth = d.isSame(dayjs().subtract(1, "month"), "month");
-    range = isThisMonth ? "thisMonth" : isLastMonth ? "lastMonth" : "custom";
+    start = d.startOf("month");
+    end   = d.endOf("month");
   } else {
-    // year
-    start = d.startOf("year").format("YYYY-MM-DD");
-    end   = d.endOf("year").format("YYYY-MM-DD");
-    range = "custom";
+    start = d.startOf("year");
+    end   = d.endOf("year");
   }
 
-  const res = await getBranchDashboardStats(range, start, end, branchId);
-  return res?.data || null;
+  const res = await getCashFlows(branchId);
+  const allCashFlows = res || [];
+
+  const filtered = allCashFlows.filter((cf) => {
+    const dateVal = cf.businessDate || cf.createdAt;
+    if (!dateVal) return false;
+    const cfDate = dayjs(dateVal);
+    return (cfDate.isSame(start, "day") || cfDate.isAfter(start, "day")) &&
+           (cfDate.isSame(end, "day") || cfDate.isBefore(end, "day"));
+  });
+
+  const revenue = filtered
+    .filter(cf => cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu")
+    .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
+
+  const expenses = filtered
+    .filter(cf => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
+    .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
+
+  const profit = revenue - expenses;
+
+  let dailyStats = [];
+  if (pickerType === "date") {
+    const morning = { date: "Sáng (6-11h)", profit: 0 };
+    const noon = { date: "Trưa (11-14h)", profit: 0 };
+    const afternoon = { date: "Chiều (14-18h)", profit: 0 };
+    const night = { date: "Tối (18-22h)", profit: 0 };
+
+    filtered.forEach((cf) => {
+      const dateVal = cf.businessDate || cf.createdAt;
+      const hr = dayjs(dateVal).hour();
+      const amt = cf.totalAmount || cf.amount || 0;
+      const sign = (cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu") ? 1 : -1;
+      
+      if (hr >= 6 && hr < 11) morning.profit += (amt * sign);
+      else if (hr >= 11 && hr < 14) noon.profit += (amt * sign);
+      else if (hr >= 14 && hr < 18) afternoon.profit += (amt * sign);
+      else if (hr >= 18 && hr < 22) night.profit += (amt * sign);
+    });
+    dailyStats = [morning, noon, afternoon, night];
+  } else {
+    const dailyMap = {};
+    let cur = dayjs(start);
+    while (cur.isBefore(end) || cur.isSame(end, "day")) {
+      const key = cur.format("DD/MM");
+      dailyMap[key] = { date: key, profit: 0 };
+      cur = cur.add(1, "day");
+    }
+    filtered.forEach((cf) => {
+      const dateVal = cf.businessDate || cf.createdAt;
+      const key = dayjs(dateVal).format("DD/MM");
+      if (dailyMap[key]) {
+        const amt = cf.totalAmount || cf.amount || 0;
+        const sign = (cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu") ? 1 : -1;
+        dailyMap[key].profit += (amt * sign);
+      }
+    });
+    dailyStats = Object.values(dailyMap);
+  }
+
+  return {
+    revenue,
+    expenses,
+    profit,
+    dailyStats,
+  };
 };
 
 // Map BE data → structure so sánh lợi nhuận

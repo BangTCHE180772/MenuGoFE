@@ -84,7 +84,7 @@ const ProfitSummaryCards = ({ data = {}, onOpenCompare }) => {
           onClick={onOpenCompare}
           style={{ borderRadius: 6, fontWeight: 600 }}
         >
-          So sánh hiệu quả các kỳ (Compare)
+          So sánh hiệu quả các kỳ
         </Button>
       </div>
 
