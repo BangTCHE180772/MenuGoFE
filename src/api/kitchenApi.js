@@ -9,19 +9,14 @@ export const getKitchenItems = () =>
 /**
  * Cập nhật trạng thái chế biến (Waiting -> Accepted -> Cooking -> Ready/Done)
  */
-export const updateCookingStatus = (detailId, cookingStatus) =>
-  axiosInstance.put(`/api/Order/details/${detailId}/cooking-status`, { cookingStatus });
+export const updateCookingStatus = (detailId, cookingStatus, quantity = null) =>
+  axiosInstance.put(`/api/Order/details/${detailId}/cooking-status`, { cookingStatus, quantity });
 
 /**
  * Cập nhật trạng thái cho nhiều món cùng lúc (hỗ trợ Batch Processing - AF1)
  */
-export const batchUpdateCookingStatus = async (detailIds, cookingStatus) => {
-  const results = [];
-  for (const id of detailIds) {
-    results.push(await updateCookingStatus(id, cookingStatus));
-  }
-  return results;
-};
+export const batchUpdateCookingStatus = (productId, cookingStatus) =>
+  axiosInstance.put('/api/Order/batch-cooking-status', { productId, cookingStatus });
 
 /**
  * Hủy món ăn chi tiết từ KDS
