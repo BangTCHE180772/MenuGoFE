@@ -19,7 +19,7 @@ import { FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getAllTables, getTablesByBranch, updateTable } from '../api/tableApi';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
-import { createOrder, createBulkOrderDetail, updateCookingStatus, cancelOrder } from '../api/orderApi';
+import { createOrder, createBulkOrderDetail, updateCookingStatus, cancelOrder, payOrder } from '../api/orderApi';
 import { getTableOrderSummary, confirmOrderItem, rejectOrderItem } from '../api/tableMapApi';
 import { checkInReservation } from '../api/reservationApi';
 import { TABLE_STATUS } from '../data/tableConstants';
@@ -177,11 +177,28 @@ const OrderPage = ({ isWaiterMode }) => {
       try {
         const summaryRes = await getTableOrderSummary(selectedTable.id);
         if (summaryRes.data?.activeOrderId) {
-          message.warning('Bàn đang có hoá đơn chưa thanh toán. Vui lòng thanh toán hoá đơn trước khi dọn bàn!');
-          return;
+          const items = summaryRes.data.items || [];
+          const activeItems = items.filter(i => i.status !== 'Cancelled');
+          const allReturned = activeItems.every(i => i.quantity > 0 && i.returnedQuantity === i.quantity);
+
+          if (activeItems.length > 0 && allReturned) {
+            await payOrder(summaryRes.data.activeOrderId, {
+              customerName: null, customerPhone: null, voucherCode: null, pointsUsed: 0
+            });
+            message.success('Đã tự động hoàn tất hoá đơn 0đ (do tất cả món đã được trả).');
+          } else if (items.length === 0) {
+            await cancelOrder(summaryRes.data.activeOrderId);
+            message.success('Đã tự động huỷ hoá đơn rỗng.');
+          } else {
+            message.warning('Bàn đang có hoá đơn chưa thanh toán. Vui lòng thanh toán hoá đơn trước khi dọn bàn!');
+            actionRef.current = false;
+            return;
+          }
         }
       } catch (err) {
         console.error('Lỗi kiểm tra hoá đơn của bàn:', err);
+        actionRef.current = false;
+        return;
       }
     }
 
