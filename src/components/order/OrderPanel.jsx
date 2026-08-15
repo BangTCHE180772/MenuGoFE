@@ -167,7 +167,7 @@ const OrderedItem = ({
                 Đã phục vụ
               </button>
             )}
-            {isServed && returnableQty > 0 && (
+            {isServed && returnableQty > 0 && item.productType === 'Regular' && (
               <button 
                 className="pos-action-btn pos-action-btn--return"
                 style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5' }}

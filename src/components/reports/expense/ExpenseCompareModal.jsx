@@ -15,19 +15,12 @@ import {
 import {
   SwapOutlined,
   LineChartOutlined,
-  PieChartOutlined,
-  BarChartOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -41,15 +34,6 @@ const { Title, Text } = Typography;
 
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
-
-const EXPENSE_COLORS = [
-  "#ef4444",
-  "#ea580c",
-  "#2563eb",
-  "#8b5cf6",
-  "#10b981",
-  "#64748b",
-];
 
 // Fetch data chi phí từ BE
 const fetchPeriodStats = async (date, pickerType, branchId) => {
@@ -88,7 +72,6 @@ const mapToPeriod = (beData, dateLabel) => {
       avgExpense: 0,
       avgExpensePerDay: 1,
       largestExpense: 0,
-      breakdown: [],
       topExpenses: [],
       trendData: [],
     };
@@ -106,16 +89,6 @@ const mapToPeriod = (beData, dateLabel) => {
     name:   cf.category || "Chi phí khác",
   }));
 
-  // Nhóm theo loại chi phí
-  const breakdownMap = {};
-  mappedExpenses.forEach((item) => {
-    breakdownMap[item.name] = (breakdownMap[item.name] || 0) + item.amount;
-  });
-  const breakdown = Object.keys(breakdownMap).map((key) => ({
-    name:  key,
-    value: breakdownMap[key],
-  }));
-
   // Top khoản chi lớn nhất
   const topExpenses = [...mappedExpenses]
     .sort((a, b) => b.amount - a.amount)
@@ -127,10 +100,14 @@ const mapToPeriod = (beData, dateLabel) => {
     expense: s.expense || 0,
   }));
 
-  const trendFallback = (beData.hourSlots || []).map((s) => ({
-    date:    s.slot,
-    expense: Math.round((s.value || 0) * (expenses / (beData.revenue || 1))),
-  }));
+  const trendFallback = (beData.hourSlots || []).map((s) => {
+    const slotRev = s.value || 0;
+    const expRatio = beData.revenue > 0 ? expenses / beData.revenue : 0;
+    return {
+      date:   s.slot,
+      expense: Math.round(slotRev * expRatio),
+    };
+  });
 
   const largestVal = mappedExpenses.reduce((max, c) => Math.max(max, c.amount), 0);
 
@@ -140,7 +117,6 @@ const mapToPeriod = (beData, dateLabel) => {
     avgExpense:       mappedExpenses.length ? Math.round(expenses / mappedExpenses.length) : 0,
     avgExpensePerDay: expenses,
     largestExpense:   largestVal,
-    breakdown,
     topExpenses,
     trendData:        trendData.length > 0 ? trendData : trendFallback,
   };
@@ -152,8 +128,6 @@ const mapToPeriod = (beData, dateLabel) => {
  */
 const ExpenseCompareModal = ({ visible, onClose }) => {
   const { currentBranchId } = useBranch();
-  const [hoveredPieIndexA, setHoveredPieIndexA] = useState(-1);
-  const [hoveredPieIndexB, setHoveredPieIndexB] = useState(-1);
   const [pickerType, setPickerType] = useState("date");
 
   const [dateA, setDateA] = useState(dayjs());
@@ -215,7 +189,7 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
       : 0;
   const diffExpenseDelta = periodA && periodB ? periodA.totalExpense - periodB.totalExpense : 0;
 
-  const renderPeriodBlock = (period, loading, isCurrent, hoveredIdx, setHoveredIdx) => (
+  const renderPeriodBlock = (period, loading, isCurrent) => (
     <Spin spinning={loading}>
       <Card
         bordered
@@ -245,12 +219,12 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
 
         {/* Charts Row */}
         <Row gutter={[10, 10]}>
-          <Col span={14}>
+          <Col span={24}>
             <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
               <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
                 <LineChartOutlined style={{ color: "#ef4444" }} /> Xu hướng Chi phí
               </Text>
-              <div style={{ width: "100%", height: 160 }}>
+              <div style={{ width: "100%", height: 180 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={combinedTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -281,71 +255,6 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
               </div>
             </div>
           </Col>
-          <Col span={10}>
-            <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
-              <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
-                <PieChartOutlined style={{ color: "#8b5cf6" }} /> Tỷ trọng Loại chi phí
-              </Text>
-              <div style={{ width: "100%", height: 160 }}>
-                {(period?.breakdown?.length || 0) === 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: 12 }}>
-                    Chưa có dữ liệu
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={period.breakdown}
-                        cx="50%" cy="40%"
-                        innerRadius={28} outerRadius={48}
-                        dataKey="value"
-                        onMouseEnter={(_, i) => setHoveredIdx(i)}
-                        onMouseLeave={() => setHoveredIdx(-1)}
-                      >
-                        {period.breakdown.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]}
-                            opacity={hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.35}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => [formatVND(v), "Chi phí"]} />
-                      <Legend wrapperStyle={{ fontSize: 10, paddingTop: 2 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        {/* Bar chart top expenses */}
-        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
-          <Col span={24}>
-            <div style={{ background: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e2e8f0" }}>
-              <Text strong style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
-                <BarChartOutlined style={{ color: isCurrent ? "#ef4444" : "#f97316" }} /> Top Khoản Chi Lớn Nhất ({isCurrent ? "Kỳ chọn" : "Kỳ so sánh"})
-              </Text>
-              <div style={{ width: "100%", height: 130 }}>
-                {(period?.topExpenses?.length || 0) === 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: 12 }}>
-                    Không có dữ liệu khoản chi
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={period.topExpenses} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} fontSize={9} stroke="#94a3b8" />
-                      <YAxis dataKey="name" type="category" width={140} fontSize={9} stroke="#64748b" />
-                      <Tooltip formatter={(v) => [formatVND(v), "Chi phí"]} />
-                      <Bar dataKey="amount" fill={isCurrent ? "#ef4444" : "#f97316"} radius={[0, 4, 4, 0]} barSize={12} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-          </Col>
         </Row>
       </Card>
     </Spin>
@@ -355,7 +264,7 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
     <Modal
       title={
         <Space>
-          <SwapOutlined style={{ color: "#ef4444", fontSize: 20 }} />
+          <SwapOutlined style={{ color: "var(--color-primary)", fontSize: 20 }} />
           <span style={{ fontWeight: 800, fontSize: 18 }}>So Sánh Hiệu Quả Chi Phí Vận Hành</span>
         </Space>
       }
@@ -366,7 +275,7 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
       style={{ top: 20 }}
       bodyStyle={{ maxHeight: "85vh", overflowY: "auto", padding: "16px 20px" }}
     >
-      {/* Date filter pickers */}
+      {/* ── Header: Chọn loại + 2 DatePicker ────────────────────────────── */}
       <div style={{ background: "#f1f5f9", padding: "14px 18px", borderRadius: 8, marginBottom: 16 }}>
         <Row gutter={[16, 12]} align="middle">
           <Col xs={24} md={8}>
@@ -405,25 +314,25 @@ const ExpenseCompareModal = ({ visible, onClose }) => {
         </Row>
       </div>
 
-      {/* Delta badge */}
+      {/* ── Chênh lệch tổng kết ────────────────────────────────────────── */}
       <div
         style={{
           background: "#fef2f2", padding: "10px 16px", borderRadius: 8,
-          border: "1px solid #fee2e2", marginBottom: 16,
+          border: "1px solid #fecaca", marginBottom: 16,
           display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap",
         }}
       >
-        <Text strong>Tăng trưởng chi phí: {formatTitle(dateA, pickerType)} vs {formatTitle(dateB, pickerType)}</Text>
-        <Tag color={diffExpensePct <= 0 ? "success" : "error"} style={{ fontSize: 13, fontWeight: 700, padding: "2px 8px" }}>
-          Tổng chi phí: {diffExpensePct >= 0 ? "+" : ""}{diffExpensePct}% ({diffExpenseDelta >= 0 ? "+" : ""}{formatVND(diffExpenseDelta)})
+        <Text strong>Biến động chi phí: {formatTitle(dateA, pickerType)} vs {formatTitle(dateB, pickerType)}</Text>
+        <Tag color={diffExpensePct < 0 ? "success" : "error"} style={{ fontSize: 13, fontWeight: 700, padding: "2px 8px" }}>
+          Chi phí: {diffExpensePct >= 0 ? "+" : ""}{diffExpensePct}% ({diffExpenseDelta >= 0 ? "+" : ""}{formatVND(diffExpenseDelta)})
         </Tag>
       </div>
 
-      {/* Render blocks */}
+      {/* ── 2 khối kỳ ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {renderPeriodBlock(periodA, loadingA, true,  hoveredPieIndexA, setHoveredPieIndexA)}
+        {renderPeriodBlock(periodA, loadingA, true)}
         <Divider style={{ margin: "4px 0" }}>⚡ So sánh đối chiếu trực tiếp ⚡</Divider>
-        {renderPeriodBlock(periodB, loadingB, false, hoveredPieIndexB, setHoveredPieIndexB)}
+        {renderPeriodBlock(periodB, loadingB, false)}
       </div>
     </Modal>
   );

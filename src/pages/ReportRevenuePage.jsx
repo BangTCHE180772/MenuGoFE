@@ -309,10 +309,9 @@ const ReportRevenuePage = () => {
             onOpenCompare={() => setCompareModalVisible(true)}
           />
 
-          {/* 2. Revenue Charts (Trend + Pie PTTT) */}
+          {/* 2. Revenue Charts */}
           <RevenueCharts
             trendData={trendData}
-            paymentMethodData={paymentMethodData}
           />
 
           {/* 3. Bills Table */}

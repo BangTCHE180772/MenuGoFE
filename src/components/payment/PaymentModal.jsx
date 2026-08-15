@@ -109,12 +109,35 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     return allVouchers.filter((v) => {
       if (!v.isActive) return false;
       if (v.usedCount >= v.quantity) return false;
-      if (new Date(v.startDate) > now || new Date(v.endDate) < now) return false;
-      if (v.branchId && v.branchId !== branchId) return false;
-      if (baseTotal < v.minOrderValue) return false;
+      if (v.startDate && new Date(v.startDate) > now) return false;
+      if (v.endDate && new Date(v.endDate) < now) return false;
+      if (v.branchId && branchId && Number(v.branchId) !== Number(branchId)) return false;
+      if (v.minOrderValue && baseTotal < Number(v.minOrderValue)) return false;
       return true;
     });
   }, [allVouchers, baseTotal, branchId]);
+
+  const handleSelectVoucher = async (code) => {
+    setVoucherCode(code || '');
+    if (!code) {
+      setAppliedVoucher(null);
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await checkVoucher(code, branchId || 0, baseTotal);
+      setAppliedVoucher({
+        discountAmount: res.discountAmount,
+        message: res.message,
+      });
+      message.success(res.message);
+    } catch (error) {
+      setAppliedVoucher(null);
+      message.error(error.response?.data?.message || 'Voucher không hợp lệ');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCheckVoucher = async () => {
     if (!voucherCode) return;
@@ -147,10 +170,10 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
   const isCash = paymentMethod === 'Cash';
   const grandTotal = isCash ? Math.round(grandTotalRaw / 1000) * 1000 : grandTotalRaw;
   const roundingDiscount = isCash ? grandTotalRaw - grandTotal : 0;
-  
+
   const cashNum = parseInt(cashTendered?.toString().replace(/\D/g, ''), 10) || 0;
   const changeAmount = Math.max(0, cashNum - grandTotal);
-  
+
   const isCashInsufficient = paymentMethod === 'Cash' && cashNum < grandTotal;
 
   const isPayingRef = useRef(false);
@@ -391,12 +414,12 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
       {paymentMethod === 'Cash' && (
         <div style={{ marginBottom: 16, padding: '12px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91caff' }}>
           <Text strong>Tiền khách đưa (VNĐ):</Text>
-          <Input 
-            value={cashTendered} 
+          <Input
+            value={cashTendered}
             onChange={(e) => {
               const val = e.target.value.replace(/\D/g, '');
               setCashTendered(val ? Number(val).toLocaleString('vi-VN') : '');
-            }} 
+            }}
             placeholder="Nhập số tiền khách đưa"
             style={{ marginTop: 8, marginBottom: 8, fontSize: 16, fontWeight: 'bold' }}
           />
@@ -474,13 +497,18 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
         <Row gutter={8}>
           <Col flex="auto">
             <Select
-              placeholder="Chọn mã Voucher (nếu có)"
+              showSearch
+              placeholder="Chọn hoặc nhập mã Voucher (nếu có)"
               value={voucherCode || null}
-              onChange={(val) => setVoucherCode(val || '')}
+              onChange={(val) => handleSelectVoucher(val || '')}
               disabled={!!appliedVoucher}
               style={{ width: '100%' }}
               allowClear
               notFoundContent="Không có mã giảm giá phù hợp"
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase()) ||
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+              }
             >
               {applicableVouchers.map((v) => (
                 <Select.Option key={v.code} value={v.code}>

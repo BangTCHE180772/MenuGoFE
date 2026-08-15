@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
 import NotificationBell from './NotificationBell';
@@ -417,7 +417,6 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
         )}
         
         <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: '4px' }}>
-          <NotificationBell />
           {!collapsed && (
             <Tooltip title="Đăng xuất" placement="top">
               <Button

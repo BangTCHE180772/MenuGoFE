@@ -109,9 +109,9 @@ axiosInstance.interceptors.response.use(
     // Xử lý lỗi toàn cục
     if (error.response?.status === 401) {
       const token = localStorage.getItem('access_token');
-      const errorMsg = String(error.response?.data?.message || error.response?.data?.detail || '').toLowerCase();
-      // Chỉ logout nếu token thực sự bị từ chối do hết hạn/không hợp lệ
-      if (token && (errorMsg.includes('expired') || errorMsg.includes('invalid') || errorMsg.includes('token'))) {
+      const url = error.config?.url || '';
+      const isLoginOrAuth = url.includes('/api/auth') || url.includes('/api/Auth');
+      if (token && !isLoginOrAuth) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
         window.location.href = '/login';

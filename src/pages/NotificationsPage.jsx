@@ -3,7 +3,7 @@ import { Card, Table, Tag, Typography, Button, Space, message } from 'antd';
 import { CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, ShopOutlined, CheckOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getPagedNotifications, markAsRead } from '../api/notificationApi';
+import { getNotifications as getPagedNotifications, markAsRead } from '../api/notificationApi';
 import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;

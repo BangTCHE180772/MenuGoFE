@@ -39,3 +39,23 @@ export const getPreviousLedgerSnapshots = async (date, bInventoryIds = []) => {
   });
   return response.data;
 };
+
+export const getConsumptionReport = async (branchId, startDate, endDate) => {
+  const response = await axiosInstance.get(`/api/BInventory/branch/${branchId}/consumption-report`, {
+    params: {
+      startDate: startDate ? startDate.toISOString() : undefined,
+      endDate: endDate ? endDate.toISOString() : undefined,
+    }
+  });
+  return response.data;
+};
+
+export const getTransactionLedger = async (branchId, startDate, endDate) => {
+  const response = await axiosInstance.get(`/api/BInventory/branch/${branchId}/transaction-ledger`, {
+    params: {
+      startDate: startDate ? startDate.toISOString() : undefined,
+      endDate: endDate ? endDate.toISOString() : undefined,
+    }
+  });
+  return response.data;
+};
