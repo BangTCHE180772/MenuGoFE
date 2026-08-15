@@ -106,6 +106,10 @@ const CustomerHomePage = () => {
 
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [dynamicCategories, setDynamicCategories] = useState([
+    { id: "all", name: "Tất cả", icon: <AppstoreOutlined /> },
+    { id: "new", name: "Món mới", icon: <CalendarOutlined />, isNew: true }
+  ]);
   const [sortOption, setSortOption] = useState("default");
 
   const [activeSection, setActiveSection] = useState("hero");
@@ -184,6 +188,24 @@ const CustomerHomePage = () => {
             isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
           }));
 
+          // Trích xuất danh mục động từ nhóm hàng của các sản phẩm thực tế
+          const uniqueGroups = Array.from(new Set(mapped.map((p) => p.groupName).filter(Boolean)));
+          const catList = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
+          uniqueGroups.forEach((g) => {
+            catList.push({
+              id: g,
+              name: g,
+              icon: <CoffeeOutlined />,
+            });
+          });
+          catList.push({
+            id: "new",
+            name: "Món mới",
+            icon: <CalendarOutlined />,
+            isNew: true,
+          });
+          setDynamicCategories(catList);
+
           // Áp dụng bộ lọc tìm kiếm (searchText)
           let filtered = mapped;
           if (searchText.trim()) {
@@ -197,11 +219,7 @@ const CustomerHomePage = () => {
 
           // Áp dụng bộ lọc danh mục (catId)
           if (catId && catId !== "all" && catId !== "new") {
-            const selectedMenu = currentMenus.find((m) => String(m.id || m.Id) === String(catId));
-            if (selectedMenu) {
-              const menuName = (selectedMenu.name || "").toLowerCase();
-              filtered = filtered.filter((p) => (p.groupName || "").toLowerCase() === menuName);
-            }
+            filtered = filtered.filter((p) => p.groupName === catId);
           } else if (catId === "new") {
             filtered = filtered.filter((p) => p.isNew);
           }
@@ -224,7 +242,7 @@ const CustomerHomePage = () => {
         setLoadingMenu(false);
       }
     },
-    [menus, activeBranchId],
+    [activeBranchId],
   );
 
   const fetchMenus = useCallback(async () => {
@@ -262,8 +280,9 @@ const CustomerHomePage = () => {
   const handleBranchChange = (branchId) => {
     setActiveBranchId(branchId);
     setCurrentPage(1);
+    setSelectedCategory("all");
     setSearchParams({ branchId: String(branchId) });
-    fetchProducts(searchKeyword, selectedCategory, menus, 1, pageSize, branchId);
+    fetchProducts(searchKeyword, "all", menus, 1, pageSize, branchId);
   };
 
   const handleSearchChange = (val) => {
@@ -343,25 +362,6 @@ const CustomerHomePage = () => {
     setIsMouseDownState(false);
   };
 
-  const filterCategories = useMemo(() => {
-    const list = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
-
-    menus.forEach((m) => {
-      list.push({
-        id: String(m.id || m.Id),
-        name: m.name || m.Name,
-        icon: <CoffeeOutlined />,
-      });
-    });
-
-    list.push({
-      id: "new",
-      name: "Món mới",
-      icon: <CalendarOutlined />,
-      isNew: true,
-    });
-    return list;
-  }, [menus]);
 
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
@@ -470,7 +470,7 @@ const CustomerHomePage = () => {
               />
 
               <CustomerMenuFilter
-                categories={filterCategories}
+                categories={dynamicCategories}
                 activeCategory={selectedCategory}
                 onSelectCategory={handleCategorySelect}
               />

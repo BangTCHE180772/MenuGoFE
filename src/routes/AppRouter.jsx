@@ -64,6 +64,7 @@ const AppRouter = () => {
         <GlobalStockAlertListener />
         <Routes>
           {/* ── Public: không cần đăng nhập ──────────────────────────── */}
+          <Route path="/" element={<Navigate to={(user || role) ? "/home" : "/welcome"} replace />} />
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
