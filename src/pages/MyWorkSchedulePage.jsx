@@ -77,13 +77,8 @@ const MyWorkSchedulePage = () => {
         getAllShifts(),
         getAllAccounts(),
       ]);
-      // Chỉ hiển thị các ca đã được Quản lý duyệt (managerApproved = true) ở giao diện nhân viên
-      const approvedScheds = (scheds || []).filter((s) =>
-        s.managerApproved === true ||
-        (isManagerOrAdmin && (s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING')))
-      );
-
-      setSchedules(approvedScheds);
+      // Hiển thị tất cả ca làm việc bao gồm cả các ca Quản lý chưa duyệt
+      setSchedules(scheds || []);
       setBranches(branchesRes.data || []);
       const rawShifts = shiftsRes.data || [];
       setShifts([...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || '')));
@@ -256,7 +251,7 @@ const MyWorkSchedulePage = () => {
       return { text: 'ĐANG XIN NGHỈ', color: '#ef4444', bg: '#ef4444' };
     }
     if (record.status === 'LEAVE_APPROVED') {
-      return { text: 'ĐÃ NGHỈ PHÉP', color: '#9333ea', bg: '#9333ea' };
+      return { text: 'ĐÃ XIN NGHỈ', color: '#9333ea', bg: '#9333ea' };
     }
     if (record.status?.startsWith('TRANSFER_PENDING')) {
       return { text: 'CHỜ ĐỔI CA', color: '#f59e0b', bg: '#f59e0b' };
@@ -836,6 +831,15 @@ const MyWorkSchedulePage = () => {
                                 style={{ background: statusDetails.bg }}
                               >
                                 {statusDetails.text}
+                              </span>
+                              <span
+                                className="badge-present"
+                                style={{
+                                  background: item.managerApproved ? '#16a34a' : '#d97706',
+                                  fontWeight: '600',
+                                }}
+                              >
+                                {item.managerApproved ? '✓ Đã duyệt' : '⏱ Chờ duyệt'}
                               </span>
                               <button
                                 className="badge-materials"

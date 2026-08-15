@@ -59,6 +59,7 @@ const STATUS_OPTIONS = [
   { value: 'Working', label: 'Đang làm việc', color: 'blue' },
   { value: 'Completed', label: 'Hoàn thành', color: 'success' },
   { value: 'Absent', label: 'Vắng mặt', color: 'error' },
+  { value: 'LEAVE_APPROVED', label: 'Đã xin nghỉ', color: 'purple' },
 ];
 
 const normalizeStatusString = (status) => {
@@ -69,13 +70,14 @@ const normalizeStatusString = (status) => {
   if (s === 'WORKING' || s === 'ĐANG LÀM VIỆC') return 'Working';
   if (s === 'COMPLETED' || s === 'HOÀN THÀNH' || s === 'ĐÃ HOÀN THÀNH') return 'Completed';
   if (s === 'ABSENT' || s === 'VẮNG MẶT') return 'Absent';
+  if (s === 'LEAVE_APPROVED' || s === 'ĐÃ XIN NGHỈ' || s === 'ĐÃ NGHỈ PHÉP') return 'LEAVE_APPROVED';
   return status;
 };
 
 // Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
 const getStatusOption = (status) => {
   const norm = normalizeStatusString(status);
-  return STATUS_OPTIONS.find((s) => s.value === norm) || { label: status, color: 'default' };
+  return STATUS_OPTIONS.find((s) => s.value === norm) || { label: status === 'LEAVE_APPROVED' ? 'Đã xin nghỉ' : status, color: status === 'LEAVE_APPROVED' ? 'purple' : 'default' };
 };
 
 const isLockApprovalStatus = (status) => {
@@ -218,6 +220,7 @@ const WorkSchedulePage = () => {
     if (selectedAccount && item.accountId !== selectedAccount) return false;
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
+    if (selectedManagerApproved !== null && selectedManagerApproved !== undefined && item.managerApproved !== selectedManagerApproved) return false;
     if (searchDate) {
       const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
       const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
@@ -232,6 +235,7 @@ const WorkSchedulePage = () => {
     setSelectedAccount(null);
     setSelectedShift(null);
     setSelectedStatus(null);
+    setSelectedManagerApproved(null);
     setSearchDate(null);
     message.info('Đã xóa tất cả bộ lọc');
   };
@@ -1016,6 +1020,17 @@ const WorkSchedulePage = () => {
                     ))}
                   </Select>
 
+                  <Select
+                    placeholder="Lọc Quản lý duyệt"
+                    style={{ width: 170 }}
+                    allowClear
+                    value={selectedManagerApproved}
+                    onChange={(val) => setSelectedManagerApproved(val)}
+                  >
+                    <Select.Option value={true}>🟢 Đã duyệt công</Select.Option>
+                    <Select.Option value={false}>🟠 Chờ duyệt công</Select.Option>
+                  </Select>
+
                   <DatePicker
                     placeholder="Lọc ngày cụ thể"
                     style={{ width: 160 }}
@@ -1024,7 +1039,7 @@ const WorkSchedulePage = () => {
                     format="DD/MM/YYYY"
                   />
 
-                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || searchDate) && (
+                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || selectedManagerApproved !== null || searchDate) && (
                     <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
                       Xóa lọc
                     </Button>
@@ -1125,6 +1140,17 @@ const WorkSchedulePage = () => {
                     </Select>
                   )}
 
+                  <Select
+                    placeholder="Lọc Quản lý duyệt"
+                    style={{ width: 170 }}
+                    allowClear
+                    value={selectedManagerApproved}
+                    onChange={(val) => setSelectedManagerApproved(val)}
+                  >
+                    <Select.Option value={true}>🟢 Đã duyệt công</Select.Option>
+                    <Select.Option value={false}>🟠 Chờ duyệt công</Select.Option>
+                  </Select>
+
                   <DatePicker
                     placeholder="Lọc ngày cụ thể"
                     style={{ width: 160 }}
@@ -1133,7 +1159,7 @@ const WorkSchedulePage = () => {
                     format="DD/MM/YYYY"
                   />
 
-                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || searchDate) && (
+                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || selectedManagerApproved !== null || searchDate) && (
                     <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
                       Xóa lọc
                     </Button>
