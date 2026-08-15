@@ -46,8 +46,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
     setError(null);
     try {
       if (branchId) {
-        // Lấy theo BInventory chi nhánh
-        const rawBInventory = await getBInventories(branchId);
+        // Lấy theo BInventory chi nhánh, truyền mode = 0 để lấy TẤT CẢ (bao gồm cả Processed)
+        const rawBInventory = await getBInventories(branchId, '', '', 0);
         if (Array.isArray(rawBInventory)) {
           const sellable = rawBInventory.filter(
             p => p.type === 'Processed' || p.type === 'Manufactured' || p.type === 'Regular'
@@ -59,7 +59,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             sellPrice: p.sellPrice || 0,
             description: p.description || '',
             groupId: null,
-            groupName: p.groupName || 'Khác'
+            groupName: p.groupName || 'Khác',
+            imageLink: p.imageLink || ''
           }));
 
           // Lọc tìm kiếm
@@ -95,7 +96,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             sellPrice: p.SellPrice,
             description: p.Description,
             groupId: p.GroupId,
-            groupName: p.Group ? p.Group.Name : 'Khác'
+            groupName: p.Group ? p.Group.Name : 'Khác',
+            imageLink: p.Image ? p.Image.ImageLink : ''
           }));
           setProducts(mappedProducts);
         } else {
@@ -194,11 +196,37 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
               disabled={!canOrder}
               title={canOrder ? `Thêm ${item.name}` : 'Chọn bàn Có khách để gọi món'}
             >
-              {item.imageLink && (
-                <div style={{ height: '60px', width: '60px', minWidth: '60px', borderRadius: '4px', overflow: 'hidden' }}>
-                  <img src={item.imageLink} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
+              <div style={{ 
+                height: '70px', 
+                width: '70px', 
+                minWidth: '70px', 
+                borderRadius: '8px', 
+                overflow: 'hidden',
+                border: '1px solid #f3f4f6',
+                background: '#f9fafb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}>
+                {item.imageLink ? (
+                  <img 
+                    src={item.imageLink} 
+                    alt={item.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { 
+                      e.target.onerror = null; 
+                      e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80'; 
+                    }}
+                  />
+                ) : (
+                  <img 
+                    src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80" 
+                    alt={item.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                )}
+              </div>
               <div className="pos-menu-item-info">
                 <div className="pos-menu-item-name">{item.name}</div>
                 <div className="pos-menu-item-desc">{item.description}</div>

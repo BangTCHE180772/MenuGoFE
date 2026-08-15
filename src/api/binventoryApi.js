@@ -4,7 +4,7 @@ export const getBInventories = async (branchId, search = '', docType = '', mode 
   const response = await axiosInstance.get(`/api/BInventory/branch/${branchId}`, {
     params: {
       search: search || undefined,
-      mode: mode || undefined
+      mode: mode !== null && mode !== undefined ? mode : undefined
     }
   });
   return response.data;
