@@ -1,5 +1,6 @@
 import React from "react";
-import { Table, Tag, Typography, Tooltip } from "antd";
+import { Table, Tag, Typography, Tooltip, Button } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -27,7 +28,15 @@ const RevenueReportTable = ({
       width: 110,
       sorter: (a, b) => a.billCode.localeCompare(b.billCode),
       render: (text) => (
-        <strong style={{ color: "#2563eb", cursor: "pointer" }}>{text}</strong>
+        <strong 
+          style={{ color: "#2563eb", cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.location.href = `/inventory-management?tab=Invoice&search=${text}`;
+          }}
+        >
+          {text}
+        </strong>
       ),
     },
     {
@@ -151,6 +160,25 @@ const RevenueReportTable = ({
       width: 120,
       render: () => <Tag color="success">Đã hoàn thành</Tag>,
     },
+    {
+      title: "Thao tác",
+      key: "action",
+      width: 80,
+      align: "center",
+      fixed: "right",
+      render: (_, record) => (
+        <Tooltip title="Xem chi tiết hóa đơn">
+          <Button
+            type="text"
+            icon={<EyeOutlined style={{ color: "#2563eb", fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectBill?.(record);
+            }}
+          />
+        </Tooltip>
+      ),
+    },
   ];
 
   return (
@@ -161,7 +189,7 @@ const RevenueReportTable = ({
       rowKey="id"
       size="middle"
       bordered
-      scroll={{ x: 1420 }}
+      scroll={{ x: 1540 }}
       pagination={
         pagination ?? {
           defaultPageSize: 10,
@@ -172,10 +200,6 @@ const RevenueReportTable = ({
         }
       }
       onChange={onTableChange}
-      onRow={(record) => ({
-        onClick: () => onSelectBill?.(record),
-        style: { cursor: "pointer" },
-      })}
     />
   );
 };

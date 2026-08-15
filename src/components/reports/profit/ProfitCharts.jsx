@@ -75,7 +75,7 @@ const ProfitCharts = ({
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <ThunderboltOutlined style={{ color: "#10b981" }} />
             <span style={{ fontWeight: 700, fontSize: 14 }}>
-              Biến động Doanh thu, Chi phí & Lợi nhuận (Trend)
+              Biến động Doanh thu, Chi phí & Lợi nhuận
             </span>
           </div>
         }

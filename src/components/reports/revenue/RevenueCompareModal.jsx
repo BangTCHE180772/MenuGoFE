@@ -27,7 +27,7 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
-import { getBranchDashboardStats } from "../../../api/dashboardApi";
+import { getPaidInvoices } from "../../../api/orderApi";
 import { useBranch } from "../../../context/BranchContext";
 
 const { Text, Title } = Typography;
@@ -35,32 +35,74 @@ const { Text, Title } = Typography;
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val || 0);
 
-// ─── Fetch stats cho 1 kỳ từ BE ────────────────────────────────────────────
+// ─── Fetch stats cho 1 kỳ từ getPaidInvoices ────────────────────────────────
 const fetchPeriodStats = async (date, pickerType, branchId) => {
-  let start, end, range;
   const d = dayjs(date);
-
+  let start, end;
   if (pickerType === "date") {
-    const isToday = d.isSame(dayjs(), "day");
-    const isYesterday = d.isSame(dayjs().subtract(1, "day"), "day");
-    start = d.format("YYYY-MM-DD");
-    end   = d.format("YYYY-MM-DD");
-    range = isToday ? "today" : isYesterday ? "yesterday" : "custom";
+    start = d.startOf("day");
+    end   = d.endOf("day");
   } else if (pickerType === "month") {
-    start = d.startOf("month").format("YYYY-MM-DD");
-    end   = d.endOf("month").format("YYYY-MM-DD");
-    const isThisMonth = d.isSame(dayjs(), "month");
-    const isLastMonth = d.isSame(dayjs().subtract(1, "month"), "month");
-    range = isThisMonth ? "thisMonth" : isLastMonth ? "lastMonth" : "custom";
+    start = d.startOf("month");
+    end   = d.endOf("month");
   } else {
-    // year
-    start = d.startOf("year").format("YYYY-MM-DD");
-    end   = d.endOf("year").format("YYYY-MM-DD");
-    range = "custom";
+    start = d.startOf("year");
+    end   = d.endOf("year");
   }
 
-  const res = await getBranchDashboardStats(range, start, end, branchId);
-  return res?.data || null;
+  const res = await getPaidInvoices(branchId);
+  const allInvoices = res.data || res || [];
+
+  const filtered = allInvoices.filter((inv) => {
+    if (!inv.createdAt) return false;
+    const c = dayjs(inv.createdAt);
+    return (c.isSame(start, "day") || c.isAfter(start, "day")) &&
+           (c.isSame(end, "day") || c.isBefore(end, "day"));
+  });
+
+  const revenue = filtered.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const completedBills = filtered.length;
+  const avgOrderValue = completedBills > 0 ? Math.round(revenue / completedBills) : 0;
+
+  let dailyStats = [];
+  if (pickerType === "date") {
+    const morning = { date: "Sáng (6-11h)", revenue: 0 };
+    const noon = { date: "Trưa (11-14h)", revenue: 0 };
+    const afternoon = { date: "Chiều (14-18h)", revenue: 0 };
+    const night = { date: "Tối (18-22h)", revenue: 0 };
+
+    filtered.forEach((inv) => {
+      const hr = dayjs(inv.createdAt).hour();
+      const amt = inv.totalAmount || 0;
+      if (hr >= 6 && hr < 11) morning.revenue += amt;
+      else if (hr >= 11 && hr < 14) noon.revenue += amt;
+      else if (hr >= 14 && hr < 18) afternoon.revenue += amt;
+      else if (hr >= 18 && hr < 22) night.revenue += amt;
+    });
+    dailyStats = [morning, noon, afternoon, night];
+  } else {
+    const dailyMap = {};
+    let cur = dayjs(start);
+    while (cur.isBefore(end) || cur.isSame(end, "day")) {
+      const key = cur.format("DD/MM");
+      dailyMap[key] = { date: key, revenue: 0 };
+      cur = cur.add(1, "day");
+    }
+    filtered.forEach((inv) => {
+      const key = dayjs(inv.createdAt).format("DD/MM");
+      if (dailyMap[key]) {
+        dailyMap[key].revenue += (inv.totalAmount || 0);
+      }
+    });
+    dailyStats = Object.values(dailyMap);
+  }
+
+  return {
+    revenue,
+    completedBills,
+    avgOrderValue,
+    dailyStats,
+  };
 };
 
 // ─── Map BE stats → period summary ─────────────────────────────────────────
@@ -182,11 +224,11 @@ const RevenueCompareModal = ({ visible, onClose }) => {
           {[
             { label: "Doanh Thu",   value: formatVND(period?.totalRevenue),    color: "#2563eb" },
             { label: "Số Đơn",      value: `${period?.totalOrders || 0} đơn`,  color: "#ea580c" },
-            { label: "Giá Trị AOV", value: formatVND(period?.avgOrderValue),   color: "#10b981" },
+            { label: "Giá Trị Đơn Trung Bình", value: formatVND(period?.avgOrderValue),   color: "#10b981" },
           ].map((kpi) => (
             <Col key={kpi.label} xs={8}>
               <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid #e2e8f0" }}>
-                <Text type="secondary" style={{ fontSize: 11, display: "block" }}>{kpi.label}</Text>
+                <Text type="secondary" style={{ fontSize: 10, display: "block", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{kpi.label}</Text>
                 <div style={{ fontWeight: 700, fontSize: 13, color: kpi.color }}>{kpi.value}</div>
               </div>
             </Col>

@@ -29,7 +29,7 @@ const SummaryFooter = ({
       bodyStyle={{ padding: "16px 24px" }}
     >
       <Row gutter={[16, 16]} align="middle">
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Tổng Doanh Thu
           </Text>
@@ -38,7 +38,7 @@ const SummaryFooter = ({
           </Text>
         </Col>
 
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Tổng Chi Phí
           </Text>
@@ -47,7 +47,7 @@ const SummaryFooter = ({
           </Text>
         </Col>
 
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Lợi Nhuận Ròng
           </Text>
@@ -63,7 +63,7 @@ const SummaryFooter = ({
           </Text>
         </Col>
 
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Trung bình / Ngày
           </Text>
@@ -72,7 +72,7 @@ const SummaryFooter = ({
           </Text>
         </Col>
 
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Giá trị Cao nhất
           </Text>
@@ -81,22 +81,12 @@ const SummaryFooter = ({
           </Text>
         </Col>
 
-        <Col xs={12} sm={8} md={3.4}>
+        <Col xs={12} sm={8} md={4}>
           <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
             Giá trị Thấp nhất
           </Text>
           <Text style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
             {formatVND(lowestVal)}
-          </Text>
-        </Col>
-
-        <Col xs={12} sm={8} md={3.4}>
-          <Text style={{ color: "#94a3b8", fontSize: 12, display: "block" }}>
-            Độ lệch (Variance)
-          </Text>
-          <Text style={{ color: "#a78bfa", fontSize: 14, fontWeight: 600 }}>
-            {variance >= 0 ? "+" : ""}
-            {variance}%
           </Text>
         </Col>
       </Row>

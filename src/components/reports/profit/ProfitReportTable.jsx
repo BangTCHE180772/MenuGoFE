@@ -73,7 +73,7 @@ const ProfitReportTable = ({
       ),
     },
     {
-      title: "Tỷ Suất Lợi Nhuận (Margin)",
+      title: "Tỷ Suất Lợi Nhuận",
       dataIndex: "marginPct",
       key: "marginPct",
       align: "right",
@@ -82,7 +82,7 @@ const ProfitReportTable = ({
       render: (v) => <Tag color={v >= 40 ? "success" : "warning"}>{v}%</Tag>,
     },
     {
-      title: "Tỷ Lệ Chi Phí (Cost Ratio)",
+      title: "Tỷ Lệ Chi Phí",
       dataIndex: "costRatioPct",
       key: "costRatioPct",
       align: "right",

@@ -51,7 +51,7 @@ const RevenueSummaryCards = ({ data = {}, onOpenCompare }) => {
       borderColor: "#ea580c",
     },
     {
-      title: "Giá Trị Đơn Trung Bình (AOV)",
+      title: "Giá Trị Đơn Trung Bình",
       value: formatVND(avgOrderValue),
       subText: "Trung bình mỗi bill",
       icon: <CalculatorOutlined style={{ fontSize: 20, color: "#10b981" }} />,
@@ -93,7 +93,7 @@ const RevenueSummaryCards = ({ data = {}, onOpenCompare }) => {
           onClick={onOpenCompare}
           style={{ borderRadius: 6, fontWeight: 600 }}
         >
-          So sánh hiệu quả các kỳ (Compare)
+          So sánh hiệu quả các kỳ
         </Button>
       </div>
 
