@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Spin, message } from 'antd';
 import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 import { getBInventories } from '../../api/binventoryApi';
+import { getAvailableQuantities } from '../../api/orderApi';
 
 const formatPrice = (price) =>
   Number(price).toLocaleString('vi-VN') + 'đ';
@@ -46,8 +47,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
     setError(null);
     try {
       if (branchId) {
-        // Lấy theo BInventory chi nhánh
-        const rawBInventory = await getBInventories(branchId);
+        // Lấy theo BInventory chi nhánh, truyền mode = 0 để lấy TẤT CẢ (bao gồm cả Processed)
+        const rawBInventory = await getBInventories(branchId, '', '', 0);
         if (Array.isArray(rawBInventory)) {
           const sellable = rawBInventory.filter(
             p => p.type === 'Processed' || p.type === 'Manufactured' || p.type === 'Regular'
@@ -59,7 +60,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             sellPrice: p.sellPrice || 0,
             description: p.description || '',
             groupId: null,
-            groupName: p.groupName || 'Khác'
+            groupName: p.groupName || 'Khác',
+            imageLink: p.imageLink || ''
           }));
 
           // Lọc tìm kiếm
@@ -70,7 +72,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             );
           }
 
-          // Lọc danh mục
+          // Filter by category
           if (groupId && groupId !== 'all') {
             const selectedCat = categories.find(c => c.id === String(groupId));
             if (selectedCat) {
@@ -79,6 +81,22 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                 p => p.groupName.toLowerCase() === catName
               );
             }
+          }
+
+          // Fetch Available Quantities
+          try {
+            const productIds = mappedProducts.map(p => p.id);
+            if (productIds.length > 0) {
+              const qtyRes = await getAvailableQuantities(branchId, productIds);
+              const qtyMap = qtyRes.data || {};
+              mappedProducts = mappedProducts.map(p => ({
+                ...p,
+                availableQuantity: qtyMap[p.id] !== undefined ? qtyMap[p.id] : 999999
+              }));
+            }
+          } catch (qtyErr) {
+            console.error('Lỗi lấy số lượng khả dụng:', qtyErr);
+            mappedProducts = mappedProducts.map(p => ({ ...p, availableQuantity: 999999 }));
           }
 
           setProducts(mappedProducts);
@@ -95,7 +113,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             sellPrice: p.SellPrice,
             description: p.Description,
             groupId: p.GroupId,
-            groupName: p.Group ? p.Group.Name : 'Khác'
+            groupName: p.Group ? p.Group.Name : 'Khác',
+            imageLink: p.Image ? p.Image.ImageLink : ''
           }));
           setProducts(mappedProducts);
         } else {
@@ -183,25 +202,57 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
           {products.map((item) => (
             <button
               key={item.id}
-              className={`pos-menu-item ${canOrder ? 'pos-menu-item--clickable' : ''}`}
-              onClick={() => canOrder && onAddItem({
+              className={`pos-menu-item ${canOrder && item.availableQuantity > 0 ? 'pos-menu-item--clickable' : ''}`}
+              onClick={() => canOrder && item.availableQuantity > 0 && onAddItem({
                 id: item.id,
                 name: item.name,
                 price: Number(item.sellPrice),
                 desc: item.description,
                 category: item.groupName,
               })}
-              disabled={!canOrder}
-              title={canOrder ? `Thêm ${item.name}` : 'Chọn bàn Có khách để gọi món'}
+              disabled={!canOrder || item.availableQuantity <= 0}
+              title={!canOrder ? 'Chọn bàn Có khách để gọi món' : (item.availableQuantity <= 0 ? 'Hết hàng' : `Thêm ${item.name}`)}
+              style={{ opacity: item.availableQuantity <= 0 ? 0.6 : 1 }}
             >
-              {item.imageLink && (
-                <div style={{ height: '60px', width: '60px', minWidth: '60px', borderRadius: '4px', overflow: 'hidden' }}>
-                  <img src={item.imageLink} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
+              <div style={{ 
+                height: '70px', 
+                width: '70px', 
+                minWidth: '70px', 
+                borderRadius: '8px', 
+                overflow: 'hidden',
+                border: '1px solid #f3f4f6',
+                background: '#f9fafb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}>
+                {item.imageLink ? (
+                  <img 
+                    src={item.imageLink} 
+                    alt={item.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    onError={(e) => { 
+                      e.target.onerror = null; 
+                      e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80'; 
+                    }}
+                  />
+                ) : (
+                  <img 
+                    src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80" 
+                    alt={item.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                )}
+              </div>
               <div className="pos-menu-item-info">
                 <div className="pos-menu-item-name">{item.name}</div>
                 <div className="pos-menu-item-desc">{item.description}</div>
+                {item.availableQuantity < 999999 && (
+                  <div style={{ fontSize: '11px', color: item.availableQuantity > 0 ? '#10b981' : '#ef4444', fontWeight: '500', marginTop: '2px', marginBottom: '2px' }}>
+                    {item.availableQuantity > 0 ? `Còn lại: ${item.availableQuantity}` : 'Hết hàng'}
+                  </div>
+                )}
                 <div className="pos-menu-item-tag">{item.groupName}</div>
               </div>
               <div className="pos-menu-item-price">{formatPrice(item.sellPrice)}</div>

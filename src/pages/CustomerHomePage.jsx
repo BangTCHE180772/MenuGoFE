@@ -106,6 +106,10 @@ const CustomerHomePage = () => {
 
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [dynamicCategories, setDynamicCategories] = useState([
+    { id: "all", name: "Tất cả", icon: <AppstoreOutlined /> },
+    { id: "new", name: "Món mới", icon: <CalendarOutlined />, isNew: true }
+  ]);
   const [sortOption, setSortOption] = useState("default");
 
   const [activeSection, setActiveSection] = useState("hero");
@@ -163,8 +167,8 @@ const CustomerHomePage = () => {
       if (!branchId) return;
       setLoadingMenu(true);
       try {
-        // Tải danh sách BInventory của chi nhánh
-        const rawBInventory = await getBInventories(branchId);
+        // Tải danh sách BInventory của chi nhánh (truyền mode 0 để lấy TẤT CẢ các món, không bị lọc mất Processed)
+        const rawBInventory = await getBInventories(branchId, '', '', 0);
         
         if (Array.isArray(rawBInventory)) {
           // Lọc lấy các sản phẩm bán được (Processed, Manufactured, Regular)
@@ -184,6 +188,24 @@ const CustomerHomePage = () => {
             isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
           }));
 
+          // Trích xuất danh mục động từ nhóm hàng của các sản phẩm thực tế
+          const uniqueGroups = Array.from(new Set(mapped.map((p) => p.groupName).filter(Boolean)));
+          const catList = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
+          uniqueGroups.forEach((g) => {
+            catList.push({
+              id: g,
+              name: g,
+              icon: <CoffeeOutlined />,
+            });
+          });
+          catList.push({
+            id: "new",
+            name: "Món mới",
+            icon: <CalendarOutlined />,
+            isNew: true,
+          });
+          setDynamicCategories(catList);
+
           // Áp dụng bộ lọc tìm kiếm (searchText)
           let filtered = mapped;
           if (searchText.trim()) {
@@ -197,11 +219,7 @@ const CustomerHomePage = () => {
 
           // Áp dụng bộ lọc danh mục (catId)
           if (catId && catId !== "all" && catId !== "new") {
-            const selectedMenu = currentMenus.find((m) => String(m.id || m.Id) === String(catId));
-            if (selectedMenu) {
-              const menuName = (selectedMenu.name || "").toLowerCase();
-              filtered = filtered.filter((p) => (p.groupName || "").toLowerCase() === menuName);
-            }
+            filtered = filtered.filter((p) => p.groupName === catId);
           } else if (catId === "new") {
             filtered = filtered.filter((p) => p.isNew);
           }
@@ -224,7 +242,7 @@ const CustomerHomePage = () => {
         setLoadingMenu(false);
       }
     },
-    [menus, activeBranchId],
+    [activeBranchId],
   );
 
   const fetchMenus = useCallback(async () => {
@@ -262,8 +280,9 @@ const CustomerHomePage = () => {
   const handleBranchChange = (branchId) => {
     setActiveBranchId(branchId);
     setCurrentPage(1);
+    setSelectedCategory("all");
     setSearchParams({ branchId: String(branchId) });
-    fetchProducts(searchKeyword, selectedCategory, menus, 1, pageSize, branchId);
+    fetchProducts(searchKeyword, "all", menus, 1, pageSize, branchId);
   };
 
   const handleSearchChange = (val) => {
@@ -343,25 +362,6 @@ const CustomerHomePage = () => {
     setIsMouseDownState(false);
   };
 
-  const filterCategories = useMemo(() => {
-    const list = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
-
-    menus.forEach((m) => {
-      list.push({
-        id: String(m.id || m.Id),
-        name: m.name || m.Name,
-        icon: <CoffeeOutlined />,
-      });
-    });
-
-    list.push({
-      id: "new",
-      name: "Món mới",
-      icon: <CalendarOutlined />,
-      isNew: true,
-    });
-    return list;
-  }, [menus]);
 
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
@@ -446,38 +446,51 @@ const CustomerHomePage = () => {
             <div className="title-underline"></div>
           </div>
 
-          <div className="menu-controls-bar" style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center", marginBottom: "20px" }}>
-            <div className="branch-menu-selector" style={{ minWidth: "200px" }}>
-              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Chi nhánh thực đơn:</span>
-              <Select
-                style={{ width: "100%" }}
-                value={activeBranchId}
-                onChange={handleBranchChange}
-                placeholder="Chọn chi nhánh"
-                size="large"
-                options={branches.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh").map(b => ({
-                  label: b.name,
-                  value: b.id
-                }))}
-              />
+          <div className="menu-controls-bar">
+            {/* Hàng 1: Bộ chọn chi nhánh, ô tìm kiếm và sắp xếp */}
+            <div className="controls-top-row" style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center", width: "100%" }}>
+              <div className="branch-menu-selector" style={{ minWidth: "220px", flex: "1 1 auto" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Chi nhánh thực đơn:</span>
+                <Select
+                  style={{ width: "100%" }}
+                  value={activeBranchId}
+                  onChange={handleBranchChange}
+                  placeholder="Chọn chi nhánh"
+                  size="large"
+                  options={branches.filter(b => !b.isDeleted && b.status !== "Ngừng kinh doanh").map(b => ({
+                    label: b.name,
+                    value: b.id
+                  }))}
+                />
+              </div>
+
+              <div className="search-bar-container" style={{ flex: "2 1 300px", minWidth: "260px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "4px", fontWeight: 600 }}>Tìm kiếm món ăn:</span>
+                <CustomerSearchBar
+                  value={searchKeyword}
+                  onChange={handleSearchChange}
+                  onClear={handleSearchClear}
+                />
+              </div>
+
+              <div className="sort-container" style={{ flex: "1 1 180px", minWidth: "180px", display: "flex", justifyContent: "flex-end", alignSelf: "flex-end", marginBottom: "4px" }}>
+                <CustomerMenuSort
+                  value={sortOption}
+                  onChange={(val) => setSortOption(val)}
+                />
+              </div>
             </div>
 
-            <div style={{ flex: 1, display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
-              <CustomerSearchBar
-                value={searchKeyword}
-                onChange={handleSearchChange}
-                onClear={handleSearchClear}
-              />
+            {/* Đường phân cách nhẹ */}
+            <div style={{ height: "1px", backgroundColor: "#f1f5f9", width: "100%", margin: "8px 0" }}></div>
 
+            {/* Hàng 2: Bộ lọc danh mục (Cuộn ngang) */}
+            <div className="controls-bottom-row" style={{ width: "100%" }}>
+              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "block", marginBottom: "8px", fontWeight: 600 }}>Danh mục món ăn:</span>
               <CustomerMenuFilter
-                categories={filterCategories}
+                categories={dynamicCategories}
                 activeCategory={selectedCategory}
                 onSelectCategory={handleCategorySelect}
-              />
-
-              <CustomerMenuSort
-                value={sortOption}
-                onChange={(val) => setSortOption(val)}
               />
             </div>
           </div>

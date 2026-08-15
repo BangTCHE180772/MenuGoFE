@@ -64,8 +64,7 @@ const ROLE_MENUS = {
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
-    { label: "Sơ đồ bàn", path: "/table-map", icon: <TableOutlined /> },
-    { label: "Đơn hàng", path: "/orders", icon: <ShoppingCartOutlined /> },
+    { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
@@ -102,7 +101,6 @@ const ROLE_MENUS = {
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
-    { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
   ],
   [ROLES.MANAGER]: [
@@ -298,7 +296,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
                 return location.pathname === childBasePath;
               })
             : location.pathname === item.path ||
-              (item.path !== "/home" && location.pathname.startsWith(item.path));
+              (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
 
           const isSubOpen = openSubMenus[item.label] ?? true;
 

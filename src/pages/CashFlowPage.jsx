@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -33,6 +33,7 @@ const METHOD_LABELS = {
 const CashFlowPage = () => {
   const { currentBranchId } = useBranch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const handleNavigateToSource = (row) => {
     if (!row.sourceType || !row.sourceCode) return;
@@ -57,7 +58,8 @@ const CashFlowPage = () => {
   const [modalDirection, setModalDirection] = useState(2);
 
   // Filters
-  const [searchText, setSearchText] = useState('');
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [dirFilter, setDirFilter] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -71,7 +73,6 @@ const CashFlowPage = () => {
 
   /* ── Fetch ── */
   const fetchData = async () => {
-    if (!currentBranchId || currentBranchId <= 0) { setData([]); return; }
     setLoading(true);
     try {
       const list = await getCashFlows(currentBranchId);
@@ -84,7 +85,24 @@ const CashFlowPage = () => {
   };
 
   useEffect(() => { fetchData(); }, [currentBranchId]);
+  useEffect(() => {
+    const q = searchParams.get('search') || '';
+    if (q !== searchText) {
+      setSearchText(q);
+    }
+  }, [searchParams]);
   useEffect(() => { setCurrentPage(1); }, [searchText, dirFilter, dateFrom, dateTo]);
+
+  const handleSearchChange = (newVal) => {
+    setSearchText(newVal);
+    const newParams = new URLSearchParams(searchParams);
+    if (newVal) {
+      newParams.set('search', newVal);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
 
   /* ── Filtered ── */
   const filtered = useMemo(() => {
@@ -226,7 +244,7 @@ const CashFlowPage = () => {
               type="text"
               placeholder="Tìm mã, ghi chú, đối tác..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="search-input"
             />
           </div>
@@ -346,9 +364,17 @@ const CashFlowPage = () => {
                   </td>
                   <td>{METHOD_LABELS[row.paymentMethod] || row.paymentMethod || '—'}</td>
                   <td>
-                    {row.partnerName
-                      ? <span className="partner-text">{row.partnerName}</span>
-                      : <span className="empty-text">—</span>}
+                    {row.partnerName ? (
+                      <span className="partner-text">{row.partnerName}</span>
+                    ) : row.note && (row.note.includes('cho nhân viên') || row.note.includes('lương tháng')) ? (
+                      <span className="partner-text" style={{ color: '#1677ff', fontWeight: 500 }}>
+                        {row.note.includes('cho nhân viên')
+                          ? 'NV: ' + row.note.substring(row.note.indexOf('cho nhân viên') + 14).trim()
+                          : 'NV (Chi lương)'}
+                      </span>
+                    ) : (
+                      <span className="empty-text">—</span>
+                    )}
                   </td>
                   <td>
                     {row.documentCode ? (

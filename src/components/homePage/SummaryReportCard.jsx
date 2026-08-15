@@ -84,20 +84,30 @@ const SummaryReportCard = ({ salesList = [], cashFlowList = [] }) => {
 
     cashFlowList.forEach((cf) => {
       const amt = Number(cf.amount || 0);
+      const rawMethod = String(cf.paymentMethod || '').toLowerCase();
+      const isCash = rawMethod === '1' || rawMethod === 'cash' || rawMethod.includes('mặt');
+      const isCard = rawMethod === '2' || rawMethod === 'card' || rawMethod.includes('thẻ') || rawMethod.includes('visa') || rawMethod.includes('master');
+
       if (cf.type === "Thu") {
         cfThuCount += 1;
-        if (cf.person?.includes("khai") || cf.note?.includes("mặt")) {
+        if (isCash) {
           cfThuCash += amt;
           cfThuCashCount += 1;
+        } else if (isCard) {
+          cfThuCard += amt;
+          cfThuCardCount += 1;
         } else {
           cfThuBank += amt;
           cfThuBankCount += 1;
         }
       } else if (cf.type === "Chi") {
         cfChiCount += 1;
-        if (cf.note?.includes("tiền mặt") || cf.note?.includes("chi bổ sung")) {
+        if (isCash) {
           cfChiCash += amt;
           cfChiCashCount += 1;
+        } else if (isCard) {
+          cfChiCard += amt;
+          cfChiCardCount += 1;
         } else {
           cfChiBank += amt;
           cfChiBankCount += 1;

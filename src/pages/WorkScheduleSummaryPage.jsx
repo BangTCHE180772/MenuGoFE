@@ -87,7 +87,8 @@ const WorkScheduleSummaryPage = () => {
       setSchedules(schedulesRes.data || []);
       setBranches(branchesRes.data || []);
       setAccounts(accountsRes.data || []);
-      setShifts(shiftsRes.data || []);
+      const rawShifts = shiftsRes.data || [];
+      setShifts([...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || '')));
       setContracts(contractsRes.data || []);
     } catch {
       message.error('Không thể tải dữ liệu!');
@@ -469,10 +470,11 @@ const WorkScheduleSummaryPage = () => {
       render: (status) => {
         if (!status) return <Tag>Chưa rõ</Tag>;
         if (isAbsent(status)) return <Tag color="red">Vắng mặt</Tag>;
-        if (status.startsWith('LEAVE_REQUEST')) return <Tag color="purple">Xin nghỉ</Tag>;
-        if (status === 'PENDING') return <Tag color="warning">Chờ thực hiện</Tag>;
-        if (status === 'APPROVED') return <Tag color="processing">Đã duyệt</Tag>;
-        if (status === 'COMPLETED' || status === 'Hoàn thành') return <Tag color="success">Hoàn thành</Tag>;
+        if (status.toUpperCase().startsWith('LEAVE_REQUEST')) return <Tag color="purple">Xin nghỉ</Tag>;
+        if (status.toUpperCase() === 'PENDING') return <Tag color="warning">Chờ thực hiện</Tag>;
+        if (status.toUpperCase() === 'APPROVED') return <Tag color="processing">Đã duyệt</Tag>;
+        if (status.toUpperCase() === 'COMPLETED' || status === 'Hoàn thành') return <Tag color="success">Hoàn thành</Tag>;
+        if (status.toUpperCase() === 'WORKING' || status === 'Đang làm việc') return <Tag color="blue">Đang làm việc</Tag>;
         return <Tag>{status}</Tag>;
       },
     },

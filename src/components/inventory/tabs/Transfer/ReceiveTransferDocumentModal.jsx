@@ -409,22 +409,9 @@ const ReceiveTransferDocumentModal = ({
                           {(record.transferQty != null ? record.transferQty : 0).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ textAlign: 'center', padding: '6px 10px' }}>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={record.receiveQty ?? 0}
-                            onChange={(e) => handleReceiveQtyChange(index, e.target.value)}
-                            style={{
-                              width: 75,
-                              textAlign: 'center',
-                              borderRadius: 16,
-                              border: '1px solid #cbd5e1',
-                              padding: '3px 6px',
-                              fontSize: 11,
-                              outline: 'none'
-                            }}
-                          />
+                          <span style={{ fontWeight: 600, color: '#16a34a', display: 'inline-block', padding: '3px 8px', background: '#f0fdf4', borderRadius: 4, fontSize: 11 }}>
+                            {(record.receiveQty ?? 0).toLocaleString('vi-VN')}
+                          </span>
                         </td>
                         <td style={{ textAlign: 'right', padding: '6px 10px', color: '#475569' }}>
                           {(record.unitPrice != null ? record.unitPrice : 0).toLocaleString('vi-VN')}

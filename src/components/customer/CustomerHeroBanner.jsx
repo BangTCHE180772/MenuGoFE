@@ -39,7 +39,7 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
 
           <div className="hero-title-group">
             <Tag color="gold" className="hero-welcome-badge">
-              Welcome to our Chain
+              Chào mừng quý khách đến với hệ thống của chúng tôi
             </Tag>
             <h1 className="hero-chain-name">
               {chainInfo?.name || "Chuỗi Nhà Hàng MenuGo"}
@@ -54,7 +54,19 @@ const CustomerHeroBanner = ({ chainInfo, onExploreMenu, onExploreBranches }) => 
               <div className="meta-text">
                 <span className="meta-label">Giờ mở cửa</span>
                 <span className="meta-value">
-                  {chainInfo?.openTime || "08:00"} - {chainInfo?.closeTime || "22:00"}
+                  {chainInfo?.openTime || "07:00:00"}
+                </span>
+              </div>
+            </div>
+
+            <div className="meta-card">
+              <div className="meta-icon">
+                <ClockCircleOutlined />
+              </div>
+              <div className="meta-text">
+                <span className="meta-label">Giờ đóng cửa</span>
+                <span className="meta-value">
+                  {chainInfo?.closeTime || "21:00:00"}
                 </span>
               </div>
             </div>

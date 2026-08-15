@@ -1,5 +1,7 @@
 import  { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Drawer, Button } from "antd";
+import { useAuth } from "../../context/AuthContext";
 import {
   MenuOutlined,
   ShopOutlined,
@@ -9,6 +11,8 @@ import {
 } from "@ant-design/icons";
 
 const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -48,9 +52,9 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
           )}
           <div className="brand-info">
             <span className="brand-name">
-              {chainInfo?.name || "MenuGo Restaurant"}
+              {chainInfo?.name || "Nhà Hàng MenuGo"}
             </span>
-            <span className="brand-subtitle">Culinary Experience</span>
+            <span className="brand-subtitle">Trải nghiệm ẩm thực</span>
           </div>
         </div>
 
@@ -65,6 +69,26 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
               <span>{item.label}</span>
             </button>
           ))}
+          <button
+            className="nav-link login-btn"
+            onClick={() => navigate(isAuthenticated ? "/home" : "/login")}
+            style={{
+              marginLeft: "16px",
+              background: "#ea580c",
+              color: "#fff",
+              borderRadius: "6px",
+              padding: "6px 16px",
+              fontSize: "12px",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+          >
+            {isAuthenticated ? "Truy cập" : "Đăng nhập"}
+          </button>
         </nav>
 
         <Button
@@ -96,6 +120,28 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
                 <span>{item.label}</span>
               </button>
             ))}
+            <button
+              className="mobile-nav-item login-btn"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate(isAuthenticated ? "/home" : "/login");
+              }}
+              style={{
+                marginTop: "16px",
+                width: "100%",
+                background: "#ea580c",
+                color: "#fff",
+                borderRadius: "6px",
+                padding: "8px 16px",
+                fontSize: "13px",
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                textAlign: "center"
+              }}
+            >
+              Đăng nhập
+            </button>
           </div>
         </Drawer>
       </div>

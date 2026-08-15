@@ -31,7 +31,7 @@ import ProfitCharts from "../components/reports/profit/ProfitCharts";
 import ProfitReportTable from "../components/reports/profit/ProfitReportTable";
 import ProfitCompareModal from "../components/reports/profit/ProfitCompareModal";
 
-import { getBranchDashboardStats } from "../api/dashboardApi";
+import { getCashFlows } from "../api/cashFlowApi";
 import { useBranch } from "../context/BranchContext";
 import "../styles/ReportProfitPage.css";
 
@@ -42,7 +42,7 @@ const formatVND = (val) =>
 
 /**
  * Page: ProfitReportPage
- * Báo cáo Lợi nhuận chuyên sâu — kết nối với dữ liệu thật từ Backend
+ * Báo cáo Lợi nhuận chuyên sâu — kết nối với dữ liệu thật từ Sổ quỹ /api/CashFlow
  * Đường dẫn: /reports/profit
  */
 const ReportProfitPage = () => {
@@ -58,11 +58,13 @@ const ReportProfitPage = () => {
   const [isFullscreen, setIsFullscreen]               = useState(false);
 
   // ── Dữ liệu thật từ BE ───────────────────────────────────────────────────
-  const [beStats, setBeStats]                 = useState(null);
   const [tableData, setTableData]             = useState([]);
   const [trendData, setTrendData]             = useState([]);
   const [waterfallData, setWaterfallData]     = useState([]);
   const [distributionData, setDistributionData] = useState([]);
+  const [totalRevenue, setTotalRevenue]       = useState(0);
+  const [totalExpense, setTotalExpense]       = useState(0);
+  const [netProfit, setNetProfit]             = useState(0);
 
   const fetchReportData = useCallback(async () => {
     setLoading(true);
@@ -71,112 +73,121 @@ const ReportProfitPage = () => {
       const startStr = start.format("YYYY-MM-DD");
       const endStr   = end.format("YYYY-MM-DD");
 
-      const today = dayjs().startOf("day");
-      const isToday = start.isSame(today, "day") && end.isSame(today, "day");
+      const res = await getCashFlows(currentBranchId);
+      const allCashFlows = res || [];
 
-      const presetToRange = {
-        today:       "today",
-        yesterday:   "yesterday",
-        this_week:   "custom",
-        last_week:   "custom",
-        this_month:  "thisMonth",
-        last_month:  "lastMonth",
-        this_year:   "custom",
-        custom:      "custom",
-      };
-      const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
+      // Filter cashflows in date range
+      const filteredCashFlows = allCashFlows.filter((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        if (!dateVal) return false;
+        const cfDate = dayjs(dateVal);
+        return (cfDate.isSame(start, "day") || cfDate.isAfter(start, "day")) &&
+               (cfDate.isSame(end, "day") || cfDate.isBefore(end, "day"));
+      });
 
-      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
+      // Calculate totals
+      const rev = filteredCashFlows
+        .filter(cf => cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu")
+        .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
 
-      if (res?.data) {
-        const data = res.data;
-        setBeStats(data);
+      const exp = filteredCashFlows
+        .filter(cf => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
+        .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
 
-        // 1. Phân tích theo mốc thời gian (bảng chi tiết): Lấy từ dailyStats hoặc hourSlots
-        let list = [];
-        if (data.dailyStats && data.dailyStats.length > 0) {
-          list = data.dailyStats.map((s, idx) => {
-            const rev = s.revenue || 0;
-            const exp = s.expense || 0;
-            const prof = s.profit || 0;
-            return {
-              id:           `PFT-${idx + 1}`,
-              timeLabel:    s.date || "N/A",
-              revenue:      rev,
-              expense:      exp,
-              profit:       prof,
-              marginPct:    rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,
-              costRatioPct: rev > 0 ? Number(((exp / rev) * 100).toFixed(1)) : 0,
-            };
-          });
-        } else if (data.hourSlots && data.hourSlots.length > 0) {
-          const totalRev = data.revenue || 0;
-          const totalExp = data.expenses || 0;
-          const expRatio = totalRev > 0 ? totalExp / totalRev : 0;
+      const prof = rev - exp;
 
-          list = data.hourSlots.map((s, idx) => {
-            const rev = s.value || 0;
-            const exp = Math.round(rev * expRatio);
-            const prof = rev - exp;
-            return {
-              id:           `PFT-${idx + 1}`,
-              timeLabel:    s.slot || "N/A",
-              revenue:      rev,
-              expense:      exp,
-              profit:       prof,
-              marginPct:    rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,
-              costRatioPct: rev > 0 ? Number(((exp / rev) * 100).toFixed(1)) : 0,
-            };
-          });
-        }
-        setTableData(list);
+      setTotalRevenue(rev);
+      setTotalExpense(exp);
+      setNetProfit(prof);
 
-        // 2. Trend Data cho ProfitCharts
-        setTrendData(
-          list.map((item) => ({
-            date:    item.timeLabel,
-            revenue: item.revenue,
-            expense: item.expense,
-            profit:  item.profit,
-          }))
-        );
-
-        // 3. Waterfall Data cho Cơ cấu hình thành lợi nhuận
-        const flowList = data.cashFlowList || [];
-        const costCategories = {};
-        flowList
-          .filter((cf) => cf.type === "out")
-          .forEach((cf) => {
-            costCategories[cf.category || "Chi phí khác"] =
-              (costCategories[cf.category || "Chi phí khác"] || 0) + Math.abs(cf.amount || 0);
-          });
-
-        const waterfall = [
-          { name: "Tổng Doanh Thu", amount: data.revenue || 0, isTotal: true },
-          ...Object.keys(costCategories).map((cat) => ({
-            name:   cat,
-            amount: -costCategories[cat],
-            isCost: true,
-          })),
-          { name: "Lợi Nhuận Ròng", amount: data.profit || 0, isProfit: true },
-        ];
-        setWaterfallData(waterfall);
-
-        // 4. Phân bổ khoảng lợi nhuận
-        const ranges = [
-          { range: "< 0 ₫",      min: -Infinity, max: 0,         count: 0 },
-          { range: "0 - 10M",    min: 0,         max: 10000000,  count: 0 },
-          { range: "10M - 20M",  min: 10000000,  max: 20000000,  count: 0 },
-          { range: "20M - 50M",  min: 20000000,  max: 50000000,  count: 0 },
-          { range: "> 50M",     min: 50000000,  max: Infinity,  count: 0 },
-        ];
-        list.forEach((item) => {
-          const prof = item.profit;
-          const match = ranges.find((r) => prof >= r.min && prof < r.max);
-          if (match) match.count += 1;
-        });
-        setDistributionData(ranges.filter((r) => r.count > 0));
+      // Create Daily Chart Map
+      const dailyMap = {};
+      let cur = dayjs(start);
+      while (cur.isBefore(end) || cur.isSame(end, "day")) {
+        const key = cur.format("YYYY-MM-DD");
+        dailyMap[key] = { date: cur.format("DD/MM"), revenue: 0, expense: 0, profit: 0 };
+        cur = cur.add(1, "day");
       }
+
+      filteredCashFlows.forEach((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        const key = dayjs(dateVal).format("YYYY-MM-DD");
+        if (dailyMap[key]) {
+          const amt = cf.totalAmount || cf.amount || 0;
+          if (cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu") {
+            dailyMap[key].revenue += amt;
+          } else if (cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi") {
+            dailyMap[key].expense += amt;
+          }
+        }
+      });
+
+      Object.keys(dailyMap).forEach((key) => {
+        dailyMap[key].profit = dailyMap[key].revenue - dailyMap[key].expense;
+      });
+
+      // Map detailed table analysis (tableData)
+      const list = Object.keys(dailyMap).map((key, idx) => {
+        const dailyRev = dailyMap[key].revenue;
+        const dailyExp = dailyMap[key].expense;
+        const dailyProf = dailyRev - dailyExp;
+        return {
+          id:           `PFT-${idx + 1}`,
+          timeLabel:    dayjs(key).format("DD/MM/YYYY"),
+          revenue:      dailyRev,
+          expense:      dailyExp,
+          profit:       dailyProf,
+          marginPct:    dailyRev > 0 ? Number(((dailyProf / dailyRev) * 100).toFixed(1)) : 0,
+          costRatioPct: dailyRev > 0 ? Number(((dailyExp / dailyRev) * 100).toFixed(1)) : 0,
+        };
+      });
+      setTableData(list);
+
+      // Trend data cho ProfitCharts
+      setTrendData(
+        list.map((item) => ({
+          date:    item.timeLabel.substring(0, 5), // show DD/MM
+          revenue: item.revenue,
+          expense: item.expense,
+          profit:  item.profit,
+        }))
+      );
+
+      // Waterfall data cho cơ cấu lợi nhuận
+      const costCategories = {};
+      filteredCashFlows
+        .filter((cf) => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
+        .forEach((cf) => {
+          const catName = cf.category || "Chi phí khác";
+          costCategories[catName] = (costCategories[catName] || 0) + (cf.totalAmount || cf.amount || 0);
+        });
+
+      const waterfall = [
+        { name: "Tổng Doanh Thu", amount: rev, isTotal: true },
+        ...Object.keys(costCategories).map((cat) => ({
+          name:   cat,
+          amount: -costCategories[cat],
+          isCost: true,
+        })),
+        { name: "Lợi Nhuận Ròng", amount: prof, isProfit: true },
+      ];
+      setWaterfallData(waterfall);
+
+      // Phân bổ khoảng lợi nhuận
+      const ranges = [
+        { range: "< 0 ₫",      min: -Infinity, max: 0,         count: 0 },
+        { range: "0 - 10M",    min: 0,         max: 10000000,  count: 0 },
+        { range: "10M - 20M",  min: 10000000,  max: 20000000,  count: 0 },
+        { range: "20M - 50M",  min: 20000000,  max: 50000000,  count: 0 },
+        { range: "> 50M",     min: 50000000,  max: Infinity,  count: 0 },
+      ];
+      list.forEach((item) => {
+        const profVal = item.profit;
+        const match = ranges.find((r) => profVal >= r.min && profVal < r.max);
+        if (match) match.count += 1;
+      });
+      setDistributionData(ranges.filter((r) => r.count > 0));
+
     } catch (err) {
       console.error("[ReportProfitPage] API error:", err);
       message.warning("Không thể tải dữ liệu lợi nhuận. Vui lòng thử lại.");
@@ -204,18 +215,13 @@ const ReportProfitPage = () => {
     return !searchText || item.timeLabel.toLowerCase().includes(searchText.toLowerCase());
   });
 
-  // Calculate Summary Totals
-  const totalRevenue = beStats?.revenue || 0;
-  const totalExpense = beStats?.expenses || 0;
-  const netProfit    = beStats?.profit || 0;
-
-  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
-  const avgPerDay   = Math.round(totalRevenue / daysInRange);
-
-  const dailyList = beStats?.dailyStats || [];
+  const dailyList = tableData;
   const revenueValues = dailyList.map((d) => d.revenue || 0);
   const highestVal = revenueValues.length ? Math.max(...revenueValues) : totalRevenue;
   const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
+
+  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
+  const avgPerDay   = Math.round(totalRevenue / daysInRange);
 
   // Điểm hòa vốn ước tính
   const breakEvenTarget = 40000000; // mục tiêu điểm hòa vốn giả định

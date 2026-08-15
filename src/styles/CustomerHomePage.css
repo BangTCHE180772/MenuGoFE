@@ -431,13 +431,33 @@
 .customer-menu-filter {
   width: 100%;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar for premium touch/desktop experience */
+.customer-menu-filter::-webkit-scrollbar {
+  height: 6px;
+}
+.customer-menu-filter::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+.customer-menu-filter::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.customer-menu-filter::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .filter-pill-container {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: nowrap; /* Enforce single horizontal line, preventing layout breakdown */
+  padding: 4px 0;
 }
 
 .filter-pill {

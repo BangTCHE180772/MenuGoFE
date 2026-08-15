@@ -9,11 +9,14 @@ const validateBranchId = (branchId) => {
 };
 
 /**
- * Lấy danh sách phiếu thu chi của chi nhánh.
+ * Lấy danh sách phiếu thu chi của chi nhánh (hoặc tất cả chi nhánh nếu branchId rỗng).
  */
 export const getCashFlows = async (branchId) => {
-  if (!validateBranchId(branchId)) return [];
-  const response = await axiosInstance.get('/api/CashFlow', { params: { branchId } });
+  const params = {};
+  if (branchId && branchId > 0) {
+    params.branchId = branchId;
+  }
+  const response = await axiosInstance.get('/api/CashFlow', { params });
   return Array.isArray(response.data) ? response.data : [];
 };
 
