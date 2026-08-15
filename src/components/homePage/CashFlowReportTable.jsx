@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Table, Input, Select, Button, Space, Tag, Card, Dropdown, Tooltip, message } from "antd";
 import {
   SearchOutlined,
@@ -12,31 +13,61 @@ import {
   FullscreenOutlined,
   FullscreenExitOutlined,
   ReloadOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { exportToExcelCSV, printReportTable } from "./exportUtils";
+import { deleteCashFlow } from "../../api/cashFlowApi";
 
 const formatVND = (val) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
 
 const cashFlowColumnDefs = [
-  { title: "Mã giao dịch", field: "code" },
+  { title: "Mã phiếu", field: "code" },
   { title: "Loại", field: "type", align: "center" },
-  { title: "Người nộp / nhận", field: "person" },
-  { title: "Nội dung", field: "note" },
-  { title: "Giá trị", field: (r) => `${r.type === "Thu" ? "+" : "-"}${formatVND(r.amount)}`, align: "right" },
-  { title: "Mã chứng từ", field: "docCode" },
-  { title: "Thời gian", field: "time" },
+  { title: "Số tiền", field: (r) => `${r.type === "Thu" ? "+" : "-"}${formatVND(r.amount)}`, align: "right" },
+  { title: "Phương thức", field: (r) => {
+      const METHOD_LABELS = {
+        1: 'Tiền mặt', Cash: 'Tiền mặt',
+        2: 'Thẻ', Card: 'Thẻ',
+        3: 'Chuyển khoản', Transfer: 'Chuyển khoản',
+      };
+      return METHOD_LABELS[r.paymentMethod] || r.paymentMethod || "—";
+    }
+  },
+  { title: "Đối tác", field: "person" },
+  { title: "Chứng từ gốc", field: "docCode" },
+  { title: "Ngày", field: (r) => `${r.date} ${r.time}` },
+  { title: "Ghi chú", field: "note" },
 ];
 
 /**
  * Component Báo Cáo Thu Chi Chi Tiết
  * Hỗ trợ Fullscreen mode, Horizontal Scroll, Export Dropdown, Search, Filter Loại Thu/Chi, Sort, Phân trang
  */
-const CashFlowReportTable = ({ data = [] }) => {
+const CashFlowReportTable = ({ data = [], onRefresh }) => {
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const handleDelete = async (id) => {
+    setLoading(true);
+    try {
+      await deleteCashFlow(id, "Xóa từ báo cáo");
+      message.success("Đã xóa phiếu thu chi thành công");
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi xóa phiếu thu chi");
+    } finally {
+      setConfirmDeleteId(null);
+      setLoading(false);
+    }
+  };
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
@@ -141,17 +172,31 @@ const CashFlowReportTable = ({ data = [] }) => {
 
   const columns = [
     {
-      title: "Mã giao dịch",
+      title: "STT",
+      key: "index",
+      width: 70,
+      align: "center",
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: "Mã phiếu",
       dataIndex: "code",
       key: "code",
-      width: 160,
-      render: (text) => <strong style={{ color: "#1e293b" }}>{text}</strong>,
+      width: 140,
+      render: (text) => (
+        <span
+          onClick={() => navigate(`/cashflow?search=${text}`)}
+          style={{ color: "#f97316", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+        >
+          {text}
+        </span>
+      ),
     },
     {
       title: "Loại",
       dataIndex: "type",
       key: "type",
-      width: 120,
+      width: 100,
       align: "center",
       render: (type) => (
         <Tag
@@ -163,49 +208,115 @@ const CashFlowReportTable = ({ data = [] }) => {
       ),
     },
     {
-      title: "Người nộp / nhận",
-      dataIndex: "person",
-      key: "person",
-      width: 220,
-    },
-    {
-      title: "Nội dung",
-      dataIndex: "note",
-      key: "note",
-      width: 260,
-    },
-    {
-      title: "Giá trị",
+      title: "Số tiền",
       dataIndex: "amount",
       key: "amount",
-      width: 160,
+      width: 150,
       align: "right",
       sorter: (a, b) => a.amount - b.amount,
       render: (val, record) => (
-        <strong
-          style={{
-            color: record.type === "Thu" ? "#10b981" : "#ef4444",
-            fontSize: 14,
-          }}
-        >
+        <strong style={{ color: record.type === "Thu" ? "#10b981" : "#ef4444", fontSize: 13 }}>
           {record.type === "Thu" ? "+" : "-"}{formatVND(val)}
         </strong>
       ),
     },
     {
-      title: "Mã chứng từ",
+      title: "Phương thức",
+      dataIndex: "paymentMethod",
+      key: "paymentMethod",
+      width: 130,
+      render: (method) => {
+        const METHOD_LABELS = {
+          1: 'Tiền mặt', Cash: 'Tiền mặt',
+          2: 'Thẻ', Card: 'Thẻ',
+          3: 'Chuyển khoản', Transfer: 'Chuyển khoản',
+        };
+        return METHOD_LABELS[method] || method || "—";
+      }
+    },
+    {
+      title: "Đối tác",
+      dataIndex: "person",
+      key: "person",
+      width: 180,
+    },
+    {
+      title: "Chứng từ gốc",
       dataIndex: "docCode",
       key: "docCode",
       width: 160,
-      render: (text) => <span style={{ fontFamily: "monospace", color: "#64748b" }}>{text}</span>,
+      render: (text) => {
+        if (!text || text === "—") return "—";
+        const handleClick = () => {
+          let tab = "Import";
+          const lower = text.toLowerCase();
+          if (lower.startsWith("hd") || lower.startsWith("pxbh") || lower.startsWith("ptbh") || lower.startsWith("pth")) {
+            tab = "Invoice";
+          } else if (lower.startsWith("nh") || lower.startsWith("nk")) {
+            tab = "Import";
+          } else if (lower.startsWith("ck")) {
+            tab = "Transfer";
+          }
+          navigate(`/inventory-management?tab=${tab}&search=${text}`);
+        };
+        return (
+          <span
+            onClick={handleClick}
+            style={{ fontFamily: "monospace", color: "var(--color-primary)", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+          >
+            {text}
+          </span>
+        );
+      },
     },
     {
-      title: "Thời gian",
-      dataIndex: "time",
-      key: "time",
-      width: 120,
-      sorter: (a, b) => a.time.localeCompare(b.time),
+      title: "Ngày",
+      key: "date",
+      width: 140,
+      render: (_, record) => `${record.date} ${record.time}`,
     },
+    {
+      title: "Ghi chú",
+      dataIndex: "note",
+      key: "note",
+      width: 180,
+    },
+    {
+      title: "Xóa",
+      key: "delete",
+      width: 100,
+      align: "center",
+      render: (_, record) => {
+        const hasDoc = record.docCode && record.docCode !== "—";
+        if (hasDoc) return <span style={{ color: "#cbd5e1" }}>—</span>;
+
+        return confirmDeleteId === record.id ? (
+          <Space>
+            <Button
+              type="primary"
+              danger
+              size="small"
+              onClick={() => handleDelete(record.id)}
+            >
+              Có
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setConfirmDeleteId(null)}
+            >
+              Không
+            </Button>
+          </Space>
+        ) : (
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => setConfirmDeleteId(record.id)}
+          />
+        );
+      }
+    }
   ];
 
   return (
@@ -322,31 +433,34 @@ const CashFlowReportTable = ({ data = [] }) => {
           <Table.Summary fixed="top">
             <Table.Summary.Row
               style={{
-                background: totals.netAmount >= 0 ? "#ecfdf5" : "#fef2f2",
+                background: "#fef2f2",
                 fontWeight: 700,
-                borderBottom: `2px solid ${totals.netAmount >= 0 ? "#10b981" : "#ef4444"}`,
+                borderBottom: "2px solid #fca5a5",
               }}
             >
-              <Table.Summary.Cell index={0}>
-                <span style={{ color: "#047857", fontWeight: 700 }}>
-                  Tổng: {totals.totalCount} giao dịch
+              <Table.Summary.Cell index={0} align="center">-</Table.Summary.Cell>
+              <Table.Summary.Cell index={1}>
+                <span style={{ color: "#dc2626", fontWeight: 700 }}>
+                  tổng giao dịch: {totals.totalCount}
                 </span>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={1}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={2}>-</Table.Summary.Cell>
-              <Table.Summary.Cell index={3}>-</Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">
+              <Table.Summary.Cell index={3} align="right">
                 <strong
                   style={{
                     color: totals.netAmount >= 0 ? "#10b981" : "#ef4444",
-                    fontSize: 15,
+                    fontSize: 14,
                   }}
                 >
                   {totals.netAmount >= 0 ? "+" : ""}{formatVND(totals.netAmount)}
                 </strong>
               </Table.Summary.Cell>
+              <Table.Summary.Cell index={4}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={5}>-</Table.Summary.Cell>
               <Table.Summary.Cell index={6}>-</Table.Summary.Cell>
+              <Table.Summary.Cell index={7}>-</Table.Summary.Cell>
+              <Table.Summary.Cell index={8}>-</Table.Summary.Cell>
+              <Table.Summary.Cell index={9} align="center">-</Table.Summary.Cell>
             </Table.Summary.Row>
           </Table.Summary>
         )}

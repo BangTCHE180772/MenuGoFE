@@ -4,13 +4,17 @@ import {
   DashboardOutlined,
   TableOutlined,
   CalendarOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import HomeFilter from "../components/homePage/HomeFilter";
 import HomeDashboard from "../components/homePage/HomeDashboard";
 import HomeReport from "../components/homePage/HomeReport";
 import { getBranchDashboardStats } from "../api/dashboardApi";
-import { MOCK_DAILY_REPORT } from "../components/homePage/homeMockData";
+import { getPaidInvoices, getAllOrders } from "../api/orderApi";
+import { getCashFlows } from "../api/cashFlowApi";
+import { getAllWorkSchedules } from "../api/workScheduleApi";
+import { getRoleRange } from "../api/accountApi";
 import { useBranch } from "../context/BranchContext";
 
 const { Title, Text } = Typography;
@@ -69,178 +73,195 @@ const formatVND = (val) =>
  *   monthlyStats: [...]
  * }
  */
-const mapBeToReportData = (beStats, dateStr) => {
-  // ── KPIs (lấy thẳng từ BE, không tự tính lại)
-  const revenue   = beStats.revenue   || 0;
-  const expense   = beStats.expenses  || 0;
-  const profit    = beStats.profit    || 0;
-  const completedBills = beStats.completedBills || 0;
+// ─── HELPER FOR CONSOLIDATING SERVED DISHES ──────────────────────────────────
+const getConsolidatedServedItemsForHome = (invoices = []) => {
+  const map = new Map();
+  
+  invoices.forEach((inv) => {
+    const details = inv.orderDetails || inv.details || [];
+    details.forEach((d) => {
+      if (d.status === 'Cancelled' || d.status === 'Rejected' || d.cookingStatus === 'Cancelled') {
+        return;
+      }
+      const pType = String(d.productType || d.type || '').toLowerCase();
+      if (pType === 'ingredient' || pType === '4') {
+        return;
+      }
+      const isValidStatus = !d.status || d.status === 'Confirmed' || d.status === 'Completed' || d.status === 'Served' || d.status === 1 || d.status === 'Paid';
+      const isValidCooking = !d.cookingStatus || d.cookingStatus === 'Served' || d.cookingStatus === 'Ready';
+      if (!isValidStatus || !isValidCooking) {
+        return;
+      }
 
-  // ── Biểu đồ xu hướng:
-  //    Ưu tiên hourSlots (range=today), fallback dailyStats (range=custom/yesterday)
-  let hourlyTrends;
-  if (beStats.hourSlots && beStats.hourSlots.length > 0) {
-    // hourSlots: 4 khung giờ, doanh thu từ Paid orders
-    // Chart dùng dataKey="hour" cho XAxis, "revenue"/"expense"/"profit" cho Lines
-    // expense & profit mỗi slot: ước tính tỷ lệ từ tổng ngày (không có data khung giờ chi tiết)
-    const expenseRatio = revenue > 0 ? expense / revenue : 0;
-    const profitRatio  = revenue > 0 ? profit  / revenue : 0;
-    hourlyTrends = beStats.hourSlots.map((slot) => ({
-      hour:    slot.slot,
-      revenue: slot.value || 0,
-      expense: Math.round((slot.value || 0) * expenseRatio),
-      profit:  Math.round((slot.value || 0) * profitRatio),
-      orders:  0,
-    }));
-  } else if (beStats.dailyStats && beStats.dailyStats.length > 0) {
-    hourlyTrends = beStats.dailyStats.map((item) => ({
-      hour:    item.date || "N/A",
-      revenue: item.revenue || 0,
-      expense: item.expense || 0,
-      profit:  item.profit  || 0,
-      orders:  0,
-    }));
-  } else {
-    // Không có data thật → hiển thị 4 slot rỗng (không dùng mock)
-    hourlyTrends = [
-      { hour: "Sáng (6-11h)",   revenue: 0, expense: 0, profit: 0, orders: 0 },
-      { hour: "Trưa (11-14h)",  revenue: 0, expense: 0, profit: 0, orders: 0 },
-      { hour: "Chiều (14-18h)", revenue: 0, expense: 0, profit: 0, orders: 0 },
-      { hour: "Tối (18-22h)",   revenue: 0, expense: 0, profit: 0, orders: 0 },
-    ];
-  }
+      const productId = d.productId || d.bInventoryId || d.id;
+      const name = d.productName || d.snapshotProductName || d.product?.name || d.name || 'Món ăn';
+      const unitPrice = Number(d.price ?? d.unitPrice ?? (d.quantity > 0 ? (d.totalPrice || 0) / d.quantity : 0) ?? 0);
+      const key = `${productId}_${name}_${unitPrice}`;
 
-  // ── TopDishes → topDishes cho chart TopDishes
-  const topDishes =
-    beStats.topDishes && beStats.topDishes.length > 0
-      ? beStats.topDishes.map((d) => ({
-          name:     d.name,
-          quantity: d.quantity || 0,
-          revenue:  beStats.completedBills > 0
-            ? Math.round((beStats.avgOrderValue || 0) * (d.quantity || 0))
-            : 0,
-        }))
-      : [];
+      const qty = Number(d.quantity || 0) - Number(d.returnedQuantity || 0);
+      if (qty <= 0) return;
 
-  // ── CashFlowList → Tab Thu chi tài chính
-  // CashFlowReportTable expects: { id, code, docCode, time, type("Thu"|"Chi"), person, note, amount }
-  let cashFlowList = [];
-  if (beStats.cashFlowList && beStats.cashFlowList.length > 0) {
-    cashFlowList = beStats.cashFlowList.map((item, idx) => {
-      const isIncome = item.type === "in";
-      const timeStr  = item.time
-        ? (item.time.length > 5
-            ? dayjs(item.time).format("HH:mm")
-            : item.time)
-        : "00:00";
-      return {
-        id:      String(item.id || idx + 1),
-        code:    `TC-${String(item.id || idx + 1).padStart(8, "0")}`,
-        docCode: isIncome
-          ? `CT-TN-${String(item.id || idx + 1).padStart(4, "0")}`
-          : `CT-NK-${String((item.id || idx + 1) - 1000000).padStart(4, "0")}`,
-        time:    timeStr,
-        type:    isIncome ? "Thu" : "Chi",
-        person:  item.category || "Hệ thống",
-        note:    item.category || "Giao dịch",
-        amount:  Math.abs(item.amount || 0),
-      };
+      const note = d.note || '';
+
+      if (!map.has(key)) {
+        map.set(key, {
+          productId,
+          itemName: name,
+          unitPrice,
+          qtySold: qty,
+          revenue: qty * unitPrice,
+          note: note ? [note] : [],
+        });
+      } else {
+        const existing = map.get(key);
+        existing.qtySold += qty;
+        existing.revenue += qty * unitPrice;
+        if (note && !existing.note.includes(note)) {
+          existing.note.push(note);
+        }
+      }
     });
-  }
+  });
 
-  // ── SalesTable → Tab Bán hàng (chỉ đơn ĐÃ THANH TOÁN)
-  // Lấy từ cashFlowList loại "Thu" với category="Thanh toán hóa đơn"
-  // Đây là các Payment thành công → đúng dữ liệu đã thanh toán
-  const paidFlows = cashFlowList.filter((cf) => cf.type === "Thu");
-  const salesList = paidFlows.length > 0
-    ? paidFlows.map((cf, idx) => ({
-        id:            String(idx + 1),
-        billCode:      cf.docCode || `HD-${String(idx + 1).padStart(6, "0")}`,
-        time:          cf.time,
-        tableName:     "—",           // Payment không có thông tin bàn
-        cashier:       "—",           // Payment không có thông tin thu ngân
-        itemCount:     1,             // Payment không biết số món
-        subtotal:      cf.amount,
-        surcharge:     0,
-        discount:      0,
-        total:         cf.amount,
-        paymentMethod: cf.person === "Thanh toán hóa đơn" ? "Hệ thống" : cf.person,
-      }))
-    : [];                              // Không có đơn đã thanh toán → bảng rỗng thật
+  const list = Array.from(map.values());
+  const totalRevenue = list.reduce((sum, item) => sum + item.revenue, 0);
 
-  // ── InventoryTable → Tab Hàng hóa (sản phẩm bán được trong kỳ)
-  // Dùng TopDishes + LeastDishes của BE, gộp lại tránh trùng
-  // InventoryReportTable expects: { itemCode, itemName, qtySold, unitPrice, revenue, sharePct }
-  let inventoryList = [];
-  if (beStats.topDishes && beStats.topDishes.length > 0) {
-    const topNames = new Set(beStats.topDishes.map((d) => d.name));
-    const leastUnique = (beStats.leastDishes || []).filter((d) => !topNames.has(d.name));
-    const allDishes = [...beStats.topDishes, ...leastUnique];
-    const soldDishes = allDishes.filter((d) => (d.quantity || 0) > 0);
+  return list.map((item, idx) => ({
+    id: String(idx + 1),
+    itemCode: `SP-${String(idx + 1).padStart(3, "0")}`,
+    itemName: item.itemName,
+    unitPrice: item.unitPrice,
+    qtySold: item.qtySold,
+    revenue: item.revenue,
+    note: item.note.join(", ") || "—",
+    sharePct: totalRevenue > 0 ? Number(((item.revenue / totalRevenue) * 100).toFixed(1)) : 0,
+  }));
+};
 
-    if (soldDishes.length > 0) {
-      const totalQty = soldDishes.reduce((acc, d) => acc + (d.quantity || 0), 0);
-      // unitPrice ước tính = Doanh thu / Tổng số lượng bán
-      const estimatedUnitPrice =
-        totalQty > 0 && completedBills > 0
-          ? Math.round(revenue / totalQty)
-          : 0;
+/**
+ * Ánh xạ dữ liệu BE stats + invoices + cash flows sang cấu trúc ReportData
+ */
+const mapBeToReportData = (beStats, filteredInvoices, filteredCashFlows, filteredAllOrders, dateStr) => {
+  const dailyRevenue = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const totalExpenses = filteredCashFlows
+    .filter(cf => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
+    .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
+  const dailyProfit = dailyRevenue - totalExpenses;
+  const totalPaidBills = filteredInvoices.length;
 
-      const mapped = soldDishes.map((dish, idx) => {
-        const dishRev = dish.quantity * estimatedUnitPrice;
-        return {
-          id:        String(idx + 1),
-          itemCode:  `SP-${String(idx + 1).padStart(3, "0")}`,
-          itemName:  dish.name,
-          qtySold:   dish.quantity,
-          unitPrice: estimatedUnitPrice,
-          revenue:   dishRev,
-          sharePct:  0, // tính sau
-        };
-      });
+  // Hourly Trends computed directly from filtered invoices
+  const morningSlot = { slot: "Sáng (6-11h)", count: 0 };
+  const noonSlot = { slot: "Trưa (11-14h)", count: 0 };
+  const afternoonSlot = { slot: "Chiều (14-18h)", count: 0 };
+  const nightSlot = { slot: "Tối (18-22h)", count: 0 };
 
-      const totalRev = mapped.reduce((acc, p) => acc + p.revenue, 0);
-      inventoryList = mapped.map((p) => ({
-        ...p,
-        sharePct:
-          totalRev > 0
-            ? Number(((p.revenue / totalRev) * 100).toFixed(1))
-            : 0,
-      }));
-    }
-  }
-  // inventoryList = [] nếu không có món nào bán ra trong kỳ
+  filteredInvoices.forEach((inv) => {
+    const hr = dayjs(inv.createdAt).hour();
+    if (hr >= 6 && hr < 11) morningSlot.count++;
+    else if (hr >= 11 && hr < 14) noonSlot.count++;
+    else if (hr >= 14 && hr < 18) afternoonSlot.count++;
+    else if (hr >= 18 && hr < 22) nightSlot.count++;
+  });
+
+  const hourlyTrends = [
+    { hour: "Sáng (6-11h)", revenue: morningSlot.count, expense: 0, profit: 0, orders: morningSlot.count },
+    { hour: "Trưa (11-14h)", revenue: noonSlot.count, expense: 0, profit: 0, orders: noonSlot.count },
+    { hour: "Chiều (14-18h)", revenue: afternoonSlot.count, expense: 0, profit: 0, orders: afternoonSlot.count },
+    { hour: "Tối (18-22h)", revenue: nightSlot.count, expense: 0, profit: 0, orders: nightSlot.count },
+  ];
+
+  // Cash Flow list mapping
+  const cashFlowList = filteredCashFlows.map((cf, idx) => {
+    return {
+      id: cf.id,
+      code: cf.code || `TC-${String(cf.id).padStart(8, "0")}`,
+      docCode: cf.documentCode || "—",
+      time: cf.businessDate ? dayjs(cf.businessDate).format("HH:mm") : (cf.createdAt ? dayjs(cf.createdAt).format("HH:mm") : "00:00"),
+      date: cf.businessDate ? dayjs(cf.businessDate).format("DD/MM/YYYY") : (cf.createdAt ? dayjs(cf.createdAt).format("DD/MM/YYYY") : "—"),
+      type: cf.directionValue === 1 ? "Thu" : "Chi",
+      person: cf.partnerName || (cf.note && (cf.note.includes('cho nhân viên') || cf.note.includes('lương tháng')) ? (cf.note.includes('cho nhân viên') ? 'NV: ' + cf.note.substring(cf.note.indexOf('cho nhân viên') + 14).trim() : 'NV (Chi lương)') : "—"),
+      note: cf.note || "Giao dịch",
+      amount: cf.totalAmount || 0,
+      paymentMethod: cf.paymentMethod || "—",
+      raw: cf
+    };
+  });
+
+  // Sales list mapping
+  const salesList = filteredInvoices.map((inv) => {
+    return {
+      id: inv.id,
+      billCode: inv.code || `HD${inv.id}`,
+      date: inv.createdAt ? dayjs(inv.createdAt).format("DD/MM/YYYY") : "—",
+      time: inv.createdAt ? dayjs(inv.createdAt).format("HH:mm") : "00:00",
+      tableName: inv.tableName || (inv.tableId ? `Bàn #${inv.tableId}` : 'Mang về'),
+      areaName: inv.areaName || "",
+      customer: inv.customerName || (inv.customerId ? `Khách hàng #${inv.customerId}` : 'Khách lẻ'),
+      cashier: inv.createdByName || 'Thu ngân',
+      total: inv.totalAmount || 0,
+      status: inv.status || 'Paid',
+      paymentMethod: inv.paymentMethod || "Tiền mặt",
+      orderDetails: inv.orderDetails || [],
+      raw: inv
+    };
+  });
+
+  // Consolidated items list
+  const inventoryList = getConsolidatedServedItemsForHome(filteredInvoices);
+
+  // Top Dishes computed directly from filtered invoices
+  const topDishes = [...inventoryList]
+    .sort((a, b) => b.qtySold - a.qtySold)
+    .slice(0, 5)
+    .map((item) => ({
+      name: item.itemName,
+      quantity: item.qtySold,
+      revenue: item.revenue,
+    }));
+
+  // Order status breakdown: created, completed, uncompleted
+  const completedCount = filteredInvoices.length;
+  const uncompletedCount = filteredAllOrders.filter(
+    (o) => o.status !== "Paid" && o.status !== "Completed" && o.status !== "Cancelled" && o.status !== "Rejected" && o.status !== 1
+  ).length;
+  const createdCount = completedCount + uncompletedCount;
+
+  const orderSummary = {
+    created: createdCount,
+    completed: completedCount,
+    uncompleted: uncompletedCount,
+  };
 
   return {
     dateStr: dateStr || dayjs().format("DD/MM/YYYY"),
     kpis: {
       revenue: {
-        value:     revenue,
-        formatted: formatVND(revenue),
+        value:     dailyRevenue,
+        formatted: formatVND(dailyRevenue),
         changePct: 0,
-        isPositive: revenue >= 0,
+        isPositive: dailyRevenue >= 0,
       },
       expense: {
-        value:     expense,
-        formatted: formatVND(expense),
+        value:     totalExpenses,
+        formatted: formatVND(totalExpenses),
         changePct: 0,
         isPositive: true,
       },
       profit: {
-        value:     profit,
-        formatted: formatVND(profit),
+        value:     dailyProfit,
+        formatted: formatVND(dailyProfit),
         changePct: 0,
-        isPositive: profit >= 0,
+        isPositive: dailyProfit >= 0,
       },
       orders: {
-        value:     completedBills,
-        formatted: `${completedBills} đơn`,
+        value:     totalPaidBills,
+        formatted: `${totalPaidBills} đơn`,
         changePct: 0,
         isPositive: true,
       },
     },
-    orderSummary:   beStats.orderSummary   || null,
-    alerts:         beStats.alerts         || [],
+    orderSummary,
+    alerts:         [],
     paymentMethods: beStats.paymentMethods || [],
     hourlyTrends,
     topDishes,
@@ -250,13 +271,32 @@ const mapBeToReportData = (beStats, dateStr) => {
   };
 };
 
+const EMPTY_DAILY_REPORT = {
+  dateStr: "",
+  kpis: {
+    revenue: { value: 0, formatted: "0 đ", changePct: 0, isPositive: true },
+    expense: { value: 0, formatted: "0 đ", changePct: 0, isPositive: true },
+    profit: { value: 0, formatted: "0 đ", changePct: 0, isPositive: true },
+    orders: { value: 0, formatted: "0 đơn", changePct: 0, isPositive: true },
+  },
+  hourlyTrends: [],
+  topDishes: [],
+  salesList: [],
+  cashFlowList: [],
+  inventoryList: [],
+  orderSummary: null,
+  alerts: [],
+  paymentMethods: [],
+};
+
 // ─── HomePage Component ──────────────────────────────────────────────────────
 const HomePage = () => {
   const { currentBranchId } = useBranch();
   const [selectedDate, setSelectedDate] = useState(dayjs().format("DD/MM/YYYY"));
   const [loading, setLoading]           = useState(false);
   const [displayMode, setDisplayMode]   = useState("dashboard");
-  const [reportData, setReportData]     = useState(MOCK_DAILY_REPORT);
+  const [reportData, setReportData]     = useState(EMPTY_DAILY_REPORT);
+  const [absentEmployees, setAbsentEmployees] = useState([]);
 
   const fetchDashboardData = useCallback(async (dateStr) => {
     setLoading(true);
@@ -269,17 +309,60 @@ const HomePage = () => {
       const formattedStart = parsedDate.format("YYYY-MM-DD");
       const formattedEnd   = parsedDate.format("YYYY-MM-DD");
 
-      const res = await getBranchDashboardStats(range, formattedStart, formattedEnd, currentBranchId);
+      const [statsRes, invoicesRes, cashFlowsRes, schedulesRes, accountsRes, allOrdersRes] = await Promise.allSettled([
+        getBranchDashboardStats(range, formattedStart, formattedEnd, currentBranchId),
+        getPaidInvoices(currentBranchId),
+        getCashFlows(currentBranchId),
+        getAllWorkSchedules(),
+        getRoleRange(),
+        getAllOrders(currentBranchId),
+      ]);
 
-      if (res?.data) {
-        console.log("[HomePage] BE response:", JSON.stringify(res.data, null, 2));
-        setReportData(mapBeToReportData(res.data, dateStr));
+      const beStats = statsRes.status === "fulfilled" ? statsRes.value?.data : null;
+      const allInvoices = invoicesRes.status === "fulfilled" ? (invoicesRes.value?.data || invoicesRes.value || []) : [];
+      const allCashFlows = cashFlowsRes.status === "fulfilled" ? (cashFlowsRes.value || []) : [];
+      const allSchedules = schedulesRes.status === "fulfilled" ? (schedulesRes.value?.data || schedulesRes.value || []) : [];
+      const allAccounts = accountsRes.status === "fulfilled" ? (accountsRes.value?.data || accountsRes.value || []) : [];
+      const rawAllOrders = allOrdersRes.status === "fulfilled" ? (allOrdersRes.value?.data || allOrdersRes.value || []) : [];
+
+      const filteredInvoices = allInvoices.filter((ord) => {
+        return ord.createdAt && dayjs(ord.createdAt).format("DD/MM/YYYY") === dateStr;
+      });
+
+      const filteredCashFlows = allCashFlows.filter((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        return dateVal && dayjs(dateVal).format("DD/MM/YYYY") === dateStr;
+      });
+
+      const filteredAllOrders = rawAllOrders.filter((ord) => {
+        return ord.createdAt && dayjs(ord.createdAt).format("DD/MM/YYYY") === dateStr;
+      });
+
+      // Filter absent employees
+      const targetDateStr = parsedDate.format("YYYY-MM-DD");
+      const noCheckInSchedules = allSchedules.filter((ws) => {
+        const matchesBranch = !currentBranchId || ws.branchId === currentBranchId;
+        const matchesDate = ws.workDate && dayjs(ws.workDate).format("YYYY-MM-DD") === targetDateStr;
+        const isNotCheckedIn = ws.checkInAt === null || ws.checkInAt === undefined;
+        return matchesBranch && matchesDate && isNotCheckedIn;
+      });
+
+      const absentNames = noCheckInSchedules.map((ws) => {
+        const acc = allAccounts.find((a) => a.id === ws.accountId);
+        return acc ? acc.name : `Nhân viên #${ws.accountId}`;
+      });
+
+      setAbsentEmployees(Array.from(new Set(absentNames)));
+
+      if (beStats) {
+        setReportData(mapBeToReportData(beStats, filteredInvoices, filteredCashFlows, filteredAllOrders, dateStr));
       } else {
-        setReportData({ ...MOCK_DAILY_REPORT, dateStr });
+        setReportData(mapBeToReportData({}, filteredInvoices, filteredCashFlows, filteredAllOrders, dateStr));
       }
     } catch (err) {
-      console.warn("[HomePage] API error, sử dụng mock data:", err);
-      setReportData({ ...MOCK_DAILY_REPORT, dateStr });
+      console.warn("[HomePage] API error:", err);
+      setReportData({ ...EMPTY_DAILY_REPORT, dateStr });
+      setAbsentEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -363,17 +446,72 @@ const HomePage = () => {
       <HomeFilter
         selectedDate={selectedDate}
         onDateChange={handleDateChange}
-        selectedEmployee="all"
-        onEmployeeChange={() => {}}
         onReset={handleResetFilter}
       />
+
+      {/* ─── CẢNH BÁO CHẤM CÔNG (SCROLL NGANG) ──────────────────────────────── */}
+      {absentEmployees.length > 0 && (
+        <div
+          style={{
+            margin: "0 0 16px 0",
+            background: "#fff7ed",
+            borderLeft: "4px solid #ea580c",
+            borderRadius: "8px",
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+          }}
+        >
+          <ExclamationCircleOutlined style={{ color: "#ea580c", fontSize: "16px", flexShrink: 0 }} />
+          <span style={{ fontWeight: 600, color: "#c2410c", fontSize: "13px", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {absentEmployees.length} nhân viên chưa chấm công hôm nay:
+          </span>
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              overflowX: "auto",
+              padding: "2px 0",
+              flex: 1,
+            }}
+            className="hide-scrollbar"
+          >
+            {absentEmployees.map((name, idx) => (
+              <Tag
+                key={idx}
+                color="orange"
+                style={{
+                  borderRadius: "6px",
+                  fontWeight: 600,
+                  fontSize: "12px",
+                  padding: "2px 8px",
+                  margin: 0,
+                }}
+              >
+                {name}
+              </Tag>
+            ))}
+          </div>
+          <style>{`
+            .hide-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+            .hide-scrollbar {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* ─── NỘI DUNG ─────────────────────────────────────────────────────── */}
       <Spin spinning={loading} tip="Đang tải dữ liệu từ máy chủ...">
         {displayMode === "dashboard" ? (
           <HomeDashboard data={reportData} />
         ) : (
-          <HomeReport data={reportData} />
+          <HomeReport data={reportData} onRefresh={() => fetchDashboardData(selectedDate)} />
         )}
       </Spin>
     </div>

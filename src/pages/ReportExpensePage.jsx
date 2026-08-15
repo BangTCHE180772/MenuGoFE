@@ -34,7 +34,8 @@ import ExpenseReportTable from "../components/reports/expense/ExpenseReportTable
 import ExpenseDetailDrawer from "../components/reports/expense/ExpenseDetailDrawer";
 import ExpenseCompareModal from "../components/reports/expense/ExpenseCompareModal";
 
-import { getBranchDashboardStats } from "../api/dashboardApi";
+import { getCashFlows } from "../api/cashFlowApi";
+import { getPaidInvoices } from "../api/orderApi";
 import { useBranch } from "../context/BranchContext";
 
 const { Title, Text } = Typography;
@@ -44,35 +45,9 @@ const formatVND = (val) =>
     val || 0
   );
 
-// ─── Map BE CashFlowList → Expense Bills ────────────────────────────────────
-const mapCashFlowToExpenses = (cashFlowList = []) => {
-  return cashFlowList
-    .filter((cf) => cf.type === "out") // Chỉ lấy các khoản Chi
-    .map((cf, idx) => {
-      const timeVal = cf.time || "";
-      const parsedTime = timeVal.length > 5 ? dayjs(timeVal) : null;
-      const dateStr = parsedTime ? parsedTime.format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY");
-      const timeStr = parsedTime ? parsedTime.format("HH:mm") : timeVal;
-      const amount  = Math.abs(cf.amount || 0);
-
-      return {
-        id:          String(cf.id || idx + 1),
-        expenseCode: `PC${String(Math.abs(cf.id || idx + 1)).padStart(6, "0")}`,
-        date:        dateStr,
-        time:        timeStr,
-        category:    cf.category || "Chi phí khác",
-        supplier:    "Hệ thống",
-        createdBy:   "Hệ thống",
-        amount,
-        notes:       `Phiếu chi tiền ${cf.category ? cf.category.toLowerCase() : "hoạt động"} ghi nhận từ hệ thống.`,
-        status:      "Completed",
-      };
-    });
-};
-
 /**
  * Page: ReportExpensePage
- * Báo cáo Chi phí chuyên sâu — kết nối với dữ liệu thật của BE
+ * Báo cáo Chi phí chuyên sâu — kết nối với dữ liệu thật của BE từ Sổ quỹ /api/CashFlow
  * Đường dẫn: /reports/expense
  */
 const ReportExpensePage = () => {
@@ -94,11 +69,14 @@ const ReportExpensePage = () => {
   const [compareModalVisible, setCompareModalVisible] = useState(false);
 
   // ── Dữ liệu thật từ BE ───────────────────────────────────────────────────
-  const [beStats, setBeStats]           = useState(null);
   const [allExpenses, setAllExpenses]   = useState([]);
   const [trendData, setTrendData]       = useState([]);
   const [breakdownData, setBreakdownData] = useState([]);
   const [topExpenseData, setTopExpenseData] = useState([]);
+  const [totalExpense, setTotalExpense] = useState(0);
+  const [avgExpense, setAvgExpense]     = useState(0);
+  const [avgPerDay, setAvgPerDay]       = useState(0);
+  const [highestVal, setHighestVal]     = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   const fetchReportData = useCallback(async () => {
@@ -108,65 +86,103 @@ const ReportExpensePage = () => {
       const startStr = start.format("YYYY-MM-DD");
       const endStr   = end.format("YYYY-MM-DD");
 
-      const today = dayjs().startOf("day");
-      const isToday = start.isSame(today, "day") && end.isSame(today, "day");
+      const [invoicesRes, cashFlowsRes] = await Promise.allSettled([
+        getPaidInvoices(currentBranchId),
+        getCashFlows(currentBranchId)
+      ]);
 
-      const presetToRange = {
-        today:       "today",
-        yesterday:   "yesterday",
-        this_week:   "custom",
-        last_week:   "custom",
-        this_month:  "thisMonth",
-        last_month:  "lastMonth",
-        this_year:   "custom",
-        custom:      "custom",
-      };
-      const range = isToday ? "today" : (presetToRange[presetTime] || "custom");
+      const allInvoices = invoicesRes.status === "fulfilled" ? (invoicesRes.value?.data || invoicesRes.value || []) : [];
+      const allCashFlows = cashFlowsRes.status === "fulfilled" ? (cashFlowsRes.value || []) : [];
 
-      const res = await getBranchDashboardStats(range, startStr, endStr, currentBranchId);
+      // Filter Chi cashflows in date range
+      const filteredCashFlows = allCashFlows.filter((cf) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        if (!dateVal) return false;
+        const cfDate = dayjs(dateVal);
+        const matchesDate = (cfDate.isSame(start, "day") || cfDate.isAfter(start, "day")) &&
+                            (cfDate.isSame(end, "day") || cfDate.isBefore(end, "day"));
+        const isExpense = cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi";
+        return matchesDate && isExpense;
+      });
 
-      if (res?.data) {
-        const data = res.data;
-        setBeStats(data);
-        setTotalRevenue(data.revenue || 0);
+      // Filter invoices in date range
+      const filteredInvoices = allInvoices.filter((ord) => {
+        if (!ord.createdAt) return false;
+        const ordDate = dayjs(ord.createdAt);
+        return (ordDate.isSame(start, "day") || ordDate.isAfter(start, "day")) &&
+               (ordDate.isSame(end, "day") || ordDate.isBefore(end, "day"));
+      });
 
-        // Map danh sách chi phí
-        const expenses = mapCashFlowToExpenses(data.cashFlowList || []);
-        setAllExpenses(expenses);
+      // Map expenses
+      const expenses = filteredCashFlows.map((cf, idx) => {
+        const dateVal = cf.businessDate || cf.createdAt;
+        return {
+          id:          String(cf.id),
+          expenseCode: cf.code || `PC${String(cf.id).padStart(6, "0")}`,
+          date:        dateVal ? dayjs(dateVal).format("DD/MM/YYYY") : "—",
+          time:        dateVal ? dayjs(dateVal).format("HH:mm") : "00:00",
+          category:    cf.category || "Chi phí khác",
+          supplier:    cf.partnerName || "Khác",
+          createdBy:   cf.createdByName || "Thu ngân",
+          amount:      cf.totalAmount || cf.amount || 0,
+          notes:       cf.note || `Phiếu chi tiền ${cf.category ? cf.category.toLowerCase() : "hoạt động"} ghi nhận từ sổ quỹ.`,
+          status:      cf.status || "Completed",
+        };
+      });
+      setAllExpenses(expenses);
 
-        // Map trend data
-        if (data.dailyStats && data.dailyStats.length > 0) {
-          setTrendData(
-            data.dailyStats.map((s) => ({
-              date:    s.date,
-              expense: s.expense || 0,
-            }))
-          );
-        } else {
-          setTrendData([]);
-        }
+      // Calculations
+      const totalExp = expenses.reduce((sum, item) => sum + item.amount, 0);
+      const avgExp = expenses.length > 0 ? Math.round(totalExp / expenses.length) : 0;
+      const daysInRange = Math.max(1, end.diff(start, "day") + 1);
+      const avgD = Math.round(totalExp / daysInRange);
+      const maxExp = expenses.length > 0 ? Math.max(...expenses.map(e => e.amount)) : 0;
+      const rev = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
 
-        // Map breakdown data (Theo nhóm danh mục)
-        const categoriesMap = {};
-        expenses.forEach((item) => {
-          categoriesMap[item.category] = (categoriesMap[item.category] || 0) + item.amount;
-        });
-        const breakdown = Object.keys(categoriesMap).map((catName) => ({
-          name:  catName,
-          value: categoriesMap[catName],
+      setTotalExpense(totalExp);
+      setAvgExpense(avgExp);
+      setAvgPerDay(avgD);
+      setHighestVal(maxExp);
+      setTotalRevenue(rev);
+
+      // Map breakdown data (Pie Chart: Theo nhóm danh mục)
+      const categoriesMap = {};
+      expenses.forEach((item) => {
+        categoriesMap[item.category] = (categoriesMap[item.category] || 0) + item.amount;
+      });
+      const breakdown = Object.keys(categoriesMap).map((catName) => ({
+        name:  catName,
+        value: categoriesMap[catName],
+      }));
+      setBreakdownData(breakdown);
+
+      // Map top expenses
+      const sorted = [...expenses]
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5)
+        .map((item) => ({
+          name: item.notes || item.category,
+          amount: item.amount,
         }));
-        setBreakdownData(breakdown);
+      setTopExpenseData(sorted);
 
-        // Map top expenses
-        const sorted = [...expenses]
-          .sort((a, b) => b.amount - a.amount)
-          .slice(0, 5)
-          .map((item) => ({
-            name: item.notes || item.category,
-            amount: item.amount,
-          }));
-        setTopExpenseData(sorted);
+      // Map trend data: group expenses by date
+      const dailyMap = {};
+      let cur = dayjs(start);
+      while (cur.isBefore(end) || cur.isSame(end, "day")) {
+        const key = cur.format("YYYY-MM-DD");
+        dailyMap[key] = { date: cur.format("DD/MM"), expense: 0 };
+        cur = cur.add(1, "day");
       }
+
+      expenses.forEach((item) => {
+        const key = dayjs(item.date, "DD/MM/YYYY").format("YYYY-MM-DD");
+        if (dailyMap[key]) {
+          dailyMap[key].expense += item.amount;
+        }
+      });
+      setTrendData(Object.values(dailyMap));
+
     } catch (err) {
       console.error("[ReportExpensePage] API error:", err);
       message.warning("Không thể tải dữ liệu chi phí. Vui lòng thử lại.");
@@ -207,17 +223,7 @@ const ReportExpensePage = () => {
     return matchSearch && matchCategory && matchSupplier && matchCreatedBy;
   });
 
-  // ── Tính toán số liệu tổng hợp ─────────────────────────────────────────
-  const totalExpense = beStats?.expenses || 0;
-  const avgExpense   = filteredData.length ? Math.round(totalExpense / filteredData.length) : 0;
-
-  const daysInRange = Math.max(1, dateRange[1].diff(dateRange[0], "day") + 1);
-  const avgPerDay   = Math.round((beStats?.revenue || 0) / daysInRange);
-
-  const dailyList = beStats?.dailyStats || [];
-  const revenueValues = dailyList.map((d) => d.revenue || 0);
-  const highestVal = revenueValues.length ? Math.max(...revenueValues) : (beStats?.revenue || 0);
-  const lowestVal  = revenueValues.length ? Math.min(...revenueValues) : 0;
+  const lowestVal = 0;
 
   // Lấy các option động cho category filter
   const categoryOptions = [

@@ -57,27 +57,6 @@ const ProfitSummaryCards = ({ data = {}, onOpenCompare }) => {
       bgIcon: "#fef2f2",
       borderColor: "#ef4444",
     },
-    {
-      title: "Tiến Độ Hòa Vốn (Break-even)",
-      value: `${breakEvenPct}%`,
-      subText: "Đã vượt mốc hòa vốn tháng",
-      icon: <CheckCircleOutlined style={{ fontSize: 20, color: "#8b5cf6" }} />,
-      bgIcon: "#f5f3ff",
-      borderColor: "#8b5cf6",
-    },
-    {
-      title: "Tăng Trưởng Lợi Nhuận",
-      value: `${isGrowthPositive ? "+" : ""}${growthPct}%`,
-      subText: "So với kỳ trước",
-      icon: isGrowthPositive ? (
-        <RiseOutlined style={{ fontSize: 20, color: "#16a34a" }} />
-      ) : (
-        <FallOutlined style={{ fontSize: 20, color: "#dc2626" }} />
-      ),
-      bgIcon: isGrowthPositive ? "#f0fdf4" : "#fef2f2",
-      borderColor: isGrowthPositive ? "#16a34a" : "#dc2626",
-      isBadge: true,
-    },
   ];
 
   return (
@@ -111,7 +90,7 @@ const ProfitSummaryCards = ({ data = {}, onOpenCompare }) => {
 
       <Row gutter={[16, 16]}>
         {kpis.map((kpi, idx) => (
-          <Col xs={24} sm={12} lg={4.8} key={idx} style={{ flex: "1 0 18%" }}>
+          <Col xs={24} sm={12} lg={8} key={idx}>
             <Card
               bordered={false}
               style={{

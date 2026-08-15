@@ -275,7 +275,7 @@ const ReportInventoryPage = () => {
       setAlerts(dynamicAlerts);
     } catch (err) {
       console.error("[ReportInventoryPage] API error:", err);
-      message.warning("Không thể kết nối dữ liệu kho thật. Đang dùng dữ liệu demo.");
+      message.warning("Không thể kết nối dữ liệu kho từ máy chủ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
