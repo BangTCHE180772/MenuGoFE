@@ -179,17 +179,7 @@ const KDSPage = () => {
     }
   };
 
-  // AF1: Batch Processing Handler
-  const handleBatchStatusChange = async (batchDetailIds, nextStatus) => {
-    try {
-      await batchUpdateCookingStatus(batchDetailIds, nextStatus);
-      message.success(`Đã cập nhật trạng thái cho ${batchDetailIds.length} món trong mẻ!`);
-      fetchItems(false);
-    } catch (err) {
-      console.error(err);
-      message.error('Có lỗi xảy ra khi xử lý lô/mẻ món.');
-    }
-  };
+
 
   // Group items by status for Filter Tabs & Columns
   const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
@@ -197,86 +187,7 @@ const KDSPage = () => {
   const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
   const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
 
-  // AF1: Split identical dishes into batches of 10.
-  // Only initial/new orders (Waiting/Accepted) are shown up here — once a batch
-  // is confirmed into Cooking, finishing it happens per-card down in the queue below.
-  const activeBatchGroups = useMemo(() => {
-    const activeItems = items.filter(
-      (i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING || i.cookingStatus === COOKING_STATUS.ACCEPTED
-    );
-    const groups = {};
 
-    // Group active items by product ID/Name
-    activeItems.forEach((item) => {
-      const key = item.productId || item.productName;
-      if (!groups[key]) {
-        groups[key] = {
-          productId: item.productId,
-          productName: item.productName || item.ProductName,
-          productImage: item.productImage,
-          details: [],
-        };
-      }
-      groups[key].details.push(item);
-    });
-
-    const allBatches = [];
-
-    // Partition each group into batches of 10
-    Object.values(groups).forEach((group) => {
-      // Sort by createdAt ascending (FIFO)
-      const sortedDetails = [...group.details].sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-      );
-
-      let batchNum = 1;
-      let currentBatch = {
-        productId: group.productId,
-        productName: group.productName,
-        productImage: group.productImage,
-        batchIndex: batchNum,
-        totalQty: 0,
-        details: [],
-      };
-
-      sortedDetails.forEach((detail) => {
-        let remainingQty = detail.quantity;
-
-        while (remainingQty > 0) {
-          const capacity = 10 - currentBatch.totalQty;
-          if (capacity <= 0) {
-            allBatches.push(currentBatch);
-            batchNum += 1;
-            currentBatch = {
-              productId: group.productId,
-              productName: group.productName,
-              productImage: group.productImage,
-              batchIndex: batchNum,
-              totalQty: 0,
-              details: [],
-            };
-            continue;
-          }
-
-          const qtyToTake = Math.min(remainingQty, capacity);
-          currentBatch.details.push({
-            orderDetailId: detail.orderDetailId,
-            tableName: detail.tableName,
-            quantity: qtyToTake,
-            cookingStatus: detail.cookingStatus || COOKING_STATUS.WAITING,
-          });
-          currentBatch.totalQty += qtyToTake;
-          remainingQty -= qtyToTake;
-        }
-      });
-
-      if (currentBatch.totalQty > 0) {
-        allBatches.push(currentBatch);
-      }
-    });
-
-    return allBatches;
-  }, [items]);
 
   // Group a list of items by dish, splitting each dish into batches of up to 10
   // portions (mẻ) so the queue columns below the Batch Processing Bar are also
@@ -649,6 +560,14 @@ const KDSPage = () => {
               🍳 {cookingItems.length} Đang nấu
             </Tag>
           </Badge>
+
+          <Button
+            icon={<CheckCircleOutlined />}
+            onClick={() => setShowCompletedModal(true)}
+            style={{ backgroundColor: '#f6ffed', borderColor: '#52c41a', color: '#389e0d', borderRadius: 16 }}
+          >
+            Hoàn thành ({readyItems.length})
+          </Button>
         </Space>
       </div>
 
@@ -681,118 +600,6 @@ const KDSPage = () => {
         </div>
       )}
 
-      {/* ── AF1: BATCH PROCESSING BAR (CHIA MẺ 10 XUẤT 1 MẺ) ─────── */}
-      <Card
-        title={
-          <Space>
-            <ThunderboltOutlined style={{ color: '#faad14', fontSize: 18 }} />
-            <span style={{ color: '#000000', fontWeight: 600, fontSize: 16 }}>
-              Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar - AF1)
-            </span>
-            <Tag color="warning">Tối ưu 10 phần/mẻ</Tag>
-          </Space>
-        }
-        extra={
-          <Button
-            icon={<CheckCircleOutlined />}
-            onClick={() => setShowCompletedModal(true)}
-            style={{ backgroundColor: '#f6ffed', borderColor: '#52c41a', color: '#389e0d' }}
-          >
-            Đơn đã hoàn thành ({readyItems.length})
-          </Button>
-        }
-        style={{
-          backgroundColor: '#ffffff',
-          borderColor: '#d9d9d9',
-          borderRadius: 12,
-          marginBottom: 20,
-        }}
-      >
-        {activeBatchGroups.length === 0 ? (
-          <Text style={{ color: '#595959' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
-        ) : (
-          <Row gutter={[16, 16]}>
-            {activeBatchGroups.map((batch) => {
-              const batchWaitingIds = [...new Set(batch.details
-                .filter((d) => d.cookingStatus === COOKING_STATUS.WAITING)
-                .map((d) => d.orderDetailId))];
-              const batchAcceptedIds = [...new Set(batch.details
-                .filter((d) => d.cookingStatus === COOKING_STATUS.ACCEPTED)
-                .map((d) => d.orderDetailId))];
-
-              return (
-                <Col xs={24} sm={12} md={8} lg={6} key={`${batch.productId || batch.productName}_batch_${batch.batchIndex}`}>
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid #434343',
-                      borderRadius: 8,
-                      padding: 14,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                      <Text strong style={{ color: '#000000', fontSize: 15, display: 'flex', alignItems: 'center' }}>
-                        {batch.productImage ? (
-                          <img
-                            src={batch.productImage}
-                            alt={batch.productName}
-                            style={{ width: 28, height: 28, borderRadius: 4, marginRight: 8, objectFit: 'cover', border: '1px solid #434343' }}
-                          />
-                        ) : (
-                          <span style={{ marginRight: 8 }}>🍲</span>
-                        )}
-                        <span>{batch.productName}</span>
-                      </Text>
-                      <Tag color="cyan" style={{ margin: 0, fontWeight: 700 }}>
-                        Mẻ {batch.batchIndex}
-                      </Tag>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                      <Text style={{ color: '#595959', fontSize: 12 }}>Số lượng trong mẻ:</Text>
-                      <Tag color="red" style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
-                        {batch.totalQty} phần
-                      </Tag>
-                    </div>
-
-                    {/* Table markers (Removed label 'Bàn yêu cầu:' as requested by 'Xoá tên bàn yêu cầu') */}
-                    <div style={{ marginBottom: 12 }}>
-                      <Space wrap size={[4, 4]}>
-                        {batch.details.map((d, index) => (
-                          <Tag key={`${d.orderDetailId}_${index}`} color="blue" style={{ fontSize: 12, margin: 0 }}>
-                            {d.tableName} ({d.quantity}x)
-                          </Tag>
-                        ))}
-                      </Space>
-                    </div>
-
-                    {/* Batch Action: confirm the initial batch into cooking. Finishing
-                        happens per-card down in the "Đang nấu" column below. */}
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <Button
-                        type="primary"
-                        block
-                        size="small"
-                        icon={<FireOutlined />}
-                        onClick={() =>
-                          handleBatchStatusChange(
-                            [...batchWaitingIds, ...batchAcceptedIds],
-                            COOKING_STATUS.COOKING
-                          )
-                        }
-                        style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
-                      >
-                        Xác nhận làm mẻ
-                      </Button>
-                    </Space>
-                  </div>
-                </Col>
-              );
-            })}
-          </Row>
-        )}
-      </Card>
-
       {/* ── MAIN KITCHEN QUEUE ───────────────────────────────── */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -818,7 +625,11 @@ const KDSPage = () => {
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
               <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
-                {renderGroupedColumn([...waitingItems, ...acceptedItems], 'Không có món chờ chế biến')}
+                {waitingItems.length + acceptedItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món chờ chế biến</div>
+                ) : (
+                  [...waitingItems, ...acceptedItems].map(item => renderKdsCard(item))
+                )}
               </div>
             </div>
           </Col>
