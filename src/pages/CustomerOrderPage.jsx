@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { message, Spin, Spin as AntSpin, Modal } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { getTableOrderSummary } from '../api/tableMapApi';
 import { createOrder, createBulkOrderDetail, cancelOrder, cancelOrderDetail } from '../api/orderApi';
 import { callStaff, requestBill } from '../api/customerActionApi';
@@ -453,32 +454,25 @@ const CustomerOrderPage = () => {
 
           <div className="co-cart-items">
             {cartItems.length > 0 ? cartItems.map(item => (
-              <div key={item.id} className="co-cart-item" style={{ position: 'relative' }}>
-                <div className="co-cart-item-info" style={{ paddingRight: '24px' }}>
+              <div key={item.id} className="co-cart-item">
+                <div className="co-cart-item-info">
                   <div className="co-cart-item-name">{item.name}</div>
                   <div className="co-cart-item-price">{formatPrice(item.price)}</div>
                 </div>
-                <div className="co-cart-qty-ctrl">
-                  <button className="co-qty-btn" onClick={() => handleUpdateQty(item.id, -1)}>−</button>
-                  <span style={{ fontWeight: '600', minWidth: '20px', textAlign: 'center' }}>{item.qty}</span>
-                  <button className="co-qty-btn" onClick={() => handleUpdateQty(item.id, 1)}>+</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div className="co-cart-qty-ctrl">
+                    <button className="co-qty-btn" onClick={() => handleUpdateQty(item.id, -1)}>−</button>
+                    <span style={{ fontWeight: '600', minWidth: '20px', textAlign: 'center' }}>{item.qty}</span>
+                    <button className="co-qty-btn" onClick={() => handleUpdateQty(item.id, 1)}>+</button>
+                  </div>
+                  <button 
+                    onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} 
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '18px', padding: 0, display: 'flex', alignItems: 'center' }}
+                    title="Xóa món"
+                  >
+                    <DeleteOutlined />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setCartItems(prev => prev.filter(i => i.id !== item.id))} 
-                  style={{ 
-                    position: 'absolute', 
-                    top: '8px', 
-                    right: '8px', 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#9ca3af', 
-                    cursor: 'pointer',
-                    fontSize: '16px'
-                  }}
-                  title="Xóa món"
-                >
-                  ✕
-                </button>
               </div>
             )) : (
               <div className="co-empty-state" style={{ padding: '20px' }}>Giỏ hàng trống</div>
