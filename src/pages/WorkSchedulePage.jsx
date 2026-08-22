@@ -21,6 +21,8 @@ import {
   Divider,
   Calendar,
   Avatar,
+  Popover,
+  Dropdown,
 } from 'antd';
 import {
   PlusOutlined,
@@ -37,8 +39,19 @@ import {
   FileDoneOutlined,
   UserOutlined,
   SafetyCertificateOutlined,
+  LeftOutlined,
+  RightOutlined,
+  DownloadOutlined,
+  FilterOutlined,
+  SettingOutlined,
+  MobileOutlined,
+  InfoCircleOutlined,
+  DownOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+dayjs.extend(isoWeek);
 import {
   getAllWorkSchedules,
   createWorkSchedule,
@@ -117,6 +130,14 @@ const WorkSchedulePage = () => {
     6: { label: 'Phục vụ', color: 'green' },
   };
 
+  const contractedAccounts = useMemo(() => {
+    if (!accounts || accounts.length === 0) return [];
+    if (!contracts || contracts.length === 0) return accounts;
+    const contractedAccountIds = new Set(contracts.map((c) => c.accountId));
+    const filtered = accounts.filter((a) => contractedAccountIds.has(a.id));
+    return filtered.length > 0 ? filtered : accounts;
+  }, [accounts, contracts]);
+
   const groupedStaffAccounts = useMemo(() => {
     const groups = {
       4: { label: '💳 THU NGÂN', items: [] },
@@ -142,12 +163,20 @@ const WorkSchedulePage = () => {
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
   }, [accounts]);
 
-  // Filtering states
+  // Filtering & View states
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
+  const [searchEmpText, setSearchEmpText] = useState('');
+
+  // Weekly Matrix Grid Navigation
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => dayjs().startOf('isoWeek'));
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => currentWeekStart.add(i, 'day'));
+  }, [currentWeekStart]);
 
   // Modal states - Single Add/Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -162,8 +191,40 @@ const WorkSchedulePage = () => {
   const selectedFormBranchId = Form.useWatch('branchId', form);
   const selectedBulkBranchId = Form.useWatch('branchId', bulkForm);
 
-  // Active view tab
-  const [activeTab, setActiveTab] = useState('table');
+  // Active view tab ('grid' = Tanca Weekly Roster Grid, 'table' = Table list, 'calendar' = Monthly calendar)
+  const [activeTab, setActiveTab] = useState('grid');
+
+  // Excel Export Handler
+  const handleExportExcel = () => {
+    try {
+      let csv = '\uFEFF';
+      csv += 'Mã NV,Tên Nhân viên,Chi nhánh,Ca làm,Ngày làm việc,Giờ Check-in,Giờ Check-out,Số giờ thực tế,Trạng thái,Quản lý duyệt\n';
+      filteredSchedules.forEach((s) => {
+        const empName = getAccountName(s.accountId);
+        const brName = getBranchName(s.branchId);
+        const shiftInfo = getShiftDetails(s.shiftId);
+        const dateStr = dayjs(s.workDate).format('DD/MM/YYYY');
+        const inTime = s.checkInAt ? dayjs(s.checkInAt).format('HH:mm') : '--';
+        const outTime = s.checkOutAt ? dayjs(s.checkOutAt).format('HH:mm') : '--';
+        const hours = s.actualHours ?? 0;
+        const stLabel = getStatusOption(s.status)?.label || s.status;
+        const approved = s.managerApproved ? 'Đã duyệt' : 'Chờ duyệt';
+        csv += `"${s.accountId}","${empName}","${brName}","${shiftInfo.name}","${dateStr}","${inTime}","${outTime}",${hours},"${stLabel}","${approved}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Lich_Lam_Viec_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success('Đã xuất báo cáo lịch làm việc ra tập tin Excel (CSV) thành công!');
+    } catch (err) {
+      console.error(err);
+      message.error('Có lỗi xảy ra khi xuất file Excel!');
+    }
+  };
 
   // Load all lists
   const loadData = useCallback(async () => {
@@ -741,6 +802,350 @@ const WorkSchedulePage = () => {
     );
   };
 
+  // Quick Add Shift from Grid Cell
+  const handleQuickAddShift = (accountId, date) => {
+    setModalType('create');
+    setEditingRecord(null);
+    setIsModalOpen(true);
+    form.resetFields();
+    form.setFieldsValue({
+      accountId,
+      workDate: dayjs(date),
+      branchId: defaultBranchId,
+      status: 'Pending',
+      managerApproved: true,
+    });
+  };
+
+  // Render individual Shift Card inside Weekly Grid
+  const renderShiftCard = (item, isCompact = false) => {
+    const shiftInfo = getShiftDetails(item.shiftId);
+    const normSt = (item.status || '').toUpperCase();
+
+    let bgColor = '#fffbe6';
+    let borderColor = '#ffe58f';
+    let textColor = '#873800';
+
+    if (normSt === 'COMPLETED' || normSt === 'HOÀN THÀNH') {
+      bgColor = '#f6ffed';
+      borderColor = '#b7eb8f';
+      textColor = '#274e13';
+    } else if (normSt === 'WORKING' || normSt === 'ĐANG LÀM VIỆC') {
+      bgColor = '#e6f7ff';
+      borderColor = '#91d5ff';
+      textColor = '#003a8c';
+    } else if (normSt === 'ABSENT' || normSt === 'VẮNG MẮT' || (item.checkInAt && !item.checkOutAt)) {
+      bgColor = '#fff2f0';
+      borderColor = '#ffccc7';
+      textColor = '#a8071a';
+    } else if (normSt === 'LEAVE_APPROVED' || normSt === 'ĐÃ XIN NGHỈ') {
+      bgColor = '#f9f0ff';
+      borderColor = '#d3adf7';
+      textColor = '#531dab';
+    }
+
+    const checkInStr = item.checkInAt ? dayjs(item.checkInAt).format('HH:mm') : null;
+    const checkOutStr = item.checkOutAt ? dayjs(item.checkOutAt).format('HH:mm') : null;
+    let timeText = shiftInfo.time;
+    if (checkInStr || checkOutStr) {
+      timeText = `${checkInStr || '--'} 📲 - ${checkOutStr || '--'} 📲`;
+    }
+
+    return (
+      <div
+        key={item.id}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenModal('edit', item);
+        }}
+        style={{
+          backgroundColor: bgColor,
+          border: `1px solid ${borderColor}`,
+          color: textColor,
+          borderRadius: '6px',
+          padding: isCompact ? '4px 6px' : '6px 8px',
+          marginBottom: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          transition: 'all 0.2s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {shiftInfo.name}
+        </div>
+        <div style={{ fontSize: '10px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          ({timeText})
+        </div>
+      </div>
+    );
+  };
+
+  // Render Matrix Weekly Roster Grid
+  const renderWeeklyGrid = () => {
+    const isCurrentWeek = currentWeekStart.isSame(dayjs().startOf('isoWeek'), 'week');
+
+    const displayAccounts = contractedAccounts.filter((acc) => {
+      if (selectedAccount && acc.id !== selectedAccount) return false;
+      if (searchEmpText) {
+        const q = searchEmpText.toLowerCase();
+        const matchName = acc.name?.toLowerCase().includes(q);
+        const matchId = String(acc.id).includes(q);
+        const matchPhone = acc.phone?.includes(q);
+        if (!matchName && !matchId && !matchPhone) return false;
+      }
+      return true;
+    });
+
+    return (
+      <div className="weekly-roster-container" style={{ background: '#fff', borderRadius: '12px', padding: '16px' }}>
+        {/* Top Control Bar matching reference image */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+          {/* Left Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Button icon={<FilterOutlined />} style={{ borderRadius: '6px' }} title="Bộ lọc" />
+
+            <div style={{ display: 'flex', alignItems: 'center', background: '#f5f5f5', borderRadius: '6px', padding: '2px 4px' }}>
+              <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => setCurrentWeekStart((prev) => prev.subtract(1, 'week'))} />
+              <div style={{ padding: '0 8px', fontWeight: 600, fontSize: '13px', color: '#1f2937' }}>
+                Tuần {currentWeekStart.format('WW')}-{currentWeekStart.format('YYYY')} ({currentWeekStart.format('DD/MM')} - {currentWeekStart.add(6, 'day').format('DD/MM')})
+              </div>
+              <Button type="text" size="small" icon={<RightOutlined />} onClick={() => setCurrentWeekStart((prev) => prev.add(1, 'week'))} />
+            </div>
+
+            <Button
+              size="middle"
+              style={{ borderRadius: '6px', color: isCurrentWeek ? '#1890ff' : undefined, borderColor: isCurrentWeek ? '#91d5ff' : undefined }}
+              onClick={() => setCurrentWeekStart(dayjs().startOf('isoWeek'))}
+            >
+              Hôm nay
+            </Button>
+
+            <Select
+              placeholder="Ca làm ∨"
+              allowClear
+              style={{ width: 130 }}
+              value={selectedShift}
+              onChange={(val) => setSelectedShift(val)}
+            >
+              {shifts.map((s) => (
+                <Select.Option key={s.id} value={s.id}>
+                  {s.name}
+                </Select.Option>
+              ))}
+            </Select>
+
+            <Input
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              placeholder="Q Tìm kiếm nhân viên..."
+              allowClear
+              value={searchEmpText}
+              onChange={(e) => setSearchEmpText(e.target.value)}
+              style={{ width: 190, borderRadius: '6px' }}
+            />
+          </div>
+
+
+        </div>
+
+        {/* Matrix Table */}
+        <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', background: '#fff' }}>
+            <thead>
+              <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
+                <th style={{ padding: '12px 14px', textAlign: 'left', minWidth: '210px', borderRight: '1px solid #f0f0f0', color: '#595959', fontWeight: 700 }}>
+                  Nhân viên ({displayAccounts.length})
+                </th>
+                {weekDays.map((day, idx) => {
+                  const isToday = day.isSame(dayjs(), 'day');
+                  const dayName = idx === 6 ? 'CN' : `T${idx + 2}`;
+                  const formattedDate = day.format('DD/MM');
+                  return (
+                    <th
+                      key={day.format('YYYY-MM-DD')}
+                      style={{
+                        padding: '10px 8px',
+                        textAlign: 'center',
+                        minWidth: '125px',
+                        borderRight: idx === 6 ? 'none' : '1px solid #f0f0f0',
+                        background: isToday ? '#e6f7ff' : undefined,
+                        color: isToday ? '#1890ff' : '#262626',
+                        fontWeight: isToday ? 800 : 600,
+                      }}
+                    >
+                      <div>{dayName} {formattedDate}</div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {displayAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '32px', color: '#8c8c8c' }}>
+                    Không tìm thấy nhân viên nào phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              ) : (
+                displayAccounts.map((acc) => {
+                  const primaryRoleId = acc.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : (acc.roleId || 6);
+                  const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+
+                  return (
+                    <tr key={acc.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '10px 12px', borderRight: '1px solid #f0f0f0', background: '#fafafa', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar
+                            size={34}
+                            src={acc.avatarImage || undefined}
+                            icon={!acc.avatarImage ? <UserOutlined /> : undefined}
+                            style={{ backgroundColor: acc.avatarImage ? undefined : '#1890ff', flexShrink: 0 }}
+                          />
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontWeight: 700, color: '#1f2937', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {acc.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Tag color={roleInfo.color} style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px' }}>
+                                {roleInfo.label}
+                              </Tag>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {weekDays.map((day) => {
+                        const dateStr = day.format('YYYY-MM-DD');
+                        const empDaySchedules = filteredSchedules.filter(
+                          (s) => s.accountId === acc.id && dayjs(s.workDate).format('YYYY-MM-DD') === dateStr
+                        );
+                        const isToday = day.isSame(dayjs(), 'day');
+
+                        return (
+                          <td
+                            key={dateStr}
+                            style={{
+                              padding: '6px',
+                              verticalAlign: 'top',
+                              borderRight: '1px solid #f0f0f0',
+                              background: isToday ? '#fafafa' : '#fff',
+                              minHeight: '65px',
+                            }}
+                          >
+                            {empDaySchedules.length === 0 ? (
+                              <div
+                                onClick={() => handleQuickAddShift(acc.id, dateStr)}
+                                style={{
+                                  height: '52px',
+                                  borderRadius: '6px',
+                                  border: '1px dashed transparent',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  color: '#bfbfbf',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = '#1890ff';
+                                  e.currentTarget.style.color = '#1890ff';
+                                  e.currentTarget.style.backgroundColor = '#e6f7ff';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = 'transparent';
+                                  e.currentTarget.style.color = '#bfbfbf';
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                title="Bấm để phân ca trực"
+                              >
+                                <PlusOutlined style={{ fontSize: '14px' }} />
+                              </div>
+                            ) : empDaySchedules.length === 1 ? (
+                              renderShiftCard(empDaySchedules[0])
+                            ) : (
+                              <Popover
+                                trigger="click"
+                                title={<strong>Lịch làm việc ({empDaySchedules.length} ca):</strong>}
+                                content={
+                                  <div style={{ minWidth: 200 }}>
+                                    {empDaySchedules.map((s) => renderShiftCard(s))}
+                                  </div>
+                                }
+                              >
+                                <div
+                                  style={{
+                                    backgroundColor: '#e6f7ff',
+                                    border: '1px solid #91d5ff',
+                                    borderRadius: '6px',
+                                    padding: '6px 8px',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    color: '#003a8c',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  {empDaySchedules.length} Ca • •
+                                </div>
+                              </Popover>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bottom Legend Bar matching system STATUS_OPTIONS */}
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '10px 14px',
+            background: '#fafafa',
+            borderRadius: '8px',
+            border: '1px solid #f0f0f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: '20px',
+            fontSize: '12px',
+            color: '#595959',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#faad14' }} />
+            <span>Chờ thực hiện</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#1890ff' }} />
+            <span>Đã duyệt ca</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#13c2c2' }} />
+            <span>Đang làm việc</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#52c41a' }} />
+            <span>Hoàn thành</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#ff4d4f' }} />
+            <span>Vắng mặt</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#722ed1' }} />
+            <span>Đã xin nghỉ</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="work-schedule-page animate-fade-in" style={{ padding: '0px 0' }}>
       {/* Page Header */}
@@ -942,122 +1347,13 @@ const WorkSchedulePage = () => {
         style={{ background: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
         items={[
           {
-            key: 'table',
+            key: 'grid',
             label: (
               <span>
-                <SolutionOutlined /> Danh sách lịch trực
+                <CalendarOutlined /> Lịch tuần
               </span>
             ),
-            children: (
-              <>
-                {/* Advanced Search & Filtering Box */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
-                  {isOwnerOrAdmin && (
-                    <Select
-                      placeholder="Lọc chi nhánh"
-                      style={{ width: 180 }}
-                      allowClear
-                      value={selectedBranch}
-                      onChange={(val) => setSelectedBranch(val)}
-                    >
-                      {branches.map((b) => (
-                        <Select.Option key={b.id} value={b.id}>
-                          {b.name}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  )}
-
-                  <Select
-                    placeholder="Lọc nhân viên"
-                    style={{ width: 180 }}
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    value={selectedAccount}
-                    onChange={(val) => setSelectedAccount(val)}
-                  >
-                    {accounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-
-
-                  <Select
-                    placeholder="Lọc ca làm việc"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedShift}
-                    onChange={(val) => setSelectedShift(val)}
-                  >
-                    {shifts.map((s) => (
-                      <Select.Option key={s.id} value={s.id}>
-                        {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-                  <Select
-                    placeholder="Lọc trạng thái"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                  >
-                    {[
-                      { value: 'PENDING', label: 'Chờ thực hiện' },
-                      { value: 'APPROVED', label: 'Đã duyệt' },
-                      { value: 'Working', label: 'Đang làm việc' },
-                      { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT', label: 'Vắng mặt' },
-                    ].map((st) => (
-                      <Select.Option key={st.value} value={st.value}>
-                        {st.label}
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-                  <Select
-                    placeholder="Lọc Quản lý duyệt"
-                    style={{ width: 170 }}
-                    allowClear
-                    value={selectedManagerApproved}
-                    onChange={(val) => setSelectedManagerApproved(val)}
-                  >
-                    <Select.Option value={true}>🟢 Đã duyệt công</Select.Option>
-                    <Select.Option value={false}>🟠 Chờ duyệt công</Select.Option>
-                  </Select>
-
-                  <DatePicker
-                    placeholder="Lọc ngày cụ thể"
-                    style={{ width: 160 }}
-                    value={searchDate}
-                    onChange={(date) => setSearchDate(date)}
-                    format="DD/MM/YYYY"
-                  />
-
-                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || selectedManagerApproved !== null || searchDate) && (
-                    <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
-                      Xóa lọc
-                    </Button>
-                  )}
-                </div>
-
-                {/* Table View */}
-                <Table
-                  columns={columns}
-                  dataSource={filteredSchedules}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-                  scroll={{ x: 1100 }}
-                  bordered
-                />
-              </>
-            ),
+            children: renderWeeklyGrid(),
           },
           {
             key: 'calendar',
@@ -1388,7 +1684,7 @@ const WorkSchedulePage = () => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <TeamOutlined />
-            <span>PHÂN CA HÀNG LOẠT (BULK SHIFT ASSIGNMENT)</span>
+            <span>PHÂN CA HÀNG LOẠT</span>
           </div>
         }
         open={isBulkModalOpen}
