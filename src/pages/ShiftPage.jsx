@@ -6,9 +6,12 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Switch,
   TimePicker,
   Space,
+  Row,
+  Col,
   Tag,
   Tooltip,
   Popconfirm,
@@ -73,11 +76,21 @@ const ShiftPage = () => {
         name: record.name,
         startTime: record.startTime ? dayjs(record.startTime, 'HH:mm:ss') : null,
         endTime: record.endTime ? dayjs(record.endTime, 'HH:mm:ss') : null,
-        isActive: record.isActive,
+        standardHours: record.standardHours ?? 8.0,
+        isNightShift: record.isNightShift ?? false,
+        nightBonusRate: record.nightBonusRate ?? 1.3,
+        nightAllowance: record.nightAllowance ?? 0,
+        nightHours: record.nightHours ?? 0,
+        isActive: record.isActive ?? true,
       });
     } else {
       form.resetFields();
       form.setFieldsValue({
+        standardHours: 8.0,
+        isNightShift: false,
+        nightBonusRate: 1.3,
+        nightAllowance: 0,
+        nightHours: 0,
         isActive: true,
       });
     }
@@ -96,6 +109,11 @@ const ShiftPage = () => {
         name: values.name,
         startTime: values.startTime ? values.startTime.format('HH:mm:ss') : null,
         endTime: values.endTime ? values.endTime.format('HH:mm:ss') : null,
+        standardHours: values.standardHours ?? 8.0,
+        isNightShift: values.isNightShift ?? false,
+        nightBonusRate: values.nightBonusRate ?? 1.3,
+        nightAllowance: values.nightAllowance ?? 0,
+        nightHours: values.nightHours ?? 0,
         isActive: values.isActive ?? true,
       };
 
@@ -188,6 +206,22 @@ const ShiftPage = () => {
       },
     },
     {
+      title: 'Loại ca',
+      dataIndex: 'isNightShift',
+      key: 'isNightShift',
+      render: (isNight) => (
+        <Tag color={isNight ? 'purple' : 'blue'}>
+          {isNight ? 'Ca đêm' : 'Ca ngày'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Giờ chuẩn',
+      dataIndex: 'standardHours',
+      key: 'standardHours',
+      render: (hrs) => `${hrs ?? 8.0}h`,
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'isActive',
       key: 'isActive',
@@ -273,7 +307,7 @@ const ShiftPage = () => {
                 Quản Lý Ca Làm Việc
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                Thiết lập các ca làm việc, thời gian bắt đầu và kết thúc
+                Thiết lập các ca làm việc, thời gian, giờ chuẩn và phụ cấp ca đêm
               </p>
             </div>
           </div>
@@ -332,7 +366,7 @@ const ShiftPage = () => {
         open={isModalOpen}
         onCancel={handleCloseModal}
         onOk={() => form.submit()}
-        width={520}
+        width={560}
         okText={modalType === 'create' ? 'Tạo mới' : 'Cập nhật'}
         cancelText="Hủy bỏ"
         okButtonProps={{
@@ -359,36 +393,138 @@ const ShiftPage = () => {
             label="Tên ca làm việc"
             rules={[{ required: true, message: 'Vui lòng nhập tên ca làm việc!' }]}
           >
-            <Input placeholder="VD: Ca sáng, Ca chiều, Ca tối..." />
+            <Input placeholder="VD: Ca sáng, Ca chiều, Ca đêm..." />
           </Form.Item>
 
-          <Space style={{ display: 'flex', width: '100%' }} size="large" align="start">
-            <Form.Item
-              name="startTime"
-              label="Giờ bắt đầu"
-              rules={[{ required: true, message: 'Vui lòng chọn giờ bắt đầu!' }]}
-              style={{ width: 220 }}
-            >
-              <TimePicker
-                format="HH:mm"
-                style={{ width: '100%' }}
-                placeholder="Chọn giờ bắt đầu"
-              />
-            </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item
+                name="startTime"
+                label="Giờ bắt đầu"
+                rules={[{ required: true, message: 'Vui lòng chọn giờ bắt đầu!' }]}
+              >
+                <TimePicker
+                  format="HH:mm"
+                  style={{ width: '100%' }}
+                  placeholder="Bắt đầu"
+                />
+              </Form.Item>
+            </Col>
 
-            <Form.Item
-              name="endTime"
-              label="Giờ kết thúc"
-              rules={[{ required: true, message: 'Vui lòng chọn giờ kết thúc!' }]}
-              style={{ width: 220 }}
-            >
-              <TimePicker
-                format="HH:mm"
-                style={{ width: '100%' }}
-                placeholder="Chọn giờ kết thúc"
-              />
-            </Form.Item>
-          </Space>
+            <Col span={8}>
+              <Form.Item
+                name="endTime"
+                label="Giờ kết thúc"
+                rules={[{ required: true, message: 'Vui lòng chọn giờ kết thúc!' }]}
+              >
+                <TimePicker
+                  format="HH:mm"
+                  style={{ width: '100%' }}
+                  placeholder="Kết thúc"
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={8}>
+              <Form.Item
+                name="standardHours"
+                label="Số giờ chuẩn"
+                rules={[{ required: true, message: 'Vui lòng nhập số giờ chuẩn!' }]}
+              >
+                <InputNumber
+                  min={0.5}
+                  max={24.0}
+                  step={0.5}
+                  style={{ width: '100%' }}
+                  placeholder="8.0"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="isNightShift"
+            label="Cấu hình Ca Đêm"
+            valuePropName="checked"
+          >
+            <Switch
+              checkedChildren="Ca đêm"
+              unCheckedChildren="Ca ngày"
+            />
+          </Form.Item>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.isNightShift !== currentValues.isNightShift}
+          >
+            {({ getFieldValue }) =>
+              getFieldValue('isNightShift') ? (
+                <Card
+                  size="small"
+                  style={{
+                    marginBottom: 16,
+                    background: '#faf5ff',
+                    border: '1px solid #d8b4fe',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <Row gutter={12}>
+                    <Col span={8}>
+                      <Form.Item
+                        name="nightBonusRate"
+                        label="Hệ số ca đêm"
+                        rules={[{ required: true, message: 'Nhập hệ số!' }]}
+                        style={{ marginBottom: 8 }}
+                      >
+                        <InputNumber
+                          min={1.0}
+                          max={5.0}
+                          step={0.1}
+                          style={{ width: '100%' }}
+                          placeholder="VD: 1.3 (+30%)"
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={8}>
+                      <Form.Item
+                        name="nightHours"
+                        label="Số giờ tính ca đêm"
+                        tooltip="Ví dụ: Ca 22h-2h (4 tiếng), nhưng chỉ 24h-2h tính ca đêm thì nhập 2.0h. Để 0 = tính toàn bộ ca."
+                        style={{ marginBottom: 8 }}
+                      >
+                        <InputNumber
+                          min={0}
+                          max={24}
+                          step={0.5}
+                          addonAfter="h"
+                          style={{ width: '100%' }}
+                          placeholder="VD: 2.0 (Để 0 = cả ca)"
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={8}>
+                      <Form.Item
+                        name="nightAllowance"
+                        label="Phụ cấp cố định (đ)"
+                        style={{ marginBottom: 8 }}
+                      >
+                        <InputNumber
+                          min={0}
+                          step={10000}
+                          style={{ width: '100%' }}
+                          placeholder="VD: 50000"
+                          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
+              ) : null
+            }
+          </Form.Item>
 
           <Form.Item
             name="isActive"
