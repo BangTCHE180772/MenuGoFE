@@ -58,6 +58,8 @@ import {
   updateWorkSchedule,
   deleteWorkSchedule,
   assignWorkSchedules,
+  approveOT,
+  verifyPOSActivity,
 } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
@@ -187,6 +189,53 @@ const WorkSchedulePage = () => {
   // Modal states - Bulk Assign
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkForm] = Form.useForm();
+
+  // OT Approval Modal state
+  const [isOTModalOpen, setIsOTModalOpen] = useState(false);
+  const [selectedOTRecord, setSelectedOTRecord] = useState(null);
+  const [posVerificationData, setPosVerificationData] = useState(null);
+  const [loadingPOS, setLoadingPOS] = useState(false);
+  const [otForm] = Form.useForm();
+
+  const handleOpenOTModal = async (record) => {
+    setSelectedOTRecord(record);
+    setIsOTModalOpen(true);
+    setLoadingPOS(true);
+    setPosVerificationData(null);
+    otForm.setFieldsValue({
+      approvedOTHours: record.approvedOTHours ?? 0,
+      otNotes: record.otNotes || '',
+      otStatus: record.otStatus || 'Approved',
+    });
+
+    try {
+      const res = await verifyPOSActivity(record.id);
+      setPosVerificationData(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error('Không thể kiểm tra hoạt động POS!');
+    } finally {
+      setLoadingPOS(false);
+    }
+  };
+
+  const handleOTSubmit = async (values) => {
+    try {
+      await approveOT({
+        workScheduleId: selectedOTRecord.id,
+        approvedOTHours: values.approvedOTHours,
+        otNotes: values.otNotes,
+        otStatus: values.otStatus || 'Approved',
+      });
+      message.success('Đã duyệt giờ làm thêm (OT) thành công!');
+      setIsOTModalOpen(false);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi duyệt OT!';
+      message.error(errorMsg);
+    }
+  };
 
   const selectedFormBranchId = Form.useWatch('branchId', form);
   const selectedBulkBranchId = Form.useWatch('branchId', bulkForm);
@@ -695,6 +744,13 @@ const WorkSchedulePage = () => {
     width: 110,
     render: (_, record) => (
       <Space size="middle">
+        <Tooltip title="Duyệt OT & Kiểm tra POS">
+          <Button
+            type="text"
+            icon={<SafetyCertificateOutlined style={{ color: '#fa8c16' }} />}
+            onClick={() => handleOpenOTModal(record)}
+          />
+        </Tooltip>
         <Tooltip title="Chỉnh sửa ca trực">
           <Button
             type="text"
@@ -1823,6 +1879,85 @@ const WorkSchedulePage = () => {
             </span>
           </div>
         </Form>
+      </Modal>
+
+      {/* Modal Duyệt OT & Kiểm tra POS */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#fa8c16' }}>
+            <SafetyCertificateOutlined />
+            <span>PHÊ DUYỆT TĂNG CA (OT) & XÁC MINH POS</span>
+          </div>
+        }
+        open={isOTModalOpen}
+        onCancel={() => setIsOTModalOpen(false)}
+        onOk={() => otForm.submit()}
+        width={560}
+        okText="Lưu phê duyệt OT"
+        cancelText="Hủy bỏ"
+        okButtonProps={{
+          style: {
+            background: 'linear-gradient(135deg, #fa8c16, #ffa940)',
+            border: 'none',
+          },
+        }}
+      >
+        {selectedOTRecord && (
+          <div>
+            <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 16 }}>
+              <div><strong>Nhân viên:</strong> {getAccountName(selectedOTRecord.accountId)}</div>
+              <div><strong>Ngày làm việc:</strong> {dayjs(selectedOTRecord.workDate).format('DD/MM/YYYY')}</div>
+              <div><strong>Check-in / Check-out:</strong> {selectedOTRecord.checkInAt ? dayjs(selectedOTRecord.checkInAt).format('HH:mm') : '--'} - {selectedOTRecord.checkOutAt ? dayjs(selectedOTRecord.checkOutAt).format('HH:mm') : '--'}</div>
+              <div><strong>Tổng giờ thực tế:</strong> <Tag color="blue">{selectedOTRecord.actualHours || 0} giờ</Tag></div>
+            </div>
+
+            {/* POS Verification Result Alert */}
+            <div style={{ marginBottom: 16 }}>
+              {loadingPOS ? (
+                <Card loading size="small" title="Đang kiểm tra hoạt động POS..." />
+              ) : posVerificationData ? (
+                <Card
+                  size="small"
+                  style={{
+                    border: posVerificationData.isSuspicious ? '1px solid #ffbb96' : '1px solid #b7eb8f',
+                    background: posVerificationData.isSuspicious ? '#fff2e8' : '#f6ffed',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: posVerificationData.isSuspicious ? '#d4380d' : '#389e0d', marginBottom: 4 }}>
+                    {posVerificationData.isSuspicious ? '⚠️ CẢNH BÁO KHÔNG CÓ HOẠT ĐỘNG POS' : '✅ ĐÃ XÁC MINH CÓ ĐƠN HÀNG POS'}
+                  </div>
+                  <div style={{ fontSize: 13 }}>{posVerificationData.message}</div>
+                  <div style={{ fontSize: 12, marginTop: 4, color: '#595959' }}>
+                    Số đơn hàng ghi nhận trong giờ dư: <strong>{posVerificationData.orderCount || 0} đơn</strong>
+                  </div>
+                </Card>
+              ) : null}
+            </div>
+
+            <Form form={otForm} layout="vertical" onFinish={handleOTSubmit}>
+              <Form.Item
+                name="approvedOTHours"
+                label="Số giờ OT được Quản lý duyệt tính lương"
+                rules={[{ required: true, message: 'Vui lòng nhập số giờ OT!' }]}
+                help="Lưu ý: Chỉ số giờ OT được duyệt tại đây mới được cộng vào tiền tăng ca cuối tháng."
+              >
+                <InputNumber min={0} max={12} step={0.5} style={{ width: '100%' }} suffix="giờ" />
+              </Form.Item>
+
+              <Form.Item name="otNotes" label="Ghi chú duyệt OT (Lý do duyệt / Từ chối)">
+                <Input.TextArea rows={2} placeholder="Nhập ghi chú cho nhân viên..." />
+              </Form.Item>
+
+              <Form.Item name="otStatus" label="Trạng thái phê duyệt OT">
+                <Select>
+                  <Select.Option value="Approved">Chấp nhận OT (Approved)</Select.Option>
+                  <Select.Option value="Rejected">Từ chối OT (Rejected - Nghi ngờ quên check-out)</Select.Option>
+                  <Select.Option value="Pending">Chờ xem xét (Pending)</Select.Option>
+                </Select>
+              </Form.Item>
+            </Form>
+          </div>
+        )}
       </Modal>
     </div>
   );
