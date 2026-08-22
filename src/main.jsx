@@ -10,6 +10,7 @@ dayjs.locale('vi');
 import { AuthProvider } from './context/AuthContext';
 import { BranchProvider } from './context/BranchContext';
 import { DeviceProvider } from './context/DeviceContext';
+import { CustomerAuthProvider } from './context/CustomerAuthContext';
 
 import './index.css';
 import App from './App.jsx';
@@ -31,7 +32,9 @@ createRoot(document.getElementById('root')).render(
         <AuthProvider>
           <BranchProvider>
             <DeviceProvider>
-              <App />
+              <CustomerAuthProvider>
+                <App />
+              </CustomerAuthProvider>
             </DeviceProvider>
           </BranchProvider>
         </AuthProvider>

@@ -19,14 +19,10 @@ import {
   MoreOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import {
-  searchBranches,
-  deleteBranch,
-  updateBranch,
-} from "../api/branchApi";
+import { searchBranches, deleteBranch, updateBranch } from "../api/branchApi";
 import { getBranchDashboardStats } from "../api/dashboardApi";
 import "../styles/BranchPage.css";
-import CreateUpdateBranchFormPopup from "../Popup/CreateUpdateBranchFormPopup";
+import CreateUpdateBranchFormPopup from "../PopUp/CreateUpdateBranchFormPopup";
 import { getMainChain } from "../api/chainApi";
 
 const { RangePicker } = DatePicker;
@@ -245,7 +241,9 @@ const BranchPage = () => {
     try {
       await deleteBranch(id);
 
-      message.success("Chi nhánh đã được chuyển sang trạng thái Ngừng kinh doanh");
+      message.success(
+        "Chi nhánh đã được chuyển sang trạng thái Ngừng kinh doanh",
+      );
 
       loadBranches();
     } catch (err) {
@@ -256,7 +254,9 @@ const BranchPage = () => {
 
   const handleToggleStatus = async (record) => {
     if (record.isDeleted || record.status === "Ngừng kinh doanh") {
-      message.warning("Chi nhánh đã ngừng kinh doanh, liên hệ admin để thao tác mở chi nhánh.");
+      message.warning(
+        "Chi nhánh đã ngừng kinh doanh, liên hệ admin để thao tác mở chi nhánh.",
+      );
       return;
     }
 
@@ -270,11 +270,15 @@ const BranchPage = () => {
         closeTime: record.closeTime,
         status: nextStatus,
       });
-      message.success(`Đã chuyển trạng thái chi nhánh "${record.name}" sang "${nextStatus}"`);
+      message.success(
+        `Đã chuyển trạng thái chi nhánh "${record.name}" sang "${nextStatus}"`,
+      );
       loadBranches();
     } catch (err) {
       console.error(err);
-      message.error(err.response?.data?.message ?? "Chuyển trạng thái thất bại");
+      message.error(
+        err.response?.data?.message ?? "Chuyển trạng thái thất bại",
+      );
     }
   };
 
@@ -286,8 +290,12 @@ const BranchPage = () => {
     };
 
     return [...branches].sort((a, b) => {
-      const statusA = a.isDeleted ? "Ngừng kinh doanh" : (a.status || "Hoạt động");
-      const statusB = b.isDeleted ? "Ngừng kinh doanh" : (b.status || "Hoạt động");
+      const statusA = a.isDeleted
+        ? "Ngừng kinh doanh"
+        : a.status || "Hoạt động";
+      const statusB = b.isDeleted
+        ? "Ngừng kinh doanh"
+        : b.status || "Hoạt động";
 
       const prioA = statusPriority[statusA] || 1;
       const prioB = statusPriority[statusB] || 1;
@@ -313,7 +321,10 @@ const BranchPage = () => {
       dataIndex: "newAddressName",
       key: "newAddressName",
       sorter: true,
-      render: (text) => <span>{text || "Chưa có địa chỉ"}</span>,
+      render: (text, record) => {
+        const fullAddr = [record.addressText || record.AddressText, text].filter(Boolean).join(", ");
+        return <span>{fullAddr || "Chưa có địa chỉ"}</span>;
+      },
     },
     {
       title: "Giờ mở cửa",
@@ -356,12 +367,24 @@ const BranchPage = () => {
       width: 140,
       render: (_, record) => {
         if (record.isDeleted || record.status === "Ngừng kinh doanh") {
-          return <Tag color="error" style={{ fontWeight: 600 }}>Ngừng kinh doanh</Tag>;
+          return (
+            <Tag color="error" style={{ fontWeight: 600 }}>
+              Ngừng kinh doanh
+            </Tag>
+          );
         }
         if (record.status === "Tạm dừng") {
-          return <Tag color="warning" style={{ fontWeight: 600 }}>Tạm dừng</Tag>;
+          return (
+            <Tag color="warning" style={{ fontWeight: 600 }}>
+              Tạm dừng
+            </Tag>
+          );
         }
-        return <Tag color="success" style={{ fontWeight: 600 }}>Hoạt động</Tag>;
+        return (
+          <Tag color="success" style={{ fontWeight: 600 }}>
+            Hoạt động
+          </Tag>
+        );
       },
     },
     {
@@ -370,7 +393,8 @@ const BranchPage = () => {
       align: "center",
       width: 120,
       render: (_, record) => {
-        const isClosed = record.isDeleted || record.status === "Ngừng kinh doanh";
+        const isClosed =
+          record.isDeleted || record.status === "Ngừng kinh doanh";
         const isPaused = record.status === "Tạm dừng";
 
         const ActionsMenu = (
@@ -393,7 +417,11 @@ const BranchPage = () => {
                 <div className="ant-dropdown-menu-item">
                   <Button
                     type="text"
-                    style={{ width: "100%", textAlign: "left", color: isPaused ? "#16a34a" : "#fa8c16" }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      color: isPaused ? "#16a34a" : "#fa8c16",
+                    }}
                     onClick={() => handleToggleStatus(record)}
                   >
                     {isPaused ? "Hoạt động" : "Tạm dừng"}
@@ -407,14 +435,24 @@ const BranchPage = () => {
                     cancelText="Hủy"
                     onConfirm={() => {
                       Modal.confirm({
-                        title: "Xác nhận? (Hệ thống sẽ khóa chi nhánh khỏi việc các thao tác)",
+                        title:
+                          "Xác nhận? (Hệ thống sẽ khóa chi nhánh khỏi việc các thao tác)",
                         content: (
                           <div>
                             <div>
-                              Bạn sắp chuyển chi nhánh <strong>"{record.name}"</strong> sang trạng thái <strong>Ngừng kinh doanh</strong>.
+                              Bạn sắp chuyển chi nhánh{" "}
+                              <strong>"{record.name}"</strong> sang trạng thái{" "}
+                              <strong>Ngừng kinh doanh</strong>.
                             </div>
-                            <div style={{ marginTop: 8, color: "#ff4d4f", fontWeight: 700 }}>
-                              ⚠️ Dữ liệu Chi nhánh vẫn sẽ được lưu trữ (liên hệ quản trị viên để mở lại) ⚠️
+                            <div
+                              style={{
+                                marginTop: 8,
+                                color: "#ff4d4f",
+                                fontWeight: 700,
+                              }}
+                            >
+                              ⚠️ Dữ liệu Chi nhánh vẫn sẽ được lưu trữ (liên hệ
+                              quản trị viên để mở lại) ⚠️
                             </div>
                           </div>
                         ),
@@ -425,14 +463,25 @@ const BranchPage = () => {
                       });
                     }}
                   >
-                    <Button danger type="text" style={{ width: "100%", textAlign: "left" }}>
+                    <Button
+                      danger
+                      type="text"
+                      style={{ width: "100%", textAlign: "left" }}
+                    >
                       Xóa
                     </Button>
                   </Popconfirm>
                 </div>
               </>
             ) : (
-              <div style={{ padding: "8px 12px", color: "#94a3b8", fontSize: 12, fontStyle: "italic" }}>
+              <div
+                style={{
+                  padding: "8px 12px",
+                  color: "#94a3b8",
+                  fontSize: 12,
+                  fontStyle: "italic",
+                }}
+              >
                 Đã ngừng kinh doanh
               </div>
             )}

@@ -23,6 +23,7 @@ import {
   CheckCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -85,6 +86,7 @@ const ChainPage = () => {
         name: data.name,
         openTime: parseTime(data.openTime),
         closeTime: parseTime(data.closeTime),
+        addressText: data.addressText || data.AddressText || "",
       });
 
       setBannerPreview(data.backgroundImage || null);
@@ -240,6 +242,7 @@ const ChainPage = () => {
         closeTime: values.closeTime
           ? values.closeTime.format("HH:mm:ss")
           : chain.closeTime,
+        addressText: values.addressText || "",
         address: {
           type: "Chuỗi",
           newWardId: newAddressState.wardId
@@ -283,6 +286,7 @@ const ChainPage = () => {
       name: chain.name,
       openTime: parseTime(chain.openTime),
       closeTime: parseTime(chain.closeTime),
+      addressText: chain.addressText || chain.AddressText || "",
     });
 
     setBannerPreview(chain.backgroundImage || null);
@@ -452,32 +456,64 @@ const ChainPage = () => {
                 </Space>
               }
             >
-              {/* new */}
-              <div className="chain-address-box">
-                <div className="chain-address-title">
-                  <Tag color="green">MỚI</Tag>
-                  <span>Khu vực Địa chỉ mới</span>
+              {/* Khu vực Tỉnh / Huyện / Xã */}
+              <div className="chain-address-box" style={{ marginBottom: 16 }}>
+                <div className="chain-address-title" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Tag color="blue">Khu vực</Tag>
+                  <Text strong>Tỉnh / Thành phố, Phường / Xã</Text>
                 </div>
-                <div className="chain-address-content">
+                <div className="chain-address-content" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <Button
                     type="primary"
                     ghost
                     icon={<EnvironmentOutlined />}
                     onClick={openNewAddressModal}
                   >
-                    Chọn địa chỉ mới
+                    Chọn Tỉnh/Xã
                   </Button>
-                  <div className="chain-address-display">
+                  <div className="chain-address-display" style={{ flex: 1, background: "#f8fafc", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
                     <Text
                       type="secondary"
-                      style={{ fontSize: 12, display: "block" }}
+                      style={{ fontSize: 11, display: "block" }}
                     >
-                      Địa chỉ đang lưu:
+                      Khu vực đã chọn:
                     </Text>
-                    <Text bold color="primary">
+                    <Text strong>
                       {newAddressState.name || "Chưa thiết lập"}
                     </Text>
                   </div>
+                </div>
+              </div>
+
+              {/* Địa chỉ chi tiết */}
+              <div style={{ marginTop: 16 }}>
+                <Form.Item
+                  label={<span style={{ fontWeight: 600 }}>Địa chỉ chi tiết (Số nhà, tên đường...)</span>}
+                  name="addressText"
+                  rules={[
+                    { required: true, message: "Vui lòng nhập địa chỉ chi tiết" },
+                  ]}
+                  style={{ marginBottom: 8 }}
+                >
+                  <Input
+                    placeholder="Nhập số nhà, tên đường, tổ/thôn..."
+                    size="large"
+                  />
+                </Form.Item>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Button
+                    type="link"
+                    icon={<GlobalOutlined />}
+                    onClick={() => {
+                      const addr = form.getFieldValue("addressText");
+                      const url = addr 
+                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`
+                        : "https://www.google.com/maps";
+                      window.open(url, "_blank");
+                    }}
+                  >
+                    Tìm địa điểm trực tiếp trên Google Maps
+                  </Button>
                 </div>
               </div>
 

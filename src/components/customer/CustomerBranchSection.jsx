@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Row, Col, Typography, Spin, Pagination } from "antd";
-import { ShopOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Row, Col, Typography, Spin, Pagination, Button, Space, message } from "antd";
+import { ShopOutlined, LeftOutlined, RightOutlined, CompassOutlined } from "@ant-design/icons";
 import CustomerBranchCard from "./CustomerBranchCard";
 
 const { Title, Paragraph } = Typography;
@@ -8,10 +8,63 @@ const { Title, Paragraph } = Typography;
 const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(4);
+  const [userCoords, setUserCoords] = useState(null);
+  const [sortByDistance, setSortByDistance] = useState(false);
 
-  const activeBranches = (branches || []).filter(
-    (b) => !b.isDeleted && b.status !== "Ngừng kinh doanh"
-  );
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const handleRequestLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          setSortByDistance(true);
+          message.success("Đã xác định vị trí của bạn!");
+        },
+        (error) => {
+          console.warn("Lỗi GPS:", error);
+          message.warning("Không thể lấy vị trí. Vui lòng cấp quyền định vị GPS trên trình duyệt.");
+        }
+      );
+    } else {
+      message.error("Trình duyệt không hỗ trợ định vị.");
+    }
+  };
+
+  const activeBranches = (branches || [])
+    .filter((b) => !b.isDeleted && b.status !== "Ngừng kinh doanh")
+    .map(b => {
+      const distance = getDistance(
+        userCoords?.latitude,
+        userCoords?.longitude,
+        b.latitude || b.Latitude,
+        b.longitude || b.Longitude
+      );
+      return { ...b, distance };
+    });
+
+  if (sortByDistance && userCoords) {
+    activeBranches.sort((a, b) => {
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
+  }
+
   const paginatedBranches = activeBranches.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
@@ -86,6 +139,32 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
             Với không gian sang trọng, tinh tế cùng đội ngũ phục vụ chuyên
             nghiệp, chúng tôi sẵn sàng đón tiếp quý khách tại mọi chi nhánh.
           </Paragraph>
+          <div style={{ marginTop: 16 }}>
+            <Button
+              type="primary"
+              icon={<CompassOutlined />}
+              onClick={handleRequestLocation}
+              loading={sortByDistance && !userCoords}
+              style={{
+                background: sortByDistance ? "#10b981" : "#ea580c",
+                borderColor: sortByDistance ? "#10b981" : "#ea580c",
+                fontWeight: 600,
+                borderRadius: 8,
+                height: 40
+              }}
+            >
+              {sortByDistance ? "Đang sắp xếp theo vị trí gần nhất" : "Tìm chi nhánh gần nhất"}
+            </Button>
+            {sortByDistance && (
+              <Button
+                type="text"
+                onClick={() => setSortByDistance(false)}
+                style={{ marginLeft: 8, color: "#64748b" }}
+              >
+                Hủy sắp xếp
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Loading Spinner */}
@@ -138,7 +217,7 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
                         sm={12}
                         lg={8}
                       >
-                        <CustomerBranchCard branch={branch} isMain={isMain} />
+                        <CustomerBranchCard branch={branch} isMain={isMain} userCoords={userCoords} />
                       </Col>
                     );
                   })
