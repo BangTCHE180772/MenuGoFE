@@ -232,7 +232,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Sidebar Header: Logo & Toggle Button */}
-      <div className="sidebar-header" style={{ flexDirection: collapsed ? 'column' : 'row', gap: collapsed ? 8 : 0, paddingBottom: collapsed ? 8 : 0, height: 'auto' }}>
+      <div className="sidebar-header" style={{ flexDirection: collapsed ? 'column' : 'row', gap: collapsed ? 8 : 0, paddingTop: 12, paddingBottom: collapsed ? 12 : 10, height: 'auto' }}>
         <Link to="/home" className="sidebar-logo">
           <div className="sidebar-logo-icon">
             <CrownOutlined style={{ fontSize: 22, color: "var(--color-primary)" }} />

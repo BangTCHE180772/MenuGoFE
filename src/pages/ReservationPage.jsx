@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Space, message, Tabs, Modal, Typography, DatePicker, Radio, Calendar, Badge, Row, Col, Empty } from 'antd';
+import { Card, Button, Tag, Space, message, Tabs, Modal, Typography, DatePicker, Radio, Calendar, Badge, Row, Col, Empty, Tooltip } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, AppstoreOutlined, CalendarOutlined, EditOutlined } from '@ant-design/icons';
 import { getReservations, checkInReservation, cancelReservation } from '../api/reservationApi';
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
 import ReservationEditModal from '../components/reservation/ReservationEditModal';
 import dayjs from 'dayjs';
 import { useBranch } from '../context/BranchContext';
+import { useSignalR } from '../context/SignalRContext';
 import '../styles/ReservationPage.css';
 
 const { Title, Text } = Typography;
@@ -22,13 +23,12 @@ const ReservationPage = ({ isPosHub }) => {
   const [activeTab, setActiveTab] = useState('All');
 
   const { currentBranchId } = useBranch();
+  const connection = useSignalR();
   const [now, setNow] = useState(dayjs());
 
   const fetchReservations = async () => {
     setLoading(true);
     try {
-      // For Admin, it uses currentBranchId. If not admin (or currentBranchId is null), we can still fetch all if backend permits, 
-      // but usually Admin selects branch from dropdown.
       const data = await getReservations(currentBranchId);
       setReservations(data);
     } catch (error) {
@@ -44,6 +44,40 @@ const ReservationPage = ({ isPosHub }) => {
     const interval = setInterval(() => setNow(dayjs()), 60000);
     return () => clearInterval(interval);
   }, [currentBranchId]);
+
+  // Realtime SignalR listener
+  useEffect(() => {
+    if (connection && currentBranchId) {
+      connection.invoke('JoinBranchGroup', currentBranchId).catch(console.error);
+
+      const handleReservationUpdate = () => {
+        fetchReservations();
+      };
+
+      const handleNotification = (data) => {
+        if (
+          data.type === 'new-reservation' ||
+          data.type === 'reservation-updated' ||
+          data.type === 'reservation-confirmed' ||
+          data.type === 'reservation-cancelled' ||
+          data.type === 'reservation-rejected'
+        ) {
+          fetchReservations();
+          if (data.type === 'new-reservation') {
+            message.info(data.message || 'Có yêu cầu đặt bàn mới!');
+          }
+        }
+      };
+
+      connection.on('ReceiveReservationUpdate', handleReservationUpdate);
+      connection.on('ReceiveNotification', handleNotification);
+
+      return () => {
+        connection.off('ReceiveReservationUpdate', handleReservationUpdate);
+        connection.off('ReceiveNotification', handleNotification);
+      };
+    }
+  }, [connection, currentBranchId]);
 
   const handleCheckIn = async (id) => {
     Modal.confirm({
@@ -143,7 +177,7 @@ const ReservationPage = ({ isPosHub }) => {
           headStyle={{ borderBottom: `1px solid ${cardBorderColor}`, backgroundColor: 'transparent' }}
           title={
             <Space>
-              <span className="card-time">{rTime.format('HH:mm')}</span>
+              <span className="reservation-card-time">{rTime.format('HH:mm')}</span>
               {getStatusTag()}
             </Space>
           }
@@ -174,20 +208,29 @@ const ReservationPage = ({ isPosHub }) => {
           </Row>
 
           <div className="card-note">
-            <Text type="secondary">Ghi chú:</Text> {r.note || <Text type="secondary" italic>Không có</Text>}
+            <Text type="secondary">Ghi chú:</Text>{' '}
+            {r.note ? (
+              <Tooltip title={r.note} placement="topLeft">
+                <span className="card-note-text">{r.note}</span>
+              </Tooltip>
+            ) : (
+              <Text type="secondary" italic>Không có</Text>
+            )}
           </div>
 
           {/* Hành động thông minh */}
           {isPending && (
-            canCheckIn ? (
-              <Button type="primary" block size="large" onClick={() => handleCheckIn(r.id)}>
-                Khách đã đến (Check-in)
-              </Button>
-            ) : (
-              <Button block size="large" disabled>
-                Chưa đến giờ (còn {diffMinutes} phút)
-              </Button>
-            )
+            <div className="card-action-wrapper">
+              {canCheckIn ? (
+                <Button type="primary" block size="middle" onClick={() => handleCheckIn(r.id)} style={{ fontWeight: 600, height: 40, borderRadius: 8 }}>
+                  Khách đã đến (Check-in)
+                </Button>
+              ) : (
+                <Button block size="middle" disabled style={{ height: 40, borderRadius: 8 }}>
+                  Chưa đến giờ (còn {diffMinutes} phút)
+                </Button>
+              )}
+            </div>
           )}
         </Card>
       </Col>

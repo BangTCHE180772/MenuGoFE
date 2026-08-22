@@ -109,7 +109,7 @@ const CustomerRegisterPage = () => {
           >
             <Input
               prefix={<MailOutlined style={{ color: '#94a3b8' }} />}
-              placeholder="Địa chỉ email (tùy chọn)"
+              placeholder="Địa chỉ email (dùng để nhận OTP khôi phục mật khẩu)"
             />
           </Form.Item>
 
@@ -123,6 +123,27 @@ const CustomerRegisterPage = () => {
             <Input.Password
               prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
               placeholder="Mật khẩu (ít nhất 6 ký tự)"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="confirmPassword"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
+              placeholder="Nhập lại mật khẩu"
             />
           </Form.Item>
 

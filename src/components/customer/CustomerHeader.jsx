@@ -1,6 +1,6 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Drawer, Button } from "antd";
+import { Drawer, Button, Dropdown } from "antd";
 import { useAuth } from "../../context/AuthContext";
 import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import {
@@ -9,7 +9,10 @@ import {
   AppstoreOutlined,
   HomeOutlined,
   EnvironmentOutlined,
-  UserOutlined
+  UserOutlined,
+  CalendarOutlined,
+  MessageOutlined,
+  DownOutlined
 } from "@ant-design/icons";
 
 const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
@@ -31,6 +34,27 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
     { key: "hero", label: "Trang chủ", icon: <HomeOutlined /> },
     { key: "menu", label: "Thực đơn", icon: <AppstoreOutlined /> },
     { key: "branches", label: "Chi nhánh", icon: <EnvironmentOutlined /> },
+  ];
+
+  const profileMenuItems = [
+    {
+      key: "dashboard",
+      icon: <UserOutlined style={{ color: "#ea580c" }} />,
+      label: <span style={{ fontWeight: 600 }}>Thông tin</span>,
+      onClick: () => navigate("/customer/dashboard")
+    },
+    {
+      key: "booking",
+      icon: <CalendarOutlined style={{ color: "#ea580c" }} />,
+      label: <span style={{ fontWeight: 600 }}>Đặt bàn</span>,
+      onClick: () => navigate("/customer/booking")
+    },
+    {
+      key: "chat",
+      icon: <MessageOutlined style={{ color: "#ea580c" }} />,
+      label: <span style={{ fontWeight: 600 }}>Tin nhắn</span>,
+      onClick: () => navigate("/customer/chat")
+    }
   ];
 
   const handleNavClick = (key) => {
@@ -60,8 +84,8 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
             <span className="brand-subtitle">Trải nghiệm ẩm thực</span>
           </div>
         </div>
- 
-        <nav className="desktop-nav">
+
+        <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
           {navItems.map((item) => (
             <button
               key={item.key}
@@ -73,44 +97,52 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
             </button>
           ))}
           {customerAuth.isAuthenticated ? (
-            <button
-              className="nav-link login-btn"
-              onClick={() => navigate("/customer/dashboard")}
-              style={{
-                marginLeft: "16px",
-                background: "#ea580c",
-                color: "#fff",
-                borderRadius: "6px",
-                padding: "6px 16px",
-                fontSize: "12px",
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px"
-              }}
-            >
-              <UserOutlined />
-              <span>Portal Khách</span>
-            </button>
+            <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight" trigger={['click', 'hover']}>
+              <button
+                className="nav-link login-btn"
+                style={{
+                  marginLeft: "12px",
+                  background: "#ea580c",
+                  color: "#fff",
+                  borderRadius: "6px",
+                  padding: "0 16px",
+                  height: "36px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  verticalAlign: "middle"
+                }}
+              >
+                <UserOutlined />
+                <span>Hồ sơ</span>
+                <DownOutlined style={{ fontSize: 10 }} />
+              </button>
+            </Dropdown>
           ) : (
             <button
               className="nav-link login-btn"
               onClick={() => navigate("/customer/login")}
               style={{
-                marginLeft: "16px",
+                marginLeft: "12px",
                 background: "#ea580c",
                 color: "#fff",
                 borderRadius: "6px",
-                padding: "6px 16px",
-                fontSize: "12px",
+                padding: "0 16px",
+                height: "36px",
+                fontSize: "13px",
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "4px"
+                justifyContent: "center",
+                gap: "4px",
+                verticalAlign: "middle"
               }}
             >
               <span>Khách hàng</span>
@@ -125,10 +157,15 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
               color: scrolled ? "#334155" : "#fff",
               border: "1px solid " + (scrolled ? "#cbd5e1" : "rgba(255,255,255,0.4)"),
               borderRadius: "6px",
-              padding: "5px 12px",
-              fontSize: "11px",
+              padding: "0 14px",
+              height: "36px",
+              fontSize: "13px",
               fontWeight: 500,
-              cursor: "pointer"
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              verticalAlign: "middle"
             }}
           >
             Nhân viên
@@ -164,29 +201,46 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
                 <span>{item.label}</span>
               </button>
             ))}
-             {customerAuth.isAuthenticated ? (
-              <button
-                className="mobile-nav-item login-btn"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigate("/customer/dashboard");
-                }}
-                style={{
-                  marginTop: "16px",
-                  width: "100%",
-                  background: "#ea580c",
-                  color: "#fff",
-                  borderRadius: "6px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "center"
-                }}
-              >
-                Portal Khách
-              </button>
+            
+            {customerAuth.isAuthenticated ? (
+              <div style={{ marginTop: "16px", background: "#fff7ed", borderRadius: "8px", padding: "10px", border: "1px solid #fed7aa" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#9a3412", marginBottom: "8px", paddingLeft: "8px" }}>
+                  HỒ SƠ KHÁCH HÀNG
+                </div>
+                <button
+                  className="mobile-nav-item"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("/customer/dashboard");
+                  }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "8px", background: "none", border: "none", cursor: "pointer", fontWeight: 600, color: "#1e293b" }}
+                >
+                  <UserOutlined style={{ color: "#ea580c" }} />
+                  <span>Thông tin</span>
+                </button>
+                <button
+                  className="mobile-nav-item"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("/customer/booking");
+                  }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "8px", background: "none", border: "none", cursor: "pointer", fontWeight: 600, color: "#1e293b" }}
+                >
+                  <CalendarOutlined style={{ color: "#ea580c" }} />
+                  <span>Đặt bàn</span>
+                </button>
+                <button
+                  className="mobile-nav-item"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("/customer/chat");
+                  }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "8px", background: "none", border: "none", cursor: "pointer", fontWeight: 600, color: "#1e293b" }}
+                >
+                  <MessageOutlined style={{ color: "#ea580c" }} />
+                  <span>Tin nhắn</span>
+                </button>
+              </div>
             ) : (
               <button
                 className="mobile-nav-item login-btn"
@@ -208,30 +262,31 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
                   textAlign: "center"
                 }}
               >
-                Khách đăng nhập
+                Khách hàng
               </button>
             )}
+
             <button
-              className="mobile-nav-item staff-login-btn"
+              className="mobile-nav-item staff-btn"
               onClick={() => {
                 setMobileMenuOpen(false);
                 navigate(isAuthenticated ? "/home" : "/login");
               }}
               style={{
-                marginTop: "8px",
+                marginTop: "12px",
                 width: "100%",
-                background: "transparent",
+                background: "#f1f5f9",
                 color: "#475569",
-                border: "1px solid #cbd5e1",
                 borderRadius: "6px",
                 padding: "8px 16px",
                 fontSize: "13px",
                 fontWeight: 500,
+                border: "1px solid #cbd5e1",
                 cursor: "pointer",
                 textAlign: "center"
               }}
             >
-              Nhân viên
+              Cổng nhân viên
             </button>
           </div>
         </Drawer>

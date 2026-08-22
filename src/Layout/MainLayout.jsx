@@ -16,7 +16,10 @@ const MainLayout = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { isBranchInactive } = useBranch();
-  const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
+  const isFluid =
+    location.pathname.startsWith('/product-catalog') ||
+    location.pathname.startsWith('/inventory-management') ||
+    location.pathname.startsWith('/chat');
 
   // Sidebar collapse state initialized from localStorage
   const [collapsed, setCollapsed] = useState(() => {

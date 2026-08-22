@@ -9,6 +9,15 @@ export const loginCustomer = (data) =>
 export const getCustomerProfile = () =>
   axiosInstance.get('/api/CustomerPortal/profile');
 
+export const updateCustomerProfile = (data) =>
+  axiosInstance.put('/api/CustomerPortal/profile', data);
+
+export const sendCustomerResetOtp = (email) =>
+  axiosInstance.post('/api/CustomerAuth/forgot-password/send-otp', { email });
+
+export const resetCustomerPassword = (data) =>
+  axiosInstance.post('/api/CustomerAuth/forgot-password/reset', data);
+
 export const getCustomerReservations = () =>
   axiosInstance.get('/api/CustomerPortal/reservations');
 

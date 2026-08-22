@@ -146,7 +146,6 @@ const CreateUpdateBranchFormPopup = ({
         latitude: mapCoords.lat || null,
         longitude: mapCoords.lng || null,
         address: {
-          type: "Chi Nhánh",
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
             : null,

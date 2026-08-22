@@ -101,7 +101,6 @@ const CustomerReservationPage = () => {
             layout="vertical"
             size="large"
             onFinish={onFinish}
-            initialValues={{ numberOfGuests: 2 }}
           >
             <Form.Item
               name="branchId"
