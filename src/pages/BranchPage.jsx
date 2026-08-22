@@ -322,8 +322,8 @@ const BranchPage = () => {
       key: "newAddressName",
       sorter: true,
       render: (text, record) => {
-        const fullAddr = [record.addressText || record.AddressText, text].filter(Boolean).join(", ");
-        return <span>{fullAddr || "Chưa có địa chỉ"}</span>;
+        const fullAddr = text || record.oldAddressName || "Chưa có địa chỉ";
+        return <span>{fullAddr}</span>;
       },
     },
     {

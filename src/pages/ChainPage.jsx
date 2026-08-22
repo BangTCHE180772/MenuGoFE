@@ -30,6 +30,7 @@ import dayjs from "dayjs";
 import { getMainChain, updateChain } from "../api/chainApi";
 import { uploadImage } from "../api/imageApi";
 import AddressSelectModal from "../PopUp/AddressSelectModal";
+import MapPickerModal from "../PopUp/MapPickerModal";
 import "../styles/ChainPage.css";
 
 const { Text } = Typography;
@@ -72,6 +73,9 @@ const ChainPage = () => {
     title: "",
   });
 
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [mapCoords, setCoords] = useState({ lat: null, lng: null });
+
   // ===================================================================================================================Fetch Data
   const loadChain = useCallback(async () => {
     setLoading(true);
@@ -86,7 +90,6 @@ const ChainPage = () => {
         name: data.name,
         openTime: parseTime(data.openTime),
         closeTime: parseTime(data.closeTime),
-        addressText: data.addressText || data.AddressText || "",
       });
 
       setBannerPreview(data.backgroundImage || null);
@@ -101,6 +104,10 @@ const ChainPage = () => {
       setOldAddressState({
         wardId: null,
         name: data.oldAddressName || "Chưa thiết lập",
+      });
+      setCoords({
+        lat: data.latitude || data.Latitude || null,
+        lng: data.longitude || data.Longitude || null,
       });
     } catch (err) {
       console.error(err);
@@ -242,14 +249,12 @@ const ChainPage = () => {
         closeTime: values.closeTime
           ? values.closeTime.format("HH:mm:ss")
           : chain.closeTime,
-        addressText: values.addressText || "",
+        latitude: mapCoords.lat || null,
+        longitude: mapCoords.lng || null,
         address: {
           type: "Chuỗi",
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
-            : null,
-          oldWardId: oldAddressState.wardId
-            ? Number(oldAddressState.wardId)
             : null,
         },
       };
@@ -286,11 +291,14 @@ const ChainPage = () => {
       name: chain.name,
       openTime: parseTime(chain.openTime),
       closeTime: parseTime(chain.closeTime),
-      addressText: chain.addressText || chain.AddressText || "",
     });
 
     setBannerPreview(chain.backgroundImage || null);
     setLogoPreview(chain.logoImage || null);
+    setCoords({
+      lat: chain.latitude || chain.Latitude || null,
+      lng: chain.longitude || chain.Longitude || null,
+    });
     setBannerFile(null);
     setLogoFile(null);
 
@@ -485,36 +493,35 @@ const ChainPage = () => {
                 </div>
               </div>
 
-              {/* Địa chỉ chi tiết */}
-              <div style={{ marginTop: 16 }}>
-                <Form.Item
-                  label={<span style={{ fontWeight: 600 }}>Địa chỉ chi tiết (Số nhà, tên đường...)</span>}
-                  name="addressText"
-                  rules={[
-                    { required: true, message: "Vui lòng nhập địa chỉ chi tiết" },
-                  ]}
-                  style={{ marginBottom: 8 }}
-                >
-                  <Input
-                    placeholder="Nhập số nhà, tên đường, tổ/thôn..."
-                    size="large"
-                  />
-                </Form.Item>
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Button
-                    type="link"
-                    icon={<GlobalOutlined />}
-                    onClick={() => {
-                      const addr = form.getFieldValue("addressText");
-                      const url = addr 
-                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`
-                        : "https://www.google.com/maps";
-                      window.open(url, "_blank");
-                    }}
-                  >
-                    Tìm địa điểm trực tiếp trên Google Maps
-                  </Button>
+              {/* Chọn tọa độ trực tiếp trên GGMap */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#f1f5f9",
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  marginTop: 16,
+                }}
+              >
+                <div>
+                  <Text type="secondary" style={{ fontSize: 11, display: "block" }}>Vị trí bản đồ (Tọa độ GPS):</Text>
+                  <Text strong style={{ fontSize: 13 }}>
+                    {mapCoords.lat && mapCoords.lng 
+                      ? `Vĩ độ: ${mapCoords.lat.toFixed(5)}, Kinh độ: ${mapCoords.lng.toFixed(5)}`
+                      : "Chưa cấu hình tọa độ trên bản đồ"
+                    }
+                  </Text>
                 </div>
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<GlobalOutlined />}
+                  onClick={() => setMapModalOpen(true)}
+                >
+                  Chọn vị trí trên GGMap
+                </Button>
               </div>
 
               {/* Old */}
@@ -613,6 +620,18 @@ const ChainPage = () => {
         title={addressModalConfig.title}
         onClose={closeAddressModal}
         onSelect={handleAddressSelected}
+      />
+
+      {/* Map Picker Modal */}
+      <MapPickerModal
+        open={mapModalOpen}
+        onClose={() => setMapModalOpen(false)}
+        initialLat={mapCoords.lat}
+        initialLng={mapCoords.lng}
+        onSelect={(lat, lng) => {
+          setCoords({ lat, lng });
+          message.success("Đã ghi nhận tọa độ định vị chuỗi!");
+        }}
       />
     </div>
   );

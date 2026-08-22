@@ -12,7 +12,6 @@ import {
   Tag,
   Space,
   Divider,
-  InputNumber,
 } from "antd";
 import {
   ShopOutlined,
@@ -71,7 +70,6 @@ const CreateUpdateBranchFormPopup = ({
           type: branchObject.type || "Main",
           openTime: parseTime(branchObject.openTime),
           closeTime: parseTime(branchObject.closeTime),
-          addressText: branchObject.addressText || branchObject.AddressText || "",
         });
 
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -79,23 +77,20 @@ const CreateUpdateBranchFormPopup = ({
           wardId: branchObject.newWardId || branchObject.NewWardId || null,
           name: branchObject.newAddressName || "Chưa thiết lập",
         });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOldAddressState({
           wardId: branchObject.oldWardId || branchObject.OldWardId || null,
           name: branchObject.oldAddressName || "Chưa thiết lập",
         });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCoords({
           lat: branchObject.latitude || branchObject.Latitude || null,
           lng: branchObject.longitude || branchObject.Longitude || null,
         });
       } else {
         form.resetFields();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNewAddressState({ wardId: null, name: "" });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+
         setOldAddressState({ wardId: null, name: "" });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+
         setCoords({ lat: null, lng: null });
       }
     }
@@ -148,16 +143,12 @@ const CreateUpdateBranchFormPopup = ({
         closeTime: values.closeTime
           ? values.closeTime.format("HH:mm:ss")
           : "22:00:00",
-        addressText: values.addressText || "",
         latitude: mapCoords.lat || null,
         longitude: mapCoords.lng || null,
         address: {
           type: "Chi Nhánh",
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
-            : null,
-          oldWardId: oldAddressState.wardId
-            ? Number(oldAddressState.wardId)
             : null,
         },
       };
@@ -314,38 +305,50 @@ const CreateUpdateBranchFormPopup = ({
           >
             {/* Tỉnh / Huyện / Xã */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  marginBottom: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
                 <Tag color="blue">Khu vực</Tag>
                 <Text strong>Tỉnh / Thành phố, Phường / Xã</Text>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
                 <Button
                   icon={<EnvironmentOutlined />}
                   onClick={openNewAddressModal}
                 >
                   Chọn Tỉnh/Xã
                 </Button>
-                <div style={{ flex: 1, background: "#fff", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
-                  <Text type="secondary" style={{ fontSize: 11, display: "block" }}>Khu vực đã chọn:</Text>
+                <div
+                  style={{
+                    flex: 1,
+                    background: "#fff",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 11, display: "block" }}
+                  >
+                    Khu vực đã chọn:
+                  </Text>
                   <Text strong>{newAddressState.name || "Chưa thiết lập"}</Text>
                 </div>
               </div>
             </div>
-
-            {/* Địa chỉ chi tiết */}
-            <Form.Item
-              label={<span style={{ fontWeight: 600 }}>Địa chỉ chi tiết (Số nhà, tên đường...)</span>}
-              name="addressText"
-              rules={[
-                { required: true, message: "Vui lòng nhập địa chỉ chi tiết" },
-              ]}
-              style={{ marginBottom: 12 }}
-            >
-              <Input
-                placeholder="Nhập số nhà, tên đường, tổ/thôn..."
-                size="large"
-              />
-            </Form.Item>
 
             {/* Chọn tọa độ trực tiếp trên GGMap */}
             <div
@@ -360,12 +363,16 @@ const CreateUpdateBranchFormPopup = ({
               }}
             >
               <div>
-                <Text type="secondary" style={{ fontSize: 11, display: "block" }}>Vị trí bản đồ (Tọa độ GPS):</Text>
+                <Text
+                  type="secondary"
+                  style={{ fontSize: 11, display: "block" }}
+                >
+                  Vị trí bản đồ (Tọa độ GPS):
+                </Text>
                 <Text strong style={{ fontSize: 13 }}>
-                  {mapCoords.lat && mapCoords.lng 
+                  {mapCoords.lat && mapCoords.lng
                     ? `Vĩ độ: ${mapCoords.lat.toFixed(5)}, Kinh độ: ${mapCoords.lng.toFixed(5)}`
-                    : "Chưa cấu hình tọa độ trên bản đồ"
-                  }
+                    : "Chưa cấu hình tọa độ trên bản đồ"}
                 </Text>
               </div>
               <Button
