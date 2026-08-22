@@ -37,6 +37,7 @@ import {
   UserOutlined,
   BankOutlined,
   ThunderboltOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -48,6 +49,8 @@ import {
   updatePayroll,
   updatePayrollStatus,
   deletePayroll,
+  lockPayroll,
+  approvePayroll,
 } from '../api/payrollApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
@@ -56,27 +59,42 @@ import { useAuth } from '../context/AuthContext';
 // Payroll status definitions
 const PAYROLL_STATUS = {
   Draft: 1,
+  Pending: 2,
+  Approved: 3,
   Paid: 4,
   Cancelled: 5,
+  Locked: 6,
 };
 
 const STATUS_CONFIG = {
   [PAYROLL_STATUS.Draft]: { label: 'Bản nháp', color: 'default', badge: 'default' },
+  [PAYROLL_STATUS.Pending]: { label: 'Chờ duyệt', color: 'warning', badge: 'warning' },
+  [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt', color: 'processing', badge: 'processing' },
   [PAYROLL_STATUS.Paid]: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   [PAYROLL_STATUS.Cancelled]: { label: 'Đã hủy', color: 'error', badge: 'error' },
+  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Khóa)', color: 'purple', badge: 'purple' },
 
   Draft: { label: 'Bản nháp', color: 'default', badge: 'default' },
+  Pending: { label: 'Chờ duyệt', color: 'warning', badge: 'warning' },
+  Approved: { label: 'Đã duyệt', color: 'processing', badge: 'processing' },
   Paid: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   Cancelled: { label: 'Đã hủy', color: 'error', badge: 'error' },
+  Locked: { label: 'Đã chốt (Khóa)', color: 'purple', badge: 'purple' },
 };
 
 const STATUS_TO_NUM = {
   Draft: 1,
+  Pending: 2,
+  Approved: 3,
   Paid: 4,
   Cancelled: 5,
+  Locked: 6,
   1: 1,
+  2: 2,
+  3: 3,
   4: 4,
   5: 5,
+  6: 6,
 };
 
 const STATUS_OPTIONS = [
@@ -534,6 +552,36 @@ const PayrollPage = () => {
     }
   };
 
+  // Lock Payroll Handler
+  const handleLockPayroll = async (id) => {
+    try {
+      await lockPayroll(id);
+      message.success('Đã chốt (khóa) bảng lương thành công!');
+      loadData();
+      if (isDetailModalOpen && detailRecord?.id === id) {
+        setIsDetailModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Có lỗi xảy ra khi chốt bảng lương!');
+    }
+  };
+
+  // Approve Payroll Handler
+  const handleApprovePayroll = async (id) => {
+    try {
+      await approvePayroll(id);
+      message.success('Đã phê duyệt bảng lương thành công!');
+      loadData();
+      if (isDetailModalOpen && detailRecord?.id === id) {
+        setIsDetailModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt bảng lương!');
+    }
+  };
+
   // Handle Delete
   const handleDelete = async (id) => {
     try {
@@ -673,30 +721,64 @@ const PayrollPage = () => {
       title: 'Hành động',
       key: 'actions',
       fixed: 'right',
-      width: 100,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Chỉnh sửa">
-            <Button
-              type="text"
-              icon={<EditOutlined style={{ color: '#fa8c16' }} />}
-              onClick={() => handleOpenFormModal('edit', record)}
-            />
-          </Tooltip>
+      width: 160,
+      render: (_, record) => {
+        const isLocked = record.status === PAYROLL_STATUS.Locked || record.status === 6 || record.status === 'Locked';
+        const isApproved = record.status === PAYROLL_STATUS.Approved || record.status === 3 || record.status === 'Approved';
+        const isPaid = record.status === PAYROLL_STATUS.Paid || record.status === 4 || record.status === 'Paid';
 
-          <Tooltip title="Xóa">
-            <Popconfirm
-              title="Bạn chắc chắn muốn xóa bảng lương này?"
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      ),
+        return (
+          <Space size="small">
+            {!isLocked && !isApproved && !isPaid && (
+              <Tooltip title="Chốt (Khóa) bảng lương">
+                <Popconfirm
+                  title="Chốt bảng lương này để ngăn chỉnh sửa?"
+                  okText="Chốt lương"
+                  cancelText="Hủy"
+                  onConfirm={() => handleLockPayroll(record.id)}
+                >
+                  <Button type="text" icon={<LockOutlined style={{ color: '#722ed1' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {isLocked && !isApproved && !isPaid && (
+              <Tooltip title="Phê duyệt bảng lương">
+                <Popconfirm
+                  title="Phê duyệt bảng lương này?"
+                  okText="Duyệt"
+                  cancelText="Hủy"
+                  onConfirm={() => handleApprovePayroll(record.id)}
+                >
+                  <Button type="text" icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            <Tooltip title="Chỉnh sửa">
+              <Button
+                type="text"
+                disabled={isLocked || isApproved || isPaid}
+                icon={<EditOutlined style={{ color: isLocked || isApproved || isPaid ? '#ccc' : '#fa8c16' }} />}
+                onClick={() => handleOpenFormModal('edit', record)}
+              />
+            </Tooltip>
+
+            <Tooltip title="Xóa">
+              <Popconfirm
+                title="Bạn chắc chắn muốn xóa bảng lương này?"
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+                disabled={isLocked || isApproved || isPaid}
+                onConfirm={() => handleDelete(record.id)}
+              >
+                <Button type="text" danger disabled={isLocked || isApproved || isPaid} icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -1446,6 +1528,95 @@ const PayrollPage = () => {
                 {detailRecord.paymentDate ? dayjs(detailRecord.paymentDate).format('DD/MM/YYYY HH:mm') : 'Chưa thanh toán'}
               </Descriptions.Item>
             </Descriptions>
+
+            {/* Chi tiết ca làm việc trong tháng */}
+            {((detailRecord.payrollShiftDetails && detailRecord.payrollShiftDetails.length > 0) || (detailRecord.shiftDetails && detailRecord.shiftDetails.length > 0)) && (
+              <>
+                <Divider style={{ margin: '16px 0 8px 0' }}>Bảng Bóc Tách Chi Tiết Theo Ca (Hệ số Lễ/Tết & Ca đêm & OT)</Divider>
+                <Table
+                  dataSource={detailRecord.payrollShiftDetails || detailRecord.shiftDetails || []}
+                  rowKey={(r, idx) => r.id || idx}
+                  pagination={{ pageSize: 5 }}
+                  size="small"
+                  bordered
+                  columns={[
+                    {
+                      title: 'Ngày làm',
+                      dataIndex: 'workDate',
+                      key: 'workDate',
+                      width: 105,
+                      render: (d) => dayjs(d).format('DD/MM/YYYY'),
+                    },
+                    {
+                      title: 'Số giờ làm',
+                      key: 'hours',
+                      align: 'center',
+                      width: 90,
+                      render: (_, r) => (
+                        <span>{r.actualHours ?? r.regularHours ?? 0}h{r.standardHours ? `/${r.standardHours}h` : ''}</span>
+                      ),
+                    },
+                    {
+                      title: 'Hệ số ngày',
+                      dataIndex: 'dateCoefficient',
+                      key: 'dateCoefficient',
+                      align: 'center',
+                      width: 90,
+                      render: (coeff, r) => {
+                        const val = coeff ?? r.dateMultiplier ?? 1.0;
+                        return <Tag color={val > 1.0 ? 'volcano' : 'default'}>{val}x</Tag>;
+                      },
+                    },
+                    {
+                      title: 'Loại ca',
+                      dataIndex: 'isNightShift',
+                      key: 'isNightShift',
+                      align: 'center',
+                      width: 85,
+                      render: (isNight) => isNight ? <Tag color="purple">Ca đêm</Tag> : <Tag color="default">Ca ngày</Tag>,
+                    },
+                    {
+                      title: 'OT duyệt',
+                      dataIndex: 'approvedOTHours',
+                      key: 'approvedOTHours',
+                      align: 'center',
+                      width: 85,
+                      render: (ot) => (ot > 0 ? <Tag color="orange">+{ot}h OT</Tag> : '0h'),
+                    },
+                    {
+                      title: 'Tiền ca gốc',
+                      dataIndex: 'baseShiftPay',
+                      key: 'baseShiftPay',
+                      align: 'right',
+                      render: (amt, r) => formatVND(amt ?? r.shiftTotal ?? 0),
+                    },
+                    {
+                      title: 'Thưởng Ca đêm / OT',
+                      key: 'bonusPay',
+                      align: 'right',
+                      render: (_, r) => {
+                        const night = r.nightShiftPay || 0;
+                        const ot = r.oTPay || 0;
+                        if (night === 0 && ot === 0) return '0 đ';
+                        return (
+                          <div style={{ fontSize: 11 }}>
+                            {night > 0 && <span style={{ color: '#722ed1', display: 'block' }}>Đêm: +{formatVND(night)}</span>}
+                            {ot > 0 && <span style={{ color: '#fa8c16', display: 'block' }}>OT: +{formatVND(ot)}</span>}
+                          </div>
+                        );
+                      },
+                    },
+                    {
+                      title: 'Tổng tiền ca',
+                      dataIndex: 'totalShiftPay',
+                      key: 'totalShiftPay',
+                      align: 'right',
+                      render: (amt, r) => <strong style={{ color: '#e8442a' }}>{formatVND(amt ?? r.shiftTotal ?? 0)}</strong>,
+                    },
+                  ]}
+                />
+              </>
+            )}
 
             <Divider style={{ margin: '16px 0 8px 0' }}>Chi tiết Phụ cấp & Khoản trừ</Divider>
 

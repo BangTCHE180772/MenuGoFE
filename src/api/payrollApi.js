@@ -28,3 +28,9 @@ export const updatePayrollStatus = (id, status, paymentDate) =>
 
 export const deletePayroll = (id) =>
   axiosInstance.delete(`/api/Payroll/${id}`);
+
+export const lockPayroll = (id) =>
+  axiosInstance.post(`/api/Payroll/${id}/lock`);
+
+export const approvePayroll = (id) =>
+  axiosInstance.post(`/api/Payroll/${id}/approve`);
