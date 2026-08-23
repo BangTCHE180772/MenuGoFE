@@ -61,3 +61,19 @@ export const cancelOrderDetail = (id) =>
 
 export const getAvailableQuantities = (branchId, productIds) =>
   axiosInstance.post(`/api/Order/available-quantities/${branchId}`, productIds);
+
+// ─── Order Assignment ─────────────────────────────────────────────────────
+export const getMyAssignments = () =>
+  axiosInstance.get('/api/Order/my-assignments');
+
+export const assignSelf = (orderId) =>
+  axiosInstance.post(`/api/Order/${orderId}/assign`);
+
+export const unassignOrder = (orderId) =>
+  axiosInstance.delete(`/api/Order/${orderId}/unassign`);
+
+export const forceAssignOrder = (orderId, accountId) =>
+  axiosInstance.post(`/api/Order/${orderId}/force-assign`, { accountId });
+
+export const getOnDutyStaff = (branchId) =>
+  axiosInstance.get(`/api/Order/on-duty-staff/${branchId}`);

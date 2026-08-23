@@ -6,11 +6,13 @@ import dayjs from 'dayjs';
 import TableMapPage from './TableMapPage';
 import OrderPage from './OrderPage';
 import { useAuth } from '../context/AuthContext';
+import { useSignalR } from '../context/SignalRContext';
 import { getMyWorkSchedules } from '../api/workScheduleApi';
 import { getAllShifts } from '../api/shiftApi';
 
 const WaiterMobileSessionPage = () => {
   const { user } = useAuth();
+  const connection = useSignalR();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -89,6 +91,30 @@ const WaiterMobileSessionPage = () => {
   useEffect(() => {
     checkAttendanceAndShift();
   }, [checkAttendanceAndShift]);
+
+  // Join SignalR groups khi waiter mở phiên làm việc
+  useEffect(() => {
+    if (!connection || !authorized || !user) return;
+
+    const branchId = user.branchId;
+    const accountId = user.id;
+
+    if (branchId) {
+      connection.invoke('JoinOnDuty', branchId).catch(console.error);
+    }
+    if (accountId) {
+      connection.invoke('JoinWaiterGroup', accountId).catch(console.error);
+    }
+
+    return () => {
+      if (branchId) {
+        connection.invoke('LeaveOnDuty', branchId).catch(console.error);
+      }
+      if (accountId) {
+        connection.invoke('LeaveWaiterGroup', accountId).catch(console.error);
+      }
+    };
+  }, [connection, authorized, user]);
 
   useEffect(() => {
     if (!shiftInfo) return;

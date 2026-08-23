@@ -44,6 +44,15 @@ const CashierPage = () => {
   // SignalR Connection
   const signalRConnection = useSignalR();
 
+  // Cashier join on_duty group để nhận thông báo order
+  useEffect(() => {
+    if (!signalRConnection || !currentBranchId) return;
+    signalRConnection.invoke('JoinOnDuty', currentBranchId).catch(console.error);
+    return () => {
+      signalRConnection.invoke('LeaveOnDuty', currentBranchId).catch(console.error);
+    };
+  }, [signalRConnection, currentBranchId]);
+
   // Fetch Orders and Shifts
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
