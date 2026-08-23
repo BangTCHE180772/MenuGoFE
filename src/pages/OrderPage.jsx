@@ -38,6 +38,7 @@ const OrderPage = ({ isWaiterMode }) => {
   const [cartItems, setCartItems] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const actionRef = useRef(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
   const [isRestockModalVisible, setIsRestockModalVisible] = useState(false);
@@ -147,7 +148,6 @@ const OrderPage = ({ isWaiterMode }) => {
     setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, note } : i));
   }, []);
 
-  const actionRef = useRef(false);
 
   const handleChangeTableStatus = async (newStatus) => {
     if (!selectedTable) return;
@@ -378,6 +378,8 @@ const OrderPage = ({ isWaiterMode }) => {
   };
 
   const handleMarkAsServed = async (orderDetailId) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await updateCookingStatus(orderDetailId, { cookingStatus: 'Served' });
       message.success('Đã xác nhận phục vụ món!');
@@ -388,10 +390,14 @@ const OrderPage = ({ isWaiterMode }) => {
     } catch (err) {
       console.error(err);
       message.error('Lỗi khi xác nhận phục vụ món');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleConfirmItem = async (orderDetailId, quantity) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await confirmOrderItem(orderDetailId, quantity);
       message.success('Đã xác nhận món!');
@@ -401,10 +407,14 @@ const OrderPage = ({ isWaiterMode }) => {
       }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleRejectItem = async (orderDetailId, reason) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await rejectOrderItem(orderDetailId, reason);
       message.success('Đã từ chối món!');
@@ -414,6 +424,8 @@ const OrderPage = ({ isWaiterMode }) => {
       }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Từ chối thất bại');
+    } finally {
+      actionRef.current = false;
     }
   };
 
