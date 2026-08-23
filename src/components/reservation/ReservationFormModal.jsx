@@ -251,14 +251,33 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     }
   ];
 
+  const handleCancel = () => {
+    if (form.isFieldsTouched()) {
+      Modal.confirm({
+        title: 'Cảnh báo chưa lưu dữ liệu',
+        content: 'Bạn có dữ liệu đang nhập dở. Bạn có chắc chắn muốn thoát và hủy bỏ toàn bộ không?',
+        okText: 'Thoát',
+        cancelText: 'Tiếp tục nhập',
+        onOk: () => {
+           form.resetFields();
+           onCancel();
+        }
+      });
+    } else {
+      form.resetFields();
+      onCancel();
+    }
+  };
+
   return (
     <Modal
       title="Thêm Đặt Bàn Mới"
       open={visible}
-      onCancel={onCancel}
+      maskClosable={false}
+      onCancel={handleCancel}
       width={800}
       footer={[
-        <Button key="back" onClick={onCancel}>Hủy</Button>,
+        <Button key="back" onClick={handleCancel}>Hủy</Button>,
         <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
           Tạo Đặt Bàn
         </Button>

@@ -93,11 +93,30 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
     }
   };
 
+  const handleCancel = () => {
+    if (form.isFieldsTouched()) {
+      Modal.confirm({
+        title: 'Cảnh báo chưa lưu dữ liệu',
+        content: 'Bạn có dữ liệu đang nhập dở. Bạn có chắc chắn muốn thoát và hủy bỏ toàn bộ không?',
+        okText: 'Thoát',
+        cancelText: 'Tiếp tục nhập',
+        onOk: () => {
+           form.resetFields();
+           onClose();
+        }
+      });
+    } else {
+      form.resetFields();
+      onClose();
+    }
+  };
+
   return (
     <Modal
       title="Sửa Thông Tin Đặt Bàn"
       open={visible}
-      onCancel={onClose}
+      maskClosable={false}
+      onCancel={handleCancel}
       onOk={handleOk}
       confirmLoading={loading}
       okText="Lưu"
