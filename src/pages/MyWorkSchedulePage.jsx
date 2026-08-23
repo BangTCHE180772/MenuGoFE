@@ -12,6 +12,8 @@ import {
   Input,
   DatePicker,
   Radio,
+  List,
+  Space,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -23,10 +25,13 @@ import {
   SwapOutlined,
   FileTextOutlined,
   SafetyCertificateOutlined,
+  AimOutlined,
+  SyncOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap } from '../api/workScheduleApi';
+import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap, checkInWithLocation } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getAllAccounts } from '../api/accountApi';
@@ -60,6 +65,13 @@ const MyWorkSchedulePage = () => {
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveForm] = Form.useForm();
+
+  // Check-in with location states
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [checkinBranchModalOpen, setCheckinBranchModalOpen] = useState(false);
+  const [checkinBranchId, setCheckinBranchId] = useState(null);
+  const [checkinShiftModalOpen, setCheckinShiftModalOpen] = useState(false);
+  const [todayShiftSchedules, setTodayShiftSchedules] = useState([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -130,6 +142,69 @@ const MyWorkSchedulePage = () => {
     setDetailModalOpen(false);
     transferForm.resetFields();
     setTransferModalOpen(true);
+  };
+
+  // ---- GPS Check-in handler ----
+  const doCheckInWithShift = (branchId, workScheduleId = null) => {
+    setCheckinLoading(true);
+    if (!navigator.geolocation) {
+      message.error('Trình duyệt của bạn không hỗ trợ GPS. Vui lòng dùng thiết bị khác.');
+      setCheckinLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await checkInWithLocation({ branchId, latitude, longitude, workScheduleId });
+          const data = res.data;
+          if (data.success) {
+            if (data.action === 'checkin') {
+              message.success({ content: `✅ ${data.message || 'Check-in thành công!'}`, duration: 4 });
+            } else if (data.action === 'checkout') {
+              message.success({ content: `✅ ${data.message || 'Check-out thành công!'}`, duration: 4 });
+            } else {
+              message.success({ content: data.message, duration: 4 });
+            }
+            setCheckinShiftModalOpen(false);
+            loadData();
+          } else {
+            message.error({ content: data.message, duration: 6 });
+          }
+        } catch (err) {
+          const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi điểm danh!';
+          message.error({ content: errMsg, duration: 6 });
+        } finally {
+          setCheckinLoading(false);
+        }
+      },
+      (geoErr) => {
+        setCheckinLoading(false);
+        if (geoErr.code === 1) {
+          message.error('Bạn đã từ chối cấp quyền vị trí. Vui lòng bật quyền GPS trong cài đặt trình duyệt và thử lại.');
+        } else {
+          message.error('Không lấy được vị trí. Vui lòng kiểm tra GPS và thử lại.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleCheckIn = () => {
+    const today = dayjs().format('YYYY-MM-DD');
+    const myUserId = user?.id;
+    const todaySchedules = schedules.filter(
+      (s) => dayjs(s.workDate).format('YYYY-MM-DD') === today
+        && (!myUserId || s.accountId === myUserId)
+    );
+
+    if (todaySchedules.length === 0) {
+      message.warning('Bạn không có ca làm việc nào hôm nay.');
+      return;
+    }
+
+    setTodayShiftSchedules(todaySchedules);
+    setCheckinShiftModalOpen(true);
   };
 
   const handleOpenLeaveModal = (type = 'day', schedule = null) => {
@@ -627,6 +702,18 @@ const MyWorkSchedulePage = () => {
           </div>
           <h1 className="timetable-title">Lịch làm việc tuần</h1>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {!isManagerOrAdmin && (
+              <Button
+                type="primary"
+                size="small"
+                style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 'bold', borderRadius: '14px' }}
+                icon={<AimOutlined />}
+                onClick={handleCheckIn}
+                loading={checkinLoading}
+              >
+                Điểm danh
+              </Button>
+            )}
             <Button
               type="primary"
               size="small"
@@ -1192,6 +1279,189 @@ const MyWorkSchedulePage = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* Branch Selection Modal - when employee has shifts at multiple branches today */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '17px', color: '#16a34a' }}>
+            <AimOutlined />
+            <span>CHỌN CHI NHÁNH ĐIỂM DANH</span>
+          </div>
+        }
+        open={checkinBranchModalOpen}
+        onCancel={() => setCheckinBranchModalOpen(false)}
+        footer={null}
+        width={380}
+        destroyOnClose
+      >
+        <div style={{ marginTop: '12px', marginBottom: '8px', color: '#475569', fontSize: '14px' }}>
+          Bạn có ca làm việc tại nhiều chi nhánh hôm nay. Vui lòng chọn chi nhánh cần điểm danh:
+        </div>
+        {(() => {
+          const today = dayjs().format('YYYY-MM-DD');
+          const myUserId = user?.id;
+          const todaySchedules = schedules.filter(
+            (s) => dayjs(s.workDate).format('YYYY-MM-DD') === today
+              && (!myUserId || s.accountId === myUserId)
+          );
+          const uniqueBranchIds = [...new Set(todaySchedules.map((s) => s.branchId))];
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+              {uniqueBranchIds.map((bId) => (
+                <Button
+                  key={bId}
+                  type={checkinBranchId === bId ? 'primary' : 'default'}
+                  size="large"
+                  style={{
+                    background: checkinBranchId === bId ? '#16a34a' : '#fff',
+                    borderColor: '#16a34a',
+                    color: checkinBranchId === bId ? '#fff' : '#16a34a',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    textAlign: 'left',
+                  }}
+                  onClick={() => setCheckinBranchId(bId)}
+                >
+                  {getBranchName(bId)}
+                </Button>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <Button size="large" onClick={() => setCheckinBranchModalOpen(false)}>Hủy</Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  loading={checkinLoading}
+                  icon={<AimOutlined />}
+                  style={{ background: '#16a34a', borderColor: '#16a34a', fontWeight: 'bold' }}
+                  onClick={() => {
+                    if (checkinBranchId) {
+                      setCheckinBranchModalOpen(false);
+                      doCheckInWithBranch(checkinBranchId);
+                    }
+                  }}
+                >
+                  Điểm danh
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Modal chọn ca làm việc điểm danh */}
+      <Modal
+        title={
+          <Space>
+            <ClockCircleOutlined style={{ color: '#16a34a' }} />
+            <span style={{ fontWeight: 'bold', fontSize: 16 }}>Chọn ca làm việc để điểm danh</span>
+          </Space>
+        }
+        open={checkinShiftModalOpen}
+        onCancel={() => setCheckinShiftModalOpen(false)}
+        footer={null}
+        width={560}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 14, color: '#4b5563', fontSize: 14 }}>
+          Danh sách ca làm việc của bạn hôm nay (<strong>{dayjs().format('DD/MM/YYYY')}</strong>):
+        </div>
+
+        <List
+          dataSource={todayShiftSchedules}
+          renderItem={(item) => {
+            const shiftObj = shifts.find((s) => s.id === item.shiftId);
+            const shiftName = shiftObj?.name || `Ca #${item.shiftId}`;
+            const startTime = shiftObj?.startTime ? shiftObj.startTime.substring(0, 5) : '--:--';
+            const endTime = shiftObj?.endTime ? shiftObj.endTime.substring(0, 5) : '--:--';
+            const branchName = getBranchName(item.branchId);
+            const status = item.status;
+
+            let statusTag = null;
+            let actionButton = null;
+
+            if (status === 'Working') {
+              statusTag = <Tag color="processing" icon={<SyncOutlined spin />}>Đang làm việc</Tag>;
+              actionButton = (
+                <Button
+                  type="primary"
+                  danger
+                  size="large"
+                  loading={checkinLoading}
+                  onClick={() => doCheckInWithShift(item.branchId, item.id)}
+                >
+                  Check-out
+                </Button>
+              );
+            } else if (status === 'Completed') {
+              statusTag = <Tag color="success">Đã hoàn thành</Tag>;
+              actionButton = (
+                <Button
+                  type="default"
+                  size="small"
+                  loading={checkinLoading}
+                  onClick={() => doCheckInWithShift(item.branchId, item.id)}
+                >
+                  Cập nhật Check-out
+                </Button>
+              );
+            } else if (status === 'Absent') {
+              statusTag = <Tag color="error">Vắng mặt</Tag>;
+              actionButton = <Button disabled>Đã vắng mặt</Button>;
+            } else {
+              // Scheduled, Approved, Pending
+              statusTag = <Tag color="warning">Chưa điểm danh</Tag>;
+              actionButton = (
+                <Button
+                  type="primary"
+                  size="large"
+                  style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', fontWeight: 'bold' }}
+                  loading={checkinLoading}
+                  onClick={() => doCheckInWithShift(item.branchId, item.id)}
+                >
+                  Check-in
+                </Button>
+              );
+            }
+
+            return (
+              <List.Item
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 10,
+                  marginBottom: 10,
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ flex: 1, paddingRight: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <strong style={{ fontSize: 15, color: '#111827' }}>{shiftName}</strong>
+                    {statusTag}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#374151', lineHeight: '1.6' }}>
+                    <div>🕒 Giờ ca: <strong>{startTime} - {endTime}</strong></div>
+                    <div>🏢 Chi nhánh: <strong>{branchName}</strong></div>
+                    {item.checkInAt && (
+                      <div style={{ color: '#16a34a', fontSize: 12, marginTop: 2 }}>
+                        ✅ Check-in: {dayjs(item.checkInAt).format('HH:mm:ss')}
+                      </div>
+                    )}
+                    {item.checkOutAt && (
+                      <div style={{ color: '#2563eb', fontSize: 12, marginTop: 2 }}>
+                        🏁 Check-out: {dayjs(item.checkOutAt).format('HH:mm:ss')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>{actionButton}</div>
+              </List.Item>
+            );
+          }}
+        />
       </Modal>
     </div>
   );

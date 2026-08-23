@@ -33,3 +33,5 @@ export const approveOT = (data) =>
 export const verifyPOSActivity = (id) =>
   axiosInstance.get(`/api/WorkSchedule/${id}/verify-pos-activity`);
 
+export const checkInWithLocation = (data) =>
+  axiosInstance.post('/api/WorkSchedule/check-in-with-location', data);
