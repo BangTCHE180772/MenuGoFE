@@ -30,10 +30,7 @@ const ChangeTableModal = ({ visible, onClose, conflictData, onSuccess }) => {
         response = await getTablesByBranch([branchId]);
       }
 
-      const availableTables = response.data.filter(
-        t => t.status === 'Empty' || t.status === 'Available'
-      );
-      setTables(availableTables);
+      setTables(response.data);
     } catch (error) {
       console.error("Lỗi lấy danh sách bàn:", error);
       message.error("Không thể tải danh sách bàn dự phòng.");

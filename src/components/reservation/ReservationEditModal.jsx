@@ -27,7 +27,7 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
     form.setFieldsValue({ customerName: customer.name });
   };
 
-  const submitUpdate = async (values, confirmUpdateCustomer = false) => {
+  const submitUpdate = async (values, confirmUpdateCustomer = false, ignoreWarning = false) => {
     try {
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -39,7 +39,8 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
         numberOfGuests: values.numberOfGuests,
         reservationTime: values.reservationTime.toISOString(),
         note: values.note || '',
-        confirmUpdateCustomer
+        confirmUpdateCustomer,
+        ignoreWarning
       };
 
       await updateReservation(reservation.id, updateData);
@@ -54,7 +55,21 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
           cancelText: 'Hủy',
           onOk: async () => {
             isSubmittingRef.current = false;
-            await submitUpdate(values, true);
+            await submitUpdate(values, true, ignoreWarning);
+          },
+          onCancel: () => {
+             isSubmittingRef.current = false;
+          }
+        });
+      } else if (error.response?.status === 422 && error.response.data?.isWarning) {
+        Modal.confirm({
+          title: 'Cảnh báo trùng bàn',
+          content: error.response.data.message,
+          okText: 'Vẫn cập nhật',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            isSubmittingRef.current = false;
+            await submitUpdate(values, confirmUpdateCustomer, true);
           },
           onCancel: () => {
              isSubmittingRef.current = false;
@@ -112,8 +127,8 @@ const ReservationEditModal = ({ visible, onClose, onSuccess, reservation }) => {
             { required: true, message: 'Vui lòng chọn thời gian' },
             {
               validator: (_, value) => {
-                if (value && value.isBefore(dayjs().add(10, 'minute'))) {
-                  return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                if (value && value.isBefore(dayjs())) {
+                  return Promise.reject(new Error('Phải sau thời gian hiện tại'));
                 }
                 return Promise.resolve();
               }

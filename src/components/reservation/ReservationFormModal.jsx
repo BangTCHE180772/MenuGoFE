@@ -66,8 +66,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         tablesRes = await getTablesByBranch([branchId]);
       }
 
-      const availableTables = tablesRes.data.filter(t => t.status === 'Empty' || t.status === 'Available');
-      setTables(availableTables);
+      setTables(tablesRes.data);
     } catch (error) {
       message.error('Lỗi khi tải dữ liệu bàn');
     } finally {
@@ -129,13 +128,13 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
 
   const isSubmittingRef = useRef(false);
 
-  const submitCreate = async (payload, confirmUpdateCustomer = false) => {
+  const submitCreate = async (payload, confirmUpdateCustomer = false, ignoreWarning = false) => {
     try {
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
       setLoading(true);
 
-      const dataToSubmit = { ...payload, confirmUpdateCustomer };
+      const dataToSubmit = { ...payload, confirmUpdateCustomer, ignoreWarning };
       await createReservation(dataToSubmit);
       message.success('Đã tạo đặt bàn thành công!');
       onSuccess();
@@ -148,7 +147,21 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
           cancelText: 'Hủy',
           onOk: async () => {
             isSubmittingRef.current = false;
-            await submitCreate(payload, true);
+            await submitCreate(payload, true, ignoreWarning);
+          },
+          onCancel: () => {
+             isSubmittingRef.current = false;
+          }
+        });
+      } else if (error.response?.status === 422 && error.response.data?.isWarning) {
+        Modal.confirm({
+          title: 'Cảnh báo trùng bàn',
+          content: error.response.data.message,
+          okText: 'Vẫn đặt',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            isSubmittingRef.current = false;
+            await submitCreate(payload, confirmUpdateCustomer, true);
           },
           onCancel: () => {
              isSubmittingRef.current = false;
@@ -280,8 +293,8 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
                 { required: true, message: 'Vui lòng chọn thời gian' },
                 {
                   validator: (_, value) => {
-                    if (value && value.isBefore(dayjs().add(10, 'minute'))) {
-                      return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                    if (value && value.isBefore(dayjs())) {
+                      return Promise.reject(new Error('Phải sau thời gian hiện tại'));
                     }
                     return Promise.resolve();
                   }
