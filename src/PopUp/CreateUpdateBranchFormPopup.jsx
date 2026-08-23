@@ -308,7 +308,7 @@ const CreateUpdateBranchFormPopup = ({
               <Col span={10}>
                 <Form.Item
                   name="latitude"
-                  label={<Text strong style={{ fontSize: 13 }}>Vĩ độ (Latitude)</Text>}
+                  label={<Text strong style={{ fontSize: 13 }}>Vĩ độ</Text>}
                   rules={[
                     {
                       validator: (_, value) => {
@@ -327,7 +327,7 @@ const CreateUpdateBranchFormPopup = ({
               <Col span={10}>
                 <Form.Item
                   name="longitude"
-                  label={<Text strong style={{ fontSize: 13 }}>Kinh độ (Longitude)</Text>}
+                  label={<Text strong style={{ fontSize: 13 }}>Kinh độ</Text>}
                   rules={[
                     {
                       validator: (_, value) => {
