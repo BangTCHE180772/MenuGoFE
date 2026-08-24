@@ -1397,12 +1397,15 @@ const MyWorkSchedulePage = () => {
               statusTag = <Tag color="success">Đã hoàn thành</Tag>;
               actionButton = (
                 <Button
-                  type="default"
-                  size="small"
-                  loading={checkinLoading}
-                  onClick={() => doCheckInWithShift(item.branchId, item.id)}
+                  disabled
+                  style={{
+                    backgroundColor: '#f6ffed',
+                    borderColor: '#b7eb8f',
+                    color: '#52c41a',
+                    fontWeight: 'bold',
+                  }}
                 >
-                  Cập nhật Check-out
+                  Đã hoàn thành
                 </Button>
               );
             } else if (status === 'Absent') {

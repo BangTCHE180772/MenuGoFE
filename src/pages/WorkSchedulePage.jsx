@@ -1726,12 +1726,7 @@ const WorkSchedulePage = () => {
             </Form.Item>
           </div>
 
-          {/* Code (optional/display) */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <Form.Item name="code" label="Mã phân ca (Tự động sinh)" style={{ flex: 1, marginBottom: 0 }}>
-              <Input placeholder="Tự động sinh theo hệ thống" disabled />
-            </Form.Item>
-          </div>
+
         </Form>
       </Modal>
 
