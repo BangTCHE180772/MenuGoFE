@@ -1116,34 +1116,12 @@ const WorkSchedulePage = () => {
                               >
                                 <PlusOutlined style={{ fontSize: '14px' }} />
                               </div>
-                            ) : empDaySchedules.length === 1 ? (
-                              renderShiftCard(empDaySchedules[0])
                             ) : (
-                              <Popover
-                                trigger="click"
-                                title={<strong>Lịch làm việc ({empDaySchedules.length} ca):</strong>}
-                                content={
-                                  <div style={{ minWidth: 200 }}>
-                                    {empDaySchedules.map((s) => renderShiftCard(s))}
-                                  </div>
-                                }
-                              >
-                                <div
-                                  style={{
-                                    backgroundColor: '#e6f7ff',
-                                    border: '1px solid #91d5ff',
-                                    borderRadius: '6px',
-                                    padding: '6px 8px',
-                                    textAlign: 'center',
-                                    cursor: 'pointer',
-                                    fontWeight: 700,
-                                    color: '#003a8c',
-                                    fontSize: '12px',
-                                  }}
-                                >
-                                  {empDaySchedules.length} Ca • •
-                                </div>
-                              </Popover>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {[...empDaySchedules]
+                                  .sort((a, b) => (a.shiftId ?? 0) - (b.shiftId ?? 0))
+                                  .map((s) => renderShiftCard(s))}
+                              </div>
                             )}
                           </td>
                         );
