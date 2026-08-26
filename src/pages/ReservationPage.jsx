@@ -131,7 +131,8 @@ const ReservationPage = ({ isPosHub }) => {
 
   const filteredReservations = reservations.filter(r => {
     const isSameDate = dayjs(r.reservationTime).isSame(selectedDate, 'day');
-    if (!isSameDate) return false;
+    if (activeTab !== 'Pending' && !isSameDate) return false;
+
     if (activeTab === 'All') return true;
     return r.status === activeTab;
   }).sort((a, b) => dayjs(a.reservationTime).diff(dayjs(b.reservationTime)));
@@ -140,12 +141,14 @@ const ReservationPage = ({ isPosHub }) => {
     const rTime = dayjs(r.reservationTime);
     const diffMinutes = rTime.diff(now, 'minute');
     const isPending = r.status === 'Pending';
+    const isConfirmed = r.status === 'Confirmed';
+    const isActive = isPending || isConfirmed;
 
-    const canCheckIn = isPending && diffMinutes <= 30;
+    const canCheckIn = isConfirmed && diffMinutes <= 30;
 
-    const isLate = isPending && diffMinutes < 0;
+    const isLate = isActive && diffMinutes < 0;
 
-    const isWarning = isPending && diffMinutes >= 0 && diffMinutes <= 30;
+    const isWarning = isActive && diffMinutes >= 0 && diffMinutes <= 30;
 
     let cardBorderColor = '#e8e8e8';
     let cardBg = '#fff';
@@ -162,7 +165,8 @@ const ReservationPage = ({ isPosHub }) => {
     }
 
     const getStatusTag = () => {
-      if (r.status === 'Pending') return <Tag color="warning">Chờ đến</Tag>;
+      if (r.status === 'Pending') return <Tag color="processing">Chờ xác nhận</Tag>;
+      if (r.status === 'Confirmed') return <Tag color="warning">Chờ đến</Tag>;
       if (r.status === 'Completed') return <Tag color="success">Đã đến</Tag>;
       if (r.status === 'Cancelled') return <Tag color="error">Đã hủy</Tag>;
       return null;
@@ -182,7 +186,7 @@ const ReservationPage = ({ isPosHub }) => {
             </Space>
           }
           extra={
-            isPending && (
+            isActive && (
               <Space>
                 <Button type="text" style={{ color: '#1890ff' }} size="small" onClick={() => {
                   setEditingReservation(r);
@@ -219,13 +223,30 @@ const ReservationPage = ({ isPosHub }) => {
           </div>
 
           {/* Hành động thông minh */}
-          {isPending && (
-            <div className="card-action-wrapper">
-              {canCheckIn ? (
+          {isActive && (
+            <div className="card-action-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {isPending && (
+                <Button block type="dashed" onClick={() => {
+                  setEditingReservation(r);
+                  setIsEditModalVisible(true);
+                }} style={{ height: 40, borderRadius: 8, borderColor: '#1890ff', color: '#1890ff' }}>
+                  Duyệt Đơn & Sửa TT
+                </Button>
+              )}
+              {isConfirmed && (!r.tableNames || r.tableNames.length === 0) && (
+                <Button block onClick={() => {
+                  setAssigningReservation(r);
+                  setIsAssignModalVisible(true);
+                }} style={{ height: 40, borderRadius: 8 }}>
+                  Xếp Bàn
+                </Button>
+              )}
+              {isConfirmed && canCheckIn && (
                 <Button type="primary" block size="middle" onClick={() => handleCheckIn(r.id)} style={{ fontWeight: 600, height: 40, borderRadius: 8 }}>
                   Khách đã đến (Check-in)
                 </Button>
-              ) : (
+              )}
+              {isConfirmed && !canCheckIn && (
                 <Button block size="middle" disabled style={{ height: 40, borderRadius: 8 }}>
                   Chưa đến giờ (còn {diffMinutes} phút)
                 </Button>
@@ -239,7 +260,8 @@ const ReservationPage = ({ isPosHub }) => {
 
   const tabs = [
     { key: 'All', label: `Tất cả (${reservations.filter(r => dayjs(r.reservationTime).isSame(selectedDate, 'day')).length})` },
-    { key: 'Pending', label: 'Chờ đến' },
+    { key: 'Pending', label: 'Chờ xác nhận' },
+    { key: 'Confirmed', label: 'Chờ đến' },
     { key: 'Completed', label: 'Đã đến' },
     { key: 'Cancelled', label: 'Đã hủy' }
   ];

@@ -161,8 +161,12 @@ const OrderPage = ({ isWaiterMode }) => {
         return;
       }
       try {
-        await checkInReservation(orderSummary.reservationId);
-        message.success("Đã xác nhận khách đến!");
+        const res = await checkInReservation(orderSummary.reservationId);
+        if (res.failedItems && res.failedItems.length > 0) {
+          message.warning(`Khách đã đến! Tuy nhiên các món [${res.failedItems.join(', ')}] đã hết hàng/nguyên liệu và tự động bị hủy.`);
+        } else {
+          message.success("Đã xác nhận khách đến!");
+        }
         const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
         setSelectedTable(updated);
         setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));

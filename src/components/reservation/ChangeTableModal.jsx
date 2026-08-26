@@ -100,7 +100,7 @@ const ChangeTableModal = ({ visible, onClose, conflictData, onSuccess }) => {
         >
           {tables.map(t => (
             <Option key={t.id} value={t.id}>
-              Bàn {t.name} (Sức chứa: {t.capacity}) - Khu vực: {t.areaName || 'Chung'}
+              Bàn {t.name} - Khu vực: {t.areaName || 'Chung'}
             </Option>
           ))}
         </Select>
