@@ -907,6 +907,12 @@ const WorkSchedulePage = () => {
       timeText = `${checkInStr || '--'} 📲 - ${checkOutStr || '--'} 📲`;
     }
 
+    const shHours = item.standardHours || 8.0;
+    const actualH = item.actualHours || 0;
+    const excessH = Math.max(0, actualH - shHours);
+    const hasApprovedOT = (item.approvedOTHours || 0) > 0;
+    const isUnapprovedExcess = excessH > 0 && !hasApprovedOT;
+
     return (
       <div
         key={item.id}
@@ -927,12 +933,46 @@ const WorkSchedulePage = () => {
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         }}
       >
-        <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {shiftInfo.name}
+        <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{shiftInfo.name}</span>
+          {(hasApprovedOT || isUnapprovedExcess) && (
+            <Tooltip title="Bấm để mở Modal duyệt OT">
+              <SafetyCertificateOutlined
+                style={{ color: '#fa8c16', fontSize: '13px' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenOTModal(item);
+                }}
+              />
+            </Tooltip>
+          )}
         </div>
         <div style={{ fontSize: '10px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           ({timeText})
         </div>
+
+        {hasApprovedOT && (
+          <div style={{ marginTop: 2 }}>
+            <Tag color="orange" style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px' }}>
+              +{item.approvedOTHours}h OT
+            </Tag>
+          </div>
+        )}
+
+        {isUnapprovedExcess && (
+          <div style={{ marginTop: 2 }}>
+            <Tag
+              color="volcano"
+              style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px', cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenOTModal(item);
+              }}
+            >
+              ⚠️ Duyệt OT (+{excessH.toFixed(1)}h)
+            </Tag>
+          </div>
+        )}
       </div>
     );
   };
@@ -1704,7 +1744,31 @@ const WorkSchedulePage = () => {
             </Form.Item>
           </div>
 
-
+          {modalType === 'edit' && editingRecord && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #ffd591', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbe6', padding: '12px 16px', borderRadius: '8px', border: '1px solid #ffe58f' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#d4380d', fontSize: '13px' }}>
+                  <SafetyCertificateOutlined style={{ marginRight: 6 }} />
+                  Phê duyệt làm thêm giờ (OT) & Đơn hàng POS:
+                </div>
+                <div style={{ fontSize: '12px', color: '#595959', marginTop: 2 }}>
+                  Số giờ OT được duyệt: <Tag color="orange">{editingRecord.approvedOTHours || 0} giờ</Tag>
+                  {editingRecord.otStatus && <Tag color="blue">{editingRecord.otStatus}</Tag>}
+                </div>
+              </div>
+              <Button
+                type="primary"
+                icon={<SafetyCertificateOutlined />}
+                style={{ background: 'linear-gradient(135deg, #fa8c16, #ffa940)', border: 'none', borderRadius: '6px' }}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  handleOpenOTModal(editingRecord);
+                }}
+              >
+                Mở Duyệt OT & POS
+              </Button>
+            </div>
+          )}
         </Form>
       </Modal>
 
