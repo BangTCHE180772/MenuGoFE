@@ -150,7 +150,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             await submitCreate(payload, true, ignoreWarning);
           },
           onCancel: () => {
-             isSubmittingRef.current = false;
+            isSubmittingRef.current = false;
           }
         });
       } else if (error.response?.status === 422 && error.response.data?.isWarning) {
@@ -164,7 +164,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             await submitCreate(payload, confirmUpdateCustomer, true);
           },
           onCancel: () => {
-             isSubmittingRef.current = false;
+            isSubmittingRef.current = false;
           }
         });
       } else {
@@ -186,6 +186,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         customerPhone: values.customerPhone,
         reservationTime: values.reservationTime.toISOString(),
         numberOfGuests: values.numberOfGuests,
+        tableCount: values.tableCount,
         note: values.note || '',
         tableIds: values.tableIds || [],
         preOrderItems: preOrderItems.map(item => ({
@@ -259,8 +260,8 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         okText: 'Thoát',
         cancelText: 'Tiếp tục nhập',
         onOk: () => {
-           form.resetFields();
-           onCancel();
+          form.resetFields();
+          onCancel();
         }
       });
     } else {
@@ -337,6 +338,15 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
+            <Form.Item
+              name="tableCount"
+              label="Số Bàn"
+              rules={[{ required: true, message: 'Vui lòng nhập số bàn' }]}
+              initialValue={1}
+              style={{ flex: 1 }}
+            >
+              <InputNumber min={1} max={20} style={{ width: '100%' }} />
+            </Form.Item>
           </div>
 
           <Form.Item name="note" label="Ghi Chú Đặt Bàn">
@@ -366,7 +376,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             >
               {tables.map(t => (
                 <Select.Option key={t.id} value={t.id}>
-                  {t.name} (Sức chứa: {t.capacity})
+                  {t.name}
                 </Select.Option>
               ))}
             </Select>
