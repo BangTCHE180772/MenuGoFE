@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, InputNumber, DatePicker, Button, Card, Select, Typography, Row, Col, Space, message, Modal } from 'antd';
-import { CalendarOutlined, ArrowLeftOutlined, ShopOutlined, UserOutlined, FileTextOutlined, TableOutlined } from '@ant-design/icons';
+import { CalendarOutlined, ArrowLeftOutlined, ShopOutlined, UserOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllBranches } from '../../api/branchApi';
 import { createCustomerReservation } from '../../api/customerPortalApi';
@@ -39,7 +39,6 @@ const CustomerReservationPage = () => {
         branchId: values.branchId,
         reservationTime: values.reservationTime.toISOString(),
         numberOfGuests: values.numberOfGuests,
-        tableCount: values.tableCount,
         note: values.note || '',
         tableIds: [], // Customers don't pick table IDs directly; staff assigns them
         preOrderItems: []
@@ -122,7 +121,7 @@ const CustomerReservationPage = () => {
             </Form.Item>
 
             <Row gutter={16}>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={12}>
                 <Form.Item
                   name="reservationTime"
                   label={<span style={{ fontWeight: 600, color: '#334155' }}>Thời gian</span>}
@@ -130,8 +129,8 @@ const CustomerReservationPage = () => {
                     { required: true, message: 'Vui lòng chọn thời gian nhận bàn!' },
                     {
                       validator: (_, value) => {
-                        if (value && value.isBefore(dayjs())) {
-                          return Promise.reject(new Error('Thời gian đặt bàn phải sau thời gian hiện tại'));
+                        if (value && value.isBefore(dayjs().add(15, 'minute'))) {
+                          return Promise.reject(new Error('Thời gian đặt bàn phải cách hiện tại ít nhất 15 phút'));
                         }
                         return Promise.resolve();
                       }
@@ -147,10 +146,10 @@ const CustomerReservationPage = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={12} sm={8}>
+              <Col xs={24} sm={12}>
                 <Form.Item
                   name="numberOfGuests"
-                  label={<span style={{ fontWeight: 600, color: '#334155' }}>Số khách</span>}
+                  label={<span style={{ fontWeight: 600, color: '#334155' }}>Số lượng khách</span>}
                   rules={[{ required: true, message: 'Vui lòng nhập số lượng khách!' }]}
                 >
                   <InputNumber
@@ -159,22 +158,6 @@ const CustomerReservationPage = () => {
                     style={{ width: '100%' }}
                     placeholder="Số lượng khách đi"
                     addonBefore={<UserOutlined />}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={8}>
-                <Form.Item
-                  name="tableCount"
-                  label={<span style={{ fontWeight: 600, color: '#334155' }}>Số bàn</span>}
-                  rules={[{ required: true, message: 'Vui lòng nhập số lượng bàn!' }]}
-                  initialValue={1}
-                >
-                  <InputNumber
-                    min={1}
-                    max={20}
-                    style={{ width: '100%' }}
-                    placeholder="Số lượng bàn"
-                    addonBefore={<TableOutlined />}
                   />
                 </Form.Item>
               </Col>
