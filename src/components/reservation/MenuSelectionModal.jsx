@@ -64,9 +64,12 @@ const MenuSelectionModal = ({ visible, onCancel, onConfirm, initialSelectedItems
     if (!visible) return;
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     
+    // Nếu có search thì delay 500ms để chờ gõ xong, nếu không thì fetch luôn ngay lập tức
+    const delay = search ? 500 : 0;
+    
     searchTimeout.current = setTimeout(() => {
       fetchProducts(search, activeGroup);
-    }, 500);
+    }, delay);
 
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -112,10 +115,10 @@ const MenuSelectionModal = ({ visible, onCancel, onConfirm, initialSelectedItems
         </Button>
       ]}
       style={{ top: 20 }}
-      bodyStyle={{ height: '60vh', overflow: 'hidden', padding: 0 }}
+      bodyStyle={{ height: '65vh', overflow: 'hidden', padding: 0, display: 'flex' }}
     >
-      <Row style={{ height: '600px' }}>
-        <Col span={16} style={{ borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column' }}>
+      <Row style={{ flex: 1, width: '100%', height: '100%' }}>
+        <Col span={16} style={{ borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ padding: '16px 16px 0 16px' }}>
             <Input
               prefix={<SearchOutlined />}
@@ -128,40 +131,54 @@ const MenuSelectionModal = ({ visible, onCancel, onConfirm, initialSelectedItems
           <Tabs
             activeKey={activeGroup}
             onChange={setActiveGroup}
-            style={{ padding: '0 16px', flex: 1, display: 'flex', flexDirection: 'column' }}
+            style={{ padding: '0 16px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             items={categories.map(cat => ({
               key: cat.id,
               label: cat.name,
               children: (
-                <div style={{ height: '480px', overflowY: 'auto', paddingRight: 8 }}>
+                <div style={{ height: 'calc(65vh - 140px)', overflowY: 'auto', paddingRight: 8, paddingBottom: 16 }}>
                   <Spin spinning={loading}>
-                    <Row gutter={[16, 16]}>
+                    <Row gutter={[0, 8]}>
                       {products.map(p => {
                         const qty = getQuantity(p.id);
                         return (
-                          <Col span={8} key={p.id}>
-                            <Badge count={qty} offset={[-10, 10]} color="#52c41a">
-                              <Card
-                                hoverable
-                                bodyStyle={{ padding: 12, textAlign: 'center' }}
-                                style={{ height: '100%', borderColor: qty > 0 ? '#1890ff' : '#f0f0f0' }}
-                                onClick={() => handleUpdateQuantity(p, 1)}
-                              >
+                          <Col span={24} key={p.id}>
+                            <Card
+                              hoverable
+                              bodyStyle={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                              style={{ width: '100%', borderColor: qty > 0 ? '#1890ff' : '#f0f0f0' }}
+                              onClick={() => handleUpdateQuantity(p, 1)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                                 {p.imageUrl && (
                                   <img
                                     src={p.imageUrl}
                                     alt={p.name}
-                                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 4, marginBottom: 8 }}
+                                    loading="lazy"
+                                    style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, marginRight: 12 }}
                                   />
                                 )}
-                                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                  {p.name}
+                                <div>
+                                  <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 4 }}>{p.name}</div>
+                                  <div style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                                    {Number(p.sellPrice).toLocaleString('vi-VN')}đ
+                                  </div>
                                 </div>
-                                <Text type="success" strong>
-                                  {Number(p.sellPrice).toLocaleString('vi-VN')}đ
-                                </Text>
-                              </Card>
-                            </Badge>
+                              </div>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                {qty > 0 ? (
+                                  <Space>
+                                    <Button icon={<MinusOutlined />} onClick={() => handleUpdateQuantity(p, -1)} />
+                                    <span style={{ width: 24, textAlign: 'center', fontWeight: 'bold' }}>{qty}</span>
+                                    <Button icon={<PlusOutlined />} onClick={() => handleUpdateQuantity(p, 1)} />
+                                  </Space>
+                                ) : (
+                                  <Button type="primary" ghost icon={<PlusOutlined />} onClick={() => handleUpdateQuantity(p, 1)}>
+                                    Thêm
+                                  </Button>
+                                )}
+                              </div>
+                            </Card>
                           </Col>
                         );
                       })}
