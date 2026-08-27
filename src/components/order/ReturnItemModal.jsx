@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal, InputNumber, Input, Form, message, Checkbox } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 
 const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const actionRef = useRef(false);
 
   if (!item) return null;
 
   const maxReturnable = item.quantity - (item.returnedQuantity || 0);
 
   const handleOk = async () => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       const values = await form.validateFields();
       setLoading(true);
@@ -36,6 +39,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
       message.error(error.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu trả món!');
     } finally {
       setLoading(false);
+      actionRef.current = false;
     }
   };
 

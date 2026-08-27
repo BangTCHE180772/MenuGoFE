@@ -20,8 +20,6 @@ const InventoryStatusChart = ({ data }) => {
       normal: 126,
       lowStock: 5,
       outOfStock: 3,
-      needCheck: 8,
-      expiringSoon: 6,
     },
   ];
 
@@ -38,14 +36,14 @@ const InventoryStatusChart = ({ data }) => {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
-            📊 Phân bổ Trạng thái Nguyên liệu Kho (Inventory Status)
+            📊 Phân bổ Trạng thái Nguyên liệu Kho
           </Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Tổng quan số lượng và tỷ lệ các nguyên liệu đang gặp vấn đề trong kho.
           </Text>
         </div>
 
-        <AntTooltip title="Biểu đồ phản ánh số lượng nguyên liệu chia theo 5 trạng thái vận hành.">
+        <AntTooltip title="Biểu đồ phản ánh số lượng nguyên liệu chia theo 3 trạng thái vận hành.">
           <InfoCircleOutlined style={{ fontSize: 16, color: "#94a3b8", cursor: "pointer" }} />
         </AntTooltip>
       </div>
@@ -69,8 +67,6 @@ const InventoryStatusChart = ({ data }) => {
                     { label: "Bình thường", color: "#22c55e" },
                     { label: "Sắp hết",     color: "#f59e0b" },
                     { label: "Hết hàng",    color: "#ef4444" },
-                    { label: "Cần kiểm tra", color: "#0ea5e9" },
-                    { label: "Sắp hết hạn",  color: "#f97316" },
                   ].map((item, index) => (
                     <div key={index} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ display: "inline-block", width: 12, height: 12, backgroundColor: item.color, borderRadius: 2 }} />
@@ -82,9 +78,7 @@ const InventoryStatusChart = ({ data }) => {
             />
             <Bar dataKey="normal" name="normal" stackId="status" fill="#22c55e" radius={[4, 0, 0, 4]} barSize={28} />
             <Bar dataKey="lowStock" name="lowStock" stackId="status" fill="#f59e0b" barSize={28} />
-            <Bar dataKey="outOfStock" name="outOfStock" stackId="status" fill="#ef4444" barSize={28} />
-            <Bar dataKey="needCheck" name="needCheck" stackId="status" fill="#0ea5e9" barSize={28} />
-            <Bar dataKey="expiringSoon" name="expiringSoon" stackId="status" fill="#f97316" radius={[0, 4, 4, 0]} barSize={28} />
+            <Bar dataKey="outOfStock" name="outOfStock" stackId="status" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={28} />
           </BarChart>
         </ResponsiveContainer>
       </div>

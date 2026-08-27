@@ -16,7 +16,14 @@ const axiosInstance = axios.create({
 // Tự động đính kèm JWT token vào mỗi request
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    let token = localStorage.getItem('access_token');
+    const isCustomerPortalRoute = config.url && (config.url.includes('/api/CustomerPortal') || config.url.includes('/api/CustomerAuth') || config.url.includes('/api/Customer'));
+    if (isCustomerPortalRoute) {
+      const customerToken = localStorage.getItem('customer_access_token');
+      if (customerToken) {
+        token = customerToken;
+      }
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -108,13 +115,20 @@ axiosInstance.interceptors.response.use(
 
     // Xử lý lỗi toàn cục
     if (error.response?.status === 401) {
-      const token = localStorage.getItem('access_token');
       const url = error.config?.url || '';
-      const isLoginOrAuth = url.includes('/api/auth') || url.includes('/api/Auth');
-      if (token && !isLoginOrAuth) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+      const isCustomerRoute = url.includes('/api/CustomerPortal') || url.includes('/api/CustomerAuth') || url.includes('/api/Customer');
+      if (isCustomerRoute) {
+        localStorage.removeItem('customer_access_token');
+        localStorage.removeItem('customer');
+        window.location.href = '/customer/login';
+      } else {
+        const token = localStorage.getItem('access_token');
+        const isLoginOrAuth = url.includes('/api/auth') || url.includes('/api/Auth');
+        if (token && !isLoginOrAuth) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
       }
     } else if (error.response?.status === 403) {
       // 403 Forbidden: không xóa session và không redirect về login/unauthorized, chỉ từ chối promise

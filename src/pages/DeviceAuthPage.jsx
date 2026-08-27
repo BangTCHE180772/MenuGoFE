@@ -63,8 +63,8 @@ const DeviceAuthPage = () => {
         <div style={{ padding: 20, textAlign: 'center', maxWidth: 400, margin: '50px auto' }}>
           <Result
             status="success"
-            title="Đã gửi yêu cầu!"
-            subTitle="Vui lòng nhập mã PIN (2FA) trên màn hình thiết bị thu ngân để hoàn tất đăng nhập."
+            title="Đăng nhập thành công!"
+            subTitle="Tài khoản của bạn đã được đăng nhập vào thiết bị Thu ngân thành công."
             extra={[
               <Button type="primary" key="home" onClick={() => navigate('/')}>
                 Về Trang Chủ

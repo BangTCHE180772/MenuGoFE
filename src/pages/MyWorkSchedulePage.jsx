@@ -990,41 +990,56 @@ const MyWorkSchedulePage = () => {
         footer={(() => {
           const shiftInfo = selectedSchedule ? getShiftDetails(selectedSchedule.shiftId) : null;
           let isShiftPast = false;
+          let isAlreadyLeave = false;
+          let isLeaveApproved = false;
+          
           if (selectedSchedule && shiftInfo && shiftInfo.endTime) {
             const dateStr = dayjs(selectedSchedule.workDate).format('YYYY-MM-DD');
             const endStr = shiftInfo.endTime.length > 5 ? shiftInfo.endTime : `${shiftInfo.endTime}:00`;
             isShiftPast = dayjs(`${dateStr} ${endStr}`).isBefore(dayjs());
+            
+            const currentStatus = (selectedSchedule.status || '').toUpperCase();
+            if (currentStatus.startsWith('LEAVE_REQUEST')) isAlreadyLeave = true;
+            if (currentStatus === 'ABSENT' || currentStatus === 'VẮNG MẶT' || currentStatus === 'VẮNG') isLeaveApproved = true;
           }
+          
+          let disableReason = "";
+          if (isShiftPast) disableReason = "Ca làm việc đã kết thúc.";
+          else if (isLeaveApproved) disableReason = "Ca làm việc này đã được duyệt nghỉ.";
+          else if (isAlreadyLeave) disableReason = "Bạn đã gửi đơn xin nghỉ cho ca này.";
+          
+          const isDisabled = isShiftPast || isAlreadyLeave || isLeaveApproved;
+          
           return [
-            <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể xin nghỉ." : ""} key="leave-tooltip">
+            <Tooltip title={disableReason} key="leave-tooltip">
               <Button
                 key="leave"
                 type="primary"
                 icon={<FileTextOutlined />}
                 onClick={() => handleOpenLeaveModal('shift', selectedSchedule)}
-                disabled={isShiftPast}
+                disabled={isDisabled}
                 style={{ 
-                  background: isShiftPast ? '#d9d9d9' : '#722ed1', 
-                  borderColor: isShiftPast ? '#d9d9d9' : '#722ed1', 
+                  background: isDisabled ? '#d9d9d9' : '#722ed1', 
+                  borderColor: isDisabled ? '#d9d9d9' : '#722ed1', 
                   fontWeight: 'bold',
-                  color: isShiftPast ? '#8c8c8c' : '#fff'
+                  color: isDisabled ? '#8c8c8c' : '#fff'
                 }}
               >
                 Xin nghỉ ca này
               </Button>
             </Tooltip>,
-            <Tooltip title={isShiftPast ? "Ca làm việc đã kết thúc, không thể chuyển ca." : ""} key="transfer-tooltip">
+            <Tooltip title={disableReason} key="transfer-tooltip">
               <Button
                 key="transfer"
                 type="primary"
                 icon={<SwapOutlined />}
                 onClick={handleOpenTransfer}
-                disabled={isShiftPast}
+                disabled={isDisabled}
                 style={{
-                  background: isShiftPast ? '#d9d9d9' : '#f97316',
-                  borderColor: isShiftPast ? '#d9d9d9' : '#f97316',
+                  background: isDisabled ? '#d9d9d9' : '#f97316',
+                  borderColor: isDisabled ? '#d9d9d9' : '#f97316',
                   fontWeight: 'bold',
-                  color: isShiftPast ? '#8c8c8c' : '#fff'
+                  color: isDisabled ? '#8c8c8c' : '#fff'
                 }}
               >
                 Đổi ca

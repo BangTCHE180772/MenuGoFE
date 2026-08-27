@@ -60,7 +60,7 @@ const OperationalAlerts = ({ alerts = [] }) => {
           </Badge>
           <div>
             <Title level={5} style={{ margin: 0, color: "#0f172a" }}>
-              🚨 Cảnh báo Vận hành Kho Nguyên liệu (Operational Alerts)
+              🚨 Cảnh báo Vận hành Kho Nguyên liệu
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
               Danh sách thông báo khẩn cấp cần Bếp trưởng và Quản lý xử lý ngay lập tức trong ca làm việc.
@@ -74,10 +74,11 @@ const OperationalAlerts = ({ alerts = [] }) => {
         </Tag>
       </div>
 
-      <List
-        dataSource={alerts}
-        renderItem={(item) => {
-          const style = getSeverityStyle(item.severity);
+      <div style={{ maxHeight: "380px", overflowY: "auto", paddingRight: 4 }}>
+        <List
+          dataSource={alerts}
+          renderItem={(item) => {
+            const style = getSeverityStyle(item.severity);
           return (
             <List.Item
               style={{
@@ -128,6 +129,7 @@ const OperationalAlerts = ({ alerts = [] }) => {
           );
         }}
       />
+      </div>
     </Card>
   );
 };

@@ -112,7 +112,7 @@ const WaiterActionFeed = ({ tables, onSelectTable }) => {
                     </>
                   )}
                 </div>
-                <div className="card-time">
+                <div className="waiter-card-time">
                   {notif.timestamp ? new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                 </div>
               </div>

@@ -148,7 +148,7 @@ const WorkSchedulePage = () => {
       other: { label: '👤 NHÂN VIÊN KHÁC', items: [] },
     };
 
-    accounts
+    contractedAccounts
       .filter((a) => {
         if (!a.roleIds || a.roleIds.length === 0) return false;
         return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
@@ -163,7 +163,7 @@ const WorkSchedulePage = () => {
       });
 
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
-  }, [accounts]);
+  }, [contractedAccounts]);
 
   // Filtering & View states
   const [selectedBranch, setSelectedBranch] = useState(null);
@@ -1506,7 +1506,7 @@ const WorkSchedulePage = () => {
                       value={selectedAccount}
                       onChange={(val) => setSelectedAccount(val)}
                     >
-                      {accounts.map((a) => (
+                      {contractedAccounts.map((a) => (
                         <Select.Option key={a.id} value={a.id} label={a.name}>
                           {a.name}
                         </Select.Option>

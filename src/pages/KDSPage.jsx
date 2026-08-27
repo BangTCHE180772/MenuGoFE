@@ -29,6 +29,9 @@ import {
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
+import { useDevice } from '../context/DeviceContext';
+
+import { useBranch } from '../context/BranchContext';
 
 const { Title, Text } = Typography;
 
@@ -42,7 +45,10 @@ const COOKING_STATUS = {
 
 const KDSPage = () => {
   const { user } = useAuth();
-  const currentBranchId = user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
+  const { deviceInfo } = useDevice();
+  const { currentBranchId: contextBranchId } = useBranch();
+  
+  const currentBranchId = deviceInfo?.branchId || contextBranchId || user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -93,7 +99,7 @@ const KDSPage = () => {
   const fetchItems = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await getKitchenItems();
+      const res = await getKitchenItems(currentBranchId);
       const data = res.data || [];
       // Sort chronologically from oldest to newest
       const sorted = [...data].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -104,7 +110,7 @@ const KDSPage = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [currentBranchId]);
 
   useEffect(() => {
     fetchItems(true);
@@ -148,12 +154,17 @@ const KDSPage = () => {
     return () => {
       signalRConnection.off('ReceiveNotification', handleNotification);
     };
-  }, [signalRConnection, fetchItems, playAlertSound]);
+  }, [signalRConnection, fetchItems, playAlertSound, currentBranchId]);
 
   // Single Item Status Change Handler
-  const handleStatusChange = async (detailId, nextStatus) => {
+  const handleStatusChange = async (detailIdOrIds, nextStatus, quantity = null) => {
     try {
-      await updateCookingStatus(detailId, nextStatus);
+      if (Array.isArray(detailIdOrIds)) {
+        await Promise.all(detailIdOrIds.map(id => updateCookingStatus(id, nextStatus)));
+      } else {
+        await updateCookingStatus(detailIdOrIds, nextStatus, quantity);
+      }
+      
       const statusLabels = {
         [COOKING_STATUS.ACCEPTED]: 'Đã nhận món',
         [COOKING_STATUS.COOKING]: 'Đã chuyển sang Đang nấu',
@@ -164,6 +175,17 @@ const KDSPage = () => {
     } catch (err) {
       console.error(err);
       message.error('Lỗi khi cập nhật trạng thái món.');
+    }
+  };
+
+  const handleBatchStatusChange = async (productId, nextStatus) => {
+    try {
+      await batchUpdateCookingStatus(productId, nextStatus);
+      message.success('Đã xác nhận toàn bộ mẻ thành công');
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi cập nhật trạng thái mẻ.');
     }
   };
 
@@ -181,11 +203,59 @@ const KDSPage = () => {
 
 
 
-  // Group items by status for Filter Tabs & Columns
+  const handleCompleteBatch = async (itemsInBatch) => {
+    try {
+      // Nhóm theo orderDetailId để tránh gọi API nhiều lần cho cùng 1 orderDetailId bị split
+      const groupedById = {};
+      itemsInBatch.forEach(item => {
+        if (!groupedById[item.orderDetailId]) {
+          groupedById[item.orderDetailId] = 0;
+        }
+        groupedById[item.orderDetailId] += item.quantity;
+      });
+
+      // Gọi API lần lượt để tránh race condition
+      for (const [id, qty] of Object.entries(groupedById)) {
+        await updateCookingStatus(id, COOKING_STATUS.READY, qty);
+      }
+      message.success('Đã hoàn thành toàn bộ mẻ');
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi hoàn thành mẻ');
+    }
+  };
+
   const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
   const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
-  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING), [items]);
-  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY), [items]);
+  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
+  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
+
+  const batchableItems = useMemo(() => {
+    const combined = [...waitingItems, ...acceptedItems];
+    const grouped = {};
+    const now = new Date();
+    
+    combined.forEach(item => {
+      // Bỏ qua các món đã tạo quá 30 phút (không cho vào mẻ nữa)
+      if (item.createdAt) {
+        const minutes = (now - new Date(item.createdAt)) / 60000;
+        if (minutes > 30) return;
+      }
+
+      const key = item.productId || item.productName;
+      if (!grouped[key]) {
+        grouped[key] = {
+          productId: item.productId,
+          productName: item.productName || item.ProductName,
+          totalQty: 0,
+        };
+      }
+      grouped[key].totalQty += item.quantity;
+    });
+    // Lọc ra những món có số lượng >= 2 để gộp mẻ
+    return Object.values(grouped).filter(g => g.totalQty >= 2);
+  }, [waitingItems, acceptedItems]);
 
 
 
@@ -235,13 +305,39 @@ const KDSPage = () => {
     }
     return groupItemsByDish(list).map((batch) => (
       <div key={`${batch.productId || batch.productName}_${batch.batchIndex}`} style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text strong style={{ color: '#000000', fontSize: 14 }}>{batch.productName}</Text>
-          {batch.items.length > 1 && (
-            <Tag color="cyan" style={{ margin: 0, fontWeight: 700 }}>
-              Mẻ {batch.batchIndex} • {batch.totalQty} phần
-            </Tag>
-          )}
+        <div style={{ marginBottom: 12, borderBottom: '2px dashed #d9d9d9', paddingBottom: 12 }}>
+          <div style={{ marginBottom: 8 }}>
+            <Text strong style={{ color: '#000000', fontSize: 18 }}>{batch.productName}</Text>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            {batch.items.length > 1 && (
+              <div style={{ 
+                backgroundColor: '#e6fffb', 
+                border: '2px solid #13c2c2', 
+                borderRadius: 8, 
+                padding: '4px 10px', 
+                color: '#006d75',
+                fontSize: 14,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                whiteSpace: 'nowrap'
+              }}>
+                Mẻ {batch.batchIndex} • {batch.totalQty} phần
+              </div>
+            )}
+            {batch.items.some(i => i.cookingStatus === COOKING_STATUS.COOKING) && (
+              <Button 
+                type="primary" 
+                size="middle"
+                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 800, borderRadius: 8 }}
+                onClick={() => handleCompleteBatch(batch.items)}
+                icon={<CheckCircleOutlined />}
+              >
+                Hoàn thành mẻ
+              </Button>
+            )}
+          </div>
         </div>
         {batch.items.map(renderKdsCard)}
       </div>
@@ -294,7 +390,7 @@ const KDSPage = () => {
 
     return (
       <Card
-        key={item.orderDetailId}
+        key={item._splitKey || item.orderDetailId}
         hoverable
         style={{
           backgroundColor: '#ffffff',
@@ -373,8 +469,13 @@ const KDSPage = () => {
             >
               {item.productName}
             </Title>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#faad14', fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center' }}>
               Số lượng: x{item.quantity}
+              {item.batchId && (
+                <Tag color="magenta" style={{ marginLeft: 12, fontSize: 14, fontWeight: 800, padding: '2px 8px' }}>
+                  <ThunderboltOutlined /> MẺ
+                </Tag>
+              )}
             </div>
           </div>
         </div>
@@ -412,10 +513,10 @@ const KDSPage = () => {
               block
               size="large"
               icon={<FireOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
-              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff' }}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING, 1)}
+              style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff', marginBottom: 8 }}
             >
-              Xác nhận
+              Xác nhận chế biến
             </Button>
           )}
 
@@ -425,7 +526,7 @@ const KDSPage = () => {
               block
               size="large"
               icon={<CheckCircleOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.READY)}
+              onClick={() => handleStatusChange(item.orderDetailIds || item.orderDetailId, COOKING_STATUS.READY)}
               style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', fontWeight: 600, color: '#ffffff' }}
             >
               Hoàn thành
@@ -442,7 +543,13 @@ const KDSPage = () => {
           {status !== COOKING_STATUS.READY && (
             <Popconfirm
               title="Bạn có chắc chắn muốn hủy món này không?"
-              onConfirm={() => handleCancelItem(item.orderDetailId)}
+              onConfirm={() => {
+                  if (item.orderDetailIds) {
+                      item.orderDetailIds.forEach(id => handleCancelItem(id));
+                  } else {
+                      handleCancelItem(item.orderDetailId);
+                  }
+              }}
               okText="Đồng ý"
               cancelText="Hủy bỏ"
               okButtonProps={{ danger: true }}
@@ -600,6 +707,44 @@ const KDSPage = () => {
         </div>
       )}
 
+      {/* ── BATCH PROCESSING BAR ────────────────────────────────── */}
+      <div style={{ marginBottom: 20, backgroundColor: '#f0f5ff', padding: '16px 20px', borderRadius: 12, border: '1px solid #adc6ff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
+        <Title level={5} style={{ margin: '0 0 12px 0', color: '#1d39c4', display: 'flex', alignItems: 'center' }}>
+          <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8, fontSize: 18 }} />
+          Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar)
+        </Title>
+        {batchableItems.length === 0 ? (
+          <Text style={{ color: '#8c8c8c' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
+        ) : (
+          <Space size="middle" wrap style={{ width: '100%' }}>
+            {batchableItems.map(batch => (
+              <Card
+                key={batch.productId}
+                size="small"
+                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
+                styles={{ body: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
+              >
+                <div>
+                  <Text strong style={{ fontSize: 16, color: '#000000', display: 'block', marginBottom: 4 }}>{batch.productName}</Text>
+                  <div style={{ color: '#d4380d', fontWeight: 900, fontSize: 22, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Mẻ {batch.totalQty} phần
+                  </div>
+                </div>
+                <Button 
+                  type="primary" 
+                  size="large"
+                  onClick={() => handleBatchStatusChange(batch.productId, COOKING_STATUS.COOKING)}
+                  style={{ marginLeft: 20, backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 700, height: 48, borderRadius: 8 }}
+                  icon={<FireOutlined style={{ fontSize: 20 }} />}
+                >
+                  Xác nhận
+                </Button>
+              </Card>
+            ))}
+          </Space>
+        )}
+      </div>
+
       {/* ── MAIN KITCHEN QUEUE ───────────────────────────────── */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -610,7 +755,7 @@ const KDSPage = () => {
         <Row gutter={[20, 20]}>
           {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -624,7 +769,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={waitingItems.length + acceptedItems.length} style={{ backgroundColor: '#1890ff' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {waitingItems.length + acceptedItems.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#595959' }}>Không có món chờ chế biến</div>
                 ) : (
@@ -636,7 +781,7 @@ const KDSPage = () => {
 
           {/* Column 2: Đang nấu (Cooking) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -650,7 +795,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={cookingItems.length} style={{ backgroundColor: '#fa8c16' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {renderGroupedColumn(cookingItems, 'Không có món đang làm')}
               </div>
             </div>
@@ -658,7 +803,7 @@ const KDSPage = () => {
 
           {/* Column 3: Hoàn thành (Ready) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', minHeight: '60vh', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -672,7 +817,7 @@ const KDSPage = () => {
                 </Title>
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
-              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', paddingRight: 4 }}>
+              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
                 {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
               </div>
             </div>
@@ -739,7 +884,7 @@ const KDSPage = () => {
           ) : (
             <Row gutter={[16, 16]}>
               {filteredItems.map((item) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={item.orderDetailId}>
+                <Col xs={24} sm={12} md={8} lg={6} key={item._splitKey || item.orderDetailId}>
                   {renderKdsCard(item)}
                 </Col>
               ))}

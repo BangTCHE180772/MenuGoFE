@@ -18,6 +18,7 @@ import WaiterStationPage from '../pages/WaiterStationPage';
 import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
+import BranchChatPage from '../pages/BranchChatPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import ContractPage from '../pages/ContractPage';
 import MyContractPage from '../pages/MyContractPage';
@@ -38,7 +39,13 @@ import HolidayConfigPage from '../pages/HolidayConfigPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
-import CustomerHomePage from '../pages/CustomerHomePage';
+import CustomerHomePage from '../pages/customer/CustomerHomePage';
+import CustomerLoginPage from '../pages/customer/CustomerLoginPage';
+import CustomerRegisterPage from '../pages/customer/CustomerRegisterPage';
+import CustomerDashboardPage from '../pages/customer/CustomerDashboardPage';
+import CustomerReservationPage from '../pages/customer/CustomerReservationPage';
+import CustomerChatPage from '../pages/customer/CustomerChatPage';
+import CustomerPrivateRoute from './CustomerPrivateRoute';
 import VoucherPage from '../pages/VoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
@@ -71,6 +78,14 @@ const AppRouter = () => {
           </Route>
           <Route path="/welcome" element={<CustomerHomePage />} />
           <Route path="/customer-order/:tableId" element={<CustomerOrderPage />} />
+          <Route path="/customer/login" element={<CustomerLoginPage />} />
+          <Route path="/customer/register" element={<CustomerRegisterPage />} />
+          
+          <Route element={<CustomerPrivateRoute />}>
+            <Route path="/customer/dashboard" element={<CustomerDashboardPage />} />
+            <Route path="/customer/booking" element={<CustomerReservationPage />} />
+            <Route path="/customer/chat" element={<CustomerChatPage />} />
+          </Route>
 
           {/* ── Device Route: cần device_token ─────────── */}
           <Route element={<DeviceRoute />}>
@@ -160,6 +175,7 @@ const AppRouter = () => {
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
+                <Route path="/chat" element={<BranchChatPage />} />
                 <Route path="/reports/revenue" element={<ReportRevenuePage />} />
                 <Route path="/reports/expense" element={<ReportExpensePage />} />
                 <Route path="/reports/profit" element={<ReportProfitPage />} />

@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useDevice } from '../context/DeviceContext';
-import { Button, Tooltip } from 'antd';
+import { Button, Tooltip, message } from 'antd';
 import { LogoutOutlined, LockOutlined, DesktopOutlined, LoginOutlined } from '@ant-design/icons';
 import { useState, useEffect, useRef } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
@@ -8,7 +8,7 @@ import DeviceEmployeeLoginModal from '../components/DeviceEmployeeLoginModal';
 import '../styles/devicelayout.css';
 
 const DeviceLayout = () => {
-  const { deviceInfo, deviceEmployee, logoutEmployee, resetDevice } = useDevice();
+  const { deviceInfo, deviceEmployee, loginEmployee, logoutEmployee, resetDevice } = useDevice();
   const navigate = useNavigate();
   const location = useLocation();
   const [loginVisible, setLoginVisible] = useState(false);
@@ -85,10 +85,16 @@ const DeviceLayout = () => {
         }
 
         if (dType === 'POS') {
-          setScannedEmail(data.email);
-          setLoginVisible(true);
+          if (data && data.success && data.employee) {
+            loginEmployee(data.employee);
+            message.success(`Đăng nhập thành công: ${data.employee.name}`);
+            setLoginVisible(false);
+          } else {
+            setScannedEmail(data.email);
+            setLoginVisible(true);
+          }
         } else {
-          message.success(`Nhân viên ${data.email} vừa kết nối thành công!`);
+          message.success(`Nhân viên ${data.email || data.employee?.email} vừa kết nối thành công!`);
         }
       });
 

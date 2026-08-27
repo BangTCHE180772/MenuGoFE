@@ -66,8 +66,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         tablesRes = await getTablesByBranch([branchId]);
       }
 
-      const availableTables = tablesRes.data.filter(t => t.status === 'Empty' || t.status === 'Available');
-      setTables(availableTables);
+      setTables(tablesRes.data);
     } catch (error) {
       message.error('Lỗi khi tải dữ liệu bàn');
     } finally {
@@ -129,13 +128,13 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
 
   const isSubmittingRef = useRef(false);
 
-  const submitCreate = async (payload, confirmUpdateCustomer = false) => {
+  const submitCreate = async (payload, confirmUpdateCustomer = false, ignoreWarning = false) => {
     try {
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
       setLoading(true);
 
-      const dataToSubmit = { ...payload, confirmUpdateCustomer };
+      const dataToSubmit = { ...payload, confirmUpdateCustomer, ignoreWarning };
       await createReservation(dataToSubmit);
       message.success('Đã tạo đặt bàn thành công!');
       onSuccess();
@@ -148,10 +147,24 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
           cancelText: 'Hủy',
           onOk: async () => {
             isSubmittingRef.current = false;
-            await submitCreate(payload, true);
+            await submitCreate(payload, true, ignoreWarning);
           },
           onCancel: () => {
-             isSubmittingRef.current = false;
+            isSubmittingRef.current = false;
+          }
+        });
+      } else if (error.response?.status === 422 && error.response.data?.isWarning) {
+        Modal.confirm({
+          title: 'Cảnh báo trùng bàn',
+          content: error.response.data.message,
+          okText: 'Vẫn đặt',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            isSubmittingRef.current = false;
+            await submitCreate(payload, confirmUpdateCustomer, true);
+          },
+          onCancel: () => {
+            isSubmittingRef.current = false;
           }
         });
       } else {
@@ -173,6 +186,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         customerPhone: values.customerPhone,
         reservationTime: values.reservationTime.toISOString(),
         numberOfGuests: values.numberOfGuests,
+        tableCount: values.tableCount,
         note: values.note || '',
         tableIds: values.tableIds || [],
         preOrderItems: preOrderItems.map(item => ({
@@ -238,14 +252,33 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
     }
   ];
 
+  const handleCancel = () => {
+    if (form.isFieldsTouched()) {
+      Modal.confirm({
+        title: 'Cảnh báo chưa lưu dữ liệu',
+        content: 'Bạn có dữ liệu đang nhập dở. Bạn có chắc chắn muốn thoát và hủy bỏ toàn bộ không?',
+        okText: 'Thoát',
+        cancelText: 'Tiếp tục nhập',
+        onOk: () => {
+          form.resetFields();
+          onCancel();
+        }
+      });
+    } else {
+      form.resetFields();
+      onCancel();
+    }
+  };
+
   return (
     <Modal
       title="Thêm Đặt Bàn Mới"
       open={visible}
-      onCancel={onCancel}
+      maskClosable={false}
+      onCancel={handleCancel}
       width={800}
       footer={[
-        <Button key="back" onClick={onCancel}>Hủy</Button>,
+        <Button key="back" onClick={handleCancel}>Hủy</Button>,
         <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
           Tạo Đặt Bàn
         </Button>
@@ -280,8 +313,8 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
                 { required: true, message: 'Vui lòng chọn thời gian' },
                 {
                   validator: (_, value) => {
-                    if (value && value.isBefore(dayjs().add(10, 'minute'))) {
-                      return Promise.reject(new Error('Phải cách hiện tại ít nhất 10 phút'));
+                    if (value && value.isBefore(dayjs())) {
+                      return Promise.reject(new Error('Phải sau thời gian hiện tại'));
                     }
                     return Promise.resolve();
                   }
@@ -304,6 +337,15 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
               style={{ flex: 1 }}
             >
               <InputNumber min={1} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              name="tableCount"
+              label="Số Bàn"
+              rules={[{ required: true, message: 'Vui lòng nhập số bàn' }]}
+              initialValue={1}
+              style={{ flex: 1 }}
+            >
+              <InputNumber min={1} max={20} style={{ width: '100%' }} />
             </Form.Item>
           </div>
 
@@ -334,7 +376,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             >
               {tables.map(t => (
                 <Select.Option key={t.id} value={t.id}>
-                  {t.name} (Sức chứa: {t.capacity})
+                  {t.name}
                 </Select.Option>
               ))}
             </Select>

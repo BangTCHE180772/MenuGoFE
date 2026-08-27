@@ -8,7 +8,7 @@ import {
   StarFilled,
 } from "@ant-design/icons";
 
-const CustomerBranchCard = ({ branch, isMain }) => {
+const CustomerBranchCard = ({ branch, isMain, userCoords }) => {
   const branchName = branch.name || branch.Name || "Chi nhánh MenuGo";
   const address =
     branch.newAddressName ||
@@ -20,14 +20,27 @@ const CustomerBranchCard = ({ branch, isMain }) => {
   const closeTime = branch.closeTime || "22:00";
   const phone = branch.phone || branch.phoneNumber || "1900 6868";
 
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    address,
-  )}`;
+  const latitude = branch.latitude || branch.Latitude;
+  const longitude = branch.longitude || branch.Longitude;
+  const distance = branch.distance;
+
+  const mapsUrl = latitude && longitude
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+
+  const mapEmbedUrl = latitude && longitude
+    ? `https://maps.google.com/maps?q=${latitude},${longitude}&t=&z=14&ie=UTF8&iwloc=&output=embed`
+    : `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 
   return (
     <div className={`customer-branch-card ${isMain ? "main-branch" : ""}`}>
       <div className="branch-card-header">
-        <div className="branch-badge-group" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div className="branch-badge-group" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          {distance !== null && distance !== undefined && (
+            <Tag color="magenta" style={{ margin: 0, fontWeight: 600 }}>
+              Cách bạn {distance.toFixed(1)} km
+            </Tag>
+          )}
           {isMain ? (
             <Tag color="gold" className="badge-headquarter">
               <StarFilled /> Trụ sở chính
@@ -91,7 +104,7 @@ const CustomerBranchCard = ({ branch, isMain }) => {
             style={{ border: 0, borderRadius: "8px", display: "block" }}
             loading="lazy"
             allowFullScreen
-            src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+            src={mapEmbedUrl}
           ></iframe>
         </div>
         <Button
