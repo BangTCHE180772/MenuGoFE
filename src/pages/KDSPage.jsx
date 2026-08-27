@@ -35,6 +35,20 @@ import { useBranch } from '../context/BranchContext';
 
 const { Title, Text } = Typography;
 
+// ─── Unified visual language for the whole Kitchen (KDS) screen ───────────
+// One background, one border, one shadow, one text-color scheme for every
+// card/panel on this page. Status colors (red/orange/green/blue) are kept
+// as functional accents (tags, badges, action buttons) — they signal state,
+// not stylistic drift.
+const KDS_STYLE = {
+  cardBg: '#ffffff',
+  border: '1px solid #f0f0f0',
+  radius: 12,
+  shadow: '0 2px 8px rgba(0,0,0,0.06)',
+  textPrimary: '#000000',
+  textSecondary: '#595959',
+};
+
 // Standard cooking status definitions
 const COOKING_STATUS = {
   WAITING: 'Waiting',   // Món mới (New)
@@ -374,7 +388,7 @@ const KDSPage = () => {
   const renderKdsCard = (item) => {
     const status = item.cookingStatus || COOKING_STATUS.WAITING;
 
-    let cardBorderColor = '#303030';
+    let cardBorderColor = '#ff4d4f';
     let statusTag = <Tag color="red">CHỜ XÁC NHẬN</Tag>;
 
     if (status === COOKING_STATUS.ACCEPTED) {
@@ -393,11 +407,11 @@ const KDSPage = () => {
         key={item._splitKey || item.orderDetailId}
         hoverable
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: KDS_STYLE.cardBg,
           borderColor: cardBorderColor,
-          borderRadius: 12,
+          borderRadius: KDS_STYLE.radius,
           borderWidth: 2,
-          boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+          boxShadow: KDS_STYLE.shadow,
           marginBottom: 16,
           width: '100%',
           height: 340,
@@ -432,7 +446,7 @@ const KDSPage = () => {
                 borderRadius: 8,
                 objectFit: 'cover',
                 marginRight: 12,
-                border: '1px solid #434343'
+                border: KDS_STYLE.border,
               }}
             />
           ) : (
@@ -441,14 +455,14 @@ const KDSPage = () => {
                 width: 60,
                 height: 60,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #303030, #202020)',
+                backgroundColor: '#f5f5f5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 24,
-                color: '#595959',
+                color: KDS_STYLE.textSecondary,
                 marginRight: 12,
-                border: '1px solid #434343'
+                border: KDS_STYLE.border,
               }}
             >
               🍲
@@ -484,12 +498,12 @@ const KDSPage = () => {
         {item.note && (
           <div
             style={{
-              backgroundColor: '#2b2111',
-              border: '1px solid #d48806',
+              backgroundColor: '#fff7e6',
+              border: '1px solid #ffd591',
               borderRadius: 6,
               padding: '6px 10px',
               marginBottom: 12,
-              color: '#ffe58f',
+              color: KDS_STYLE.textPrimary,
               fontSize: 13,
               maxHeight: 56,
               overflowY: 'auto',
@@ -590,12 +604,12 @@ const KDSPage = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 16,
-          backgroundColor: '#ffffff',
+          backgroundColor: KDS_STYLE.cardBg,
           padding: '16px 24px',
-          borderRadius: 12,
+          borderRadius: KDS_STYLE.radius,
           marginBottom: 20,
-          border: '1px solid #303030',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          border: KDS_STYLE.border,
+          boxShadow: KDS_STYLE.shadow,
         }}
       >
         <Space size="large" style={{ flexShrink: 0 }}>
@@ -697,9 +711,6 @@ const KDSPage = () => {
               onClose={() => setCancelledAlerts((prev) => prev.filter((a) => a.id !== alert.id))}
               style={{
                 marginBottom: 8,
-                backgroundColor: '#2a1215',
-                borderColor: '#ff4d4f',
-                color: '#ffffff',
                 borderRadius: 8,
               }}
             />
@@ -708,20 +719,20 @@ const KDSPage = () => {
       )}
 
       {/* ── BATCH PROCESSING BAR ────────────────────────────────── */}
-      <div style={{ marginBottom: 20, backgroundColor: '#f0f5ff', padding: '16px 20px', borderRadius: 12, border: '1px solid #adc6ff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
-        <Title level={5} style={{ margin: '0 0 12px 0', color: '#1d39c4', display: 'flex', alignItems: 'center' }}>
+      <div style={{ marginBottom: 20, backgroundColor: KDS_STYLE.cardBg, padding: '16px 20px', borderRadius: KDS_STYLE.radius, border: KDS_STYLE.border, boxShadow: KDS_STYLE.shadow }}>
+        <Title level={5} style={{ margin: '0 0 12px 0', color: KDS_STYLE.textPrimary, display: 'flex', alignItems: 'center' }}>
           <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8, fontSize: 18 }} />
           Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar)
         </Title>
         {batchableItems.length === 0 ? (
-          <Text style={{ color: '#8c8c8c' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
+          <Text style={{ color: KDS_STYLE.textSecondary }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
         ) : (
           <Space size="middle" wrap style={{ width: '100%' }}>
             {batchableItems.map(batch => (
               <Card
                 key={batch.productId}
                 size="small"
-                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
+                style={{ borderColor: '#f0f0f0', backgroundColor: KDS_STYLE.cardBg, minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
                 styles={{ body: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
               >
                 <div>
@@ -755,7 +766,7 @@ const KDSPage = () => {
         <Row gutter={[20, 20]}>
           {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -781,7 +792,7 @@ const KDSPage = () => {
 
           {/* Column 2: Đang nấu (Cooking) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -803,7 +814,7 @@ const KDSPage = () => {
 
           {/* Column 3: Hoàn thành (Ready) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -872,12 +883,12 @@ const KDSPage = () => {
               style={{
                 textAlign: 'center',
                 padding: '60px 0',
-                background: '#1f1f1f',
-                borderRadius: 12,
-                border: '1px solid #303030',
+                background: KDS_STYLE.cardBg,
+                borderRadius: KDS_STYLE.radius,
+                border: KDS_STYLE.border,
               }}
             >
-              <Title level={4} style={{ color: '#595959' }}>
+              <Title level={4} style={{ color: KDS_STYLE.textSecondary }}>
                 🎉 Bếp hiện không có món nào thuộc danh mục này!
               </Title>
             </div>
