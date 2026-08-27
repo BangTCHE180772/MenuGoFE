@@ -14,10 +14,12 @@ import {
   message,
   Popconfirm,
   Typography,
+  Tabs,
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/leftoverApi';
+import { getCancelledHistory } from '../api/orderApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
@@ -45,6 +47,28 @@ const LeftoverPage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState(undefined);
+
+  // ── Lịch sử hủy món (đơn đã hoàn thành vs đơn chờ xác nhận) ──────────
+  const [cancelledHistory, setCancelledHistory] = useState([]);
+  const [cancelledLoading, setCancelledLoading] = useState(false);
+  const [cancelledCategoryFilter, setCancelledCategoryFilter] = useState(undefined);
+
+  const fetchCancelledHistory = useCallback(async () => {
+    if (!branchId) return;
+    setCancelledLoading(true);
+    try {
+      const res = await getCancelledHistory(branchId);
+      setCancelledHistory(res.data || []);
+    } catch {
+      message.error('Không thể tải lịch sử hủy món.');
+    } finally {
+      setCancelledLoading(false);
+    }
+  }, [branchId]);
+
+  useEffect(() => {
+    fetchCancelledHistory();
+  }, [fetchCancelledHistory]);
 
   const fetchRecords = useCallback(async () => {
     if (!branchId) return;
@@ -159,10 +183,37 @@ const LeftoverPage = () => {
     },
   ];
 
-  return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-      <Title level={3}>Món thừa</Title>
+  const cancelledColumns = [
+    {
+      title: 'Trạng thái khi huỷ',
+      dataIndex: 'category',
+      key: 'category',
+      render: (c) =>
+        c === 'Completed' ? (
+          <Tag color="red">Đơn đã hoàn thành (bếp làm chậm)</Tag>
+        ) : (
+          <Tag color="default">Đơn chờ xác nhận</Tag>
+        ),
+    },
+    { title: 'Món', dataIndex: 'productName', key: 'productName' },
+    { title: 'Bàn', dataIndex: 'tableName', key: 'tableName' },
+    { title: 'SL', dataIndex: 'quantity', key: 'quantity', width: 60 },
+    {
+      title: 'Thời gian',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (v) => dayjs(v).format('DD/MM/YYYY HH:mm'),
+    },
+  ];
 
+  const filteredCancelledHistory = cancelledCategoryFilter
+    ? cancelledHistory.filter((r) => r.category === cancelledCategoryFilter)
+    : cancelledHistory;
+
+  const completedCancelCount = cancelledHistory.filter((r) => r.category === 'Completed').length;
+
+  const leftoverTab = (
+    <>
       <Card title="Ghi nhận món thừa" style={{ marginBottom: 20, borderRadius: 12 }}>
         <Form
           form={form}
@@ -269,6 +320,53 @@ const LeftoverPage = () => {
           pagination={{ pageSize: 10 }}
         />
       </Card>
+    </>
+  );
+
+  const cancelledHistoryTab = (
+    <Card
+      title="Lịch sử hủy món"
+      style={{ borderRadius: 12 }}
+      extra={
+        <Select
+          allowClear
+          placeholder="Lọc theo trạng thái"
+          style={{ width: 220 }}
+          value={cancelledCategoryFilter}
+          onChange={setCancelledCategoryFilter}
+          options={[
+            { value: 'Completed', label: 'Đơn đã hoàn thành' },
+            { value: 'Pending', label: 'Đơn chờ xác nhận' },
+          ]}
+        />
+      }
+    >
+      {completedCancelCount > 0 && (
+        <div style={{ marginBottom: 12, color: '#cf1322' }}>
+          Bếp làm chậm (khách không nhận món đã hoàn thành): <strong>{completedCancelCount}</strong> lần
+        </div>
+      )}
+      <Table
+        rowKey="orderDetailId"
+        columns={cancelledColumns}
+        dataSource={filteredCancelledHistory}
+        loading={cancelledLoading}
+        pagination={{ pageSize: 10 }}
+      />
+    </Card>
+  );
+
+  return (
+    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+      <Title level={3}>Món thừa &amp; Lịch sử hủy món</Title>
+
+      <Tabs
+        defaultActiveKey="leftover"
+        items={[
+          { key: 'leftover', label: 'Món thừa', children: leftoverTab },
+          { key: 'cancelled', label: 'Lịch sử hủy món', children: cancelledHistoryTab },
+        ]}
+      />
     </div>
   );
 };
