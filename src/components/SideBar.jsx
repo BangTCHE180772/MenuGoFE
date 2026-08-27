@@ -32,6 +32,7 @@ import {
   RightOutlined,
   WalletOutlined,
   GlobalOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -72,6 +73,7 @@ const ROLE_MENUS = {
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
     { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
@@ -95,6 +97,7 @@ const ROLE_MENUS = {
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
@@ -114,6 +117,7 @@ const ROLE_MENUS = {
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
+    { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
@@ -228,7 +232,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Sidebar Header: Logo & Toggle Button */}
-      <div className="sidebar-header" style={{ flexDirection: collapsed ? 'column' : 'row', gap: collapsed ? 8 : 0, paddingBottom: collapsed ? 8 : 0, height: 'auto' }}>
+      <div className="sidebar-header" style={{ flexDirection: collapsed ? 'column' : 'row', gap: collapsed ? 8 : 0, paddingTop: 12, paddingBottom: collapsed ? 12 : 10, height: 'auto' }}>
         <Link to="/home" className="sidebar-logo">
           <div className="sidebar-logo-icon">
             <CrownOutlined style={{ fontSize: 22, color: "var(--color-primary)" }} />

@@ -8,34 +8,30 @@ import {
   RightOutlined,
 } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
-import { getMainChain } from "../api/chainApi";
-import { getAllBranches } from "../api/branchApi";
-import { getAllMenus, getProductsODataPaged } from "../api/menuApi";
-import { getBInventories } from "../api/binventoryApi";
+import { getMainChain } from "../../api/chainApi";
+import { getAllBranches } from "../../api/branchApi";
+import { getAllMenus } from "../../api/menuApi";
+import { getBInventories } from "../../api/binventoryApi";
 
-import CustomerHeader from "../components/customer/CustomerHeader";
-import CustomerHeroBanner from "../components/customer/CustomerHeroBanner";
-import CustomerSearchBar from "../components/customer/CustomerSearchBar";
-import CustomerMenuFilter from "../components/customer/CustomerMenuFilter";
-import CustomerMenuSort from "../components/customer/CustomerMenuSort";
-import CustomerMenuGrid from "../components/customer/CustomerMenuGrid";
-import CustomerBranchSection from "../components/customer/CustomerBranchSection";
-import CustomerFooter from "../components/customer/CustomerFooter";
-import ProductDetailModal from "../components/customer/ProductDetailModal";
-import ToTop from "../components/ToTop";
+import CustomerHeader from "../../components/customer/CustomerHeader";
+import CustomerHeroBanner from "../../components/customer/CustomerHeroBanner";
+import CustomerSearchBar from "../../components/customer/CustomerSearchBar";
+import CustomerMenuFilter from "../../components/customer/CustomerMenuFilter";
+import CustomerMenuSort from "../../components/customer/CustomerMenuSort";
+import CustomerMenuGrid from "../../components/customer/CustomerMenuGrid";
+import CustomerBranchSection from "../../components/customer/CustomerBranchSection";
+import CustomerFooter from "../../components/customer/CustomerFooter";
+import ProductDetailModal from "../../components/customer/ProductDetailModal";
+import ToTop from "../../components/ToTop";
 
-import "../styles/CustomerHomePage.css";
+import "../../styles/CustomerHomePage.css";
 
 //=======================================================================================================================Fake Data
 const MOCK_CHAIN = {
   id: 1,
   name: "Cửa hàng",
-  logoImage:
-    // "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80",
-    "",
-  backgroundImage:
-    // "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
-    "",
+  logoImage: "",
+  backgroundImage: "",
   openTime: "08:00:00",
   closeTime: "22:30:00",
   newAddressName: "Địa chỉ",
@@ -49,9 +45,7 @@ const MOCK_PRODUCTS = [
     id: 101,
     name: "Tên món ăn mẫu (Mock)",
     price: 100000,
-    imageLink:
-      // "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
-      "",
+    imageLink: "",
     groupName: "Món ăn",
     description: "Mô tả.",
     createdAt: currentMonthIsoString,
@@ -89,7 +83,6 @@ const CustomerHomePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryBranchId = searchParams.get("branchId");
   const [activeBranchId, setActiveBranchId] = useState(null);
-  const [allInventoryProducts, setAllInventoryProducts] = useState([]);
 
   const [chainInfo, setChainInfo] = useState(MOCK_CHAIN);
   const [branches, setBranches] = useState(MOCK_BRANCHES);
@@ -163,12 +156,13 @@ const CustomerHomePage = () => {
   }, [queryBranchId]);
 
   const fetchProducts = useCallback(
-    async (searchText = "", catId = "all", currentMenus = menus, pageIdx = 1, size = 8, branchId = activeBranchId) => {
-      if (!branchId) return;
+    async (searchText = "", catId = "all", pageIdx = 1, size = 8, branchId) => {
+      const bid = branchId || activeBranchId;
+      if (!bid) return;
       setLoadingMenu(true);
       try {
         // Tải danh sách BInventory của chi nhánh (truyền mode 0 để lấy TẤT CẢ các món, không bị lọc mất Processed)
-        const rawBInventory = await getBInventories(branchId, '', '', 0);
+        const rawBInventory = await getBInventories(bid, '', '', 0);
         
         if (Array.isArray(rawBInventory)) {
           // Lọc lấy các sản phẩm bán được (Processed, Manufactured, Regular)
@@ -260,7 +254,9 @@ const CustomerHomePage = () => {
 
   useEffect(() => {
     const initData = async () => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchChain();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchBranches();
     };
     initData();
@@ -269,12 +265,14 @@ const CustomerHomePage = () => {
   useEffect(() => {
     if (activeBranchId) {
       const loadMenuData = async () => {
-        const currentMenus = await fetchMenus();
-        fetchProducts(searchKeyword, selectedCategory, currentMenus, currentPage, pageSize, activeBranchId);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        await fetchMenus();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchProducts(searchKeyword, selectedCategory, currentPage, pageSize, activeBranchId);
       };
       loadMenuData();
     }
-  }, [activeBranchId, fetchMenus]);
+  }, [activeBranchId, fetchMenus, fetchProducts, searchKeyword, selectedCategory, currentPage, pageSize]);
 
   //=================================================================================================================== filter data
   const handleBranchChange = (branchId) => {
@@ -282,31 +280,31 @@ const CustomerHomePage = () => {
     setCurrentPage(1);
     setSelectedCategory("all");
     setSearchParams({ branchId: String(branchId) });
-    fetchProducts(searchKeyword, "all", menus, 1, pageSize, branchId);
+    fetchProducts(searchKeyword, "all", 1, pageSize, branchId);
   };
 
   const handleSearchChange = (val) => {
     setSearchKeyword(val);
     setCurrentPage(1);
-    fetchProducts(val, selectedCategory, menus, 1, pageSize, activeBranchId);
+    fetchProducts(val, selectedCategory, 1, pageSize, activeBranchId);
   };
 
   const handleSearchClear = () => {
     setSearchKeyword("");
     setCurrentPage(1);
-    fetchProducts("", selectedCategory, menus, 1, pageSize, activeBranchId);
+    fetchProducts("", selectedCategory, 1, pageSize, activeBranchId);
   };
 
   const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
     setCurrentPage(1);
-    fetchProducts(searchKeyword, catId, menus, 1, pageSize, activeBranchId);
+    fetchProducts(searchKeyword, catId, 1, pageSize, activeBranchId);
   };
 
   const handlePageChange = (page, size) => {
     setCurrentPage(page);
     setPageSize(size);
-    fetchProducts(searchKeyword, selectedCategory, menus, page, size, activeBranchId);
+    fetchProducts(searchKeyword, selectedCategory, page, size, activeBranchId);
   };
 
   const [touchStartX, setTouchStartX] = useState(0);
@@ -361,7 +359,6 @@ const CustomerHomePage = () => {
   const handleMouseLeave = () => {
     setIsMouseDownState(false);
   };
-
 
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];

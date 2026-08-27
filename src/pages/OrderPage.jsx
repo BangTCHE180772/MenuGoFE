@@ -38,6 +38,7 @@ const OrderPage = ({ isWaiterMode }) => {
   const [cartItems, setCartItems] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const actionRef = useRef(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
   const [isRestockModalVisible, setIsRestockModalVisible] = useState(false);
@@ -147,7 +148,6 @@ const OrderPage = ({ isWaiterMode }) => {
     setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, note } : i));
   }, []);
 
-  const actionRef = useRef(false);
 
   const handleChangeTableStatus = async (newStatus) => {
     if (!selectedTable) return;
@@ -161,8 +161,12 @@ const OrderPage = ({ isWaiterMode }) => {
         return;
       }
       try {
-        await checkInReservation(orderSummary.reservationId);
-        message.success("Đã xác nhận khách đến!");
+        const res = await checkInReservation(orderSummary.reservationId);
+        if (res.failedItems && res.failedItems.length > 0) {
+          message.warning(`Khách đã đến! Tuy nhiên các món [${res.failedItems.join(', ')}] đã hết hàng/nguyên liệu và tự động bị hủy.`);
+        } else {
+          message.success("Đã xác nhận khách đến!");
+        }
         const updated = { ...selectedTable, status: TABLE_STATUS.OCCUPIED };
         setSelectedTable(updated);
         setTables((prev) => prev.map((t) => String(t.id) === String(updated.id) ? updated : t));
@@ -378,6 +382,8 @@ const OrderPage = ({ isWaiterMode }) => {
   };
 
   const handleMarkAsServed = async (orderDetailId) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await updateCookingStatus(orderDetailId, { cookingStatus: 'Served' });
       message.success('Đã xác nhận phục vụ món!');
@@ -388,10 +394,14 @@ const OrderPage = ({ isWaiterMode }) => {
     } catch (err) {
       console.error(err);
       message.error('Lỗi khi xác nhận phục vụ món');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleConfirmItem = async (orderDetailId, quantity) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await confirmOrderItem(orderDetailId, quantity);
       message.success('Đã xác nhận món!');
@@ -401,10 +411,14 @@ const OrderPage = ({ isWaiterMode }) => {
       }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    } finally {
+      actionRef.current = false;
     }
   };
 
   const handleRejectItem = async (orderDetailId, reason) => {
+    if (actionRef.current) return;
+    actionRef.current = true;
     try {
       await rejectOrderItem(orderDetailId, reason);
       message.success('Đã từ chối món!');
@@ -414,6 +428,8 @@ const OrderPage = ({ isWaiterMode }) => {
       }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Từ chối thất bại');
+    } finally {
+      actionRef.current = false;
     }
   };
 

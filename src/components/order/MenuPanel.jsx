@@ -83,23 +83,23 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             }
           }
 
-          // Fetch Available Quantities
-          try {
-            const productIds = mappedProducts.map(p => p.id);
-            if (productIds.length > 0) {
-              const qtyRes = await getAvailableQuantities(branchId, productIds);
+          // Gán mặc định để hiển thị UI ngay lập tức không cần đợi API lấy số lượng
+          const initialProducts = mappedProducts.map(p => ({ ...p, availableQuantity: 999999 }));
+          setProducts(initialProducts);
+          
+          // Fetch Available Quantities chạy ngầm để không block UI (hiển thị UI ngay)
+          const productIds = initialProducts.map(p => p.id);
+          if (productIds.length > 0) {
+            getAvailableQuantities(branchId, productIds).then(qtyRes => {
               const qtyMap = qtyRes.data || {};
-              mappedProducts = mappedProducts.map(p => ({
+              setProducts(currentProducts => currentProducts.map(p => ({
                 ...p,
                 availableQuantity: qtyMap[p.id] !== undefined ? qtyMap[p.id] : 999999
-              }));
-            }
-          } catch (qtyErr) {
-            console.error('Lỗi lấy số lượng khả dụng:', qtyErr);
-            mappedProducts = mappedProducts.map(p => ({ ...p, availableQuantity: 999999 }));
+              })));
+            }).catch(qtyErr => {
+              console.error('Lỗi lấy số lượng khả dụng chạy ngầm:', qtyErr);
+            });
           }
-
-          setProducts(mappedProducts);
         } else {
           setProducts([]);
         }
@@ -231,6 +231,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                   <img 
                     src={item.imageLink} 
                     alt={item.name} 
+                    loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                     onError={(e) => { 
                       e.target.onerror = null; 
@@ -241,6 +242,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                   <img 
                     src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80" 
                     alt={item.name} 
+                    loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                   />
                 )}

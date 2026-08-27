@@ -4,6 +4,7 @@ import { getDevicesByBranch, deleteDevice, revokeDevice, updateDevice } from '..
 import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import dayjs from 'dayjs';
+import DeviceEditModal from '../components/device/DeviceEditModal';
 
 import { Link } from 'react-router-dom';
 
@@ -14,7 +15,6 @@ const DeviceManagementPage = () => {
 
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingDevice, setEditingDevice] = useState(null);
-  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
@@ -109,31 +109,7 @@ const DeviceManagementPage = () => {
 
   const openEditModal = (record) => {
     setEditingDevice(record);
-    form.setFieldsValue({
-      name: record.name,
-      deviceType: record.deviceType
-    });
     setIsEditModalVisible(true);
-  };
-
-  const handleUpdate = async (values) => {
-    if (actionRef.current) return;
-    actionRef.current = true;
-    try {
-      await updateDevice({
-        id: editingDevice.id,
-        name: values.name,
-        deviceType: values.deviceType,
-        isActive: editingDevice.isActive
-      });
-      message.success('Cập nhật thiết bị thành công');
-      setIsEditModalVisible(false);
-      loadDevices();
-    } catch (err) {
-      message.error('Lỗi khi cập nhật thiết bị');
-    } finally {
-      actionRef.current = false;
-    }
   };
 
   const columns = [
@@ -217,36 +193,12 @@ const DeviceManagementPage = () => {
         pagination={{ pageSize: 10 }}
       />
 
-      <Modal
-        title="Chỉnh sửa thiết bị"
-        open={isEditModalVisible}
-        onCancel={() => setIsEditModalVisible(false)}
-        onOk={() => form.submit()}
-        okText="Lưu"
-        cancelText="Hủy"
-      >
-        <Form form={form} layout="vertical" onFinish={handleUpdate}>
-          <Form.Item 
-            name="name" 
-            label="Tên thiết bị" 
-            rules={[{ required: true, message: 'Vui lòng nhập tên thiết bị' }]}
-          >
-            <Input placeholder="Ví dụ: Máy Waiter 01" />
-          </Form.Item>
-          <Form.Item 
-            name="deviceType" 
-            label="Loại thiết bị"
-            rules={[{ required: true, message: 'Vui lòng chọn loại thiết bị' }]}
-          >
-            <Select>
-              <Select.Option value="POS">Thu ngân (POS)</Select.Option>
-              <Select.Option value="Waiter">Phục vụ (Waiter)</Select.Option>
-              <Select.Option value="Kitchen">Bếp (Kitchen)</Select.Option>
-              <Select.Option value="Attendance">Điểm danh (Attendance)</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <DeviceEditModal
+        visible={isEditModalVisible}
+        onClose={() => setIsEditModalVisible(false)}
+        onSuccess={loadDevices}
+        editingDevice={editingDevice}
+      />
     </div>
   );
 };

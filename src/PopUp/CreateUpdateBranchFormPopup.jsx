@@ -17,10 +17,12 @@ import {
   ShopOutlined,
   EnvironmentOutlined,
   ClockCircleOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { createBranch, updateBranch } from "../api/branchApi";
 import AddressSelectModal from "./AddressSelectModal";
+import MapPickerModal from "./MapPickerModal";
 
 const { Text } = Typography;
 
@@ -56,6 +58,9 @@ const CreateUpdateBranchFormPopup = ({
     title: "",
   });
 
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [mapCoords, setCoords] = useState({ lat: null, lng: null });
+
   useEffect(() => {
     if (open) {
       if (branchObject) {
@@ -69,20 +74,24 @@ const CreateUpdateBranchFormPopup = ({
 
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setNewAddressState({
-          wardId: null,
+          wardId: branchObject.newWardId || branchObject.NewWardId || null,
           name: branchObject.newAddressName || "Chưa thiết lập",
         });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOldAddressState({
-          wardId: null,
+          wardId: branchObject.oldWardId || branchObject.OldWardId || null,
           name: branchObject.oldAddressName || "Chưa thiết lập",
+        });
+        setCoords({
+          lat: branchObject.latitude || branchObject.Latitude || null,
+          lng: branchObject.longitude || branchObject.Longitude || null,
         });
       } else {
         form.resetFields();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNewAddressState({ wardId: null, name: "" });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+
         setOldAddressState({ wardId: null, name: "" });
+
+        setCoords({ lat: null, lng: null });
       }
     }
   }, [open, branchObject, form]);
@@ -134,13 +143,11 @@ const CreateUpdateBranchFormPopup = ({
         closeTime: values.closeTime
           ? values.closeTime.format("HH:mm:ss")
           : "22:00:00",
+        latitude: mapCoords.lat || null,
+        longitude: mapCoords.lng || null,
         address: {
-          type: "Chi Nhánh",
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
-            : null,
-          oldWardId: oldAddressState.wardId
-            ? Number(oldAddressState.wardId)
             : null,
         },
       };
@@ -285,122 +292,112 @@ const CreateUpdateBranchFormPopup = ({
             </Space>
           </Divider>
 
-          {/* Khu vực Địa chỉ mới */}
+          {/* Nhóm Địa chỉ Chi nhánh */}
           <div
             style={{
               background: "#f8fafc",
-              border: "1px dashed #cbd5e1",
-              borderRadius: 10,
-              padding: 14,
-              marginBottom: 14,
+              border: "1px solid #cbd5e1",
+              borderRadius: 12,
+              padding: 16,
+              marginBottom: 16,
             }}
           >
-            <div
-              style={{
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Tag color="green">MỚI</Tag>
-              <Text strong>Địa chỉ mới</Text>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <Button
-                icon={<EnvironmentOutlined />}
-                onClick={openNewAddressModal}
-              >
-                Chọn địa chỉ mới
-              </Button>
+            {/* Tỉnh / Huyện / Xã */}
+            <div style={{ marginBottom: 16 }}>
               <div
                 style={{
-                  flex: 1,
-                  background: "#fff",
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid #e2e8f0",
+                  marginBottom: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
-                <Text
-                  type="secondary"
-                  style={{ fontSize: 11, display: "block" }}
+                <Tag color="blue">Khu vực</Tag>
+                <Text strong>Tỉnh / Thành phố, Phường / Xã</Text>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <Button
+                  icon={<EnvironmentOutlined />}
+                  onClick={openNewAddressModal}
                 >
-                  Địa chỉ hiện tại:
-                </Text>
-                <Text strong style={{ color: "#0f172a" }}>
-                  {newAddressState.name || "Chưa thiết lập"}
-                </Text>
+                  Chọn Tỉnh/Xã
+                </Button>
+                <div
+                  style={{
+                    flex: 1,
+                    background: "#fff",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 11, display: "block" }}
+                  >
+                    Khu vực đã chọn:
+                  </Text>
+                  <Text strong>{newAddressState.name || "Chưa thiết lập"}</Text>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Khu vực Địa chỉ cũ */}
-          {/*
-          <div
-            style={{
-              background: "#f8fafc",
-              border: "1px dashed #cbd5e1",
-              borderRadius: 10,
-              padding: 14,
-            }}
-          >
-            <div
-              style={{
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Tag color="default">CŨ</Tag>
-              <Text strong>Địa chỉ cũ </Text>
-            </div>
+            {/* Chọn tọa độ trực tiếp trên GGMap */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
                 justifyContent: "space-between",
-                gap: 12,
+                alignItems: "center",
+                background: "#f1f5f9",
+                padding: "10px 14px",
+                borderRadius: 8,
+                marginTop: 12,
               }}
             >
-              <Button
-                icon={<EnvironmentOutlined />}
-                onClick={openOldAddressModal}
-              >
-                Chọn địa chỉ cũ
-              </Button>
-              <div
-                style={{
-                  flex: 1,
-                  background: "#fff",
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid #e2e8f0",
-                }}
-              >
+              <div>
                 <Text
                   type="secondary"
                   style={{ fontSize: 11, display: "block" }}
                 >
-                  Địa chỉ cũ:
+                  Vị trí bản đồ (Tọa độ GPS):
                 </Text>
-                <Text type="secondary">
-                  {oldAddressState.name || "Chưa thiết lập"}
+                <Text strong style={{ fontSize: 13 }}>
+                  {mapCoords.lat && mapCoords.lng
+                    ? `Vĩ độ: ${mapCoords.lat.toFixed(5)}, Kinh độ: ${mapCoords.lng.toFixed(5)}`
+                    : "Chưa cấu hình tọa độ trên bản đồ"}
                 </Text>
               </div>
+              <Button
+                type="primary"
+                ghost
+                icon={<GlobalOutlined />}
+                onClick={() => setMapModalOpen(true)}
+              >
+                Chọn vị trí trên GGMap
+              </Button>
             </div>
           </div>
- */}
         </Form>
       </Modal>
+
+      {/* Map Picker Modal */}
+      <MapPickerModal
+        open={mapModalOpen}
+        onClose={() => setMapModalOpen(false)}
+        initialLat={mapCoords.lat}
+        initialLng={mapCoords.lng}
+        onSelect={(lat, lng) => {
+          setCoords({ lat, lng });
+          message.success("Đã ghi nhận tọa độ định vị chi nhánh!");
+        }}
+      />
 
       {/* Address Select Modal */}
       <AddressSelectModal

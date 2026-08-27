@@ -16,7 +16,10 @@ const MainLayout = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { isBranchInactive } = useBranch();
-  const isFluid = location.pathname.startsWith('/product-catalog') || location.pathname.startsWith('/inventory-management');
+  const isFluid =
+    location.pathname.startsWith('/product-catalog') ||
+    location.pathname.startsWith('/inventory-management') ||
+    location.pathname.startsWith('/chat');
 
   // Sidebar collapse state initialized from localStorage
   const [collapsed, setCollapsed] = useState(() => {
@@ -37,9 +40,14 @@ const MainLayout = () => {
 
   useEffect(() => {
     if (connection && user) {
-      // Tham gia group của user và branch để nhận thông báo realtime
+      // Tham gia group cá nhân
       if (user.id) connection.invoke('JoinUserGroup', user.id).catch(console.error);
-      if (user.branchId) connection.invoke('JoinBranchGroup', user.branchId).catch(console.error);
+
+      // CHỈ Manager/Admin join branch group → họ LUÔN nhận mọi thông báo
+      const isManagerOrAdmin = user.role === 'Admin' || user.role === 'Owner' || user.role === 'Manager';
+      if (isManagerOrAdmin && user.branchId) {
+        connection.invoke('JoinBranchGroup', user.branchId).catch(console.error);
+      }
     }
   }, [connection, user]);
 
