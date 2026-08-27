@@ -32,5 +32,8 @@ export const deletePayroll = (id) =>
 export const lockPayroll = (id) =>
   axiosInstance.post(`/api/Payroll/${id}/lock`);
 
+export const unlockPayroll = (id) =>
+  axiosInstance.post(`/api/Payroll/${id}/unlock`);
+
 export const approvePayroll = (id) =>
   axiosInstance.post(`/api/Payroll/${id}/approve`);

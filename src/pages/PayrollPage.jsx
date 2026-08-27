@@ -21,6 +21,7 @@ import {
   Descriptions,
   Divider,
   Alert,
+  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
@@ -38,6 +39,10 @@ import {
   BankOutlined,
   ThunderboltOutlined,
   LockOutlined,
+  UnlockOutlined,
+  CloseCircleOutlined,
+  DownOutlined,
+  UpOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -50,11 +55,13 @@ import {
   updatePayrollStatus,
   deletePayroll,
   lockPayroll,
+  unlockPayroll,
   approvePayroll,
 } from '../api/payrollApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 
 // Payroll status definitions
 const PAYROLL_STATUS = {
@@ -64,22 +71,25 @@ const PAYROLL_STATUS = {
   Paid: 4,
   Cancelled: 5,
   Locked: 6,
+  Rejected: 7,
 };
 
 const STATUS_CONFIG = {
   [PAYROLL_STATUS.Draft]: { label: 'Bản nháp', color: 'default', badge: 'default' },
-  [PAYROLL_STATUS.Pending]: { label: 'Chờ duyệt', color: 'warning', badge: 'warning' },
-  [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt', color: 'processing', badge: 'processing' },
+  [PAYROLL_STATUS.Pending]: { label: 'Chờ chốt', color: 'warning', badge: 'warning' },
+  [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   [PAYROLL_STATUS.Paid]: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   [PAYROLL_STATUS.Cancelled]: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Khóa)', color: 'purple', badge: 'purple' },
+  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  [PAYROLL_STATUS.Rejected]: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 
   Draft: { label: 'Bản nháp', color: 'default', badge: 'default' },
-  Pending: { label: 'Chờ duyệt', color: 'warning', badge: 'warning' },
-  Approved: { label: 'Đã duyệt', color: 'processing', badge: 'processing' },
+  Pending: { label: 'Chờ chốt', color: 'warning', badge: 'warning' },
+  Approved: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   Paid: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   Cancelled: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  Locked: { label: 'Đã chốt (Khóa)', color: 'purple', badge: 'purple' },
+  Locked: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  Rejected: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 };
 
 const STATUS_TO_NUM = {
@@ -89,19 +99,33 @@ const STATUS_TO_NUM = {
   Paid: 4,
   Cancelled: 5,
   Locked: 6,
+  Rejected: 7,
   1: 1,
   2: 2,
   3: 3,
   4: 4,
   5: 5,
   6: 6,
+  7: 7,
 };
 
-const STATUS_OPTIONS = [
+const STATUS_FILTER_OPTIONS = [
   { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
+  { value: PAYROLL_STATUS.Pending, label: 'Chờ chốt' },
+  { value: PAYROLL_STATUS.Locked, label: 'Đã chốt (Chờ Owner duyệt)' },
+  { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt (Chờ thanh toán)' },
+  { value: PAYROLL_STATUS.Rejected, label: 'Từ chối (Cần tính lại)' },
   { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán' },
   { value: PAYROLL_STATUS.Cancelled, label: 'Đã hủy' },
 ];
+
+const FORM_STATUS_OPTIONS = [
+  { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
+  { value: PAYROLL_STATUS.Pending, label: 'Chờ chốt' },
+  { value: PAYROLL_STATUS.Cancelled, label: 'Đã hủy' },
+];
+
+const STATUS_OPTIONS = STATUS_FILTER_OPTIONS;
 
 const DETAIL_TYPE_OPTIONS = [
   { value: 'Allowance', label: 'Phụ cấp (+)' },
@@ -124,21 +148,36 @@ const PayrollPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'Staff'; // 'Staff' | 'Manager'
+
   const isOwnerOrAdmin =
     user?.roles?.some((r) => ['Admin', 'Owner', 'ADMIN', 'OWNER', 'Quản trị viên'].includes(r)) ||
     user?.roleIds?.some((id) => id === 1 || id === 2);
 
-  const titleText = isOwnerOrAdmin ? 'Quản Lý Bảng Lương Quản Lý' : 'Quản Lý Bảng Lương Nhân Viên Chi Nhánh';
+  const isManagerTab = isOwnerOrAdmin && activeTab === 'Manager';
+
+  const titleText = isOwnerOrAdmin
+    ? isManagerTab
+      ? '👑 Quản Lý & Phê Duyệt Bảng Lương Quản Lý'
+      : '👥 Quản Lý & Phê Duyệt Bảng Lương Nhân Viên'
+    : 'Quản Lý Bảng Lương Nhân Viên Chi Nhánh';
+
   const subtitleText = isOwnerOrAdmin
-    ? 'Quản lý tính toán, phê duyệt và thanh toán tiền lương của Quản lý các chi nhánh'
-    : 'Tính toán, phê duyệt và thanh toán tiền lương cho nhân viên trong chi nhánh';
+    ? isManagerTab
+      ? 'Tính toán, chốt, phê duyệt và thanh toán tiền lương cho Quản lý các chi nhánh'
+      : 'Tính toán, chốt, phê duyệt và thanh toán tiền lương cho Nhân viên (Thu ngân, Bếp, Phục vụ...) thuộc tất cả chi nhánh'
+    : 'Tính toán, chốt bảng lương và thanh toán tiền lương cho nhân viên trong chi nhánh';
 
   const filteredAccounts = accounts.filter((a) => {
     if (!a.roleIds || a.roleIds.length === 0) return false;
     if (isOwnerOrAdmin) {
-      return a.roleIds.includes(3); // Owner only manages Manager accounts (roleId 3)
+      if (isManagerTab) {
+        return a.roleIds.includes(3); // Manager accounts only
+      }
+      return !a.roleIds.includes(1) && !a.roleIds.includes(2) && !a.roleIds.includes(3); // Staff accounts only
     }
-    return !a.roleIds.some((rId) => [1, 2, 3].includes(rId)); // Manager only manages Staff accounts
+    return !a.roleIds.some((rId) => [1, 2, 3].includes(rId)); // Manager manages Staff accounts (4, 5, 6)
   });
 
   // Group accounts by role for cleaner dropdown UX
@@ -167,8 +206,35 @@ const PayrollPage = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
-  const [selectedMonthYear, setSelectedMonthYear] = useState(null);
+  const [selectedMonthYear, setSelectedMonthYear] = useState(dayjs());
+
+  const STAFF_ROLE_OPTIONS = [
+    { value: 4, label: '💳 Thu ngân' },
+    { value: 5, label: '👨‍🍳 Bếp trưởng' },
+    { value: 6, label: '🤵 Phục vụ' },
+  ];
+
+  const availableStatusOptions = useMemo(() => {
+    if (isOwnerOrAdmin) {
+      return [
+        { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+        { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
+        { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
+        { value: PAYROLL_STATUS.Rejected, label: '🚫 Từ chối (Cần tính lại)' },
+      ];
+    }
+    return [
+      { value: PAYROLL_STATUS.Draft, label: '📝 Bản nháp' },
+      { value: PAYROLL_STATUS.Pending, label: '⏳ Chờ chốt' },
+      { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+      { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
+      { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
+      { value: PAYROLL_STATUS.Cancelled, label: '❌ Đã hủy' },
+      { value: PAYROLL_STATUS.Rejected, label: '🚫 Từ chối (Cần tính lại)' },
+    ];
+  }, [isOwnerOrAdmin]);
 
   // Modal States
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -184,6 +250,7 @@ const PayrollPage = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [showShiftTable, setShowShiftTable] = useState(false);
 
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusTargetRecord, setStatusTargetRecord] = useState(null);
@@ -235,29 +302,6 @@ const PayrollPage = () => {
     loadData();
   }, [loadData]);
 
-  // Compute Statistics
-  const stats = useMemo(() => {
-    let totalNet = 0;
-    let paidCount = 0;
-    let paidAmount = 0;
-    let pendingCount = 0;
-    let draftCount = 0;
-
-    payrolls.forEach((p) => {
-      totalNet += p.netSalary || 0;
-      if (p.status === PAYROLL_STATUS.Paid) {
-        paidCount++;
-        paidAmount += p.netSalary || 0;
-      } else if (p.status === PAYROLL_STATUS.Pending || p.status === PAYROLL_STATUS.Approved) {
-        pendingCount++;
-      } else if (p.status === PAYROLL_STATUS.Draft) {
-        draftCount++;
-      }
-    });
-
-    return { totalNet, paidCount, paidAmount, pendingCount, draftCount };
-  }, [payrolls]);
-
   // Helper names
   const getAccountName = (id) => {
     const acc = accounts.find((a) => a.id === id);
@@ -272,6 +316,33 @@ const PayrollPage = () => {
   // Filter Table Data
   const filteredPayrolls = useMemo(() => {
     return payrolls.filter((p) => {
+      // Role filter for Owner/Admin tabs (Staff vs Manager)
+      if (isOwnerOrAdmin) {
+        const acc = accounts.find((a) => a.id === p.accountId);
+        const isManagerAcc = acc?.roleIds?.includes(3) || p.roleId === 3 || (p.roleName && p.roleName.toLowerCase().includes('quản lý'));
+        if (isManagerTab && !isManagerAcc) return false;
+        if (!isManagerTab && isManagerAcc) return false;
+
+        // Owner thấy bảng lương ở các trạng thái: Đã chốt (Locked), Đã duyệt (Approved), Đã thanh toán (Paid), Đã từ chối (Rejected)
+        const allowedOwnerStatuses = [
+          PAYROLL_STATUS.Locked,
+          PAYROLL_STATUS.Approved,
+          PAYROLL_STATUS.Paid,
+          PAYROLL_STATUS.Rejected,
+          'Locked',
+          'Approved',
+          'Paid',
+          'Rejected',
+          6,
+          3,
+          4,
+          7,
+        ];
+        const statusVal = STATUS_TO_NUM[p.status] ?? p.status;
+        if (!allowedOwnerStatuses.includes(p.status) && !allowedOwnerStatuses.includes(statusVal)) {
+          return false;
+        }
+      }
       if (searchText) {
         const accName = (p.accountName || getAccountName(p.accountId)).toLowerCase();
         const brName = (p.branchName || getBranchName(p.branchId)).toLowerCase();
@@ -281,12 +352,46 @@ const PayrollPage = () => {
           return false;
         }
       }
-      if (selectedStatus && p.status !== selectedStatus) {
-        return false;
+      if (selectedRole) {
+        const acc = accounts.find((a) => a.id === p.accountId);
+        const accRoleIds = acc?.roleIds || [];
+        if (!accRoleIds.includes(selectedRole) && p.roleId !== selectedRole) {
+          return false;
+        }
+      }
+      if (selectedStatus !== null && selectedStatus !== undefined) {
+        const pStatusNum = STATUS_TO_NUM[p.status] ?? Number(p.status);
+        const selectedStatusNum = STATUS_TO_NUM[selectedStatus] ?? Number(selectedStatus);
+        if (pStatusNum !== selectedStatusNum) {
+          return false;
+        }
       }
       return true;
     });
-  }, [payrolls, searchText, selectedStatus, accounts, branches]);
+  }, [payrolls, isOwnerOrAdmin, isManagerTab, accounts, branches, searchText, selectedRole, selectedStatus]);
+
+  // Compute Statistics based on filteredPayrolls
+  const stats = useMemo(() => {
+    let totalNet = 0;
+    let paidCount = 0;
+    let paidAmount = 0;
+    let pendingCount = 0;
+    let draftCount = 0;
+
+    filteredPayrolls.forEach((p) => {
+      totalNet += p.netSalary || 0;
+      if (p.status === PAYROLL_STATUS.Paid) {
+        paidCount++;
+        paidAmount += p.netSalary || 0;
+      } else if (p.status === PAYROLL_STATUS.Pending || p.status === PAYROLL_STATUS.Approved) {
+        pendingCount++;
+      } else if (p.status === PAYROLL_STATUS.Draft) {
+        draftCount++;
+      }
+    });
+
+    return { totalNet, paidCount, paidAmount, pendingCount, draftCount };
+  }, [filteredPayrolls]);
 
   // Open Create/Edit Modal
   const handleOpenFormModal = (type, record = null) => {
@@ -511,6 +616,7 @@ const PayrollPage = () => {
 
   // Open Detail Modal
   const handleOpenDetail = async (record) => {
+    setShowShiftTable(false);
     setIsDetailModalOpen(true);
     setDetailLoading(true);
     try {
@@ -552,6 +658,17 @@ const PayrollPage = () => {
     }
   };
 
+  const handleUpdateStatusDirect = async (id, status) => {
+    try {
+      await updatePayrollStatus(id, status, null);
+      message.success('Cập nhật trạng thái bảng lương thành công!');
+      loadData();
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Không thể cập nhật trạng thái bảng lương!');
+    }
+  };
+
   // Lock Payroll Handler
   const handleLockPayroll = async (id) => {
     try {
@@ -564,6 +681,21 @@ const PayrollPage = () => {
     } catch (err) {
       console.error(err);
       message.error(err.response?.data?.message || 'Có lỗi xảy ra khi chốt bảng lương!');
+    }
+  };
+
+  // Unlock Payroll Handler
+  const handleUnlockPayroll = async (id) => {
+    try {
+      await unlockPayroll(id);
+      message.success('Đã mở khóa bảng lương thành công!');
+      loadData();
+      if (isDetailModalOpen && detailRecord?.id === id) {
+        setIsDetailModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Có lỗi xảy ra khi mở khóa bảng lương!');
     }
   };
 
@@ -597,14 +729,6 @@ const PayrollPage = () => {
   // Columns table
   const columns = [
     {
-      title: 'Mã BL',
-      dataIndex: 'id',
-      key: 'id',
-      width: 75,
-      sorter: (a, b) => a.id - b.id,
-      defaultSortOrder: 'ascend',
-    },
-    {
       title: 'Nhân viên',
       dataIndex: 'accountId',
       key: 'accountId',
@@ -632,32 +756,29 @@ const PayrollPage = () => {
               {record.accountName || getAccountName(id)}
               <EyeOutlined style={{ fontSize: '13px', color: '#e8442a' }} />
             </strong>
-            <div style={{ fontSize: '11px', color: '#6b7280' }}>
-              <UserOutlined style={{ marginRight: 4 }} />
-              ID: {id}
-            </div>
+
           </div>
         </Tooltip>
       ),
     },
     ...(isOwnerOrAdmin
       ? [
-          {
-            title: 'Chi nhánh',
-            dataIndex: 'branchId',
-            key: 'branchId',
-            width: 170,
-            render: (id, record) => {
-              const fullName = record.branchName || getBranchName(id);
-              const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
-              return (
-                <Tooltip title={fullName}>
-                  <span>{displayName}</span>
-                </Tooltip>
-              );
-            },
+        {
+          title: 'Chi nhánh',
+          dataIndex: 'branchId',
+          key: 'branchId',
+          width: 170,
+          render: (id, record) => {
+            const fullName = record.branchName || getBranchName(id);
+            const displayName = fullName.includes(',') ? fullName.split(',')[0].trim() : fullName;
+            return (
+              <Tooltip title={fullName}>
+                <span>{displayName}</span>
+              </Tooltip>
+            );
           },
-        ]
+        },
+      ]
       : []),
     {
       title: 'Kỳ lương',
@@ -721,18 +842,35 @@ const PayrollPage = () => {
       title: 'Hành động',
       key: 'actions',
       fixed: 'right',
-      width: 160,
+      width: 180,
       render: (_, record) => {
+        const isDraft = record.status === PAYROLL_STATUS.Draft || record.status === 1 || record.status === 'Draft';
+        const isPending = record.status === PAYROLL_STATUS.Pending || record.status === 2 || record.status === 'Pending';
         const isLocked = record.status === PAYROLL_STATUS.Locked || record.status === 6 || record.status === 'Locked';
         const isApproved = record.status === PAYROLL_STATUS.Approved || record.status === 3 || record.status === 'Approved';
         const isPaid = record.status === PAYROLL_STATUS.Paid || record.status === 4 || record.status === 'Paid';
 
         return (
           <Space size="small">
-            {!isLocked && !isApproved && !isPaid && (
-              <Tooltip title="Chốt (Khóa) bảng lương">
+            {/* If Draft: allow quick move to Pending (Chờ chốt) */}
+            {isDraft && (
+              <Tooltip title="Chuyển sang Chờ chốt">
                 <Popconfirm
-                  title="Chốt bảng lương này để ngăn chỉnh sửa?"
+                  title="Chuyển trạng thái bảng lương này sang Chờ chốt?"
+                  okText="Chuyển"
+                  cancelText="Hủy"
+                  onConfirm={() => handleUpdateStatusDirect(record.id, PAYROLL_STATUS.Pending)}
+                >
+                  <Button type="text" icon={<SyncOutlined style={{ color: '#fa8c16' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {/* If Pending: allow Lock (Chốt bảng lương & Gửi Owner) */}
+            {isPending && (
+              <Tooltip title="Chốt (Khóa) bảng lương & Gửi Owner duyệt">
+                <Popconfirm
+                  title="Chốt bảng lương này và gửi cho Owner phê duyệt?"
                   okText="Chốt lương"
                   cancelText="Hủy"
                   onConfirm={() => handleLockPayroll(record.id)}
@@ -742,8 +880,24 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            {isLocked && !isApproved && !isPaid && (
-              <Tooltip title="Phê duyệt bảng lương">
+            {/* Owner Reject button: When Locked or Approved */}
+            {(isLocked || isApproved) && isOwnerOrAdmin && (
+              <Tooltip title="Từ chối phê duyệt (Yêu cầu Quản lý tính lại)">
+                <Popconfirm
+                  title="Từ chối bảng lương này để yêu cầu Quản lý tính lại?"
+                  okText="Từ chối"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleUnlockPayroll(record.id)}
+                >
+                  <Button type="text" danger icon={<CloseCircleOutlined style={{ color: '#ff4d4f' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {/* Owner Approval button (When Locked) */}
+            {isLocked && isOwnerOrAdmin && (
+              <Tooltip title="Phê duyệt bảng lương (Owner)">
                 <Popconfirm
                   title="Phê duyệt bảng lương này?"
                   okText="Duyệt"
@@ -755,27 +909,45 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            <Tooltip title="Chỉnh sửa">
-              <Button
-                type="text"
-                disabled={isLocked || isApproved || isPaid}
-                icon={<EditOutlined style={{ color: isLocked || isApproved || isPaid ? '#ccc' : '#fa8c16' }} />}
-                onClick={() => handleOpenFormModal('edit', record)}
-              />
-            </Tooltip>
+            {/* Manager / Owner Payment button (When Approved) */}
+            {isApproved && (
+              <Tooltip title="Thanh toán cho nhân viên (Tự động tạo phiếu chi trong Thu/Chi)">
+                <Popconfirm
+                  title="Xác nhận thực hiện thanh toán lương cho nhân viên?"
+                  okText="Thanh toán"
+                  cancelText="Hủy"
+                  onConfirm={() => handleUpdateStatusDirect(record.id, PAYROLL_STATUS.Paid)}
+                >
+                  <Button type="text" icon={<DollarCircleOutlined style={{ color: '#52c41a', fontSize: '18px' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
 
-            <Tooltip title="Xóa">
-              <Popconfirm
-                title="Bạn chắc chắn muốn xóa bảng lương này?"
-                okText="Xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-                disabled={isLocked || isApproved || isPaid}
-                onConfirm={() => handleDelete(record.id)}
-              >
-                <Button type="text" danger disabled={isLocked || isApproved || isPaid} icon={<DeleteOutlined />} />
-              </Popconfirm>
-            </Tooltip>
+            {(!isOwnerOrAdmin || isManagerTab) && (
+              <>
+                <Tooltip title="Chỉnh sửa">
+                  <Button
+                    type="text"
+                    disabled={isLocked || isApproved || isPaid}
+                    icon={<EditOutlined style={{ color: isLocked || isApproved || isPaid ? '#ccc' : '#fa8c16' }} />}
+                    onClick={() => handleOpenFormModal('edit', record)}
+                  />
+                </Tooltip>
+
+                <Tooltip title="Xóa">
+                  <Popconfirm
+                    title="Bạn chắc chắn muốn xóa bảng lương này?"
+                    okText="Xóa"
+                    cancelText="Hủy"
+                    okButtonProps={{ danger: true }}
+                    disabled={isLocked || isApproved || isPaid}
+                    onConfirm={() => handleDelete(record.id)}
+                  >
+                    <Button type="text" danger disabled={isLocked || isApproved || isPaid} icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                </Tooltip>
+              </>
+            )}
           </Space>
         );
       },
@@ -784,6 +956,36 @@ const PayrollPage = () => {
 
   return (
     <div className="payroll-page animate-fade-in" style={{ padding: '4px 0' }}>
+      {/* Role Tabs for Owner / Admin */}
+      {isOwnerOrAdmin && (
+        <Card style={{ marginBottom: 16, borderRadius: '12px', background: '#fafafa', border: '1px solid #f0f0f0' }} bodyStyle={{ padding: 8 }}>
+          <Segmented
+            size="large"
+            block
+            value={activeTab}
+            onChange={(val) => setSearchParams({ tab: val })}
+            options={[
+              {
+                label: (
+                  <div style={{ padding: '4px 16px', fontWeight: 600, fontSize: 14 }}>
+                    👥 Lương Nhân Viên (Thu ngân, Bếp, Phục vụ...)
+                  </div>
+                ),
+                value: 'Staff',
+              },
+              {
+                label: (
+                  <div style={{ padding: '4px 16px', fontWeight: 600, fontSize: 14 }}>
+                    👑 Lương Quản Lý Chi Nhánh
+                  </div>
+                ),
+                value: 'Manager',
+              },
+            ]}
+          />
+        </Card>
+      )}
+
       {/* Header Banner */}
       <Card
         style={{
@@ -820,60 +1022,62 @@ const PayrollPage = () => {
             </div>
           </div>
 
-          <Space size="middle" wrap>
-            <Button
-              type="default"
-              icon={<CalculatorOutlined style={{ color: '#e8442a' }} />}
-              size="large"
-              style={{ borderRadius: '8px', borderColor: '#ffdeda' }}
-              onClick={() => {
-                generateForm.resetFields();
-                generateForm.setFieldsValue({
-                  branchId: branches[0]?.id || 1,
-                  monthYear: dayjs(),
-                });
-                setIsGenerateModalOpen(true);
-              }}
-            >
-              Tự động tính cá nhân
-            </Button>
-            <Button
-              type="primary"
-              icon={<ThunderboltOutlined />}
-              size="large"
-              style={{
-                background: 'linear-gradient(135deg, #1890ff, #36cfc9)',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(24, 144, 255, 0.25)',
-                fontWeight: 600,
-              }}
-              onClick={() => {
-                batchForm.resetFields();
-                batchForm.setFieldsValue({
-                  monthYear: dayjs(),
-                  branchId: selectedBranch ? Number(selectedBranch) : undefined,
-                });
-                setIsBatchModalOpen(true);
-              }}
-            >
-              Tính lương hàng loạt
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              style={{
-                background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
-                border: 'none',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
-              }}
-              onClick={() => handleOpenFormModal('create')}
-            >
-              Tạo bảng lương thủ công
-            </Button>
-          </Space>
+          {(!isOwnerOrAdmin || isManagerTab) && (
+            <Space size="middle" wrap>
+              <Button
+                type="default"
+                icon={<CalculatorOutlined style={{ color: '#e8442a' }} />}
+                size="large"
+                style={{ borderRadius: '8px', borderColor: '#ffdeda' }}
+                onClick={() => {
+                  generateForm.resetFields();
+                  generateForm.setFieldsValue({
+                    branchId: branches[0]?.id || 1,
+                    monthYear: dayjs(),
+                  });
+                  setIsGenerateModalOpen(true);
+                }}
+              >
+                Tự động tính cá nhân
+              </Button>
+              <Button
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                size="large"
+                style={{
+                  background: 'linear-gradient(135deg, #1890ff, #36cfc9)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(24, 144, 255, 0.25)',
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  batchForm.resetFields();
+                  batchForm.setFieldsValue({
+                    monthYear: dayjs(),
+                    branchId: selectedBranch ? Number(selectedBranch) : undefined,
+                  });
+                  setIsBatchModalOpen(true);
+                }}
+              >
+                Tính lương hàng loạt
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size="large"
+                style={{
+                  background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(232, 68, 42, 0.25)',
+                }}
+                onClick={() => handleOpenFormModal('create')}
+              >
+                Tạo bảng lương thủ công
+              </Button>
+            </Space>
+          )}
         </div>
       </Card>
 
@@ -895,6 +1099,7 @@ const PayrollPage = () => {
             placeholder="Chọn tháng/năm"
             style={{ width: 160, borderRadius: '8px' }}
             format="MM/YYYY"
+            allowClear
             value={selectedMonthYear}
             onChange={(val) => setSelectedMonthYear(val)}
             disabledDate={(current) => current && current.isAfter(dayjs().endOf('month'))}
@@ -916,37 +1121,37 @@ const PayrollPage = () => {
             </Select>
           )}
 
-          <Select
-            placeholder="Lọc nhân viên"
-            style={{ width: 180 }}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            value={selectedAccount}
-            onChange={(val) => setSelectedAccount(val)}
-          >
-            {filteredAccounts.map((a) => (
-              <Select.Option key={a.id} value={a.id} label={a.name}>
-                {a.name} (ID: {a.id})
-              </Select.Option>
-            ))}
-          </Select>
+          {!isManagerTab && (
+            <Select
+              placeholder="Lọc theo vai trò"
+              style={{ width: 170 }}
+              allowClear
+              value={selectedRole}
+              onChange={(val) => setSelectedRole(val)}
+            >
+              {STAFF_ROLE_OPTIONS.map((r) => (
+                <Select.Option key={r.value} value={r.value}>
+                  {r.label}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
 
           <Select
             placeholder="Trạng thái"
-            style={{ width: 160 }}
+            style={{ width: 180 }}
             allowClear
             value={selectedStatus}
             onChange={(val) => setSelectedStatus(val)}
           >
-            {STATUS_OPTIONS.map((st) => (
+            {availableStatusOptions.map((st) => (
               <Select.Option key={st.value} value={st.value}>
                 {st.label}
               </Select.Option>
             ))}
           </Select>
 
-          {(searchText || selectedBranch || selectedMonthYear || selectedAccount || selectedStatus) && (
+          {(searchText || selectedBranch || selectedMonthYear || selectedAccount || selectedRole || selectedStatus) && (
             <Button
               type="link"
               danger
@@ -955,6 +1160,7 @@ const PayrollPage = () => {
                 setSelectedBranch(null);
                 setSelectedMonthYear(null);
                 setSelectedAccount(null);
+                setSelectedRole(null);
                 setSelectedStatus(null);
               }}
             >
@@ -1480,7 +1686,7 @@ const PayrollPage = () => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <EyeOutlined />
-            <span>CHI TIẾT BẢNG LƯƠNG #{detailRecord?.id}</span>
+            <span>CHI TIẾT BẢNG LƯƠNG</span>
           </div>
         }
         open={isDetailModalOpen}
@@ -1498,7 +1704,7 @@ const PayrollPage = () => {
           <div>
             <Descriptions title="Thông tin chung" bordered size="small" column={2}>
               <Descriptions.Item label="Nhân viên">
-                <strong>{detailRecord.accountName || getAccountName(detailRecord.accountId)}</strong> (ID: {detailRecord.accountId})
+                <strong>{detailRecord.accountName || getAccountName(detailRecord.accountId)}</strong>
               </Descriptions.Item>
               <Descriptions.Item label="Chi nhánh">
                 {detailRecord.branchName || getBranchName(detailRecord.branchId)}
@@ -1530,93 +1736,158 @@ const PayrollPage = () => {
             </Descriptions>
 
             {/* Chi tiết ca làm việc trong tháng */}
-            {((detailRecord.payrollShiftDetails && detailRecord.payrollShiftDetails.length > 0) || (detailRecord.shiftDetails && detailRecord.shiftDetails.length > 0)) && (
-              <>
-                <Divider style={{ margin: '16px 0 8px 0' }}>Bảng Bóc Tách Chi Tiết Theo Ca (Hệ số Lễ/Tết & Ca đêm & OT)</Divider>
-                <Table
-                  dataSource={detailRecord.payrollShiftDetails || detailRecord.shiftDetails || []}
-                  rowKey={(r, idx) => r.id || idx}
-                  pagination={{ pageSize: 5 }}
-                  size="small"
-                  bordered
-                  columns={[
-                    {
-                      title: 'Ngày làm',
-                      dataIndex: 'workDate',
-                      key: 'workDate',
-                      width: 105,
-                      render: (d) => dayjs(d).format('DD/MM/YYYY'),
-                    },
-                    {
-                      title: 'Số giờ làm',
-                      key: 'hours',
-                      align: 'center',
-                      width: 90,
-                      render: (_, r) => (
-                        <span>{r.actualHours ?? r.regularHours ?? 0}h{r.standardHours ? `/${r.standardHours}h` : ''}</span>
-                      ),
-                    },
-                    {
-                      title: 'Hệ số ngày',
-                      dataIndex: 'dateCoefficient',
-                      key: 'dateCoefficient',
-                      align: 'center',
-                      width: 90,
-                      render: (coeff, r) => {
-                        const val = coeff ?? r.dateMultiplier ?? 1.0;
-                        return <Tag color={val > 1.0 ? 'volcano' : 'default'}>{val}x</Tag>;
+            {(() => {
+              const allShifts = detailRecord.payrollShiftDetails || detailRecord.shiftDetails || [];
+              const completedShifts = allShifts.filter((s) => {
+                if (s.isCompleted === false) return false;
+                if (s.status) {
+                  const st = String(s.status).toUpperCase();
+                  if (st === 'ABSENT' || st === 'CANCELLED' || st === 'VẮNG MẶT' || st === 'ĐÃ HỦY') return false;
+                }
+                return (s.actualHours ?? s.regularHours ?? s.actualWorkHours ?? 0) > 0 || s.isNightShift || (s.approvedOTHours && s.approvedOTHours > 0);
+              });
+
+              if (completedShifts.length === 0) return null;
+
+              return (
+                <>
+                  <Divider style={{ margin: '16px 0 12px 0' }}>
+                    Tổng Hợp Theo Ca Làm Việc ({completedShifts.length} ca đã hoàn thành)
+                  </Divider>
+                  <Card size="small" style={{ background: '#fafafa', borderRadius: '8px', marginBottom: 12, border: '1px solid #f0f0f0' }}>
+                    <Row gutter={[16, 12]} align="middle">
+                      <Col span={6}>
+                        <Statistic
+                          title={<span style={{ fontSize: 12, color: '#595959' }}>Tiền ca gốc</span>}
+                          value={detailRecord.totalBaseShiftPay ?? 0}
+                          formatter={(val) => formatVND(val)}
+                          valueStyle={{ fontSize: 14, fontWeight: 600, color: '#262626' }}
+                        />
+                      </Col>
+                      <Col span={6}>
+                        <Statistic
+                          title={<span style={{ fontSize: 12, color: '#722ed1' }}>Phụ cấp ca đêm</span>}
+                          value={detailRecord.totalNightPay ?? 0}
+                          formatter={(val) => formatVND(val)}
+                          valueStyle={{ fontSize: 14, fontWeight: 600, color: '#722ed1' }}
+                        />
+                      </Col>
+                      <Col span={6}>
+                        <Statistic
+                          title={<span style={{ fontSize: 12, color: '#fa8c16' }}>Phụ cấp OT</span>}
+                          value={detailRecord.totalOTPay ?? 0}
+                          formatter={(val) => formatVND(val)}
+                          valueStyle={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}
+                        />
+                      </Col>
+                      <Col span={6}>
+                        <Statistic
+                          title={<span style={{ fontSize: 12, color: '#ff4d4f' }}>Thưởng Lễ/Tết</span>}
+                          value={detailRecord.totalHolidayBonus ?? 0}
+                          formatter={(val) => formatVND(val)}
+                          valueStyle={{ fontSize: 14, fontWeight: 600, color: '#ff4d4f' }}
+                        />
+                      </Col>
+                    </Row>
+                    <div style={{ textAlign: 'center', marginTop: 12, paddingTop: 8, borderTop: '1px dashed #e8e8e8' }}>
+                      <Button
+                        type="default"
+                        icon={showShiftTable ? <UpOutlined /> : <DownOutlined />}
+                        onClick={() => setShowShiftTable(!showShiftTable)}
+                        style={{ borderRadius: '6px' }}
+                      >
+                        {showShiftTable ? 'Ẩn chi tiết từng ca làm' : 'Xem chi tiết từng ca làm'}
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {showShiftTable && (
+                    <Table
+                      dataSource={completedShifts}
+                      rowKey={(r, idx) => r.id || idx}
+                      pagination={{ pageSize: 5 }}
+                      size="small"
+                      bordered
+                      columns={[
+                      {
+                        title: 'Ngày làm',
+                        dataIndex: 'workDate',
+                        key: 'workDate',
+                        width: 105,
+                        render: (d) => dayjs(d).format('DD/MM/YYYY'),
                       },
-                    },
-                    {
-                      title: 'Loại ca',
-                      dataIndex: 'isNightShift',
-                      key: 'isNightShift',
-                      align: 'center',
-                      width: 85,
-                      render: (isNight) => isNight ? <Tag color="purple">Ca đêm</Tag> : <Tag color="default">Ca ngày</Tag>,
-                    },
-                    {
-                      title: 'OT duyệt',
-                      dataIndex: 'approvedOTHours',
-                      key: 'approvedOTHours',
-                      align: 'center',
-                      width: 85,
-                      render: (ot) => (ot > 0 ? <Tag color="orange">+{ot}h OT</Tag> : '0h'),
-                    },
-                    {
-                      title: 'Tiền ca gốc',
-                      dataIndex: 'baseShiftPay',
-                      key: 'baseShiftPay',
-                      align: 'right',
-                      render: (amt, r) => formatVND(amt ?? r.shiftTotal ?? 0),
-                    },
-                    {
-                      title: 'Thưởng Ca đêm / OT',
-                      key: 'bonusPay',
-                      align: 'right',
-                      render: (_, r) => {
-                        const night = r.nightShiftPay || 0;
-                        const ot = r.oTPay || 0;
-                        if (night === 0 && ot === 0) return '0 đ';
-                        return (
-                          <div style={{ fontSize: 11 }}>
-                            {night > 0 && <span style={{ color: '#722ed1', display: 'block' }}>Đêm: +{formatVND(night)}</span>}
-                            {ot > 0 && <span style={{ color: '#fa8c16', display: 'block' }}>OT: +{formatVND(ot)}</span>}
-                          </div>
-                        );
+                      {
+                        title: 'Số giờ làm',
+                        key: 'hours',
+                        align: 'center',
+                        width: 90,
+                        render: (_, r) => (
+                          <span>{r.actualHours ?? r.regularHours ?? 0}h{r.standardHours ? `/${r.standardHours}h` : ''}</span>
+                        ),
                       },
-                    },
-                    {
-                      title: 'Tổng tiền ca',
-                      dataIndex: 'totalShiftPay',
-                      key: 'totalShiftPay',
-                      align: 'right',
-                      render: (amt, r) => <strong style={{ color: '#e8442a' }}>{formatVND(amt ?? r.shiftTotal ?? 0)}</strong>,
-                    },
-                  ]}
-                />
+                      {
+                        title: 'Hệ số ngày',
+                        dataIndex: 'dateCoefficient',
+                        key: 'dateCoefficient',
+                        align: 'center',
+                        width: 90,
+                        render: (coeff, r) => {
+                          const val = coeff ?? r.dateMultiplier ?? 1.0;
+                          return <Tag color={val > 1.0 ? 'volcano' : 'default'}>{val}x</Tag>;
+                        },
+                      },
+                      {
+                        title: 'Loại ca',
+                        dataIndex: 'isNightShift',
+                        key: 'isNightShift',
+                        align: 'center',
+                        width: 85,
+                        render: (isNight) => isNight ? <Tag color="purple">Ca đêm</Tag> : <Tag color="default">Ca ngày</Tag>,
+                      },
+                      {
+                        title: 'OT duyệt',
+                        dataIndex: 'approvedOTHours',
+                        key: 'approvedOTHours',
+                        align: 'center',
+                        width: 85,
+                        render: (ot) => (ot > 0 ? <Tag color="orange">+{ot}h OT</Tag> : '0h'),
+                      },
+                      {
+                        title: 'Tiền ca gốc',
+                        dataIndex: 'baseShiftPay',
+                        key: 'baseShiftPay',
+                        align: 'right',
+                        render: (amt, r) => formatVND(amt ?? r.shiftTotal ?? 0),
+                      },
+                      {
+                        title: 'Thưởng Ca đêm / OT',
+                        key: 'bonusPay',
+                        align: 'right',
+                        render: (_, r) => {
+                          const night = r.nightShiftPay || 0;
+                          const ot = r.oTPay || 0;
+                          if (night === 0 && ot === 0) return '0 đ';
+                          return (
+                            <div style={{ fontSize: 11 }}>
+                              {night > 0 && <span style={{ color: '#722ed1', display: 'block' }}>Đêm: +{formatVND(night)}</span>}
+                              {ot > 0 && <span style={{ color: '#fa8c16', display: 'block' }}>OT: +{formatVND(ot)}</span>}
+                            </div>
+                          );
+                        },
+                      },
+                      {
+                        title: 'Tổng tiền ca',
+                        dataIndex: 'totalShiftPay',
+                        key: 'totalShiftPay',
+                        align: 'right',
+                        render: (amt, r) => <strong style={{ color: '#e8442a' }}>{formatVND(amt ?? r.shiftTotal ?? 0)}</strong>,
+                      },
+                    ]}
+                  />
+                )}
               </>
-            )}
+            );
+          })()}
 
             <Divider style={{ margin: '16px 0 8px 0' }}>Chi tiết Phụ cấp & Khoản trừ</Divider>
 
