@@ -49,6 +49,7 @@ import {
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
 import { getAllShifts } from '../api/shiftApi';
+import { getShiftChangeRequestsByBranch, approveShiftChangeRequest, rejectShiftChangeRequest } from '../api/shiftChangeRequestApi';
 import { getContracts } from '../api/contractApi';
 import { useAuth } from '../context/AuthContext';
 import MyWorkSchedulePage from './MyWorkSchedulePage';
@@ -100,6 +101,7 @@ const WorkSchedulePage = () => {
   const [shifts, setShifts] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [shiftChangeRequests, setShiftChangeRequests] = useState([]);
 
   const allowedBranches = useMemo(() => {
     if (isManager && managerBranchId) {
@@ -202,6 +204,28 @@ const WorkSchedulePage = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Yêu cầu đổi giờ ca (4.4) đang chờ duyệt — nạp riêng vì nằm ở API khác WorkSchedule
+  const loadShiftChangeRequests = useCallback(async () => {
+    if (!(isManager || isOwnerOrAdmin)) return;
+    const branchIds = isManager && managerBranchId ? [managerBranchId] : allowedBranches.map((b) => b.id);
+    if (branchIds.length === 0) {
+      setShiftChangeRequests([]);
+      return;
+    }
+    try {
+      const results = await Promise.all(
+        branchIds.map((id) => getShiftChangeRequestsByBranch(id, 'Pending').catch(() => ({ data: [] })))
+      );
+      setShiftChangeRequests(results.flatMap((r) => r.data || []));
+    } catch {
+      setShiftChangeRequests([]);
+    }
+  }, [isManager, isOwnerOrAdmin, managerBranchId, allowedBranches]);
+
+  useEffect(() => {
+    loadShiftChangeRequests();
+  }, [loadShiftChangeRequests]);
 
   // Helper mappings
   const getAccountName = (id) => {
@@ -837,7 +861,7 @@ const WorkSchedulePage = () => {
       </Card>
 
       {/* 👑 Khu vực Admin / Quản lý Phê duyệt Đơn xin nghỉ & Đổi ca */}
-      {(isManager || isOwnerOrAdmin) && (schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING'))) && (
+      {(isManager || isOwnerOrAdmin) && (schedules.some((s) => s.status?.startsWith('LEAVE_REQUEST') || s.status?.startsWith('TRANSFER_PENDING')) || shiftChangeRequests.length > 0) && (
         <Card
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#cf1322', fontSize: '15px', fontWeight: 'bold' }}>
@@ -939,6 +963,47 @@ const WorkSchedulePage = () => {
                 </div>
               );
             })}
+
+            {/* Yêu cầu đổi giờ ca (4.4 Đổi ca / làm ca khác) */}
+            {shiftChangeRequests.map((item) => (
+              <div key={`shift-change-${item.id}`} style={{
+                background: '#fff', border: '1px solid #87e8de', borderRadius: '6px', padding: '10px 14px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+              }}>
+                <div>
+                  <Tag color="cyan">🕘 ĐỔI GIỜ CA</Tag>
+                  <strong>{item.accountName}</strong> muốn đổi ca ngày <strong>{dayjs(item.workDate).format('DD/MM/YYYY')}</strong> từ{' '}
+                  <strong>{item.oldShiftName} ({item.oldStartTime?.slice(0, 5)}-{item.oldEndTime?.slice(0, 5)})</strong> sang{' '}
+                  <strong>{item.newShiftName} ({item.newStartTime?.slice(0, 5)}-{item.newEndTime?.slice(0, 5)})</strong>
+                  {item.isNightShift && <Tag color="purple" style={{ marginLeft: 6 }}>Ca đêm</Tag>}
+                  {item.reason && (
+                    <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>💬 Lý do: <em>{item.reason}</em></div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button type="primary" size="small" style={{ background: '#13c2c2', borderColor: '#13c2c2', fontWeight: 'bold' }} onClick={async () => {
+                    try {
+                      await approveShiftChangeRequest(item.id);
+                      message.success(`🟢 Đã duyệt đổi giờ ca cho ${item.accountName}!`);
+                      loadData();
+                      loadShiftChangeRequests();
+                    } catch (e) { message.error(e.response?.data?.message || 'Lỗi khi duyệt đổi ca!'); }
+                  }}>
+                    Duyệt
+                  </Button>
+                  <Button danger size="small" onClick={async () => {
+                    try {
+                      await rejectShiftChangeRequest(item.id);
+                      message.info(`❌ Đã từ chối yêu cầu đổi ca của ${item.accountName}.`);
+                      loadData();
+                      loadShiftChangeRequests();
+                    } catch (e) { message.error(e.response?.data?.message || 'Lỗi từ chối!'); }
+                  }}>
+                    Từ chối
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
