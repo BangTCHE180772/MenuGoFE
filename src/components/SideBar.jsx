@@ -33,6 +33,7 @@ import {
   WalletOutlined,
   GlobalOutlined,
   MessageOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -71,6 +72,7 @@ const ROLE_MENUS = {
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
