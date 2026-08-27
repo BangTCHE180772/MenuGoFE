@@ -15,6 +15,10 @@ import {
   Tooltip,
   Popconfirm,
   Modal,
+  Select,
+  List,
+  Form,
+  Input,
 } from 'antd';
 import {
   FireOutlined,
@@ -25,8 +29,18 @@ import {
   ReloadOutlined,
   AppstoreOutlined,
   BellOutlined,
+  SettingOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
+import {
+  getKitchenStationsByBranchId,
+  createKitchenStation,
+  updateKitchenStation,
+  deleteKitchenStation,
+} from '../api/kitchenStationApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -71,6 +85,68 @@ const KDSPage = () => {
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const signalRConnection = useSignalR();
+
+  // ── Kitchen Stations (Trạm bếp) ─────────────────────────────────
+  const [kitchenStations, setKitchenStations] = useState([]);
+  const [stationFilter, setStationFilter] = useState('ALL');
+  const [showStationModal, setShowStationModal] = useState(false);
+  const [editingStation, setEditingStation] = useState(null);
+  const [stationForm] = Form.useForm();
+  const [savingStation, setSavingStation] = useState(false);
+
+  const fetchKitchenStations = useCallback(async () => {
+    if (!currentBranchId) return;
+    try {
+      const res = await getKitchenStationsByBranchId(currentBranchId);
+      setKitchenStations(res.data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách trạm bếp:', err);
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchKitchenStations();
+  }, [fetchKitchenStations]);
+
+  const openStationModal = (station = null) => {
+    setEditingStation(station);
+    if (station) {
+      stationForm.setFieldsValue({ name: station.name });
+    } else {
+      stationForm.resetFields();
+    }
+  };
+
+  const handleSaveStation = async (values) => {
+    setSavingStation(true);
+    try {
+      if (editingStation) {
+        await updateKitchenStation({ ...editingStation, name: values.name });
+        message.success('Cập nhật trạm bếp thành công');
+      } else {
+        await createKitchenStation({ branchId: currentBranchId, name: values.name, isActive: true });
+        message.success('Thêm trạm bếp thành công');
+      }
+      setEditingStation(null);
+      stationForm.resetFields();
+      fetchKitchenStations();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Lỗi khi lưu trạm bếp.');
+    } finally {
+      setSavingStation(false);
+    }
+  };
+
+  const handleDeleteStation = async (id) => {
+    try {
+      await deleteKitchenStation(id);
+      message.success('Đã xóa trạm bếp');
+      if (stationFilter === String(id)) setStationFilter('ALL');
+      fetchKitchenStations();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Không thể xóa trạm bếp này (có thể đang được gán cho món ăn).');
+    }
+  };
 
   // Join branch-specific SignalR group
   useEffect(() => {
@@ -240,10 +316,16 @@ const KDSPage = () => {
     }
   };
 
-  const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
-  const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
-  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
-  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
+  // Filter the whole queue down to one kitchen station (Trạm bếp) if selected
+  const visibleItems = useMemo(() => {
+    if (stationFilter === 'ALL') return items;
+    return items.filter((i) => String(i.kitchenStationId) === stationFilter);
+  }, [items, stationFilter]);
+
+  const waitingItems = useMemo(() => visibleItems.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [visibleItems]);
+  const acceptedItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [visibleItems]);
+  const cookingItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [visibleItems]);
+  const readyItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [visibleItems]);
 
   const batchableItems = useMemo(() => {
     const combined = [...waitingItems, ...acceptedItems];
@@ -369,9 +451,9 @@ const KDSPage = () => {
       case COOKING_STATUS.READY:
         return readyItems;
       default:
-        return items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
+        return visibleItems.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
     }
-  }, [activeTab, items, waitingItems, acceptedItems, cookingItems, readyItems]);
+  }, [activeTab, visibleItems, waitingItems, acceptedItems, cookingItems, readyItems]);
 
   // Render Time Elapsed since created
   const renderTimeElapsed = (createdAt) => {
@@ -422,12 +504,19 @@ const KDSPage = () => {
       >
         {/* Card Header: Table Name & Time */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-          <Tag
-            color="volcano"
-            style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4, margin: 0 }}
-          >
-            🪑 {item.tableName}
-          </Tag>
+          <Space size={4}>
+            <Tag
+              color="volcano"
+              style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4, margin: 0 }}
+            >
+              🪑 {item.tableName}
+            </Tag>
+            {item.kitchenStationName && (
+              <Tag color="purple" style={{ fontSize: 12, margin: 0 }}>
+                {item.kitchenStationName}
+              </Tag>
+            )}
+          </Space>
           <Text style={{ color: '#595959', fontSize: 12 }}>
             <ClockCircleOutlined style={{ marginRight: 4 }} />
             {renderTimeElapsed(item.createdAt)}
@@ -640,6 +729,27 @@ const KDSPage = () => {
         </Space>
 
         <Space size="middle" wrap style={{ flexShrink: 0 }}>
+          {/* Kitchen Station (Trạm bếp) filter */}
+          <Select
+            value={stationFilter}
+            onChange={setStationFilter}
+            style={{ minWidth: 160 }}
+            options={[
+              { value: 'ALL', label: 'Tất cả trạm bếp' },
+              ...kitchenStations.map((s) => ({ value: String(s.id), label: s.name })),
+            ]}
+          />
+
+          <Tooltip title="Quản lý trạm bếp">
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => setShowStationModal(true)}
+              style={{ backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
+            >
+              Trạm bếp
+            </Button>
+          </Tooltip>
+
           {/* View Mode Toggle Button Group */}
           <Button.Group>
             <Button
@@ -847,7 +957,7 @@ const KDSPage = () => {
                 key: 'ALL',
                 label: (
                   <span>
-                    <AppstoreOutlined /> Tất cả ({items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
+                    <AppstoreOutlined /> Tất cả ({visibleItems.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
                   </span>
                 ),
               },
@@ -915,6 +1025,63 @@ const KDSPage = () => {
         <div style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
           {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
         </div>
+      </Modal>
+
+      {/* ── Modal: Quản lý trạm bếp (Kitchen Stations) ─────── */}
+      <Modal
+        title="🔧 Quản lý trạm bếp"
+        open={showStationModal}
+        onCancel={() => {
+          setShowStationModal(false);
+          setEditingStation(null);
+          stationForm.resetFields();
+        }}
+        footer={null}
+        width={480}
+      >
+        <Form form={stationForm} layout="inline" onFinish={handleSaveStation} style={{ marginBottom: 16 }}>
+          <Form.Item
+            name="name"
+            rules={[{ required: true, message: 'Nhập tên trạm bếp' }]}
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="Tên trạm bếp (VD: Bếp 1, Bếp phụ...)" />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" icon={editingStation ? <EditOutlined /> : <PlusOutlined />} loading={savingStation}>
+              {editingStation ? 'Cập nhật' : 'Thêm'}
+            </Button>
+          </Form.Item>
+          {editingStation && (
+            <Form.Item>
+              <Button onClick={() => { setEditingStation(null); stationForm.resetFields(); }}>Hủy</Button>
+            </Form.Item>
+          )}
+        </Form>
+
+        <List
+          bordered
+          dataSource={kitchenStations}
+          locale={{ emptyText: 'Chưa có trạm bếp nào' }}
+          renderItem={(station) => (
+            <List.Item
+              actions={[
+                <Button key="edit" type="text" icon={<EditOutlined />} onClick={() => openStationModal(station)} />,
+                <Popconfirm
+                  key="delete"
+                  title="Xóa trạm bếp này?"
+                  onConfirm={() => handleDeleteStation(station.id)}
+                  okText="Đồng ý"
+                  cancelText="Hủy bỏ"
+                >
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              {station.name}
+            </List.Item>
+          )}
+        />
       </Modal>
     </div>
   );
