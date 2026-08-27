@@ -324,6 +324,27 @@ const WorkSchedulePage = () => {
     return { name: sh.name, time: `${start} - ${end}` };
   };
 
+  const isOverShiftEndTime = (item) => {
+    if (!item) return false;
+    if ((item.approvedOTHours || 0) > 0) return true;
+    if (!item.checkInAt || !item.checkOutAt) return false;
+
+    const shift = shifts.find((s) => s.id === item.shiftId);
+    const shHours = item.standardHours || 8.0;
+    const actualH = item.actualHours || 0;
+
+    if (actualH > shHours) return true;
+
+    if (shift && shift.endTime && item.workDate) {
+      const workDateStr = dayjs(item.workDate).format('YYYY-MM-DD');
+      const shiftEnd = dayjs(`${workDateStr} ${shift.endTime}`);
+      const checkOut = dayjs(item.checkOutAt);
+      if (checkOut.isAfter(shiftEnd)) return true;
+    }
+
+    return false;
+  };
+
   // Filter schedules
   const filteredSchedules = schedules.filter((item) => {
     if (selectedBranch && item.branchId !== selectedBranch) return false;
@@ -360,6 +381,9 @@ const WorkSchedulePage = () => {
       // Parse inputs
       const checkInVal = record.checkInAt ? dayjs(record.checkInAt) : null;
       const checkOutVal = record.checkOutAt ? dayjs(record.checkOutAt) : null;
+      const baseHours = record.actualHours || 0;
+      const otHours = record.approvedOTHours || 0;
+      const totalActualHours = baseHours + otHours;
 
       form.setFieldsValue({
         accountId: record.accountId,
@@ -369,7 +393,7 @@ const WorkSchedulePage = () => {
         workDate: record.workDate ? dayjs(record.workDate) : null,
         checkInTime: checkInVal,
         checkOutTime: checkOutVal,
-        actualHours: record.actualHours,
+        actualHours: totalActualHours > 0 ? totalActualHours : record.actualHours,
         status: normalizeStatusString(record.status),
         managerApproved: record.managerApproved,
       });
@@ -468,6 +492,10 @@ const WorkSchedulePage = () => {
         return;
       }
 
+      const baseActualHours = (values.actualHours || 0) > (editingRecord?.approvedOTHours || 0)
+        ? (values.actualHours || 0) - (editingRecord?.approvedOTHours || 0)
+        : (values.actualHours || 0);
+
       const payload = {
         accountId: values.accountId,
         branchId: values.branchId,
@@ -476,7 +504,7 @@ const WorkSchedulePage = () => {
         workDate: workDateStr,
         checkInAt,
         checkOutAt,
-        actualHours: values.actualHours,
+        actualHours: baseActualHours,
         status: values.status,
         managerApproved: values.managerApproved,
       };
@@ -492,6 +520,9 @@ const WorkSchedulePage = () => {
         const updatePayload = {
           ...payload,
           id: editingRecord.id,
+          approvedOTHours: editingRecord?.approvedOTHours,
+          otStatus: editingRecord?.otStatus,
+          otNotes: editingRecord?.otNotes,
         };
         await updateWorkSchedule(updatePayload);
         message.success('Cập nhật lịch làm việc thành công!');
@@ -523,6 +554,9 @@ const WorkSchedulePage = () => {
         checkInAt: record.checkInAt,
         checkOutAt: record.checkOutAt,
         actualHours: record.actualHours,
+        approvedOTHours: record.approvedOTHours,
+        otStatus: record.otStatus,
+        otNotes: record.otNotes,
         status: checked ? 'Approved' : record.status === 'Approved' ? 'Pending' : record.status,
         managerApproved: checked,
       };
@@ -742,15 +776,19 @@ const WorkSchedulePage = () => {
     key: 'actions',
     fixed: 'right',
     width: 110,
-    render: (_, record) => (
-      <Space size="middle">
-        <Tooltip title="Duyệt OT & Kiểm tra POS">
-          <Button
-            type="text"
-            icon={<SafetyCertificateOutlined style={{ color: '#fa8c16' }} />}
-            onClick={() => handleOpenOTModal(record)}
-          />
-        </Tooltip>
+    render: (_, record) => {
+      const canApproveOT = isOverShiftEndTime(record);
+      return (
+        <Space size="middle">
+          {canApproveOT && (
+            <Tooltip title="Duyệt OT & Kiểm tra POS">
+              <Button
+                type="text"
+                icon={<SafetyCertificateOutlined style={{ color: '#fa8c16' }} />}
+                onClick={() => handleOpenOTModal(record)}
+              />
+            </Tooltip>
+          )}
         <Tooltip title="Chỉnh sửa ca trực">
           <Button
             type="text"
@@ -769,8 +807,9 @@ const WorkSchedulePage = () => {
           </Popconfirm>
         </Tooltip>
       </Space>
-    ),
-  };
+    );
+  },
+};
 
   const columns = isManager ? [...baseColumns, actionColumn] : baseColumns;
 
@@ -911,7 +950,8 @@ const WorkSchedulePage = () => {
     const actualH = item.actualHours || 0;
     const excessH = Math.max(0, actualH - shHours);
     const hasApprovedOT = (item.approvedOTHours || 0) > 0;
-    const isUnapprovedExcess = excessH > 0 && !hasApprovedOT;
+    const isOverEnd = isOverShiftEndTime(item);
+    const isUnapprovedExcess = isOverEnd && !hasApprovedOT;
 
     return (
       <div
@@ -1575,7 +1615,8 @@ const WorkSchedulePage = () => {
               if (allValues.checkInTime && allValues.checkOutTime) {
                 const diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
                 if (diff > 0) {
-                  form.setFieldsValue({ actualHours: parseFloat(diff.toFixed(2)) });
+                  const otH = editingRecord?.approvedOTHours || 0;
+                  form.setFieldsValue({ actualHours: parseFloat((diff + otH).toFixed(2)) });
                 }
               }
             }
@@ -1710,7 +1751,15 @@ const WorkSchedulePage = () => {
 
           {/* Row 4: Actual Hours, Status & Manager Approved */}
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="actualHours" label="Tổng giờ làm việc thực tế" style={{ flex: 1 }}>
+            <Form.Item
+              name="actualHours"
+              label={
+                editingRecord?.approvedOTHours > 0
+                  ? `Tổng giờ làm việc thực tế (Đã cộng ${editingRecord.approvedOTHours}h OT)`
+                  : "Tổng giờ làm việc thực tế"
+              }
+              style={{ flex: 1 }}
+            >
               <InputNumber min={0} max={24} step={0.5} style={{ width: '100%' }} placeholder="Tự động tính từ Check-in/out" disabled />
             </Form.Item>
 
