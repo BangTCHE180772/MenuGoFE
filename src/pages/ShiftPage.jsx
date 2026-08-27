@@ -80,6 +80,8 @@ const ShiftPage = () => {
         isNightShift: record.isNightShift ?? false,
         nightBonusRate: record.nightBonusRate ?? 1.3,
         nightAllowance: record.nightAllowance ?? 0,
+        nightStartTime: record.nightStartTime ? dayjs(record.nightStartTime, 'HH:mm:ss') : null,
+        nightEndTime: record.nightEndTime ? dayjs(record.nightEndTime, 'HH:mm:ss') : null,
         nightHours: record.nightHours ?? 0,
         isActive: record.isActive ?? true,
       });
@@ -90,6 +92,8 @@ const ShiftPage = () => {
         isNightShift: false,
         nightBonusRate: 1.3,
         nightAllowance: 0,
+        nightStartTime: null,
+        nightEndTime: null,
         nightHours: 0,
         isActive: true,
       });
@@ -113,6 +117,8 @@ const ShiftPage = () => {
         isNightShift: values.isNightShift ?? false,
         nightBonusRate: values.nightBonusRate ?? 1.3,
         nightAllowance: values.nightAllowance ?? 0,
+        nightStartTime: values.nightStartTime ? values.nightStartTime.format('HH:mm:ss') : null,
+        nightEndTime: values.nightEndTime ? values.nightEndTime.format('HH:mm:ss') : null,
         nightHours: values.nightHours ?? 0,
         isActive: values.isActive ?? true,
       };
@@ -468,6 +474,30 @@ const ShiftPage = () => {
                     borderRadius: '8px',
                   }}
                 >
+                  <div style={{ marginBottom: 8, fontSize: '12px', fontWeight: 600, color: '#6b21a8' }}>
+                    🌙 Cấu hình Khung giờ ca đêm & Đơn giá:
+                  </div>
+                  <Row gutter={12} style={{ marginBottom: 8 }}>
+                    <Col span={12}>
+                      <Form.Item
+                        name="nightStartTime"
+                        label="Giờ bắt đầu tính ca đêm"
+                        tooltip="Ví dụ: 00:00 (hoặc 24h00)"
+                      >
+                        <TimePicker format="HH:mm" style={{ width: '100%' }} placeholder="Chọn giờ BĐ ca đêm" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        name="nightEndTime"
+                        label="Giờ kết thúc tính ca đêm"
+                        tooltip="Ví dụ: 02:00"
+                      >
+                        <TimePicker format="HH:mm" style={{ width: '100%' }} placeholder="Chọn giờ KT ca đêm" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
                   <Row gutter={12}>
                     <Col span={8}>
                       <Form.Item
@@ -488,24 +518,6 @@ const ShiftPage = () => {
 
                     <Col span={8}>
                       <Form.Item
-                        name="nightHours"
-                        label="Số giờ tính ca đêm"
-                        tooltip="Ví dụ: Ca 22h-2h (4 tiếng), nhưng chỉ 24h-2h tính ca đêm thì nhập 2.0h. Để 0 = tính toàn bộ ca."
-                        style={{ marginBottom: 8 }}
-                      >
-                        <InputNumber
-                          min={0}
-                          max={24}
-                          step={0.5}
-                          addonAfter="h"
-                          style={{ width: '100%' }}
-                          placeholder="VD: 2.0 (Để 0 = cả ca)"
-                        />
-                      </Form.Item>
-                    </Col>
-
-                    <Col span={8}>
-                      <Form.Item
                         name="nightAllowance"
                         label="Phụ cấp cố định (đ)"
                         style={{ marginBottom: 8 }}
@@ -517,6 +529,24 @@ const ShiftPage = () => {
                           placeholder="VD: 50000"
                           formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                           parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={8}>
+                      <Form.Item
+                        name="nightHours"
+                        label="Nhập cố định giờ"
+                        tooltip="Nếu đặt khung giờ ở trên thì để 0. Hệ thống sẽ tự động tính số giờ giao nhau."
+                        style={{ marginBottom: 8 }}
+                      >
+                        <InputNumber
+                          min={0}
+                          max={24}
+                          step={0.5}
+                          addonAfter="h"
+                          style={{ width: '100%' }}
+                          placeholder="Mặc định: 0"
                         />
                       </Form.Item>
                     </Col>
