@@ -21,6 +21,8 @@ import {
   Divider,
   Calendar,
   Avatar,
+  Popover,
+  Dropdown,
 } from 'antd';
 import {
   PlusOutlined,
@@ -37,14 +39,27 @@ import {
   FileDoneOutlined,
   UserOutlined,
   SafetyCertificateOutlined,
+  LeftOutlined,
+  RightOutlined,
+  DownloadOutlined,
+  FilterOutlined,
+  SettingOutlined,
+  MobileOutlined,
+  InfoCircleOutlined,
+  DownOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+dayjs.extend(isoWeek);
 import {
   getAllWorkSchedules,
   createWorkSchedule,
   updateWorkSchedule,
   deleteWorkSchedule,
   assignWorkSchedules,
+  approveOT,
+  verifyPOSActivity,
 } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
@@ -121,7 +136,8 @@ const WorkSchedulePage = () => {
     if (!accounts || accounts.length === 0) return [];
     if (!contracts || contracts.length === 0) return accounts;
     const contractedAccountIds = new Set(contracts.map((c) => c.accountId));
-    return accounts.filter((a) => contractedAccountIds.has(a.id));
+    const filtered = accounts.filter((a) => contractedAccountIds.has(a.id));
+    return filtered.length > 0 ? filtered : accounts;
   }, [accounts, contracts]);
 
   const groupedStaffAccounts = useMemo(() => {
@@ -149,13 +165,20 @@ const WorkSchedulePage = () => {
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
   }, [contractedAccounts]);
 
-  // Filtering states
+  // Filtering & View states
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
+  const [searchEmpText, setSearchEmpText] = useState('');
+
+  // Weekly Matrix Grid Navigation
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => dayjs().startOf('isoWeek'));
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => currentWeekStart.add(i, 'day'));
+  }, [currentWeekStart]);
 
   // Modal states - Single Add/Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -167,11 +190,90 @@ const WorkSchedulePage = () => {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkForm] = Form.useForm();
 
+  // OT Approval Modal state
+  const [isOTModalOpen, setIsOTModalOpen] = useState(false);
+  const [selectedOTRecord, setSelectedOTRecord] = useState(null);
+  const [posVerificationData, setPosVerificationData] = useState(null);
+  const [loadingPOS, setLoadingPOS] = useState(false);
+  const [otForm] = Form.useForm();
+
+  const handleOpenOTModal = async (record) => {
+    setSelectedOTRecord(record);
+    setIsOTModalOpen(true);
+    setLoadingPOS(true);
+    setPosVerificationData(null);
+    otForm.setFieldsValue({
+      approvedOTHours: record.approvedOTHours ?? 0,
+      otNotes: record.otNotes || '',
+      otStatus: record.otStatus || 'Approved',
+    });
+
+    try {
+      const res = await verifyPOSActivity(record.id);
+      setPosVerificationData(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error('Không thể kiểm tra hoạt động POS!');
+    } finally {
+      setLoadingPOS(false);
+    }
+  };
+
+  const handleOTSubmit = async (values) => {
+    try {
+      await approveOT({
+        workScheduleId: selectedOTRecord.id,
+        approvedOTHours: values.approvedOTHours,
+        otNotes: values.otNotes,
+        otStatus: values.otStatus || 'Approved',
+      });
+      message.success('Đã duyệt giờ làm thêm (OT) thành công!');
+      setIsOTModalOpen(false);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi duyệt OT!';
+      message.error(errorMsg);
+    }
+  };
+
   const selectedFormBranchId = Form.useWatch('branchId', form);
   const selectedBulkBranchId = Form.useWatch('branchId', bulkForm);
 
-  // Active view tab
-  const [activeTab, setActiveTab] = useState('table');
+  // Active view tab ('grid' = Tanca Weekly Roster Grid, 'table' = Table list, 'calendar' = Monthly calendar)
+  const [activeTab, setActiveTab] = useState('grid');
+
+  // Excel Export Handler
+  const handleExportExcel = () => {
+    try {
+      let csv = '\uFEFF';
+      csv += 'Mã NV,Tên Nhân viên,Chi nhánh,Ca làm,Ngày làm việc,Giờ Check-in,Giờ Check-out,Số giờ thực tế,Trạng thái,Quản lý duyệt\n';
+      filteredSchedules.forEach((s) => {
+        const empName = getAccountName(s.accountId);
+        const brName = getBranchName(s.branchId);
+        const shiftInfo = getShiftDetails(s.shiftId);
+        const dateStr = dayjs(s.workDate).format('DD/MM/YYYY');
+        const inTime = s.checkInAt ? dayjs(s.checkInAt).format('HH:mm') : '--';
+        const outTime = s.checkOutAt ? dayjs(s.checkOutAt).format('HH:mm') : '--';
+        const hours = s.actualHours ?? 0;
+        const stLabel = getStatusOption(s.status)?.label || s.status;
+        const approved = s.managerApproved ? 'Đã duyệt' : 'Chờ duyệt';
+        csv += `"${s.accountId}","${empName}","${brName}","${shiftInfo.name}","${dateStr}","${inTime}","${outTime}",${hours},"${stLabel}","${approved}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Lich_Lam_Viec_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success('Đã xuất báo cáo lịch làm việc ra tập tin Excel (CSV) thành công!');
+    } catch (err) {
+      console.error(err);
+      message.error('Có lỗi xảy ra khi xuất file Excel!');
+    }
+  };
 
   // Load all lists
   const loadData = useCallback(async () => {
@@ -222,6 +324,27 @@ const WorkSchedulePage = () => {
     return { name: sh.name, time: `${start} - ${end}` };
   };
 
+  const isOverShiftEndTime = (item) => {
+    if (!item) return false;
+    if ((item.approvedOTHours || 0) > 0) return true;
+    if (!item.checkInAt || !item.checkOutAt) return false;
+
+    const shift = shifts.find((s) => s.id === item.shiftId);
+    const shHours = item.standardHours || 8.0;
+    const actualH = item.actualHours || 0;
+
+    if (actualH > shHours) return true;
+
+    if (shift && shift.endTime && item.workDate) {
+      const workDateStr = dayjs(item.workDate).format('YYYY-MM-DD');
+      const shiftEnd = dayjs(`${workDateStr} ${shift.endTime}`);
+      const checkOut = dayjs(item.checkOutAt);
+      if (checkOut.isAfter(shiftEnd)) return true;
+    }
+
+    return false;
+  };
+
   // Filter schedules
   const filteredSchedules = schedules.filter((item) => {
     if (selectedBranch && item.branchId !== selectedBranch) return false;
@@ -258,6 +381,9 @@ const WorkSchedulePage = () => {
       // Parse inputs
       const checkInVal = record.checkInAt ? dayjs(record.checkInAt) : null;
       const checkOutVal = record.checkOutAt ? dayjs(record.checkOutAt) : null;
+      const baseHours = record.actualHours || 0;
+      const otHours = record.approvedOTHours || 0;
+      const totalActualHours = baseHours + otHours;
 
       form.setFieldsValue({
         accountId: record.accountId,
@@ -267,7 +393,7 @@ const WorkSchedulePage = () => {
         workDate: record.workDate ? dayjs(record.workDate) : null,
         checkInTime: checkInVal,
         checkOutTime: checkOutVal,
-        actualHours: record.actualHours,
+        actualHours: totalActualHours > 0 ? totalActualHours : record.actualHours,
         status: normalizeStatusString(record.status),
         managerApproved: record.managerApproved,
       });
@@ -366,6 +492,10 @@ const WorkSchedulePage = () => {
         return;
       }
 
+      const baseActualHours = (values.actualHours || 0) > (editingRecord?.approvedOTHours || 0)
+        ? (values.actualHours || 0) - (editingRecord?.approvedOTHours || 0)
+        : (values.actualHours || 0);
+
       const payload = {
         accountId: values.accountId,
         branchId: values.branchId,
@@ -374,7 +504,7 @@ const WorkSchedulePage = () => {
         workDate: workDateStr,
         checkInAt,
         checkOutAt,
-        actualHours: values.actualHours,
+        actualHours: baseActualHours,
         status: values.status,
         managerApproved: values.managerApproved,
       };
@@ -390,6 +520,9 @@ const WorkSchedulePage = () => {
         const updatePayload = {
           ...payload,
           id: editingRecord.id,
+          approvedOTHours: editingRecord?.approvedOTHours,
+          otStatus: editingRecord?.otStatus,
+          otNotes: editingRecord?.otNotes,
         };
         await updateWorkSchedule(updatePayload);
         message.success('Cập nhật lịch làm việc thành công!');
@@ -421,6 +554,9 @@ const WorkSchedulePage = () => {
         checkInAt: record.checkInAt,
         checkOutAt: record.checkOutAt,
         actualHours: record.actualHours,
+        approvedOTHours: record.approvedOTHours,
+        otStatus: record.otStatus,
+        otNotes: record.otNotes,
         status: checked ? 'Approved' : record.status === 'Approved' ? 'Pending' : record.status,
         managerApproved: checked,
       };
@@ -640,8 +776,19 @@ const WorkSchedulePage = () => {
     key: 'actions',
     fixed: 'right',
     width: 110,
-    render: (_, record) => (
-      <Space size="middle">
+    render: (_, record) => {
+      const canApproveOT = isOverShiftEndTime(record);
+      return (
+        <Space size="middle">
+          {canApproveOT && (
+            <Tooltip title="Duyệt OT & Kiểm tra POS">
+              <Button
+                type="text"
+                icon={<SafetyCertificateOutlined style={{ color: '#fa8c16' }} />}
+                onClick={() => handleOpenOTModal(record)}
+              />
+            </Tooltip>
+          )}
         <Tooltip title="Chỉnh sửa ca trực">
           <Button
             type="text"
@@ -660,8 +807,9 @@ const WorkSchedulePage = () => {
           </Popconfirm>
         </Tooltip>
       </Space>
-    ),
-  };
+    );
+  },
+};
 
   const columns = isManager ? [...baseColumns, actionColumn] : baseColumns;
 
@@ -746,6 +894,369 @@ const WorkSchedulePage = () => {
           );
         })}
       </ul>
+    );
+  };
+
+  // Quick Add Shift from Grid Cell
+  const handleQuickAddShift = (accountId, date) => {
+    setModalType('create');
+    setEditingRecord(null);
+    setIsModalOpen(true);
+    form.resetFields();
+    form.setFieldsValue({
+      accountId,
+      workDate: dayjs(date),
+      branchId: defaultBranchId,
+      status: 'Pending',
+      managerApproved: true,
+    });
+  };
+
+  // Render individual Shift Card inside Weekly Grid
+  const renderShiftCard = (item, isCompact = false) => {
+    const shiftInfo = getShiftDetails(item.shiftId);
+    const normSt = (item.status || '').toUpperCase();
+
+    let bgColor = '#fffbe6';
+    let borderColor = '#ffe58f';
+    let textColor = '#873800';
+
+    if (normSt === 'COMPLETED' || normSt === 'HOÀN THÀNH') {
+      bgColor = '#f6ffed';
+      borderColor = '#b7eb8f';
+      textColor = '#274e13';
+    } else if (normSt === 'WORKING' || normSt === 'ĐANG LÀM VIỆC') {
+      bgColor = '#e6f7ff';
+      borderColor = '#91d5ff';
+      textColor = '#003a8c';
+    } else if (normSt === 'ABSENT' || normSt === 'VẮNG MẮT' || (item.checkInAt && !item.checkOutAt)) {
+      bgColor = '#fff2f0';
+      borderColor = '#ffccc7';
+      textColor = '#a8071a';
+    } else if (normSt === 'LEAVE_APPROVED' || normSt === 'ĐÃ XIN NGHỈ') {
+      bgColor = '#f9f0ff';
+      borderColor = '#d3adf7';
+      textColor = '#531dab';
+    }
+
+    const checkInStr = item.checkInAt ? dayjs(item.checkInAt).format('HH:mm') : null;
+    const checkOutStr = item.checkOutAt ? dayjs(item.checkOutAt).format('HH:mm') : null;
+    let timeText = shiftInfo.time;
+    if (checkInStr || checkOutStr) {
+      timeText = `${checkInStr || '--'} 📲 - ${checkOutStr || '--'} 📲`;
+    }
+
+    const shHours = item.standardHours || 8.0;
+    const actualH = item.actualHours || 0;
+    const excessH = Math.max(0, actualH - shHours);
+    const hasApprovedOT = (item.approvedOTHours || 0) > 0;
+    const isOverEnd = isOverShiftEndTime(item);
+    const isUnapprovedExcess = isOverEnd && !hasApprovedOT;
+
+    return (
+      <div
+        key={item.id}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenModal('edit', item);
+        }}
+        style={{
+          backgroundColor: bgColor,
+          border: `1px solid ${borderColor}`,
+          color: textColor,
+          borderRadius: '6px',
+          padding: isCompact ? '4px 6px' : '6px 8px',
+          marginBottom: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          transition: 'all 0.2s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{shiftInfo.name}</span>
+          {(hasApprovedOT || isUnapprovedExcess) && (
+            <Tooltip title="Bấm để mở Modal duyệt OT">
+              <SafetyCertificateOutlined
+                style={{ color: '#fa8c16', fontSize: '13px' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenOTModal(item);
+                }}
+              />
+            </Tooltip>
+          )}
+        </div>
+        <div style={{ fontSize: '10px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          ({timeText})
+        </div>
+
+        {hasApprovedOT && (
+          <div style={{ marginTop: 2 }}>
+            <Tag color="orange" style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px' }}>
+              +{item.approvedOTHours}h OT
+            </Tag>
+          </div>
+        )}
+
+        {isUnapprovedExcess && (
+          <div style={{ marginTop: 2 }}>
+            <Tag
+              color="volcano"
+              style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px', cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenOTModal(item);
+              }}
+            >
+              ⚠️ Duyệt OT (+{excessH.toFixed(1)}h)
+            </Tag>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Matrix Weekly Roster Grid
+  const renderWeeklyGrid = () => {
+    const isCurrentWeek = currentWeekStart.isSame(dayjs().startOf('isoWeek'), 'week');
+
+    const displayAccounts = contractedAccounts.filter((acc) => {
+      if (selectedAccount && acc.id !== selectedAccount) return false;
+      if (searchEmpText) {
+        const q = searchEmpText.toLowerCase();
+        const matchName = acc.name?.toLowerCase().includes(q);
+        const matchId = String(acc.id).includes(q);
+        const matchPhone = acc.phone?.includes(q);
+        if (!matchName && !matchId && !matchPhone) return false;
+      }
+      return true;
+    });
+
+    return (
+      <div className="weekly-roster-container" style={{ background: '#fff', borderRadius: '12px', padding: '16px' }}>
+        {/* Top Control Bar matching reference image */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+          {/* Left Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Button icon={<FilterOutlined />} style={{ borderRadius: '6px' }} title="Bộ lọc" />
+
+            <div style={{ display: 'flex', alignItems: 'center', background: '#f5f5f5', borderRadius: '6px', padding: '2px 4px' }}>
+              <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => setCurrentWeekStart((prev) => prev.subtract(1, 'week'))} />
+              <div style={{ padding: '0 8px', fontWeight: 600, fontSize: '13px', color: '#1f2937' }}>
+                Tuần {currentWeekStart.format('WW')}-{currentWeekStart.format('YYYY')} ({currentWeekStart.format('DD/MM')} - {currentWeekStart.add(6, 'day').format('DD/MM')})
+              </div>
+              <Button type="text" size="small" icon={<RightOutlined />} onClick={() => setCurrentWeekStart((prev) => prev.add(1, 'week'))} />
+            </div>
+
+            <Button
+              size="middle"
+              style={{ borderRadius: '6px', color: isCurrentWeek ? '#1890ff' : undefined, borderColor: isCurrentWeek ? '#91d5ff' : undefined }}
+              onClick={() => setCurrentWeekStart(dayjs().startOf('isoWeek'))}
+            >
+              Hôm nay
+            </Button>
+
+            <Select
+              placeholder="Ca làm ∨"
+              allowClear
+              style={{ width: 130 }}
+              value={selectedShift}
+              onChange={(val) => setSelectedShift(val)}
+            >
+              {shifts.map((s) => (
+                <Select.Option key={s.id} value={s.id}>
+                  {s.name}
+                </Select.Option>
+              ))}
+            </Select>
+
+            <Input
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              placeholder="Q Tìm kiếm nhân viên..."
+              allowClear
+              value={searchEmpText}
+              onChange={(e) => setSearchEmpText(e.target.value)}
+              style={{ width: 190, borderRadius: '6px' }}
+            />
+          </div>
+
+
+        </div>
+
+        {/* Matrix Table */}
+        <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', background: '#fff' }}>
+            <thead>
+              <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
+                <th style={{ padding: '12px 14px', textAlign: 'left', minWidth: '210px', borderRight: '1px solid #f0f0f0', color: '#595959', fontWeight: 700 }}>
+                  Nhân viên ({displayAccounts.length})
+                </th>
+                {weekDays.map((day, idx) => {
+                  const isToday = day.isSame(dayjs(), 'day');
+                  const dayName = idx === 6 ? 'CN' : `T${idx + 2}`;
+                  const formattedDate = day.format('DD/MM');
+                  return (
+                    <th
+                      key={day.format('YYYY-MM-DD')}
+                      style={{
+                        padding: '10px 8px',
+                        textAlign: 'center',
+                        minWidth: '125px',
+                        borderRight: idx === 6 ? 'none' : '1px solid #f0f0f0',
+                        background: isToday ? '#e6f7ff' : undefined,
+                        color: isToday ? '#1890ff' : '#262626',
+                        fontWeight: isToday ? 800 : 600,
+                      }}
+                    >
+                      <div>{dayName} {formattedDate}</div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {displayAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '32px', color: '#8c8c8c' }}>
+                    Không tìm thấy nhân viên nào phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              ) : (
+                displayAccounts.map((acc) => {
+                  const primaryRoleId = acc.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : (acc.roleId || 6);
+                  const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
+
+                  return (
+                    <tr key={acc.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '10px 12px', borderRight: '1px solid #f0f0f0', background: '#fafafa', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar
+                            size={34}
+                            src={acc.avatarImage || undefined}
+                            icon={!acc.avatarImage ? <UserOutlined /> : undefined}
+                            style={{ backgroundColor: acc.avatarImage ? undefined : '#1890ff', flexShrink: 0 }}
+                          />
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontWeight: 700, color: '#1f2937', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {acc.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Tag color={roleInfo.color} style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px' }}>
+                                {roleInfo.label}
+                              </Tag>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {weekDays.map((day) => {
+                        const dateStr = day.format('YYYY-MM-DD');
+                        const empDaySchedules = filteredSchedules.filter(
+                          (s) => s.accountId === acc.id && dayjs(s.workDate).format('YYYY-MM-DD') === dateStr
+                        );
+                        const isToday = day.isSame(dayjs(), 'day');
+
+                        return (
+                          <td
+                            key={dateStr}
+                            style={{
+                              padding: '6px',
+                              verticalAlign: 'top',
+                              borderRight: '1px solid #f0f0f0',
+                              background: isToday ? '#fafafa' : '#fff',
+                              minHeight: '65px',
+                            }}
+                          >
+                            {empDaySchedules.length === 0 ? (
+                              <div
+                                onClick={() => handleQuickAddShift(acc.id, dateStr)}
+                                style={{
+                                  height: '52px',
+                                  borderRadius: '6px',
+                                  border: '1px dashed transparent',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  color: '#bfbfbf',
+                                  transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = '#1890ff';
+                                  e.currentTarget.style.color = '#1890ff';
+                                  e.currentTarget.style.backgroundColor = '#e6f7ff';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = 'transparent';
+                                  e.currentTarget.style.color = '#bfbfbf';
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                title="Bấm để phân ca trực"
+                              >
+                                <PlusOutlined style={{ fontSize: '14px' }} />
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {[...empDaySchedules]
+                                  .sort((a, b) => (a.shiftId ?? 0) - (b.shiftId ?? 0))
+                                  .map((s) => renderShiftCard(s))}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bottom Legend Bar matching system STATUS_OPTIONS */}
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '10px 14px',
+            background: '#fafafa',
+            borderRadius: '8px',
+            border: '1px solid #f0f0f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: '20px',
+            fontSize: '12px',
+            color: '#595959',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#faad14' }} />
+            <span>Chờ thực hiện</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#1890ff' }} />
+            <span>Đã duyệt ca</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#13c2c2' }} />
+            <span>Đang làm việc</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#52c41a' }} />
+            <span>Hoàn thành</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#ff4d4f' }} />
+            <span>Vắng mặt</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#722ed1' }} />
+            <span>Đã xin nghỉ</span>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -950,122 +1461,13 @@ const WorkSchedulePage = () => {
         style={{ background: '#fff', padding: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
         items={[
           {
-            key: 'table',
+            key: 'grid',
             label: (
               <span>
-                <SolutionOutlined /> Danh sách lịch trực
+                <CalendarOutlined /> Lịch tuần
               </span>
             ),
-            children: (
-              <>
-                {/* Advanced Search & Filtering Box */}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
-                  {isOwnerOrAdmin && (
-                    <Select
-                      placeholder="Lọc chi nhánh"
-                      style={{ width: 180 }}
-                      allowClear
-                      value={selectedBranch}
-                      onChange={(val) => setSelectedBranch(val)}
-                    >
-                      {branches.map((b) => (
-                        <Select.Option key={b.id} value={b.id}>
-                          {b.name}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  )}
-
-                  <Select
-                    placeholder="Lọc nhân viên"
-                    style={{ width: 180 }}
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    value={selectedAccount}
-                    onChange={(val) => setSelectedAccount(val)}
-                  >
-                    {contractedAccounts.map((a) => (
-                      <Select.Option key={a.id} value={a.id} label={a.name}>
-                        {a.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-
-
-                  <Select
-                    placeholder="Lọc ca làm việc"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedShift}
-                    onChange={(val) => setSelectedShift(val)}
-                  >
-                    {shifts.map((s) => (
-                      <Select.Option key={s.id} value={s.id}>
-                        {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-                  <Select
-                    placeholder="Lọc trạng thái"
-                    style={{ width: 180 }}
-                    allowClear
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                  >
-                    {[
-                      { value: 'PENDING', label: 'Chờ thực hiện' },
-                      { value: 'APPROVED', label: 'Đã duyệt' },
-                      { value: 'Working', label: 'Đang làm việc' },
-                      { value: 'COMPLETED', label: 'Hoàn thành' },
-                      { value: 'ABSENT', label: 'Vắng mặt' },
-                    ].map((st) => (
-                      <Select.Option key={st.value} value={st.value}>
-                        {st.label}
-                      </Select.Option>
-                    ))}
-                  </Select>
-
-                  <Select
-                    placeholder="Lọc Quản lý duyệt"
-                    style={{ width: 170 }}
-                    allowClear
-                    value={selectedManagerApproved}
-                    onChange={(val) => setSelectedManagerApproved(val)}
-                  >
-                    <Select.Option value={true}>🟢 Đã duyệt công</Select.Option>
-                    <Select.Option value={false}>🟠 Chờ duyệt công</Select.Option>
-                  </Select>
-
-                  <DatePicker
-                    placeholder="Lọc ngày cụ thể"
-                    style={{ width: 160 }}
-                    value={searchDate}
-                    onChange={(date) => setSearchDate(date)}
-                    format="DD/MM/YYYY"
-                  />
-
-                  {(selectedBranch || selectedAccount || selectedShift || selectedStatus || selectedManagerApproved !== null || searchDate) && (
-                    <Button type="link" danger onClick={handleResetFilters} icon={<CloseCircleOutlined />}>
-                      Xóa lọc
-                    </Button>
-                  )}
-                </div>
-
-                {/* Table View */}
-                <Table
-                  columns={columns}
-                  dataSource={filteredSchedules}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
-                  scroll={{ x: 1100 }}
-                  bordered
-                />
-              </>
-            ),
+            children: renderWeeklyGrid(),
           },
           {
             key: 'calendar',
@@ -1213,7 +1615,8 @@ const WorkSchedulePage = () => {
               if (allValues.checkInTime && allValues.checkOutTime) {
                 const diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
                 if (diff > 0) {
-                  form.setFieldsValue({ actualHours: parseFloat(diff.toFixed(2)) });
+                  const otH = editingRecord?.approvedOTHours || 0;
+                  form.setFieldsValue({ actualHours: parseFloat((diff + otH).toFixed(2)) });
                 }
               }
             }
@@ -1348,7 +1751,15 @@ const WorkSchedulePage = () => {
 
           {/* Row 4: Actual Hours, Status & Manager Approved */}
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="actualHours" label="Tổng giờ làm việc thực tế" style={{ flex: 1 }}>
+            <Form.Item
+              name="actualHours"
+              label={
+                editingRecord?.approvedOTHours > 0
+                  ? `Tổng giờ làm việc thực tế (Đã cộng ${editingRecord.approvedOTHours}h OT)`
+                  : "Tổng giờ làm việc thực tế"
+              }
+              style={{ flex: 1 }}
+            >
               <InputNumber min={0} max={24} step={0.5} style={{ width: '100%' }} placeholder="Tự động tính từ Check-in/out" disabled />
             </Form.Item>
 
@@ -1382,12 +1793,31 @@ const WorkSchedulePage = () => {
             </Form.Item>
           </div>
 
-          {/* Code (optional/display) */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <Form.Item name="code" label="Mã phân ca (Tự động sinh)" style={{ flex: 1, marginBottom: 0 }}>
-              <Input placeholder="Tự động sinh theo hệ thống" disabled />
-            </Form.Item>
-          </div>
+          {modalType === 'edit' && editingRecord && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #ffd591', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fffbe6', padding: '12px 16px', borderRadius: '8px', border: '1px solid #ffe58f' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#d4380d', fontSize: '13px' }}>
+                  <SafetyCertificateOutlined style={{ marginRight: 6 }} />
+                  Phê duyệt làm thêm giờ (OT) & Đơn hàng POS:
+                </div>
+                <div style={{ fontSize: '12px', color: '#595959', marginTop: 2 }}>
+                  Số giờ OT được duyệt: <Tag color="orange">{editingRecord.approvedOTHours || 0} giờ</Tag>
+                  {editingRecord.otStatus && <Tag color="blue">{editingRecord.otStatus}</Tag>}
+                </div>
+              </div>
+              <Button
+                type="primary"
+                icon={<SafetyCertificateOutlined />}
+                style={{ background: 'linear-gradient(135deg, #fa8c16, #ffa940)', border: 'none', borderRadius: '6px' }}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  handleOpenOTModal(editingRecord);
+                }}
+              >
+                Mở Duyệt OT & POS
+              </Button>
+            </div>
+          )}
         </Form>
       </Modal>
 
@@ -1535,6 +1965,85 @@ const WorkSchedulePage = () => {
             </span>
           </div>
         </Form>
+      </Modal>
+
+      {/* Modal Duyệt OT & Kiểm tra POS */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#fa8c16' }}>
+            <SafetyCertificateOutlined />
+            <span>PHÊ DUYỆT TĂNG CA (OT) & XÁC MINH POS</span>
+          </div>
+        }
+        open={isOTModalOpen}
+        onCancel={() => setIsOTModalOpen(false)}
+        onOk={() => otForm.submit()}
+        width={560}
+        okText="Lưu phê duyệt OT"
+        cancelText="Hủy bỏ"
+        okButtonProps={{
+          style: {
+            background: 'linear-gradient(135deg, #fa8c16, #ffa940)',
+            border: 'none',
+          },
+        }}
+      >
+        {selectedOTRecord && (
+          <div>
+            <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 16 }}>
+              <div><strong>Nhân viên:</strong> {getAccountName(selectedOTRecord.accountId)}</div>
+              <div><strong>Ngày làm việc:</strong> {dayjs(selectedOTRecord.workDate).format('DD/MM/YYYY')}</div>
+              <div><strong>Check-in / Check-out:</strong> {selectedOTRecord.checkInAt ? dayjs(selectedOTRecord.checkInAt).format('HH:mm') : '--'} - {selectedOTRecord.checkOutAt ? dayjs(selectedOTRecord.checkOutAt).format('HH:mm') : '--'}</div>
+              <div><strong>Tổng giờ thực tế:</strong> <Tag color="blue">{selectedOTRecord.actualHours || 0} giờ</Tag></div>
+            </div>
+
+            {/* POS Verification Result Alert */}
+            <div style={{ marginBottom: 16 }}>
+              {loadingPOS ? (
+                <Card loading size="small" title="Đang kiểm tra hoạt động POS..." />
+              ) : posVerificationData ? (
+                <Card
+                  size="small"
+                  style={{
+                    border: posVerificationData.isSuspicious ? '1px solid #ffbb96' : '1px solid #b7eb8f',
+                    background: posVerificationData.isSuspicious ? '#fff2e8' : '#f6ffed',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: posVerificationData.isSuspicious ? '#d4380d' : '#389e0d', marginBottom: 4 }}>
+                    {posVerificationData.isSuspicious ? '⚠️ CẢNH BÁO KHÔNG CÓ HOẠT ĐỘNG POS' : '✅ ĐÃ XÁC MINH CÓ ĐƠN HÀNG POS'}
+                  </div>
+                  <div style={{ fontSize: 13 }}>{posVerificationData.message}</div>
+                  <div style={{ fontSize: 12, marginTop: 4, color: '#595959' }}>
+                    Số đơn hàng ghi nhận trong giờ dư: <strong>{posVerificationData.orderCount || 0} đơn</strong>
+                  </div>
+                </Card>
+              ) : null}
+            </div>
+
+            <Form form={otForm} layout="vertical" onFinish={handleOTSubmit}>
+              <Form.Item
+                name="approvedOTHours"
+                label="Số giờ OT được Quản lý duyệt tính lương"
+                rules={[{ required: true, message: 'Vui lòng nhập số giờ OT!' }]}
+                help="Lưu ý: Chỉ số giờ OT được duyệt tại đây mới được cộng vào tiền tăng ca cuối tháng."
+              >
+                <InputNumber min={0} max={12} step={0.5} style={{ width: '100%' }} suffix="giờ" />
+              </Form.Item>
+
+              <Form.Item name="otNotes" label="Ghi chú duyệt OT (Lý do duyệt / Từ chối)">
+                <Input.TextArea rows={2} placeholder="Nhập ghi chú cho nhân viên..." />
+              </Form.Item>
+
+              <Form.Item name="otStatus" label="Trạng thái phê duyệt OT">
+                <Select>
+                  <Select.Option value="Approved">Chấp nhận OT (Approved)</Select.Option>
+                  <Select.Option value="Rejected">Từ chối OT (Rejected - Nghi ngờ quên check-out)</Select.Option>
+                  <Select.Option value="Pending">Chờ xem xét (Pending)</Select.Option>
+                </Select>
+              </Form.Item>
+            </Form>
+          </div>
+        )}
       </Modal>
     </div>
   );

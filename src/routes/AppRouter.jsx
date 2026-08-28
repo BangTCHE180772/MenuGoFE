@@ -35,6 +35,7 @@ import AttendancePage from '../pages/AttendancePage';
 import PayrollPage from '../pages/PayrollPage';
 import MyPayrollPage from '../pages/MyPayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
+import HolidayConfigPage from '../pages/HolidayConfigPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
@@ -169,6 +170,7 @@ const AppRouter = () => {
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
+                <Route path="/holiday-config" element={<HolidayConfigPage />} />
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />

@@ -174,7 +174,7 @@ const WorkScheduleSummaryPage = () => {
         entry.absent += 1;
       } else if (s.checkInAt) {
         entry.worked += 1;
-        entry.totalHours += s.actualHours || 0;
+        entry.totalHours += (s.actualHours || 0) + (s.approvedOTHours || 0);
         if (isLate(s)) entry.late += 1;
         else entry.onTime += 1;
         if (isEarlyLeave(s)) entry.earlyLeave += 1;
@@ -453,15 +453,20 @@ const WorkScheduleSummaryPage = () => {
     },
     {
       title: 'Giờ công',
-      dataIndex: 'actualHours',
       key: 'actualHours',
       align: 'center',
-      render: (val) =>
-        val != null ? (
-          <span style={{ color: '#4f46e5', fontWeight: 600 }}>{Number(val).toFixed(1)}h</span>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
+      render: (_, record) => {
+        const baseH = record.actualHours || 0;
+        const otH = record.approvedOTHours || 0;
+        const totalH = baseH + otH;
+        if (totalH <= 0 && record.actualHours == null) return <Text type="secondary">—</Text>;
+        return (
+          <span style={{ color: '#4f46e5', fontWeight: 600 }}>
+            {Number(totalH).toFixed(1)}h
+            {otH > 0 && <span style={{ fontSize: 11, color: '#f59e0b', marginLeft: 4 }}>(+{Number(otH).toFixed(1)}h OT)</span>}
+          </span>
+        );
+      },
     },
     {
       title: 'Trạng thái',
