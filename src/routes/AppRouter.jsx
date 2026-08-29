@@ -183,6 +183,7 @@ const AppRouter = () => {
                 <Route path="/reports/inventory" element={<ReportInventoryPage />} />
                 <Route path="/inventoryreport" element={<ReportInventoryPage />} />
                 <Route path="/leftover" element={<LeftoverPage />} />
+                <Route path="/kds" element={<KDSPage />} />
               </Route>
 
               {/* Owner, Admin */}
@@ -197,7 +198,6 @@ const AppRouter = () => {
                 <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/cashier" element={<CashierPage />} />
-                <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>
           </Route>
