@@ -12,8 +12,12 @@ import {
   Input,
   DatePicker,
   Radio,
+<<<<<<< HEAD
+  TimePicker,
+=======
   List,
   Space,
+>>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
 } from 'antd';
 import {
   CalendarOutlined,
@@ -25,6 +29,14 @@ import {
   SwapOutlined,
   FileTextOutlined,
   SafetyCertificateOutlined,
+<<<<<<< HEAD
+  FieldTimeOutlined,
+} from '@ant-design/icons';
+import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
+import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap } from '../api/workScheduleApi';
+import { createShiftChangeRequest } from '../api/shiftChangeRequestApi';
+=======
   AimOutlined,
   SyncOutlined,
   EnvironmentOutlined,
@@ -32,6 +44,7 @@ import {
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap, checkInWithLocation } from '../api/workScheduleApi';
+>>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getAllAccounts } from '../api/accountApi';
@@ -66,12 +79,20 @@ const MyWorkSchedulePage = () => {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveForm] = Form.useForm();
 
+<<<<<<< HEAD
+  // Change-shift-hours modal states (4.4 Đổi ca / làm ca khác)
+  const [changeShiftModalOpen, setChangeShiftModalOpen] = useState(false);
+  const [changeShiftLoading, setChangeShiftLoading] = useState(false);
+  const [changeShiftForm] = Form.useForm();
+  const changeShiftMode = Form.useWatch('mode', changeShiftForm);
+=======
   // Check-in with location states
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [checkinBranchModalOpen, setCheckinBranchModalOpen] = useState(false);
   const [checkinBranchId, setCheckinBranchId] = useState(null);
   const [checkinShiftModalOpen, setCheckinShiftModalOpen] = useState(false);
   const [todayShiftSchedules, setTodayShiftSchedules] = useState([]);
+>>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -144,6 +165,41 @@ const MyWorkSchedulePage = () => {
     setTransferModalOpen(true);
   };
 
+<<<<<<< HEAD
+  const handleOpenChangeShift = () => {
+    setDetailModalOpen(false);
+    changeShiftForm.resetFields();
+    changeShiftForm.setFieldsValue({ mode: 'template' });
+    setChangeShiftModalOpen(true);
+  };
+
+  const handleChangeShiftSubmit = async (values) => {
+    if (!selectedSchedule) return;
+    setChangeShiftLoading(true);
+    try {
+      const payload = {
+        workScheduleId: selectedSchedule.id,
+        reason: values.reason || undefined,
+      };
+      if (values.mode === 'template') {
+        payload.newShiftId = values.newShiftId;
+      } else {
+        payload.newStartTime = values.newStartTime.format('HH:mm:ss');
+        payload.newEndTime = values.newEndTime.format('HH:mm:ss');
+      }
+
+      await createShiftChangeRequest(payload);
+      message.success('🟢 Đã gửi yêu cầu đổi ca! Chờ quản lý duyệt.');
+      setChangeShiftModalOpen(false);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu đổi ca!';
+      message.error(errorMsg);
+    } finally {
+      setChangeShiftLoading(false);
+    }
+=======
   // ---- GPS Check-in handler ----
   const doCheckInWithShift = (branchId, workScheduleId = null) => {
     setCheckinLoading(true);
@@ -205,6 +261,7 @@ const MyWorkSchedulePage = () => {
 
     setTodayShiftSchedules(todaySchedules);
     setCheckinShiftModalOpen(true);
+>>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
   };
 
   const handleOpenLeaveModal = (type = 'day', schedule = null) => {
@@ -1045,6 +1102,23 @@ const MyWorkSchedulePage = () => {
                 Đổi ca
               </Button>
             </Tooltip>,
+            <Tooltip title={disableReason} key="change-shift-tooltip">
+              <Button
+                key="change-shift"
+                type="primary"
+                icon={<FieldTimeOutlined />}
+                onClick={handleOpenChangeShift}
+                disabled={isDisabled}
+                style={{
+                  background: isDisabled ? '#d9d9d9' : '#13c2c2',
+                  borderColor: isDisabled ? '#d9d9d9' : '#13c2c2',
+                  fontWeight: 'bold',
+                  color: isDisabled ? '#8c8c8c' : '#fff'
+                }}
+              >
+                Đổi giờ ca
+              </Button>
+            </Tooltip>,
             <Button key="close" type="primary" onClick={() => setDetailModalOpen(false)} style={{ background: '#132238', borderColor: '#132238' }}>
               Đóng
             </Button>
@@ -1189,6 +1263,122 @@ const MyWorkSchedulePage = () => {
                   style={{ background: '#f97316', borderColor: '#f97316', fontWeight: 'bold', borderRadius: '6px', color: '#fff' }}
                 >
                   Xác nhận chuyển ca
+                </Button>
+              </div>
+            </Form>
+          </div>
+        )}
+      </Modal>
+
+      {/* Change Shift Hours Modal (4.4 Đổi ca / làm ca khác) */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '18px', color: '#13c2c2' }}>
+            <FieldTimeOutlined />
+            <span>YÊU CẦU ĐỔI GIỜ CA</span>
+          </div>
+        }
+        open={changeShiftModalOpen}
+        onCancel={() => setChangeShiftModalOpen(false)}
+        footer={null}
+        width={450}
+        destroyOnClose
+      >
+        {selectedSchedule && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{
+              background: '#e6fffb',
+              border: '1px solid #87e8de',
+              borderRadius: '6px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              fontSize: '14px',
+              color: '#595959'
+            }}>
+              <div style={{ fontWeight: 'bold', color: '#08979c', marginBottom: '6px', fontSize: '15px' }}>
+                Ca hiện tại:
+              </div>
+              <div><strong>Ca trực:</strong> {getShiftDetails(selectedSchedule.shiftId).name} ({getShiftDetails(selectedSchedule.shiftId).time})</div>
+              <div><strong>Ngày làm việc:</strong> {dayjs(selectedSchedule.workDate).format('DD/MM/YYYY (dddd)')}</div>
+            </div>
+
+            <Form
+              form={changeShiftForm}
+              layout="vertical"
+              onFinish={handleChangeShiftSubmit}
+            >
+              <Form.Item
+                name="mode"
+                label={<span style={{ fontWeight: '600', fontSize: '14px', color: '#000' }}>Chọn cách đổi ca:</span>}
+              >
+                <Radio.Group>
+                  <Radio value="template">Chọn ca mẫu có sẵn</Radio>
+                  <Radio value="custom">Nhập giờ tùy chỉnh</Radio>
+                </Radio.Group>
+              </Form.Item>
+
+              {changeShiftMode === 'custom' ? (
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <Form.Item
+                    name="newStartTime"
+                    label="Giờ bắt đầu"
+                    rules={[{ required: true, message: 'Chọn giờ bắt đầu' }]}
+                    style={{ flex: 1 }}
+                  >
+                    <TimePicker format="HH:mm" style={{ width: '100%' }} minuteStep={15} />
+                  </Form.Item>
+                  <Form.Item
+                    name="newEndTime"
+                    label="Giờ kết thúc"
+                    rules={[{ required: true, message: 'Chọn giờ kết thúc' }]}
+                    style={{ flex: 1 }}
+                  >
+                    <TimePicker format="HH:mm" style={{ width: '100%' }} minuteStep={15} />
+                  </Form.Item>
+                </div>
+              ) : (
+                <Form.Item
+                  name="newShiftId"
+                  label={<span style={{ fontWeight: '600', fontSize: '14px', color: '#000' }}>Ca mẫu mới:</span>}
+                  rules={[{ required: true, message: 'Vui lòng chọn ca mẫu!' }]}
+                >
+                  <Select
+                    placeholder="Chọn ca mẫu"
+                    size="large"
+                    options={shifts
+                      .filter((s) => s.isActive && s.id !== selectedSchedule.shiftId)
+                      .map((s) => ({
+                        value: s.id,
+                        label: `${s.name} (${(s.startTime || '').slice(0, 5)} - ${(s.endTime || '').slice(0, 5)})`,
+                      }))}
+                  />
+                </Form.Item>
+              )}
+
+              <Form.Item
+                name="reason"
+                label={<span style={{ fontWeight: '600', fontSize: '14px', color: '#000' }}>Lý do đổi ca:</span>}
+              >
+                <Input.TextArea
+                  rows={3}
+                  placeholder="Nhập lý do muốn đổi giờ ca..."
+                  style={{ borderRadius: '6px' }}
+                />
+              </Form.Item>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+                <Button size="large" onClick={() => setChangeShiftModalOpen(false)} style={{ borderRadius: '6px' }}>
+                  Hủy
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  loading={changeShiftLoading}
+                  icon={<FieldTimeOutlined />}
+                  style={{ background: '#13c2c2', borderColor: '#13c2c2', fontWeight: 'bold', borderRadius: '6px', color: '#fff' }}
+                >
+                  Gửi yêu cầu đổi ca
                 </Button>
               </div>
             </Form>
