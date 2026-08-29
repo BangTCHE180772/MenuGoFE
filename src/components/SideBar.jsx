@@ -121,6 +121,7 @@ const ROLE_MENUS = {
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.MANAGER]: [
@@ -143,6 +144,7 @@ const ROLE_MENUS = {
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Cá nhân", path: "/my-contract", icon: <UserOutlined />, children: MY_INFO_SUB_MENU },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
