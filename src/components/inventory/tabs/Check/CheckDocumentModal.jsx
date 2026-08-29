@@ -135,6 +135,10 @@ const CheckDocumentModal = ({
                   unitConversions: conversions,
                   conversionPoint: conversionPoint,
                   actualQuantity: d.quantity ?? (conversionPoint > 0 ? (d.actualQuantity / conversionPoint) : d.actualQuantity) ?? 0,
+                  batchId: d.batchId || null,
+                  batchCode: d.batchCode || d.batchCodeSnapshot || d.batch?.batchCode || '',
+                  manufactureDate: d.manufactureDate || d.manufactureDateSnapshot ? dayjs(d.manufactureDate || d.manufactureDateSnapshot).format('YYYY-MM-DD') : '',
+                  expiryDate: d.expiryDate || d.expiryDateSnapshot ? dayjs(d.expiryDate || d.expiryDateSnapshot).format('YYYY-MM-DD') : '',
                   note: d.note || ''
                 };
               });
@@ -257,7 +261,12 @@ const CheckDocumentModal = ({
       unitName: defaultUc ? defaultUc.unitName : opt.unitName,
       unitConversions: conversions,
       conversionPoint: conversionPoint,
-      actualQuantity: convertedStock
+      actualQuantity: convertedStock,
+      batchId: null,
+      batchCode: '',
+      manufactureDate: '',
+      expiryDate: '',
+      isNewBatch: false
     };
     setItems((prev) => [...prev, newItem]);
     addRecentCheck(opt.name, convertedStock);
@@ -304,6 +313,34 @@ const CheckDocumentModal = ({
     addRecentCheck(updated[index].name, qty);
   };
 
+  const handleAddNewBatchRow = (index) => {
+    const parent = items[index];
+    const newBatchItem = {
+      ...parent,
+      rowId: `${parent.bInventoryId}-newbatch-${Date.now()}`,
+      baseStock: 0,
+      systemStock: 0,
+      actualQuantity: 1,
+      batchId: null,
+      batchCode: '',
+      manufactureDate: '',
+      expiryDate: '',
+      isNewBatch: true
+    };
+    const updated = [...items];
+    updated.splice(index + 1, 0, newBatchItem);
+    setItems(updated);
+  };
+
+  const handleFieldChange = (index, field, val) => {
+    const updated = [...items];
+    updated[index] = {
+      ...updated[index],
+      [field]: val
+    };
+    setItems(updated);
+  };
+
   const totalDiffValue = useMemo(() => {
     return items.reduce((sum, i) => {
       const conversionPoint = i.conversionPoint || 1;
@@ -330,7 +367,11 @@ const CheckDocumentModal = ({
           bInventoryId: Number(i.bInventoryId),
           unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
           actualQuantity: Number(i.actualQuantity),
-          note: ''
+          batchId: i.batchId ? Number(i.batchId) : null,
+          batchCodeSnapshot: i.batchCode ? i.batchCode.trim() : undefined,
+          manufactureDateSnapshot: i.manufactureDate ? new Date(i.manufactureDate).toISOString() : undefined,
+          expiryDateSnapshot: i.expiryDate ? new Date(i.expiryDate).toISOString() : undefined,
+          note: i.isNewBatch ? 'Phát hiện Lô mới khi kiểm kho' : (i.note || '')
         }))
       };
 
@@ -569,21 +610,25 @@ const CheckDocumentModal = ({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                  <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
-                  <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG HÓA</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐVT</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>THỰC TẾ</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>SL LỆCH</th>
-                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 110 }}>GIÁ TRỊ LỆCH</th>
+                  <th style={{ padding: '8px 6px', width: 28, textAlign: 'center' }}></th>
+                  <th style={{ padding: '8px 6px', width: 32, textAlign: 'center' }}>STT</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'left', width: 95 }}>MÃ HÀNG</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'left' }}>TÊN HÀNG</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'left', width: 100 }}>MÃ LÔ</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'left', width: 100 }}>NGÀY SX</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'left', width: 100 }}>HẠN DÙNG</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'center', width: 80 }}>ĐVT</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'right', width: 65 }}>TỒN</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'center', width: 75 }}>THỰC TẾ</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'right', width: 65 }}>LỆCH</th>
+                  <th style={{ padding: '8px 6px', textAlign: 'right', width: 90 }}>GIÁ TRỊ LỆCH</th>
+                  <th style={{ padding: '8px 4px', textAlign: 'center', width: 75 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
+                    <td colSpan={13} style={{ textAlign: 'center', padding: 30, color: '#94a3b8' }}>
                       Chưa có sản phẩm nào được chọn để kiểm kho.
                     </td>
                   </tr>
@@ -598,8 +643,8 @@ const CheckDocumentModal = ({
                     const diffValColor = diffVal > 0 ? '#059669' : diffVal < 0 ? '#dc2626' : '#64748b';
 
                     return (
-                      <tr key={record.rowId || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                      <tr key={record.rowId || index} style={{ borderBottom: '1px solid #f1f5f9', background: record.isNewBatch ? '#f0fdf4' : 'transparent' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 4px' }}>
                           <button
                             type="button"
                             onClick={() => {
@@ -610,21 +655,75 @@ const CheckDocumentModal = ({
                             title="Xóa dòng"
                             style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer' }}
                           >
-                            <DeleteOutlined style={{ fontSize: 14 }} />
+                            <DeleteOutlined style={{ fontSize: 13 }} />
                           </button>
                         </td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
-                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 8px' }}>{record.code}</td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td style={{ fontWeight: 600, color: '#334155', padding: '6px 6px' }}>{record.code}</td>
+                        <td style={{ padding: '6px 6px' }}>
                           <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
+                          {record.isNewBatch && (
+                            <span style={{ fontSize: 9.5, background: '#dcfce7', color: '#166534', padding: '1px 4px', borderRadius: 3, marginLeft: 4, fontWeight: 700 }}>
+                              Lô mới
+                            </span>
+                          )}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="text"
+                            placeholder="Mã Lô..."
+                            value={record.batchCode || ''}
+                            onChange={(e) => handleFieldChange(index, 'batchCode', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 24,
+                              fontSize: 10.5,
+                              padding: '0 4px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="date"
+                            value={record.manufactureDate || ''}
+                            onChange={(e) => handleFieldChange(index, 'manufactureDate', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 24,
+                              fontSize: 10.5,
+                              padding: '0 2px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="date"
+                            value={record.expiryDate || ''}
+                            onChange={(e) => handleFieldChange(index, 'expiryDate', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 24,
+                              fontSize: 10.5,
+                              padding: '0 2px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '6px 4px' }}>
                           {record.unitConversions && record.unitConversions.length > 0 ? (
                             <select
                               value={record.unitConversionId || ''}
                               onChange={(e) => handleUnitChange(index, e.target.value)}
                               style={{
-                                height: 26,
+                                height: 24,
                                 padding: '0 4px',
                                 fontSize: 11,
                                 borderRadius: 4,
@@ -643,10 +742,10 @@ const CheckDocumentModal = ({
                             <span style={{ color: '#475569' }}>{record.unitName || 'Đơn vị'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', color: '#64748b' }}>
+                        <td style={{ textAlign: 'right', padding: '6px 4px', color: '#64748b' }}>
                           {convertedSystemStock.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 4px' }}>
                           <input
                             type="number"
                             min={0}
@@ -655,21 +754,41 @@ const CheckDocumentModal = ({
                             value={record.actualQuantity ?? 0}
                             onChange={(e) => handleActualQtyChange(index, e.target.value)}
                             style={{
-                              width: 75,
+                              width: 65,
                               textAlign: 'center',
-                              borderRadius: 16,
+                              borderRadius: 4,
                               border: '1px solid #cbd5e1',
-                              padding: '3px 6px',
+                              padding: '2px 4px',
                               fontSize: 11,
+                              fontWeight: 600,
                               outline: 'none'
                             }}
                           />
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700, color: diffColor }}>
+                        <td style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 700, color: diffColor }}>
                           {diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 600, color: diffValColor }}>
+                        <td style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600, color: diffValColor }}>
                           {diffVal > 0 ? '+' : ''}{Math.round(diffVal).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '6px 2px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleAddNewBatchRow(index)}
+                            title="Phát hiện thêm Lô mới cho mặt hàng này"
+                            style={{
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: 4,
+                              padding: '2px 6px',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Lô mới
+                          </button>
                         </td>
                       </tr>
                     );

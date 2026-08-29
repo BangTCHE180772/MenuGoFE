@@ -17,7 +17,7 @@ import {
   ShopOutlined,
   EnvironmentOutlined,
   ClockCircleOutlined,
-  GlobalOutlined,
+  AimOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { createBranch, updateBranch } from "../api/branchApi";
@@ -70,15 +70,18 @@ const CreateUpdateBranchFormPopup = ({
           type: branchObject.type || "Main",
           openTime: parseTime(branchObject.openTime),
           closeTime: parseTime(branchObject.closeTime),
+          latitude: branchObject.latitude ?? "",
+          longitude: branchObject.longitude ?? "",
+          checkinRadiusMeters: branchObject.checkinRadiusMeters ?? 100,
         });
 
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setNewAddressState({
-          wardId: branchObject.newWardId || branchObject.NewWardId || null,
+          wardId: branchObject.newWardId || null,
           name: branchObject.newAddressName || "Chưa thiết lập",
         });
         setOldAddressState({
-          wardId: branchObject.oldWardId || branchObject.OldWardId || null,
+          wardId: branchObject.oldWardId || null,
           name: branchObject.oldAddressName || "Chưa thiết lập",
         });
         setCoords({
@@ -143,8 +146,10 @@ const CreateUpdateBranchFormPopup = ({
         closeTime: values.closeTime
           ? values.closeTime.format("HH:mm:ss")
           : "22:00:00",
-        latitude: mapCoords.lat || null,
-        longitude: mapCoords.lng || null,
+        status: branchObject?.status || "Hoạt động",
+        latitude: values.latitude !== "" && values.latitude != null ? Number(values.latitude) : null,
+        longitude: values.longitude !== "" && values.longitude != null ? Number(values.longitude) : null,
+        checkinRadiusMeters: values.checkinRadiusMeters ? Number(values.checkinRadiusMeters) : 100,
         address: {
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
@@ -172,9 +177,10 @@ const CreateUpdateBranchFormPopup = ({
         );
         errorList.forEach((msg) => message.error(String(msg)));
       } else {
-        message.error(
-          err.response?.data?.message || "Có lỗi xảy ra khi lưu chi nhánh.",
-        );
+        const errorMsg = err.response?.data?.error
+          ? `${err.response.data.message || "Lỗi"}: ${err.response.data.error}`
+          : (err.response?.data?.message || "Có lỗi xảy ra khi lưu chi nhánh.");
+        message.error(errorMsg);
       }
     } finally {
       setSubmitting(false);
@@ -284,6 +290,105 @@ const CreateUpdateBranchFormPopup = ({
               </Form.Item>
             </Col>
           </Row>
+
+          <Divider style={{ margin: "4px 0 14px 0" }}>
+            <Space>
+              <AimOutlined style={{ color: "#16a34a" }} />
+              <Text type="secondary">Vị trí GPS điểm danh</Text>
+            </Space>
+          </Divider>
+          <div
+            style={{
+              background: "#f0fdf4",
+              border: "1px dashed #86efac",
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ marginBottom: 10, fontSize: 12, color: "#475569" }}>
+              Đặt tọa độ GPS để hệ thống xác minh vị trí khi nhân viên điểm danh. Nếu chưa cài đặt, hệ thống bỏ qua kiểm tra.
+            </div>
+            <Row gutter={12}>
+              <Col span={10}>
+                <Form.Item
+                  name="latitude"
+                  label={<Text strong style={{ fontSize: 13 }}>Vĩ độ</Text>}
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (value === "" || value == null) return Promise.resolve();
+                        const n = Number(value);
+                        if (isNaN(n) || n < -90 || n > 90)
+                          return Promise.reject("Vĩ độ phải từ -90 đến 90");
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="10.7769" size="large" />
+                </Form.Item>
+              </Col>
+              <Col span={10}>
+                <Form.Item
+                  name="longitude"
+                  label={<Text strong style={{ fontSize: 13 }}>Kinh độ</Text>}
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (value === "" || value == null) return Promise.resolve();
+                        const n = Number(value);
+                        if (isNaN(n) || n < -180 || n > 180)
+                          return Promise.reject("Kinh độ phải từ -180 đến 180");
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="106.7009" size="large" />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label=" ">
+                  <Button
+                    icon={<AimOutlined />}
+                    size="large"
+                    title="Lấy vị trí hiện tại"
+                    style={{ background: "#16a34a", borderColor: "#16a34a", color: "#fff", width: "100%" }}
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        message.error("Trình duyệt không hỗ trợ GPS");
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          form.setFieldsValue({
+                            latitude: pos.coords.latitude.toFixed(6),
+                            longitude: pos.coords.longitude.toFixed(6),
+                          });
+                          message.success("✅ Đã lấy vị trí hiện tại!");
+                        },
+                        () => message.error("Vui lòng cấp quyền GPS trong cài đặt trình duyệt.")
+                      );
+                    }}
+                  >
+                    GPS
+                  </Button>
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  name="checkinRadiusMeters"
+                  label={<Text strong style={{ fontSize: 13 }}>Bán kính cho phép (mét)</Text>}
+                  initialValue={100}
+                >
+                  <Input placeholder="100" size="large" suffix="m" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
 
           <Divider style={{ margin: "12px 0 16px 0" }}>
             <Space>

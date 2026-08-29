@@ -51,6 +51,7 @@ const INVENTORY_SUB_MENU = [
   { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
+  { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];
 
 const REPORTS_SUB_MENU = [
@@ -63,6 +64,11 @@ const REPORTS_SUB_MENU = [
 const MY_INFO_SUB_MENU = [
   { label: "Hợp đồng của tôi", path: "/my-contract" },
   { label: "Bảng lương của tôi", path: "/my-payroll" },
+];
+
+const PAYROLL_SUB_MENU = [
+  { label: "Lương Nhân viên", path: "/payroll?tab=Staff", tabKey: "Staff" },
+  { label: "Lương Quản lý", path: "/payroll?tab=Manager", tabKey: "Manager" },
 ];
 
 // ─── Menu items theo từng role ─────────────────────────────────────────────
@@ -86,7 +92,8 @@ const ROLE_MENUS = {
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
-    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined />, children: PAYROLL_SUB_MENU },
+    { label: "Cấu hình Lễ/Tết", path: "/holiday-config", icon: <GiftOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
@@ -108,7 +115,8 @@ const ROLE_MENUS = {
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
-    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined />, children: PAYROLL_SUB_MENU },
+    { label: "Cấu hình Lễ/Tết", path: "/holiday-config", icon: <GiftOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
@@ -129,6 +137,7 @@ const ROLE_MENUS = {
     { label: "Nhân sự", path: "/accounts", icon: <TeamOutlined /> },
     { label: "Hợp đồng", path: "/contracts", icon: <FileProtectOutlined /> },
     { label: "Bảng lương", path: "/payroll", icon: <DollarOutlined /> },
+    { label: "Cấu hình Lễ/Tết", path: "/holiday-config", icon: <GiftOutlined /> },
     { label: "Chi tiết lương", path: "/salary-details", icon: <FileTextOutlined /> },
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },

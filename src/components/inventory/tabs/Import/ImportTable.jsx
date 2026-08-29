@@ -511,6 +511,8 @@ const ImportTable = ({
                                           <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, textAlign: 'left' }}>
                                             <th style={{ padding: '8px 10px' }}>Mã sản phẩm</th>
                                             <th style={{ padding: '8px 10px' }}>Tên sản phẩm</th>
+                                            <th style={{ padding: '8px 10px' }}>Mã Lô</th>
+                                            <th style={{ padding: '8px 10px' }}>Hạn sử dụng</th>
                                             <th style={{ padding: '8px 10px', textAlign: 'center' }}>Đơn vị tính</th>
                                             <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số lượng</th>
                                             <th style={{ padding: '8px 10px', textAlign: 'right' }}>Đơn giá nhập</th>
@@ -520,7 +522,7 @@ const ImportTable = ({
                                         <tbody>
                                           {detailsList.length === 0 ? (
                                             <tr>
-                                              <td colSpan={6} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
+                                              <td colSpan={8} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
                                                 Chưa có sản phẩm trong phiếu nhập
                                               </td>
                                             </tr>
@@ -528,6 +530,8 @@ const ImportTable = ({
                                             detailsList.map((dt, idx) => {
                                               const pCode = dt.productCode || dt.snapshotProductCode || dt.currentProductCode || dt.code || `SP${idx + 1}`;
                                               const pName = dt.productName || dt.snapshotProductName || dt.currentProductName || dt.name || 'Sản phẩm';
+                                              const bCode = dt.batchCode || dt.batchCodeSnapshot || dt.batch?.batchCode || '---';
+                                              const expDate = dt.expiryDate || dt.expiryDateSnapshot ? dayjs(dt.expiryDate || dt.expiryDateSnapshot).format('DD/MM/YYYY') : '---';
                                               const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
                                               const qty = Number(dt.quantity || 0);
                                               const price = Number(dt.unitPrice || 0);
@@ -537,6 +541,16 @@ const ImportTable = ({
                                                 <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                                   <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
                                                   <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#0f172a', fontWeight: 600 }}>
+                                                    {bCode !== '---' ? (
+                                                      <span style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: 4, border: '1px solid #bfdbfe', fontSize: 10.5 }}>
+                                                        {bCode}
+                                                      </span>
+                                                    ) : (
+                                                      <span style={{ color: '#94a3b8' }}>---</span>
+                                                    )}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: '#475569' }}>{expDate}</td>
                                                   <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>{uName}</td>
                                                   <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{qty.toLocaleString('vi-VN')}</td>
                                                   <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>{price.toLocaleString('vi-VN')} đ</td>
