@@ -190,6 +190,7 @@ const WorkSchedulePage = () => {
 
   // Modal states - Bulk Assign
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkAssignSubmitting, setBulkAssignSubmitting] = useState(false);
   const [bulkForm] = Form.useForm();
 
   // OT Approval Modal state
@@ -609,6 +610,8 @@ const WorkSchedulePage = () => {
 
   // Submit Handler - Bulk Assign
   const handleBulkAssignSubmit = async (values) => {
+    if (bulkAssignSubmitting) return;
+    setBulkAssignSubmitting(true);
     try {
       const { accountIds, branchId, shiftId, dateRange } = values;
       if (!dateRange || dateRange.length < 2) {
@@ -684,6 +687,8 @@ const WorkSchedulePage = () => {
       console.error(err);
       const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi phân ca hàng loạt!';
       message.error(errorMsg);
+    } finally {
+      setBulkAssignSubmitting(false);
     }
   };
 
@@ -1896,21 +1901,24 @@ const WorkSchedulePage = () => {
         }
         open={isBulkModalOpen}
         onCancel={() => {
+          if (bulkAssignSubmitting) return;
           setIsBulkModalOpen(false);
           bulkForm.resetFields();
         }}
         onOk={() => bulkForm.submit()}
+        confirmLoading={bulkAssignSubmitting}
         width={720}
         okText="Tiến hành lập lịch"
         cancelText="Hủy"
         okButtonProps={{
+          disabled: bulkAssignSubmitting,
           style: {
             background: 'linear-gradient(135deg, #e8442a, #ff8c42)',
             border: 'none',
             borderRadius: '6px',
           },
         }}
-        cancelButtonProps={{ style: { borderRadius: '6px' } }}
+        cancelButtonProps={{ disabled: bulkAssignSubmitting, style: { borderRadius: '6px' } }}
       >
         <Form bulkForm={bulkForm} form={bulkForm} layout="vertical" onFinish={handleBulkAssignSubmit} style={{ marginTop: 16 }}>
           {/* Employees picker (multiselect) */}

@@ -12,12 +12,9 @@ import {
   Input,
   DatePicker,
   Radio,
-<<<<<<< HEAD
   TimePicker,
-=======
   List,
   Space,
->>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
 } from 'antd';
 import {
   CalendarOutlined,
@@ -29,22 +26,14 @@ import {
   SwapOutlined,
   FileTextOutlined,
   SafetyCertificateOutlined,
-<<<<<<< HEAD
   FieldTimeOutlined,
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
-import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap } from '../api/workScheduleApi';
-import { createShiftChangeRequest } from '../api/shiftChangeRequestApi';
-=======
   AimOutlined,
   SyncOutlined,
-  EnvironmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap, checkInWithLocation } from '../api/workScheduleApi';
->>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
+import { createShiftChangeRequest } from '../api/shiftChangeRequestApi';
 import { getAllBranches } from '../api/branchApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getAllAccounts } from '../api/accountApi';
@@ -79,20 +68,18 @@ const MyWorkSchedulePage = () => {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveForm] = Form.useForm();
 
-<<<<<<< HEAD
   // Change-shift-hours modal states (4.4 Đổi ca / làm ca khác)
   const [changeShiftModalOpen, setChangeShiftModalOpen] = useState(false);
   const [changeShiftLoading, setChangeShiftLoading] = useState(false);
   const [changeShiftForm] = Form.useForm();
   const changeShiftMode = Form.useWatch('mode', changeShiftForm);
-=======
+
   // Check-in with location states
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [checkinBranchModalOpen, setCheckinBranchModalOpen] = useState(false);
   const [checkinBranchId, setCheckinBranchId] = useState(null);
   const [checkinShiftModalOpen, setCheckinShiftModalOpen] = useState(false);
   const [todayShiftSchedules, setTodayShiftSchedules] = useState([]);
->>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -165,7 +152,6 @@ const MyWorkSchedulePage = () => {
     setTransferModalOpen(true);
   };
 
-<<<<<<< HEAD
   const handleOpenChangeShift = () => {
     setDetailModalOpen(false);
     changeShiftForm.resetFields();
@@ -199,7 +185,8 @@ const MyWorkSchedulePage = () => {
     } finally {
       setChangeShiftLoading(false);
     }
-=======
+  };
+
   // ---- GPS Check-in handler ----
   const doCheckInWithShift = (branchId, workScheduleId = null) => {
     setCheckinLoading(true);
@@ -261,7 +248,6 @@ const MyWorkSchedulePage = () => {
 
     setTodayShiftSchedules(todaySchedules);
     setCheckinShiftModalOpen(true);
->>>>>>> db2bde992a847af6a54078b235850e50ac7b04d1
   };
 
   const handleOpenLeaveModal = (type = 'day', schedule = null) => {
@@ -1542,7 +1528,7 @@ const MyWorkSchedulePage = () => {
                   onClick={() => {
                     if (checkinBranchId) {
                       setCheckinBranchModalOpen(false);
-                      doCheckInWithBranch(checkinBranchId);
+                      doCheckInWithShift(checkinBranchId);
                     }
                   }}
                 >

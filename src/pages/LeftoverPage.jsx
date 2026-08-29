@@ -19,7 +19,7 @@ import {
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/leftoverApi';
-import { getCancelledHistory } from '../api/orderApi';
+import { getCancelledHistory, getAllOrders } from '../api/orderApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
@@ -43,6 +43,7 @@ const LeftoverPage = () => {
 
   const [products, setProducts] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [orderDetailOptions, setOrderDetailOptions] = useState([]);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,6 +99,34 @@ const LeftoverPage = () => {
       }
     })();
   }, []);
+
+  const fetchOrderDetailOptions = useCallback(async () => {
+    if (!branchId) return;
+    try {
+      const res = await getAllOrders(branchId);
+      const orders = res.data || [];
+      const options = orders
+        .slice()
+        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
+        .flatMap((order) =>
+          (order.orderDetails || [])
+            .filter((d) => d.status !== 'Cancelled')
+            .map((d) => ({
+              value: d.id,
+              label: `HD${order.id} · Bàn ${order.tableName || '?'} · ${d.productName} x${d.quantity}`,
+              productId: d.productId,
+              quantity: d.quantity,
+            }))
+        );
+      setOrderDetailOptions(options);
+    } catch {
+      message.error('Không thể tải danh sách chi tiết đơn hàng.');
+    }
+  }, [branchId]);
+
+  useEffect(() => {
+    fetchOrderDetailOptions();
+  }, [fetchOrderDetailOptions]);
 
   const handleSubmit = async (values) => {
     if (!branchId) {
@@ -243,8 +272,18 @@ const LeftoverPage = () => {
             </Form.Item>
 
             {type === 'Return' && (
-              <Form.Item name="orderDetailId" label="Mã chi tiết đơn (OrderDetailId)" rules={[{ required: true, message: 'Nhập mã chi tiết đơn' }]} style={{ width: 220 }}>
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="Xem trên màn hình đơn hàng" />
+              <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 340 }}>
+                <Select
+                  showSearch
+                  placeholder="Tìm theo bàn hoặc tên món..."
+                  optionFilterProp="label"
+                  options={orderDetailOptions}
+                  onChange={(value, option) => {
+                    if (option) {
+                      form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
+                    }
+                  }}
+                />
               </Form.Item>
             )}
 
