@@ -383,6 +383,11 @@ const AccountPage = () => {
       dataIndex: 'roleIds',
       key: 'roleIds',
       width: 140,
+      sorter: (a, b) => {
+        const roleA = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : 99;
+        const roleB = b.roleIds && b.roleIds.length > 0 ? b.roleIds[0] : 99;
+        return roleA - roleB;
+      },
       render: (roleIds) => (
         <Space size={4} wrap>
           {(roleIds || []).map((rid) => {
