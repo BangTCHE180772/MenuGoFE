@@ -15,7 +15,6 @@ const ProcessedProductModal = ({
   onCancel,
   editingProduct = null,
   groups = [],
-  kitchenStations = [],
   menus = [],
   products = [],
   onSuccess,
@@ -28,7 +27,6 @@ const ProcessedProductModal = ({
     name: '',
     skuCode: '',
     groupId: '',
-    kitchenStationId: '',
     sellPrice: 0,
     isSellable: true,
     description: '',
@@ -49,7 +47,6 @@ const ProcessedProductModal = ({
           name: editingProduct.name || '',
           skuCode: editingProduct.skuCode || '',
           groupId: editingProduct.groupId || (groups.length > 0 ? groups[0].id : ''),
-          kitchenStationId: editingProduct.kitchenStationId || '',
           sellPrice: editingProduct.sellPrice || 0,
           isSellable: editingProduct.isSellable !== undefined ? editingProduct.isSellable : true,
           description: editingProduct.description || '',
@@ -65,7 +62,6 @@ const ProcessedProductModal = ({
           name: '',
           skuCode: '',
           groupId: groups.length > 0 ? groups[0].id : '',
-          kitchenStationId: '',
           sellPrice: 0,
           isSellable: true,
           description: '',
@@ -140,7 +136,6 @@ const ProcessedProductModal = ({
       const payload = {
         chainId: 1, // Default chain
         groupId: Number(formData.groupId),
-        kitchenStationId: formData.kitchenStationId ? Number(formData.kitchenStationId) : null,
         imageId: formData.imageId,
         imageUrl: formData.imageUrl,
         name: formData.name.trim(),
@@ -342,31 +337,6 @@ const ProcessedProductModal = ({
                         <PlusOutlined />
                       </button>
                     )}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#334155', marginBottom: 4 }}>
-                    Trạm bếp
-                  </label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <select
-                      value={formData.kitchenStationId}
-                      onChange={e => setFormData({ ...formData, kitchenStationId: e.target.value })}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: '1px solid #cbd5e1',
-                        fontSize: 14,
-                        background: '#ffffff',
-                      }}
-                    >
-                      <option value="">-- Không gán trạm --</option>
-                      {kitchenStations.map(k => (
-                        <option key={k.id} value={k.id}>{k.name}</option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
