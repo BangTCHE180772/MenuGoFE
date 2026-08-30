@@ -23,6 +23,7 @@ import {
   DeleteOutlined,
   SearchOutlined,
   ClockCircleOutlined,
+  UsergroupAddOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -33,7 +34,15 @@ import {
 } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
+const SYSTEM_ROLES = [
+  { id: 3, name: 'Quản lý', color: 'purple' },
+  { id: 4, name: 'Thu ngân', color: 'blue' },
+  { id: 5, name: 'Bếp trưởng', color: 'orange' },
+  { id: 6, name: 'Phục vụ', color: 'green' },
+];
+
 const ShiftPage = () => {
+
   const { user, role } = useAuth();
   const isOwnerOrAdmin = user?.roleId === 1 || user?.roleId === 2 || ['Owner', 'Admin'].includes(role);
   const [shifts, setShifts] = useState([]);
@@ -72,6 +81,14 @@ const ShiftPage = () => {
     setIsModalOpen(true);
 
     if (type === 'edit' && record) {
+      const minRolesMap = {};
+      SYSTEM_ROLES.forEach(r => { minRolesMap[r.id] = 0; });
+      if (record.roleRequirements) {
+        record.roleRequirements.forEach(req => {
+          minRolesMap[req.roleId] = req.minQuantity;
+        });
+      }
+
       form.setFieldsValue({
         name: record.name,
         startTime: record.startTime ? dayjs(record.startTime, 'HH:mm:ss') : null,
@@ -84,9 +101,11 @@ const ShiftPage = () => {
         nightEndTime: record.nightEndTime ? dayjs(record.nightEndTime, 'HH:mm:ss') : null,
         nightHours: record.nightHours ?? 0,
         isActive: record.isActive ?? true,
+        minRoles: minRolesMap,
       });
     } else {
       form.resetFields();
+      const defaultMinRoles = { 3: 0, 4: 1, 5: 1, 6: 2 };
       form.setFieldsValue({
         standardHours: 8.0,
         isNightShift: false,
@@ -96,6 +115,7 @@ const ShiftPage = () => {
         nightEndTime: null,
         nightHours: 0,
         isActive: true,
+        minRoles: defaultMinRoles,
       });
     }
   };
@@ -109,6 +129,13 @@ const ShiftPage = () => {
   // Submit Handler
   const handleSubmit = async (values) => {
     try {
+      const roleReqsPayload = SYSTEM_ROLES
+        .map(r => ({
+          roleId: r.id,
+          minQuantity: values.minRoles?.[r.id] ?? 0
+        }))
+        .filter(item => item.minQuantity > 0);
+
       const dataPayload = {
         name: values.name,
         startTime: values.startTime ? values.startTime.format('HH:mm:ss') : null,
@@ -121,6 +148,7 @@ const ShiftPage = () => {
         nightEndTime: values.nightEndTime ? values.nightEndTime.format('HH:mm:ss') : null,
         nightHours: values.nightHours ?? 0,
         isActive: values.isActive ?? true,
+        roleRequirements: roleReqsPayload,
       };
 
       if (modalType === 'create') {
@@ -146,6 +174,7 @@ const ShiftPage = () => {
       message.error(errorMsg);
     }
   };
+
 
   // Delete Handler
   const handleDelete = async (id) => {
@@ -227,6 +256,29 @@ const ShiftPage = () => {
       key: 'standardHours',
       render: (hrs) => `${hrs ?? 8.0}h`,
     },
+    {
+      title: 'NV tối thiểu / Role',
+      dataIndex: 'roleRequirements',
+      key: 'roleRequirements',
+      render: (roleReqs) => {
+        if (!roleReqs || roleReqs.length === 0) return <span style={{ color: '#9ca3af' }}>Chưa cấu hình</span>;
+        return (
+          <Space wrap size={[4, 4]}>
+            {roleReqs.map((req) => {
+              const roleObj = SYSTEM_ROLES.find((r) => r.id === req.roleId);
+              const roleName = req.roleName || roleObj?.name || `Role ${req.roleId}`;
+              const color = roleObj?.color || 'blue';
+              return (
+                <Tag key={req.roleId} color={color} style={{ borderRadius: '4px' }}>
+                  {roleName}: <strong>{req.minQuantity}</strong>
+                </Tag>
+              );
+            })}
+          </Space>
+        );
+      },
+    },
+
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
@@ -448,7 +500,43 @@ const ShiftPage = () => {
             </Col>
           </Row>
 
+          <Card
+            size="small"
+            style={{
+              marginBottom: 16,
+              background: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: '8px',
+            }}
+          >
+            <div style={{ marginBottom: 10, fontSize: '13px', fontWeight: 600, color: '#274e13', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <UsergroupAddOutlined />
+              <span>👥 Số lượng nhân viên tối thiểu theo Role (Chức danh):</span>
+            </div>
+            <Row gutter={[12, 8]}>
+              {SYSTEM_ROLES.map((r) => (
+                <Col span={12} key={r.id}>
+                  <Form.Item
+                    name={['minRoles', r.id]}
+                    label={<span style={{ fontSize: '12px', fontWeight: 500 }}>{r.name}</span>}
+                    style={{ marginBottom: 6 }}
+                  >
+                    <InputNumber
+                      min={0}
+                      max={50}
+                      step={1}
+                      style={{ width: '100%' }}
+                      placeholder="0"
+                      addonAfter="người"
+                    />
+                  </Form.Item>
+                </Col>
+              ))}
+            </Row>
+          </Card>
+
           <Form.Item
+
             name="isNightShift"
             label="Cấu hình Ca Đêm"
             valuePropName="checked"
