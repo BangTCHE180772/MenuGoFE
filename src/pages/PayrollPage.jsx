@@ -1184,6 +1184,7 @@ const PayrollPage = () => {
       {/* 1. Modal Auto-Generate Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#e8442a' }}>
             <CalculatorOutlined />
@@ -1336,6 +1337,7 @@ const PayrollPage = () => {
       {/* 2. Modal Manual Create / Edit Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <DollarCircleOutlined />
@@ -1683,6 +1685,7 @@ const PayrollPage = () => {
       {/* 3. Modal View Payroll Detail */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <EyeOutlined />
@@ -1963,6 +1966,7 @@ const PayrollPage = () => {
       {/* 4. Modal Quick Update Status */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title="CẬP NHẬT TRẠNG THÁI BẢNG LƯƠNG"
         open={isStatusModalOpen}
         onCancel={() => setIsStatusModalOpen(false)}
@@ -2008,6 +2012,7 @@ const PayrollPage = () => {
       {/* 5. Modal Batch Generate Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#1890ff' }}>
             <ThunderboltOutlined />

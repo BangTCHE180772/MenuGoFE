@@ -246,24 +246,34 @@ const MyContractPage = () => {
                   style={{ borderRadius: '12px', marginBottom: '20px', background: '#fafafa' }}
                 >
                   <Row gutter={[16, 16]}>
-                    <Col xs={12} sm={8}>
-                      <Text type="secondary">Mức lương cơ bản:</Text>
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: '4px' }}>
-                        {new Intl.NumberFormat('vi-VN').format(activeContract.baseSalary)} đ
-                      </div>
-                    </Col>
-                    <Col xs={12} sm={8}>
-                      <Text type="secondary">Hình thức lương:</Text>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#262626', marginTop: '4px' }}>
-                        {SALARY_TYPES[activeContract.salaryType] || activeContract.salaryType}
-                      </div>
-                    </Col>
-                    <Col xs={12} sm={8}>
-                      <Text type="secondary">Ngày công chuẩn / tháng:</Text>
-                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#262626', marginTop: '4px' }}>
-                        {activeContract.baseWorkDay} ngày
-                      </div>
-                    </Col>
+                    {(() => {
+                      const hideDay = activeContract.type === 'Part-time' || activeContract.salaryType === 'Hourly' || activeContract.roleId === 3 || !activeContract.baseWorkDay;
+                      const colSpan = hideDay ? 12 : 8;
+                      return (
+                        <>
+                          <Col xs={24} sm={colSpan}>
+                            <Text type="secondary">Mức lương cơ bản:</Text>
+                            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: '4px' }}>
+                              {new Intl.NumberFormat('vi-VN').format(activeContract.baseSalary)} đ
+                            </div>
+                          </Col>
+                          <Col xs={24} sm={colSpan}>
+                            <Text type="secondary">Hình thức lương:</Text>
+                            <div style={{ fontSize: '15px', fontWeight: '600', color: '#262626', marginTop: '4px' }}>
+                              {SALARY_TYPES[activeContract.salaryType] || activeContract.salaryType}
+                            </div>
+                          </Col>
+                          {!hideDay && (
+                            <Col xs={24} sm={colSpan}>
+                              <Text type="secondary">Ngày công chuẩn / tháng:</Text>
+                              <div style={{ fontSize: '15px', fontWeight: '600', color: '#262626', marginTop: '4px' }}>
+                                {activeContract.baseWorkDay} ngày
+                              </div>
+                            </Col>
+                          )}
+                        </>
+                      );
+                    })()}
                   </Row>
                 </Card>
 

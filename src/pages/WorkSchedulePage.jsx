@@ -1686,6 +1686,7 @@ const WorkSchedulePage = () => {
 
       {/* SINGLE Create / Edit Modal Form */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <CalendarOutlined />
@@ -1930,6 +1931,7 @@ const WorkSchedulePage = () => {
 
       {/* BULK Assign Modal Form */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <TeamOutlined />
@@ -2084,6 +2086,7 @@ const WorkSchedulePage = () => {
 
       {/* Modal Duyệt OT & Kiểm tra POS */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#fa8c16' }}>
             <SafetyCertificateOutlined />

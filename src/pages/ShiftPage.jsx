@@ -418,6 +418,7 @@ const ShiftPage = () => {
 
       {/* Modal */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <ClockCircleOutlined />

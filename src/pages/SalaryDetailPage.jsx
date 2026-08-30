@@ -782,6 +782,7 @@ const SalaryDetailPage = () => {
       {/* Create / Edit Form Modal */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#e8442a' }}>
             <DollarCircleOutlined />
@@ -948,6 +949,7 @@ const SalaryDetailPage = () => {
       {/* Detail View Modal */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#e8442a' }}>
             <EyeOutlined />

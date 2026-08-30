@@ -702,6 +702,7 @@ const WorkScheduleSummaryPage = () => {
 
       {/* ── Detail Modal ── */}
       <Modal
+        maskClosable={false}
         open={detailModalOpen}
         onCancel={() => setDetailModalOpen(false)}
         footer={[
