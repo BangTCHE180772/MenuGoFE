@@ -41,11 +41,12 @@ const AccountDetailModal = ({ open, onClose, account, branches = [], onEdit }) =
   // Resolve branch name if available
   const activeContract = account.contracts?.find((c) => c.status === 'Active' || c.status === 1);
   const branchId = activeContract?.branchId || account.branchId;
-  const branchObj = branches.find((b) => b.id === branchId);
+  const branchObj = branches.find((b) => b.id === branchId || b.id === Number(branchId));
   const branchName = branchObj ? branchObj.name : branchId ? `Chi nhánh #${branchId}` : 'Chưa phân công';
 
   return (
     <Modal
+      maskClosable={false}
       open={open}
       onCancel={onClose}
       footer={[
@@ -114,9 +115,6 @@ const AccountDetailModal = ({ open, onClose, account, branches = [], onEdit }) =
               {account.isActive ? 'Hoạt động' : 'Vô hiệu'}
             </Tag>
           </div>
-          <Text type="secondary" style={{ fontSize: '13px', display: 'block', marginTop: 2 }}>
-            Mã định danh (ID): <strong>#{account.id}</strong>
-          </Text>
           <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {(account.roleIds || []).map((rid) => {
               const roleInfo = ROLES_MAP[rid] || { label: `Vai trò #${rid}`, color: 'default' };
