@@ -37,6 +37,7 @@ import PayrollPage from '../pages/PayrollPage';
 import MyPayrollPage from '../pages/MyPayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
 import HolidayConfigPage from '../pages/HolidayConfigPage';
+import ShiftFeedbackPage from '../pages/ShiftFeedbackPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
@@ -175,6 +176,7 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />
+                <Route path="/work-schedule-feedback" element={<ShiftFeedbackPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
                 <Route path="/chat" element={<BranchChatPage />} />
                 <Route path="/reports/revenue" element={<ReportRevenuePage />} />

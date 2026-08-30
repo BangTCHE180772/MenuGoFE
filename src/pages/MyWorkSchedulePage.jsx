@@ -29,7 +29,9 @@ import {
   FieldTimeOutlined,
   AimOutlined,
   SyncOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
+import ShiftFeedbackModal from '../components/workSchedule/ShiftFeedbackModal';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { getMyWorkSchedules, getAllWorkSchedules, updateWorkSchedule, requestLeave, requestShiftSwap, checkInWithLocation } from '../api/workScheduleApi';
@@ -80,6 +82,16 @@ const MyWorkSchedulePage = () => {
   const [checkinBranchId, setCheckinBranchId] = useState(null);
   const [checkinShiftModalOpen, setCheckinShiftModalOpen] = useState(false);
   const [todayShiftSchedules, setTodayShiftSchedules] = useState([]);
+  // Shift Feedback modal states
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackSchedule, setFeedbackSchedule] = useState(null);
+
+  const handleOpenFeedback = (schedule = null) => {
+    setDetailModalOpen(false);
+    const target = schedule || selectedSchedule || (schedules.length > 0 ? schedules[0] : null);
+    setFeedbackSchedule(target);
+    setFeedbackModalOpen(true);
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -767,6 +779,15 @@ const MyWorkSchedulePage = () => {
               Xin nghỉ
             </Button>
             <Button
+              type="primary"
+              size="small"
+              style={{ background: '#ea580c', borderColor: '#ea580c', fontWeight: 'bold', borderRadius: '14px' }}
+              icon={<MessageOutlined />}
+              onClick={() => handleOpenFeedback()}
+            >
+              Phản hồi ca
+            </Button>
+            <Button
               type="text"
               shape="circle"
               size="small"
@@ -1105,6 +1126,20 @@ const MyWorkSchedulePage = () => {
                 Đổi giờ ca
               </Button>
             </Tooltip>,
+            <Button
+              key="feedback"
+              type="primary"
+              icon={<MessageOutlined />}
+              onClick={() => handleOpenFeedback(selectedSchedule)}
+              style={{
+                background: '#ea580c',
+                borderColor: '#ea580c',
+                fontWeight: 'bold',
+                color: '#fff',
+              }}
+            >
+              Phản hồi ca
+            </Button>,
             <Button key="close" type="primary" onClick={() => setDetailModalOpen(false)} style={{ background: '#132238', borderColor: '#132238' }}>
               Đóng
             </Button>
@@ -1657,6 +1692,17 @@ const MyWorkSchedulePage = () => {
           }}
         />
       </Modal>
+
+      {/* Shift Feedback Modal */}
+      <ShiftFeedbackModal
+        open={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        schedule={feedbackSchedule}
+        allSchedules={schedules}
+        shifts={shifts}
+        branches={branches}
+        onSuccess={loadData}
+      />
     </div>
   );
 };
