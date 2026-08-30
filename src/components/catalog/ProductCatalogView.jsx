@@ -26,7 +26,6 @@ import {
 import { getAllGroups, createGroup } from '../../api/groupApi';
 import { getAllMenus, createMenu } from '../../api/menuApi';
 import { getAllUnits, createUnit } from '../../api/unitApi';
-import { getAllKitchenStations } from '../../api/kitchenStationApi';
 
 const ProductCatalogView = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,7 +45,6 @@ const ProductCatalogView = () => {
   const [groups, setGroups] = useState([]);
   const [units, setUnits] = useState([]);
   const [menus, setMenus] = useState([]);
-  const [kitchenStations, setKitchenStations] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Custom Toast Notification State
@@ -85,18 +83,16 @@ const ProductCatalogView = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, groupRes, unitRes, menuRes, stationRes] = await Promise.all([
+      const [prodRes, groupRes, unitRes, menuRes] = await Promise.all([
         getAllProducts(),
         getAllGroups(),
         getAllUnits(),
         getAllMenus(),
-        getAllKitchenStations(),
       ]);
       setProducts(prodRes.data || []);
       setGroups(groupRes.data || []);
       setUnits(unitRes.data || []);
       setMenus(menuRes.data || []);
-      setKitchenStations(stationRes.data || []);
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu catalog:', err);
       showToast('error', 'Không thể tải dữ liệu danh mục sản phẩm.');
@@ -381,7 +377,6 @@ const ProductCatalogView = () => {
         onCancel={() => setIsFormModalOpen(false)}
         editingProduct={editingProduct}
         groups={groups}
-        kitchenStations={kitchenStations}
         menus={menus}
         products={products}
         onSuccess={fetchData}
