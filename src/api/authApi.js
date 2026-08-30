@@ -11,14 +11,7 @@ import axiosInstance from './axiosInstance';
 export const login = (credentials) =>
   axiosInstance.post('/api/Auth/login', credentials);
 
-export const setup2FA = (accountId) =>
-  axiosInstance.post('/api/Auth/setup-2fa', { accountId });
 
-export const confirmSetup2FA = (data) =>
-  axiosInstance.post('/api/Auth/confirm-setup-2fa', data);
-
-export const verify2FA = (data) =>
-  axiosInstance.post('/api/Auth/verify-2fa', data);
 
 /**
  * Đăng xuất

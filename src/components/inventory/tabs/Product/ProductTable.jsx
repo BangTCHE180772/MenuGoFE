@@ -7,9 +7,16 @@ import {
   HistoryOutlined,
   SwapOutlined,
   ProfileOutlined,
-  SearchOutlined
+  SearchOutlined,
+  AppstoreOutlined,
+  CompassOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { getBInventories, getBInventoryLedger } from '../../../../api/binventoryApi';
+import { getBatchesByBInventoryId } from '../../../../api/batchApi';
+import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
+import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
 
 const renderTruncatedText = (value, maxLength = 25, style = {}) => {
   const str = value !== null && value !== undefined ? String(value) : '';
@@ -134,12 +141,20 @@ const ProductTable = ({
 
   // Row Expansion State: expandedId is the itemId currently expanded
   const [expandedId, setExpandedId] = useState(null);
-  // Sub-Tab State per Item: { [itemId]: 'info' | 'ledger' | 'unit' | 'recipe' }
+  // Sub-Tab State per Item: { [itemId]: 'info' | 'ledger' | 'unit' | 'recipe' | 'batches' }
   const [activeTabMap, setActiveTabMap] = useState({});
 
   // Lazy Loaded Ledger State: ONLY fetched when user clicks 'Thẻ kho' tab!
   // { [itemId]: { loading, items: [], page: 1, totalPages: 1, totalCount: 0 } }
   const [ledgerDataMap, setLedgerDataMap] = useState({});
+
+  // Lazy Loaded Batches State: ONLY fetched when user clicks 'Lô hàng & HSD' tab!
+  // { [itemId]: { loading, items: [] } }
+  const [batchDataMap, setBatchDataMap] = useState({});
+
+  // Traceability Drawer State
+  const [traceDrawerOpen, setTraceDrawerOpen] = useState(false);
+  const [selectedTraceBatchId, setSelectedTraceBatchId] = useState(null);
 
   // Fetch BInventories from API when selectedBranchId or subTab changes
   const fetchInventoryList = async () => {
@@ -277,6 +292,29 @@ const ProductTable = ({
     }
   };
 
+  // LAZY LOAD BATCHES (ONLY WHEN USER CLICKS 'LÔ HÀNG & HSD' TAB)
+  const fetchBatchesForProduct = async (itemId) => {
+    setBatchDataMap((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], loading: true }
+    }));
+
+    try {
+      const res = await getBatchesByBInventoryId(itemId);
+      const items = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : []);
+      setBatchDataMap((prev) => ({
+        ...prev,
+        [itemId]: { loading: false, items }
+      }));
+    } catch (err) {
+      console.error(`Lỗi khi tải danh sách Lô cho id=${itemId}:`, err);
+      setBatchDataMap((prev) => ({
+        ...prev,
+        [itemId]: { loading: false, items: [] }
+      }));
+    }
+  };
+
   // Toggle Expand Row (Does NOT load ledger by default)
   const toggleExpand = (itemId) => {
     if (expandedId === itemId) {
@@ -289,11 +327,13 @@ const ProductTable = ({
     }
   };
 
-  // Handle Sub-Tab Click (ONLY fetches ledger if user explicitly clicks 'ledger')
+  // Handle Sub-Tab Click (ONLY fetches ledger/batches if user explicitly clicks tab)
   const handleTabSwitch = (itemId, tabKey) => {
     setActiveTabMap((prev) => ({ ...prev, [itemId]: tabKey }));
     if (tabKey === 'ledger' && !ledgerDataMap[itemId]) {
       fetchLedgerForProduct(itemId, 1);
+    } else if (tabKey === 'batches' && !batchDataMap[itemId]) {
+      fetchBatchesForProduct(itemId);
     }
   };
 
@@ -659,7 +699,7 @@ const ProductTable = ({
                                 </button>
                               )}
 
-                              {/* TAB 4: CÔNG THỨC NẤU (CONDITIONAL) */}
+                              {/* TAB 4: ĐỊNH LƯỢNG / THÀNH PHẦN (CONDITIONAL) */}
                               {hasRecipe && (
                                 <button
                                   type="button"
@@ -678,9 +718,30 @@ const ProductTable = ({
                                     gap: 5
                                   }}
                                 >
-                                  <ProfileOutlined /> Công thức nấu
+                                  <ProfileOutlined /> Định lượng món
                                 </button>
                               )}
+
+                              {/* TAB 5: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                              <button
+                                type="button"
+                                onClick={() => handleTabSwitch(itemId, 'batches')}
+                                style={{
+                                  padding: '9px 14px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  fontWeight: activeTab === 'batches' ? 700 : 500,
+                                  color: activeTab === 'batches' ? '#2563eb' : '#64748b',
+                                  borderBottom: activeTab === 'batches' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                  cursor: 'pointer',
+                                  fontSize: 12,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 5
+                                }}
+                              >
+                                <AppstoreOutlined /> Lô hàng & HSD
+                              </button>
                             </div>
 
                             {/* TAB 1 CONTENT: THÔNG TIN */}
@@ -948,6 +1009,149 @@ const ProductTable = ({
                               </div>
                             )}
 
+                            {/* TAB 5 CONTENT: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                            {activeTab === 'batches' && (
+                              <div style={{ padding: 12 }}>
+                                {(() => {
+                                  const batchState = batchDataMap[itemId] || { loading: false, items: [] };
+                                  const batchList = batchState.items || [];
+
+                                  if (batchState.loading) {
+                                    return (
+                                      <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                                        Đang nạp danh sách Lô hàng...
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>
+                                          Danh sách Lô hàng tồn kho của mặt hàng ({batchList.length} Lô):
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => fetchBatchesForProduct(itemId)}
+                                          style={{
+                                            padding: '3px 8px',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: 4,
+                                            background: '#ffffff',
+                                            fontSize: 11,
+                                            color: '#334155',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4
+                                          }}
+                                        >
+                                          <ReloadOutlined style={{ fontSize: 10 }} /> Tải lại Lô
+                                        </button>
+                                      </div>
+
+                                      <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                                          <thead>
+                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textAlign: 'left' }}>
+                                              <th style={{ padding: '8px 10px' }}>Mã Lô</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>SL ban đầu</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn hiện tại</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn riêng Lô</th>
+                                              <th style={{ padding: '8px 10px' }}>Ngày sản xuất</th>
+                                              <th style={{ padding: '8px 10px' }}>Hạn sử dụng</th>
+                                              <th style={{ padding: '8px 10px' }}>Ngày nhập</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Trạng thái Lô</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Hạn Dùng</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Thao tác</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {batchList.length === 0 ? (
+                                              <tr>
+                                                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                                                  Mặt hàng này chưa có Lô hàng nào được ghi nhận.
+                                                </td>
+                                              </tr>
+                                            ) : (
+                                              batchList.map((b, bIdx) => {
+                                                const qRem = Number(b.quantityRemaining || 0);
+                                                const qOrig = Number(b.quantityOriginal || 0);
+                                                const bCost = Number(b.unitCost || 0);
+
+                                                return (
+                                                  <tr key={b.id || bIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
+                                                      {b.batchCode}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
+                                                      {qOrig.toLocaleString('vi-VN')} {item.unitName || 'đv'}
+                                                    </td>
+                                                    <td
+                                                      style={{
+                                                        padding: '8px 10px',
+                                                        textAlign: 'right',
+                                                        fontWeight: 700,
+                                                        color: qRem > 0 ? '#059669' : '#dc2626'
+                                                      }}
+                                                    >
+                                                      {qRem.toLocaleString('vi-VN')} {item.unitName || 'đv'}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>
+                                                      {bCost.toLocaleString('vi-VN')} đ
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                      {b.manufactureDate ? dayjs(b.manufactureDate).format('DD/MM/YYYY') : '---'}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', color: '#334155', fontWeight: 600 }}>
+                                                      {b.expiryDate ? dayjs(b.expiryDate).format('DD/MM/YYYY') : 'Không có'}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                      {b.receivedDate ? dayjs(b.receivedDate).format('DD/MM/YYYY') : '---'}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                      {renderBatchStatusBadge(b.status)}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry)}
+                                                    </td>
+                                                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setSelectedTraceBatchId(b.id);
+                                                          setTraceDrawerOpen(true);
+                                                        }}
+                                                        style={{
+                                                          background: '#eff6ff',
+                                                          color: '#2563eb',
+                                                          border: '1px solid #bfdbfe',
+                                                          borderRadius: 4,
+                                                          padding: '3px 8px',
+                                                          fontSize: 10.5,
+                                                          fontWeight: 600,
+                                                          cursor: 'pointer',
+                                                          display: 'inline-flex',
+                                                          alignItems: 'center',
+                                                          gap: 4
+                                                        }}
+                                                      >
+                                                        <CompassOutlined /> Truy vết Lô
+                                                      </button>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
                           </div>
                         </td>
                       </tr>
@@ -1014,6 +1218,16 @@ const ProductTable = ({
           </button>
         </div>
       </div>
+
+      {/* ─── BATCH TRACEABILITY DRAWER ─────────────────────────────────────── */}
+      <BatchTraceabilityDrawer
+        open={traceDrawerOpen}
+        batchId={selectedTraceBatchId}
+        onClose={() => {
+          setTraceDrawerOpen(false);
+          setSelectedTraceBatchId(null);
+        }}
+      />
     </div>
   );
 };

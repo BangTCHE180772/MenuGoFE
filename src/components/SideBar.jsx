@@ -33,6 +33,7 @@ import {
   WalletOutlined,
   GlobalOutlined,
   MessageOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useAuth, ROLES } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
@@ -50,6 +51,7 @@ const INVENTORY_SUB_MENU = [
   { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
+  { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];
 
 const REPORTS_SUB_MENU = [
@@ -76,6 +78,7 @@ const ROLE_MENUS = {
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
     { label: "Thu ngân", path: "/cashier", icon: <DollarOutlined /> },
     { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
@@ -118,6 +121,8 @@ const ROLE_MENUS = {
     { label: "Ca làm việc", path: "/shifts", icon: <ClockCircleOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.MANAGER]: [
@@ -140,6 +145,8 @@ const ROLE_MENUS = {
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Tổng hợp tháng", path: "/work-schedule-summary", icon: <BarChartOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
+    { label: "Màn hình Bếp", path: "/kds", icon: <FireOutlined /> },
+    { label: "Món thừa", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Cá nhân", path: "/my-contract", icon: <UserOutlined />, children: MY_INFO_SUB_MENU },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],

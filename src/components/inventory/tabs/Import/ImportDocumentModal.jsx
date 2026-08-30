@@ -156,7 +156,10 @@ const ImportDocumentModal = ({
             unitConversionId: selectedUc ? Number(selectedUc.id) : null,
             unitName: uName,
             unitConversions: conversions,
-            conversionPoint: conversionPoint
+            conversionPoint: conversionPoint,
+            batchCode: d.batchCode || d.batchCodeSnapshot || d.batch?.batchCode || '',
+            manufactureDate: d.manufactureDate || d.manufactureDateSnapshot ? dayjs(d.manufactureDate || d.manufactureDateSnapshot).format('YYYY-MM-DD') : '',
+            expiryDate: d.expiryDate || d.expiryDateSnapshot ? dayjs(d.expiryDate || d.expiryDateSnapshot).format('YYYY-MM-DD') : ''
           };
         });
         setItems(mappedItems);
@@ -264,7 +267,10 @@ const ImportDocumentModal = ({
           unitConversionId: defaultUc ? Number(defaultUc.id) : null,
           unitName: defaultUc ? (defaultUc.unitName || defaultUc.name) : (prod.unitName || 'Đơn vị'),
           unitConversions: conversions,
-          conversionPoint: conversionPoint
+          conversionPoint: conversionPoint,
+          batchCode: '',
+          manufactureDate: '',
+          expiryDate: ''
         }
       ];
     });
@@ -333,7 +339,10 @@ const ImportDocumentModal = ({
       bInventoryId: Number(i.bInventoryId),
       unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
       quantity: Number(i.quantity || 1),
-      unitPrice: Number(i.unitPrice || 0)
+      unitPrice: Number(i.unitPrice || 0),
+      batchCodeSnapshot: i.batchCode ? i.batchCode.trim() : undefined,
+      manufactureDateSnapshot: i.manufactureDate ? new Date(i.manufactureDate).toISOString() : undefined,
+      expiryDateSnapshot: i.expiryDate ? new Date(i.expiryDate).toISOString() : undefined
     }));
 
     return {
@@ -363,6 +372,14 @@ const ImportDocumentModal = ({
       if (p < 0 || p > 10000000000) {
         alert(`Đơn giá nhập mặt hàng '${item.name}' (${p}) không hợp lệ. Phải là số dương từ 0 đến 10 tỷ VNĐ.`);
         return;
+      }
+      if (item.manufactureDate && item.expiryDate) {
+        const mDate = new Date(item.manufactureDate);
+        const eDate = new Date(item.expiryDate);
+        if (eDate < mDate) {
+          alert(`Hạn sử dụng của mặt hàng '${item.name}' không được trước ngày sản xuất.`);
+          return;
+        }
       }
     }
 
@@ -412,6 +429,14 @@ const ImportDocumentModal = ({
       if (p < 0 || p > 10000000000) {
         alert(`Đơn giá nhập mặt hàng '${item.name}' (${p}) không hợp lệ. Phải là số dương từ 0 đến 10 tỷ VNĐ.`);
         return;
+      }
+      if (item.manufactureDate && item.expiryDate) {
+        const mDate = new Date(item.manufactureDate);
+        const eDate = new Date(item.expiryDate);
+        if (eDate < mDate) {
+          alert(`Hạn sử dụng của mặt hàng '${item.name}' không được trước ngày sản xuất.`);
+          return;
+        }
       }
     }
 
@@ -621,21 +646,24 @@ const ImportDocumentModal = ({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textTransform: 'uppercase', color: '#334155', fontWeight: 700, fontSize: 10 }}>
-                  <th style={{ width: 40, padding: '8px 6px', textAlign: 'center' }}>STT</th>
-                  <th style={{ width: 110, padding: '8px 8px', textAlign: 'left' }}>MÃ HÀNG</th>
+                  <th style={{ width: 36, padding: '8px 6px', textAlign: 'center' }}>STT</th>
+                  <th style={{ width: 95, padding: '8px 8px', textAlign: 'left' }}>MÃ HÀNG</th>
                   <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ width: 110, padding: '8px 8px', textAlign: 'center' }}>ĐVT</th>
-                  <th style={{ width: 80, padding: '8px 8px', textAlign: 'center' }}>TỒN KHO</th>
-                  <th style={{ width: 90, padding: '8px 8px', textAlign: 'center' }}>SỐ LƯỢNG</th>
-                  <th style={{ width: 110, padding: '8px 8px', textAlign: 'right' }}>ĐƠN GIÁ NHẬP</th>
-                  <th style={{ width: 120, padding: '8px 8px', textAlign: 'right' }}>THÀNH TIỀN</th>
-                  <th style={{ width: 36, padding: '8px 6px', textAlign: 'center' }}></th>
+                  <th style={{ width: 105, padding: '8px 6px', textAlign: 'left' }}>MÃ LÔ</th>
+                  <th style={{ width: 105, padding: '8px 6px', textAlign: 'left' }}>NGÀY SX</th>
+                  <th style={{ width: 105, padding: '8px 6px', textAlign: 'left' }}>HẠN DÙNG</th>
+                  <th style={{ width: 85, padding: '8px 6px', textAlign: 'center' }}>ĐVT</th>
+                  <th style={{ width: 65, padding: '8px 6px', textAlign: 'center' }}>TỒN</th>
+                  <th style={{ width: 75, padding: '8px 6px', textAlign: 'center' }}>SỐ LƯỢNG</th>
+                  <th style={{ width: 95, padding: '8px 6px', textAlign: 'right' }}>ĐƠN GIÁ</th>
+                  <th style={{ width: 105, padding: '8px 6px', textAlign: 'right' }}>THÀNH TIỀN</th>
+                  <th style={{ width: 32, padding: '8px 4px', textAlign: 'center' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: 50, color: '#94a3b8' }}>
+                    <td colSpan={12} style={{ textAlign: 'center', padding: 50, color: '#94a3b8' }}>
                       Chưa có sản phẩm nào được chọn. Hãy gõ tìm kiếm để chọn sản phẩm nhập kho.
                     </td>
                   </tr>
@@ -645,10 +673,59 @@ const ImportDocumentModal = ({
 
                     return (
                       <tr key={item.rowId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px' }}>{idx + 1}</td>
+                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px 4px' }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600, color: '#2563eb', padding: '6px 8px' }}>{item.code}</td>
                         <td style={{ fontWeight: 600, color: '#0f172a', padding: '6px 8px' }}>{item.name}</td>
-                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="text"
+                            placeholder="Tự sinh"
+                            value={item.batchCode || ''}
+                            onChange={(e) => handleItemChange(item.rowId, 'batchCode', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 26,
+                              fontSize: 10.5,
+                              padding: '0 4px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="date"
+                            value={item.manufactureDate || ''}
+                            onChange={(e) => handleItemChange(item.rowId, 'manufactureDate', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 26,
+                              fontSize: 10.5,
+                              padding: '0 2px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          <input
+                            type="date"
+                            value={item.expiryDate || ''}
+                            onChange={(e) => handleItemChange(item.rowId, 'expiryDate', e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: 26,
+                              fontSize: 10.5,
+                              padding: '0 2px',
+                              borderRadius: 4,
+                              border: '1px solid #cbd5e1',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '6px 4px' }}>
                           {item.unitConversions && item.unitConversions.length > 0 ? (
                             <select
                               value={item.unitConversionId || ''}
@@ -673,10 +750,10 @@ const ImportDocumentModal = ({
                             <span style={{ color: '#475569' }}>{item.unitName || 'Đơn vị'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px 8px' }}>
+                        <td style={{ textAlign: 'center', color: '#64748b', padding: '6px 4px' }}>
                           {item.stock != null ? Number(item.stock).toLocaleString('vi-VN', { maximumFractionDigits: 3 }) : 0}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 4px' }}>
                           <input
                             type="number"
                             min={0.001}
@@ -684,7 +761,7 @@ const ImportDocumentModal = ({
                             value={item.quantity}
                             onChange={(e) => handleItemChange(item.rowId, 'quantity', Math.max(0.001, Number(e.target.value)))}
                             style={{
-                              width: 65,
+                              width: 60,
                               height: 26,
                               textAlign: 'center',
                               fontSize: 11,
@@ -695,14 +772,14 @@ const ImportDocumentModal = ({
                             }}
                           />
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 8px' }}>
+                        <td style={{ textAlign: 'right', padding: '6px 4px' }}>
                           <input
                             type="number"
                             min={0}
                             value={item.unitPrice}
                             onChange={(e) => handleItemChange(item.rowId, 'unitPrice', Math.max(0, Number(e.target.value)))}
                             style={{
-                              width: 90,
+                              width: 80,
                               height: 26,
                               textAlign: 'right',
                               fontSize: 11,
@@ -713,14 +790,21 @@ const ImportDocumentModal = ({
                             }}
                           />
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#e8442a', padding: '6px 8px' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#e8442a', padding: '6px 4px' }}>
                           {rowTotal.toLocaleString('vi-VN')} đ
                         </td>
-                        <td style={{ textAlign: 'center', padding: '6px' }}>
+                        <td style={{ textAlign: 'center', padding: '6px 2px' }}>
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.rowId)}
-                            style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#94a3b8',
+                              cursor: 'pointer',
+                              padding: 4,
+                              fontSize: 13
+                            }}
                           >
                             <DeleteOutlined />
                           </button>

@@ -12,7 +12,8 @@ const INVENTORY_OPTIONS = [
   { key: 'Check', label: 'Kiểm kho' },
   { key: 'Adjustment', label: 'Điều chỉnh giá vốn' },
   { key: 'Partner', label: 'Đối tác' },
-  { key: 'Product', label: 'Danh sách nguyên liệu, mặt hàng' }
+  { key: 'Product', label: 'Danh sách nguyên liệu, mặt hàng' },
+  { key: 'BatchExpiry', label: 'Theo dõi Hạn sử dụng & Lô hàng' }
 ];
 
 const InventoryHeaderNav = ({ activeTab }) => {

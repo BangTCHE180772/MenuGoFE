@@ -30,6 +30,7 @@ import WorkScheduleSummaryPage from '../pages/WorkScheduleSummaryPage';
 import ShiftPage from '../pages/ShiftPage';
 import MenuManagementPage from '../pages/MenuManagementPage';
 import KDSPage from '../pages/KDSPage';
+import LeftoverPage from '../pages/LeftoverPage';
 import ChainPage from '../pages/ChainPage';
 import AttendancePage from '../pages/AttendancePage';
 import PayrollPage from '../pages/PayrollPage';
@@ -181,6 +182,8 @@ const AppRouter = () => {
                 <Route path="/reports/profit" element={<ReportProfitPage />} />
                 <Route path="/reports/inventory" element={<ReportInventoryPage />} />
                 <Route path="/inventoryreport" element={<ReportInventoryPage />} />
+                <Route path="/leftover" element={<LeftoverPage />} />
+                <Route path="/kds" element={<KDSPage />} />
               </Route>
 
               {/* Owner, Admin */}
@@ -195,7 +198,6 @@ const AppRouter = () => {
                 <Route path="/orders" element={<OrderPage />} />
               <Route path="/table-map" element={<TableMapPage />} />
               <Route path="/cashier" element={<CashierPage />} />
-                <Route path="/kds" element={<KDSPage />} />
               </Route>
             </Route>
           </Route>

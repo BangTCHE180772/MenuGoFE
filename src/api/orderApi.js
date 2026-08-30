@@ -7,6 +7,10 @@ export const getAllOrders = (branchId) =>
 export const getPaidInvoices = (branchId) =>
   axiosInstance.get('/api/Order/invoices', { params: { branchId } });
 
+// Lịch sử huỷ món: đơn đã hoàn thành (bếp làm chậm) vs đơn chờ xác nhận
+export const getCancelledHistory = (branchId, params = {}) =>
+  axiosInstance.get('/api/Order/cancelled-history', { params: { branchId, ...params } });
+
 export const getOrderById = (id) =>
   axiosInstance.get(`/api/Order/${id}`);
 

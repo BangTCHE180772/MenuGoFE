@@ -15,6 +15,7 @@ import PartnerTab from './tabs/Partner/PartnerTab';
 import ProductTab from './tabs/Product/ProductTab';
 import InvoiceTab from './tabs/Invoice/InvoiceTab';
 import AdjustmentTab from './tabs/Adjustment/AdjustmentTab';
+import BatchExpiryTab from './tabs/Product/BatchExpiryTab';
 
 const InventoryManagementTab = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -205,6 +206,10 @@ const InventoryManagementTab = () => {
 
         {activeTab === 'Invoice' && (
           <InvoiceTab selectedBranchId={currentBranchId} />
+        )}
+
+        {activeTab === 'BatchExpiry' && (
+          <BatchExpiryTab selectedBranchId={currentBranchId} />
         )}
       </div>
     </div>

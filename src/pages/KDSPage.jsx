@@ -15,6 +15,10 @@ import {
   Tooltip,
   Popconfirm,
   Modal,
+  Select,
+  List,
+  Form,
+  Input,
 } from 'antd';
 import {
   FireOutlined,
@@ -25,8 +29,18 @@ import {
   ReloadOutlined,
   AppstoreOutlined,
   BellOutlined,
+  SettingOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
+import {
+  getKitchenStationsByBranchId,
+  createKitchenStation,
+  updateKitchenStation,
+  deleteKitchenStation,
+} from '../api/kitchenStationApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -34,6 +48,20 @@ import { useDevice } from '../context/DeviceContext';
 import { useBranch } from '../context/BranchContext';
 
 const { Title, Text } = Typography;
+
+// ─── Unified visual language for the whole Kitchen (KDS) screen ───────────
+// One background, one border, one shadow, one text-color scheme for every
+// card/panel on this page. Status colors (red/orange/green/blue) are kept
+// as functional accents (tags, badges, action buttons) — they signal state,
+// not stylistic drift.
+const KDS_STYLE = {
+  cardBg: '#ffffff',
+  border: '1px solid #f0f0f0',
+  radius: 12,
+  shadow: '0 2px 8px rgba(0,0,0,0.06)',
+  textPrimary: '#000000',
+  textSecondary: '#595959',
+};
 
 // Standard cooking status definitions
 const COOKING_STATUS = {
@@ -57,6 +85,68 @@ const KDSPage = () => {
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const signalRConnection = useSignalR();
+
+  // ── Kitchen Stations (Trạm bếp) ─────────────────────────────────
+  const [kitchenStations, setKitchenStations] = useState([]);
+  const [stationFilter, setStationFilter] = useState('ALL');
+  const [showStationModal, setShowStationModal] = useState(false);
+  const [editingStation, setEditingStation] = useState(null);
+  const [stationForm] = Form.useForm();
+  const [savingStation, setSavingStation] = useState(false);
+
+  const fetchKitchenStations = useCallback(async () => {
+    if (!currentBranchId) return;
+    try {
+      const res = await getKitchenStationsByBranchId(currentBranchId);
+      setKitchenStations(res.data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách trạm bếp:', err);
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchKitchenStations();
+  }, [fetchKitchenStations]);
+
+  const openStationModal = (station = null) => {
+    setEditingStation(station);
+    if (station) {
+      stationForm.setFieldsValue({ name: station.name });
+    } else {
+      stationForm.resetFields();
+    }
+  };
+
+  const handleSaveStation = async (values) => {
+    setSavingStation(true);
+    try {
+      if (editingStation) {
+        await updateKitchenStation({ ...editingStation, name: values.name });
+        message.success('Cập nhật trạm bếp thành công');
+      } else {
+        await createKitchenStation({ branchId: currentBranchId, name: values.name, isActive: true });
+        message.success('Thêm trạm bếp thành công');
+      }
+      setEditingStation(null);
+      stationForm.resetFields();
+      fetchKitchenStations();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Lỗi khi lưu trạm bếp.');
+    } finally {
+      setSavingStation(false);
+    }
+  };
+
+  const handleDeleteStation = async (id) => {
+    try {
+      await deleteKitchenStation(id);
+      message.success('Đã xóa trạm bếp');
+      if (stationFilter === String(id)) setStationFilter('ALL');
+      fetchKitchenStations();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Không thể xóa trạm bếp này (có thể đang được gán cho món ăn).');
+    }
+  };
 
   // Join branch-specific SignalR group
   useEffect(() => {
@@ -226,10 +316,16 @@ const KDSPage = () => {
     }
   };
 
-  const waitingItems = useMemo(() => items.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [items]);
-  const acceptedItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [items]);
-  const cookingItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
-  const readyItems = useMemo(() => items.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [items]);
+  // Filter the whole queue down to one kitchen station (Trạm bếp) if selected
+  const visibleItems = useMemo(() => {
+    if (stationFilter === 'ALL') return items;
+    return items.filter((i) => String(i.kitchenStationId) === stationFilter);
+  }, [items, stationFilter]);
+
+  const waitingItems = useMemo(() => visibleItems.filter((i) => !i.cookingStatus || i.cookingStatus === COOKING_STATUS.WAITING), [visibleItems]);
+  const acceptedItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.ACCEPTED), [visibleItems]);
+  const cookingItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.COOKING).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [visibleItems]);
+  const readyItems = useMemo(() => visibleItems.filter((i) => i.cookingStatus === COOKING_STATUS.READY).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)), [visibleItems]);
 
   const batchableItems = useMemo(() => {
     const combined = [...waitingItems, ...acceptedItems];
@@ -355,9 +451,9 @@ const KDSPage = () => {
       case COOKING_STATUS.READY:
         return readyItems;
       default:
-        return items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
+        return visibleItems.filter((i) => i.cookingStatus !== COOKING_STATUS.READY);
     }
-  }, [activeTab, items, waitingItems, acceptedItems, cookingItems, readyItems]);
+  }, [activeTab, visibleItems, waitingItems, acceptedItems, cookingItems, readyItems]);
 
   // Render Time Elapsed since created
   const renderTimeElapsed = (createdAt) => {
@@ -374,7 +470,7 @@ const KDSPage = () => {
   const renderKdsCard = (item) => {
     const status = item.cookingStatus || COOKING_STATUS.WAITING;
 
-    let cardBorderColor = '#303030';
+    let cardBorderColor = '#ff4d4f';
     let statusTag = <Tag color="red">CHỜ XÁC NHẬN</Tag>;
 
     if (status === COOKING_STATUS.ACCEPTED) {
@@ -393,11 +489,11 @@ const KDSPage = () => {
         key={item._splitKey || item.orderDetailId}
         hoverable
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: KDS_STYLE.cardBg,
           borderColor: cardBorderColor,
-          borderRadius: 12,
+          borderRadius: KDS_STYLE.radius,
           borderWidth: 2,
-          boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+          boxShadow: KDS_STYLE.shadow,
           marginBottom: 16,
           width: '100%',
           height: 340,
@@ -408,12 +504,19 @@ const KDSPage = () => {
       >
         {/* Card Header: Table Name & Time */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-          <Tag
-            color="volcano"
-            style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4, margin: 0 }}
-          >
-            🪑 {item.tableName}
-          </Tag>
+          <Space size={4}>
+            <Tag
+              color="volcano"
+              style={{ fontSize: 16, fontWeight: 700, padding: '2px 10px', borderRadius: 4, margin: 0 }}
+            >
+              🪑 {item.tableName}
+            </Tag>
+            {item.kitchenStationName && (
+              <Tag color="purple" style={{ fontSize: 12, margin: 0 }}>
+                {item.kitchenStationName}
+              </Tag>
+            )}
+          </Space>
           <Text style={{ color: '#595959', fontSize: 12 }}>
             <ClockCircleOutlined style={{ marginRight: 4 }} />
             {renderTimeElapsed(item.createdAt)}
@@ -432,7 +535,7 @@ const KDSPage = () => {
                 borderRadius: 8,
                 objectFit: 'cover',
                 marginRight: 12,
-                border: '1px solid #434343'
+                border: KDS_STYLE.border,
               }}
             />
           ) : (
@@ -441,14 +544,14 @@ const KDSPage = () => {
                 width: 60,
                 height: 60,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #303030, #202020)',
+                backgroundColor: '#f5f5f5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 24,
-                color: '#595959',
+                color: KDS_STYLE.textSecondary,
                 marginRight: 12,
-                border: '1px solid #434343'
+                border: KDS_STYLE.border,
               }}
             >
               🍲
@@ -484,12 +587,12 @@ const KDSPage = () => {
         {item.note && (
           <div
             style={{
-              backgroundColor: '#2b2111',
-              border: '1px solid #d48806',
+              backgroundColor: '#fff7e6',
+              border: '1px solid #ffd591',
               borderRadius: 6,
               padding: '6px 10px',
               marginBottom: 12,
-              color: '#ffe58f',
+              color: KDS_STYLE.textPrimary,
               fontSize: 13,
               maxHeight: 56,
               overflowY: 'auto',
@@ -539,36 +642,40 @@ const KDSPage = () => {
             </Button>
           )}
 
-          {/* Cancellation Option ("Huỷ món") */}
-          {status !== COOKING_STATUS.READY && (
-            <Popconfirm
-              title="Bạn có chắc chắn muốn hủy món này không?"
-              onConfirm={() => {
-                  if (item.orderDetailIds) {
-                      item.orderDetailIds.forEach(id => handleCancelItem(id));
-                  } else {
-                      handleCancelItem(item.orderDetailId);
-                  }
+          {/* Cancellation Option ("Huỷ món") — món Ready vẫn huỷ được cho luồng
+              "bếp làm chậm, khách đi về không nhận món nữa" (lỗi của bếp, được
+              ghi nhận vào thống kê Món thừa). */}
+          <Popconfirm
+            title={
+              status === COOKING_STATUS.READY
+                ? 'Huỷ món ĐÃ HOÀN THÀNH này? (Sẽ được ghi nhận là bếp làm chậm trong thống kê)'
+                : 'Bạn có chắc chắn muốn hủy món này không?'
+            }
+            onConfirm={() => {
+                if (item.orderDetailIds) {
+                    item.orderDetailIds.forEach(id => handleCancelItem(id));
+                } else {
+                    handleCancelItem(item.orderDetailId);
+                }
+            }}
+            okText="Đồng ý"
+            cancelText="Hủy bỏ"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              danger
+              block
+              type="text"
+              style={{
+                marginTop: 4,
+                borderColor: '#ff4d4f',
+                color: '#ff4d4f',
+                border: '1px dashed #ff4d4f',
               }}
-              okText="Đồng ý"
-              cancelText="Hủy bỏ"
-              okButtonProps={{ danger: true }}
             >
-              <Button
-                danger
-                block
-                type="text"
-                style={{
-                  marginTop: 4,
-                  borderColor: '#ff4d4f',
-                  color: '#ff4d4f',
-                  border: '1px dashed #ff4d4f',
-                }}
-              >
-                Hủy món
-              </Button>
-            </Popconfirm>
-          )}
+              Hủy món
+            </Button>
+          </Popconfirm>
         </Space>
       </Card>
     );
@@ -590,12 +697,12 @@ const KDSPage = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 16,
-          backgroundColor: '#ffffff',
+          backgroundColor: KDS_STYLE.cardBg,
           padding: '16px 24px',
-          borderRadius: 12,
+          borderRadius: KDS_STYLE.radius,
           marginBottom: 20,
-          border: '1px solid #303030',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          border: KDS_STYLE.border,
+          boxShadow: KDS_STYLE.shadow,
         }}
       >
         <Space size="large" style={{ flexShrink: 0 }}>
@@ -626,6 +733,27 @@ const KDSPage = () => {
         </Space>
 
         <Space size="middle" wrap style={{ flexShrink: 0 }}>
+          {/* Kitchen Station (Trạm bếp) filter */}
+          <Select
+            value={stationFilter}
+            onChange={setStationFilter}
+            style={{ minWidth: 160 }}
+            options={[
+              { value: 'ALL', label: 'Tất cả trạm bếp' },
+              ...kitchenStations.map((s) => ({ value: String(s.id), label: s.name })),
+            ]}
+          />
+
+          <Tooltip title="Quản lý trạm bếp">
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => setShowStationModal(true)}
+              style={{ backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
+            >
+              Trạm bếp
+            </Button>
+          </Tooltip>
+
           {/* View Mode Toggle Button Group */}
           <Button.Group>
             <Button
@@ -697,9 +825,6 @@ const KDSPage = () => {
               onClose={() => setCancelledAlerts((prev) => prev.filter((a) => a.id !== alert.id))}
               style={{
                 marginBottom: 8,
-                backgroundColor: '#2a1215',
-                borderColor: '#ff4d4f',
-                color: '#ffffff',
                 borderRadius: 8,
               }}
             />
@@ -708,20 +833,20 @@ const KDSPage = () => {
       )}
 
       {/* ── BATCH PROCESSING BAR ────────────────────────────────── */}
-      <div style={{ marginBottom: 20, backgroundColor: '#f0f5ff', padding: '16px 20px', borderRadius: 12, border: '1px solid #adc6ff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
-        <Title level={5} style={{ margin: '0 0 12px 0', color: '#1d39c4', display: 'flex', alignItems: 'center' }}>
+      <div style={{ marginBottom: 20, backgroundColor: KDS_STYLE.cardBg, padding: '16px 20px', borderRadius: KDS_STYLE.radius, border: KDS_STYLE.border, boxShadow: KDS_STYLE.shadow }}>
+        <Title level={5} style={{ margin: '0 0 12px 0', color: KDS_STYLE.textPrimary, display: 'flex', alignItems: 'center' }}>
           <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8, fontSize: 18 }} />
           Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar)
         </Title>
         {batchableItems.length === 0 ? (
-          <Text style={{ color: '#8c8c8c' }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
+          <Text style={{ color: KDS_STYLE.textSecondary }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
         ) : (
           <Space size="middle" wrap style={{ width: '100%' }}>
             {batchableItems.map(batch => (
               <Card
                 key={batch.productId}
                 size="small"
-                style={{ borderColor: '#91caff', backgroundColor: '#ffffff', minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
+                style={{ borderColor: '#f0f0f0', backgroundColor: KDS_STYLE.cardBg, minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
                 styles={{ body: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
               >
                 <div>
@@ -755,7 +880,7 @@ const KDSPage = () => {
         <Row gutter={[20, 20]}>
           {/* Column 1: Chờ chế biến (Waiting + Accepted) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -781,7 +906,7 @@ const KDSPage = () => {
 
           {/* Column 2: Đang nấu (Cooking) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -803,7 +928,7 @@ const KDSPage = () => {
 
           {/* Column 3: Hoàn thành (Ready) */}
           <Col xs={24} md={8}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #303030', height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ backgroundColor: KDS_STYLE.cardBg, borderRadius: KDS_STYLE.radius, padding: 16, border: KDS_STYLE.border, height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column', boxShadow: KDS_STYLE.shadow }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -836,7 +961,7 @@ const KDSPage = () => {
                 key: 'ALL',
                 label: (
                   <span>
-                    <AppstoreOutlined /> Tất cả ({items.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
+                    <AppstoreOutlined /> Tất cả ({visibleItems.filter((i) => i.cookingStatus !== COOKING_STATUS.READY).length})
                   </span>
                 ),
               },
@@ -872,12 +997,12 @@ const KDSPage = () => {
               style={{
                 textAlign: 'center',
                 padding: '60px 0',
-                background: '#1f1f1f',
-                borderRadius: 12,
-                border: '1px solid #303030',
+                background: KDS_STYLE.cardBg,
+                borderRadius: KDS_STYLE.radius,
+                border: KDS_STYLE.border,
               }}
             >
-              <Title level={4} style={{ color: '#595959' }}>
+              <Title level={4} style={{ color: KDS_STYLE.textSecondary }}>
                 🎉 Bếp hiện không có món nào thuộc danh mục này!
               </Title>
             </div>
@@ -904,6 +1029,63 @@ const KDSPage = () => {
         <div style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
           {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
         </div>
+      </Modal>
+
+      {/* ── Modal: Quản lý trạm bếp (Kitchen Stations) ─────── */}
+      <Modal
+        title="🔧 Quản lý trạm bếp"
+        open={showStationModal}
+        onCancel={() => {
+          setShowStationModal(false);
+          setEditingStation(null);
+          stationForm.resetFields();
+        }}
+        footer={null}
+        width={480}
+      >
+        <Form form={stationForm} layout="inline" onFinish={handleSaveStation} style={{ marginBottom: 16 }}>
+          <Form.Item
+            name="name"
+            rules={[{ required: true, message: 'Nhập tên trạm bếp' }]}
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="Tên trạm bếp (VD: Bếp 1, Bếp phụ...)" />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" icon={editingStation ? <EditOutlined /> : <PlusOutlined />} loading={savingStation}>
+              {editingStation ? 'Cập nhật' : 'Thêm'}
+            </Button>
+          </Form.Item>
+          {editingStation && (
+            <Form.Item>
+              <Button onClick={() => { setEditingStation(null); stationForm.resetFields(); }}>Hủy</Button>
+            </Form.Item>
+          )}
+        </Form>
+
+        <List
+          bordered
+          dataSource={kitchenStations}
+          locale={{ emptyText: 'Chưa có trạm bếp nào' }}
+          renderItem={(station) => (
+            <List.Item
+              actions={[
+                <Button key="edit" type="text" icon={<EditOutlined />} onClick={() => openStationModal(station)} />,
+                <Popconfirm
+                  key="delete"
+                  title="Xóa trạm bếp này?"
+                  onConfirm={() => handleDeleteStation(station.id)}
+                  okText="Đồng ý"
+                  cancelText="Hủy bỏ"
+                >
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              {station.name}
+            </List.Item>
+          )}
+        />
       </Modal>
     </div>
   );

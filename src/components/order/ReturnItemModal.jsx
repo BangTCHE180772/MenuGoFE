@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Modal, InputNumber, Input, Form, message, Checkbox } from 'antd';
+import { Modal, InputNumber, Input, Form, message, Checkbox, Select } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 
 const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
@@ -10,6 +10,34 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
   if (!item) return null;
 
   const maxReturnable = item.quantity - (item.returnedQuantity || 0);
+
+  const isIntact = Form.useWatch('isIntact', form);
+
+  const getReasonOptions = () => {
+    // Nếu là đồ thường (Regular) và nguyên vẹn: được phép chọn lý do mở rộng
+    if (item.productType === 'Regular' && isIntact) {
+      return [
+        { value: 'Khách gọi dư', label: 'Khách gọi dư' },
+        { value: 'Nhân viên bấm nhầm', label: 'Nhân viên bấm nhầm' },
+        { value: 'Bàn hủy món phút chót', label: 'Bàn hủy món phút chót' },
+        { value: 'Lý do khác', label: 'Lý do khác' }
+      ];
+    }
+    // Các trường hợp còn lại (Processed hoặc Không nguyên vẹn): Chỉ các lỗi do nhà hàng
+    return [
+      { value: 'Ra món chậm', label: 'Ra món chậm' },
+      { value: 'Thức ăn nguội/kém chất lượng', label: 'Thức ăn nguội/kém chất lượng' },
+      { value: 'Có dị vật', label: 'Có dị vật' },
+      { value: 'Nhân viên làm đổ', label: 'Nhân viên làm đổ' },
+      { value: 'Lên sai món', label: 'Lên sai món' },
+      { value: 'Bao bì rách/hỏng', label: 'Bao bì rách/hỏng' },
+      { value: 'Lý do khác', label: 'Lý do khác' }
+    ];
+  };
+
+  const handleIntactChange = () => {
+    form.setFieldsValue({ returnReason: undefined });
+  };
 
   const handleOk = async () => {
     if (actionRef.current) return;
@@ -73,21 +101,20 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           <InputNumber min={1} max={maxReturnable} style={{ width: '100%' }} />
         </Form.Item>
 
-        {/* Bỏ lý do trả vì hàng nguyên vẹn không cần lý do 
         <Form.Item
           name="returnReason"
           label="Lý do trả"
-          rules={[{ required: true, message: 'Vui lòng nhập lý do trả món!' }]}
+          rules={[{ required: true, message: 'Vui lòng chọn lý do trả món!' }]}
         >
-          <Input.TextArea rows={3} placeholder="Ví dụ: Khách chê món mặn, món bị hỏng..." />
+          <Select
+            placeholder="Chọn lý do trả món..."
+            options={getReasonOptions()}
+          />
         </Form.Item>
-        */}
-        <div style={{ color: 'orange', fontStyle: 'italic', marginBottom: 16 }}>
-          Lưu ý: hàng chỉ được trả khi là đồ đóng hộp và còn nguyên!
-        </div>
-        <Form.Item name="isIntact" valuePropName="checked" style={{ display: 'none' }}>
-          <Checkbox disabled>
-            Hàng còn nguyên vẹn (Sẽ được nhập lại vào kho)
+
+        <Form.Item name="isIntact" valuePropName="checked">
+          <Checkbox onChange={handleIntactChange}>
+            Hàng còn nguyên vẹn (Sẽ được nhập lại vào kho nếu là mặt hàng Thường)
           </Checkbox>
         </Form.Item>
       </Form>
