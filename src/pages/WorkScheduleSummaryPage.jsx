@@ -69,6 +69,7 @@ const WorkScheduleSummaryPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(dayjs());
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
+  const [selectedContractType, setSelectedContractType] = useState(null);
 
   // Detail modal
   const [detailAccount, setDetailAccount] = useState(null);
@@ -184,6 +185,14 @@ const WorkScheduleSummaryPage = () => {
     return Object.values(accountMap)
       .filter((r) => activeAccountIds.has(r.accountId))  // chỉ nhân viên có hợp đồng Active
       .filter((r) => !selectedAccountId || r.accountId === selectedAccountId)
+      .filter((r) => {
+        if (!selectedContractType) return true;
+        const accContract = contracts.find((c) => c.accountId === r.accountId && (c.branchId === selectedBranchId || !c.branchId));
+        const isPartTime = accContract?.type === 'Part-time' || accContract?.salaryType === 'Hourly' || accContract?.type === 'Bán thời gian';
+        if (selectedContractType === 'FULL_TIME' && isPartTime) return false;
+        if (selectedContractType === 'PART_TIME' && !isPartTime) return false;
+        return true;
+      })
       .sort((a, b) => {
         const nameA = getAccountInfo(a.accountId)?.name || '';
         const nameB = getAccountInfo(b.accountId)?.name || '';
@@ -569,9 +578,22 @@ const WorkScheduleSummaryPage = () => {
               optionFilterProp="label"
               value={selectedAccountId}
               onChange={(val) => setSelectedAccountId(val)}
-              style={{ width: 200 }}
+              style={{ width: 220 }}
               options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             />
+          </div>
+          <div>
+            <Text strong style={{ marginRight: 8 }}>Loại nhân viên:</Text>
+            <Select
+              placeholder="Tất cả loại nhân viên"
+              allowClear
+              value={selectedContractType}
+              onChange={(val) => setSelectedContractType(val)}
+              style={{ width: 180 }}
+            >
+              <Select.Option value="FULL_TIME">Toàn thời gian</Select.Option>
+              <Select.Option value="PART_TIME">Bán thời gian</Select.Option>
+            </Select>
           </div>
         </Space>
       </Card>

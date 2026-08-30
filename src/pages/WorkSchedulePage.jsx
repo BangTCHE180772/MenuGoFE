@@ -48,6 +48,7 @@ import {
   InfoCircleOutlined,
   DownOutlined,
   ExportOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
@@ -60,6 +61,7 @@ import {
   assignWorkSchedules,
   approveOT,
   verifyPOSActivity,
+  autoAssignWorkSchedules,
 } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
@@ -142,6 +144,29 @@ const WorkSchedulePage = () => {
     return filtered.length > 0 ? filtered : accounts;
   }, [accounts, contracts]);
 
+  // Filtering & View states
+  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedShift, setSelectedShift] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
+  const [selectedContractType, setSelectedContractType] = useState(null);
+  const [searchDate, setSearchDate] = useState(null);
+  const [searchEmpText, setSearchEmpText] = useState('');
+
+  const isAccountPartTime = useCallback(
+    (accountId) => {
+      const contract = contracts.find((c) => c.accountId === accountId);
+      if (!contract) return false;
+      return (
+        contract.type === 'Part-time' ||
+        contract.salaryType === 'Hourly' ||
+        contract.type === 'Bán thời gian'
+      );
+    },
+    [contracts]
+  );
+
   const groupedStaffAccounts = useMemo(() => {
     const groups = {
       4: { label: '💳 THU NGÂN', items: [] },
@@ -153,7 +178,13 @@ const WorkSchedulePage = () => {
     contractedAccounts
       .filter((a) => {
         if (!a.roleIds || a.roleIds.length === 0) return false;
-        return !a.roleIds.some((rId) => [1, 2, 3].includes(rId));
+        if (a.roleIds.some((rId) => [1, 2, 3].includes(rId))) return false;
+        if (selectedContractType) {
+          const isPart = isAccountPartTime(a.id);
+          if (selectedContractType === 'FULL_TIME' && isPart) return false;
+          if (selectedContractType === 'PART_TIME' && !isPart) return false;
+        }
+        return true;
       })
       .forEach((a) => {
         const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 'other');
@@ -165,16 +196,7 @@ const WorkSchedulePage = () => {
       });
 
     return Object.entries(groups).filter(([_, grp]) => grp.items.length > 0);
-  }, [contractedAccounts]);
-
-  // Filtering & View states
-  const [selectedBranch, setSelectedBranch] = useState(null);
-  const [selectedAccount, setSelectedAccount] = useState(null);
-  const [selectedShift, setSelectedShift] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState(null);
-  const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
-  const [searchDate, setSearchDate] = useState(null);
-  const [searchEmpText, setSearchEmpText] = useState('');
+  }, [contractedAccounts, selectedContractType, isAccountPartTime]);
 
   // Weekly Matrix Grid Navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => dayjs().startOf('isoWeek'));
@@ -192,6 +214,12 @@ const WorkSchedulePage = () => {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkAssignSubmitting, setBulkAssignSubmitting] = useState(false);
   const [bulkForm] = Form.useForm();
+
+  // Modal states - Auto Assign
+  const [isAutoAssignModalOpen, setIsAutoAssignModalOpen] = useState(false);
+  const [autoAssignSubmitting, setAutoAssignSubmitting] = useState(false);
+  const [autoAssignResult, setAutoAssignResult] = useState(null);
+  const [autoAssignForm] = Form.useForm();
 
   // OT Approval Modal state
   const [isOTModalOpen, setIsOTModalOpen] = useState(false);
@@ -377,6 +405,12 @@ const WorkSchedulePage = () => {
     if (selectedShift && item.shiftId !== selectedShift) return false;
     if (selectedStatus && (item.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
     if (selectedManagerApproved !== null && selectedManagerApproved !== undefined && item.managerApproved !== selectedManagerApproved) return false;
+    if (selectedContractType) {
+      const accContract = contracts.find((c) => c.accountId === item.accountId && (c.branchId === item.branchId || !c.branchId));
+      const isPartTime = accContract?.type === 'Part-time' || accContract?.salaryType === 'Hourly' || accContract?.type === 'Bán thời gian';
+      if (selectedContractType === 'FULL_TIME' && isPartTime) return false;
+      if (selectedContractType === 'PART_TIME' && !isPartTime) return false;
+    }
     if (searchDate) {
       const itemDate = dayjs(item.workDate).format('YYYY-MM-DD');
       const filterDate = dayjs(searchDate).format('YYYY-MM-DD');
@@ -392,6 +426,7 @@ const WorkSchedulePage = () => {
     setSelectedShift(null);
     setSelectedStatus(null);
     setSelectedManagerApproved(null);
+    setSelectedContractType(null);
     setSearchDate(null);
     message.info('Đã xóa tất cả bộ lọc');
   };
@@ -622,6 +657,47 @@ const WorkSchedulePage = () => {
       console.error(err);
       const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi xóa lịch làm việc!';
       message.error(errorMsg);
+    }
+  };
+
+  // Submit Handler - Auto Assign
+  const handleAutoAssignSubmit = async (values) => {
+    if (autoAssignSubmitting) return;
+    setAutoAssignSubmitting(true);
+    setAutoAssignResult(null);
+    try {
+      const { branchId, shiftIds, dateRange, overwriteExisting } = values;
+      if (!dateRange || dateRange.length < 2) {
+        message.error('Vui lòng chọn khoảng thời gian phân ca!');
+        return;
+      }
+
+      const startDate = dateRange[0].format('YYYY-MM-DD');
+      const endDate = dateRange[1].format('YYYY-MM-DD');
+
+      const payload = {
+        branchId,
+        startDate,
+        endDate,
+        shiftIds: shiftIds && shiftIds.length > 0 ? shiftIds : null,
+        overwriteExisting: !!overwriteExisting,
+        createdBy: user?.id || 0,
+      };
+
+      const res = await autoAssignWorkSchedules(payload);
+      const data = res.data;
+      setAutoAssignResult(data);
+      if (data.totalCreated > 0) {
+        message.success(`Tự động phân ca thành công! Đã tạo mới ${data.totalCreated} ca làm việc.`);
+        loadData();
+      } else {
+        message.warning('Không có ca làm việc nào được phân mới.');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Có lỗi xảy ra khi phân ca tự động!');
+    } finally {
+      setAutoAssignSubmitting(false);
     }
   };
 
@@ -1084,6 +1160,17 @@ const WorkSchedulePage = () => {
 
     const displayAccounts = contractedAccounts.filter((acc) => {
       if (selectedAccount && acc.id !== selectedAccount) return false;
+      if (selectedContractType) {
+        const accContract = contracts.find(
+          (c) => c.accountId === acc.id && (c.branchId === selectedBranch || !c.branchId)
+        );
+        const isPartTime =
+          accContract?.type === 'Part-time' ||
+          accContract?.salaryType === 'Hourly' ||
+          accContract?.type === 'Bán thời gian';
+        if (selectedContractType === 'FULL_TIME' && isPartTime) return false;
+        if (selectedContractType === 'PART_TIME' && !isPartTime) return false;
+      }
       if (searchEmpText) {
         const q = searchEmpText.toLowerCase();
         const matchName = acc.name?.toLowerCase().includes(q);
@@ -1130,6 +1217,17 @@ const WorkSchedulePage = () => {
                   {s.name}
                 </Select.Option>
               ))}
+            </Select>
+
+            <Select
+              placeholder="Loại nhân viên ∨"
+              allowClear
+              style={{ width: 155 }}
+              value={selectedContractType}
+              onChange={(val) => setSelectedContractType(val)}
+            >
+              <Select.Option value="FULL_TIME">Toàn thời gian</Select.Option>
+              <Select.Option value="PART_TIME">Bán thời gian</Select.Option>
             </Select>
 
             <Input
@@ -1373,6 +1471,28 @@ const WorkSchedulePage = () => {
               <>
                 <Button
                   type="default"
+                  icon={<ThunderboltOutlined />}
+                  size="large"
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#722ed1',
+                    color: '#722ed1',
+                    fontWeight: 600,
+                  }}
+                  onClick={() => {
+                    setIsAutoAssignModalOpen(true);
+                    setAutoAssignResult(null);
+                    autoAssignForm.resetFields();
+                    autoAssignForm.setFieldsValue({
+                      branchId: managerBranchId || defaultBranchId,
+                      dateRange: [currentWeekStart, currentWeekStart.add(6, 'day')],
+                    });
+                  }}
+                >
+                  Tự động phân ca
+                </Button>
+                <Button
+                  type="default"
                   icon={<TeamOutlined />}
                   size="large"
                   style={{
@@ -1601,18 +1721,33 @@ const WorkSchedulePage = () => {
                   {!isOwnerOrAdmin && (
                     <Select
                       placeholder="Lọc nhân viên"
-                      style={{ width: 180 }}
+                      style={{ width: 220 }}
                       allowClear
                       showSearch
                       optionFilterProp="label"
                       value={selectedAccount}
                       onChange={(val) => setSelectedAccount(val)}
                     >
-                      {contractedAccounts.map((a) => (
-                        <Select.Option key={a.id} value={a.id} label={a.name}>
-                          {a.name}
-                        </Select.Option>
-                      ))}
+                      {contractedAccounts
+                        .filter((a) => {
+                          if (!selectedContractType) return true;
+                          const isPart = isAccountPartTime(a.id);
+                          if (selectedContractType === 'FULL_TIME' && isPart) return false;
+                          if (selectedContractType === 'PART_TIME' && !isPart) return false;
+                          return true;
+                        })
+                        .map((a) => (
+                          <Select.Option key={a.id} value={a.id} label={a.name}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{a.name}</span>
+                              {isAccountPartTime(a.id) ? (
+                                <Tag color="purple" style={{ margin: 0, fontSize: 10 }}>Bán thời gian</Tag>
+                              ) : (
+                                <Tag color="blue" style={{ margin: 0, fontSize: 10 }}>Toàn thời gian</Tag>
+                              )}
+                            </div>
+                          </Select.Option>
+                        ))}
                     </Select>
                   )}
 
@@ -1628,6 +1763,17 @@ const WorkSchedulePage = () => {
                         {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
                       </Select.Option>
                     ))}
+                  </Select>
+
+                  <Select
+                    placeholder="Lọc loại nhân viên"
+                    style={{ width: 170 }}
+                    allowClear
+                    value={selectedContractType}
+                    onChange={(val) => setSelectedContractType(val)}
+                  >
+                    <Select.Option value="FULL_TIME">Toàn thời gian</Select.Option>
+                    <Select.Option value="PART_TIME">Bán thời gian</Select.Option>
                   </Select>
 
                   {!isOwnerOrAdmin && (
@@ -1782,9 +1928,16 @@ const WorkSchedulePage = () => {
                                 </div>
                               </div>
                             </div>
-                            <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
-                              {roleInfo.label}
-                            </Tag>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {isAccountPartTime(a.id) ? (
+                                <Tag color="purple" style={{ margin: 0, fontSize: '10px', borderRadius: '4px' }}>Bán thời gian</Tag>
+                              ) : (
+                                <Tag color="blue" style={{ margin: 0, fontSize: '10px', borderRadius: '4px' }}>Toàn thời gian</Tag>
+                              )}
+                              <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
+                                {roleInfo.label}
+                              </Tag>
+                            </div>
                           </div>
                         </Select.Option>
                       );
@@ -1823,8 +1976,8 @@ const WorkSchedulePage = () => {
                   <Select.Option key={s.id} value={s.id}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>{s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})</span>
-                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Full-time</Tag>}
-                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Part-time</Tag>}
+                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Toàn thời gian</Tag>}
+                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Bán thời gian</Tag>}
                       {(!s.applicableTo || s.applicableTo === 'ALL') && <Tag color="default" style={{ marginLeft: 6 }}>Tất cả</Tag>}
                     </div>
                   </Select.Option>
@@ -2056,8 +2209,8 @@ const WorkSchedulePage = () => {
                   <Select.Option key={s.id} value={s.id}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>{s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})</span>
-                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Full-time</Tag>}
-                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Part-time</Tag>}
+                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Toàn thời gian</Tag>}
+                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Bán thời gian</Tag>}
                       {(!s.applicableTo || s.applicableTo === 'ALL') && <Tag color="default" style={{ marginLeft: 6 }}>Tất cả</Tag>}
                     </div>
                   </Select.Option>
@@ -2162,6 +2315,111 @@ const WorkSchedulePage = () => {
             </Form>
           </div>
         )}
+      </Modal>
+      {/* Modal Tự Động Phân Ca */}
+      <Modal
+        maskClosable={false}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#722ed1' }}>
+            <ThunderboltOutlined />
+            <span>TỰ ĐỘNG PHÂN CA THÔNG MINH</span>
+          </div>
+        }
+        open={isAutoAssignModalOpen}
+        onCancel={() => {
+          if (autoAssignSubmitting) return;
+          setIsAutoAssignModalOpen(false);
+          autoAssignForm.resetFields();
+          setAutoAssignResult(null);
+        }}
+        onOk={() => autoAssignForm.submit()}
+        confirmLoading={autoAssignSubmitting}
+        width={680}
+        okText="Chạy tự động phân ca"
+        cancelText="Đóng"
+        okButtonProps={{
+          disabled: autoAssignSubmitting,
+          style: {
+            background: 'linear-gradient(135deg, #722ed1, #9254de)',
+            border: 'none',
+            borderRadius: '6px',
+            fontWeight: 600,
+          },
+        }}
+        cancelButtonProps={{ disabled: autoAssignSubmitting, style: { borderRadius: '6px' } }}
+      >
+        <Form form={autoAssignForm} layout="vertical" onFinish={handleAutoAssignSubmit} style={{ marginTop: 16 }}>
+          <div style={{ background: '#f9f0ff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #d3ade6', marginBottom: '16px' }}>
+            <div style={{ fontWeight: 600, color: '#722ed1', marginBottom: 4 }}>⚡ Thuật toán phân ca thông minh:</div>
+            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#595959' }}>
+              <li><strong>Toàn thời gian:</strong> Ưu tiên giao ca cho nhân viên toàn thời gian thiếu ngày công để bù đủ mục tiêu công chuẩn tháng.</li>
+              <li><strong>Bán thời gian:</strong> Phân bổ số lượng ca làm việc dàn đều giữa các nhân viên bán thời gian để đảm bảo công bằng.</li>
+              <li>Tự động tuân thủ quy tắc <strong>ca phù hợp</strong> (Toàn thời gian / Bán thời gian), <strong>thời hạn hợp đồng</strong> và <strong>đơn xin nghỉ đã duyệt</strong>.</li>
+            </ul>
+          </div>
+
+          <div style={{ display: 'flex', gap: 16 }}>
+            <Form.Item
+              name="branchId"
+              label="Chi nhánh thực hiện phân ca"
+              rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
+              initialValue={managerBranchId || defaultBranchId}
+              style={{ flex: 1 }}
+            >
+              <Select placeholder="Chọn chi nhánh..." disabled={isManager || allowedBranches.length <= 1}>
+                {allowedBranches.map((b) => (
+                  <Select.Option key={b.id} value={b.id}>
+                    {b.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="shiftIds"
+              label="Chọn các ca làm việc áp dụng (Để trống = tất cả ca)"
+              style={{ flex: 1 }}
+            >
+              <Select mode="multiple" placeholder="Tất cả ca trực chi nhánh" allowClear>
+                {shifts.map((s) => (
+                  <Select.Option key={s.id} value={s.id}>
+                    {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            name="dateRange"
+            label="Khoảng thời gian tự động xếp lịch"
+            rules={[{ required: true, message: 'Vui lòng chọn khoảng ngày!' }]}
+          >
+            <DatePicker.RangePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+          </Form.Item>
+
+          {/* Result Alert display if auto-assign has run */}
+          {autoAssignResult && (
+            <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+              <div style={{ fontWeight: 600, color: '#389e0d', marginBottom: 6 }}>
+                ✅ Đã hoàn tất phân ca tự động!
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+                <Tag color="blue">Tổng ca đã tạo: <strong>{autoAssignResult.totalCreated}</strong></Tag>
+                <Tag color="cyan">Ca Toàn thời gian: <strong>{autoAssignResult.fullTimeSchedulesCreated}</strong></Tag>
+                <Tag color="purple">Ca Bán thời gian: <strong>{autoAssignResult.partTimeSchedulesCreated}</strong></Tag>
+                <Tag color="default">Vị trí đã có lịch/bỏ qua: <strong>{autoAssignResult.skippedSlotsCount}</strong></Tag>
+              </div>
+              {autoAssignResult.warnings && autoAssignResult.warnings.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#fa8c16' }}>
+                  {autoAssignResult.warnings.map((w, idx) => (
+                    <div key={idx}>⚠️ {w}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Form>
       </Modal>
     </div>
   );
