@@ -499,6 +499,23 @@ const WorkSchedulePage = () => {
           message.error(`Ngày làm việc (${workDate.format('DD/MM/YYYY')}) vượt quá ngày hết hạn hợp đồng (${dayjs(activeContract.endDate).format('DD/MM/YYYY')}) của nhân viên ${accName}! Không thể tạo lịch làm việc.`);
           return;
         }
+
+        // Validate shift applicability for employee salary type
+        const selectedShiftObj = shifts.find((s) => s.id === values.shiftId);
+        if (selectedShiftObj && selectedShiftObj.applicableTo && selectedShiftObj.applicableTo !== 'ALL') {
+          const appTo = selectedShiftObj.applicableTo.toUpperCase();
+          const isHourly = (activeContract.salaryType || '').toLowerCase() === 'hourly';
+          if (appTo === 'FULL_TIME' && isHourly) {
+            const accName = getAccountName(values.accountId);
+            message.error(`Ca '${selectedShiftObj.name}' chỉ áp dụng cho nhân viên Toàn thời gian. Nhân viên '${accName}' là Bán thời gian!`);
+            return;
+          }
+          if (appTo === 'PART_TIME' && !isHourly) {
+            const accName = getAccountName(values.accountId);
+            message.error(`Ca '${selectedShiftObj.name}' chỉ áp dụng cho nhân viên Bán thời gian. Nhân viên '${accName}' là Toàn thời gian!`);
+            return;
+          }
+        }
       }
 
       // Check if employee already has a schedule for this shift on this date
@@ -652,6 +669,21 @@ const WorkSchedulePage = () => {
           const contractStartDate = dayjs(activeContract.startDate);
           if (endDay.isBefore(contractStartDate, 'day')) {
             message.error(`Khoảng ngày phân ca (${startDay.format('DD/MM/YYYY')} - ${endDay.format('DD/MM/YYYY')}) nằm trước ngày bắt đầu hợp đồng (${contractStartDate.format('DD/MM/YYYY')}) của nhân viên ${accName}! Chỉ được phân ca trong thời hạn hợp đồng.`);
+            return;
+          }
+        }
+
+        // Validate shift applicability
+        const selectedShiftObj = shifts.find((s) => s.id === shiftId);
+        if (selectedShiftObj && selectedShiftObj.applicableTo && selectedShiftObj.applicableTo !== 'ALL') {
+          const appTo = selectedShiftObj.applicableTo.toUpperCase();
+          const isHourly = (activeContract.salaryType || '').toLowerCase() === 'hourly';
+          if (appTo === 'FULL_TIME' && isHourly) {
+            message.error(`Ca '${selectedShiftObj.name}' chỉ áp dụng cho nhân viên Toàn thời gian. Nhân viên '${accName}' là Bán thời gian!`);
+            return;
+          }
+          if (appTo === 'PART_TIME' && !isHourly) {
+            message.error(`Ca '${selectedShiftObj.name}' chỉ áp dụng cho nhân viên Bán thời gian. Nhân viên '${accName}' là Toàn thời gian!`);
             return;
           }
         }
@@ -1788,7 +1820,12 @@ const WorkSchedulePage = () => {
               <Select placeholder="Chọn ca trực...">
                 {shifts.map((s) => (
                   <Select.Option key={s.id} value={s.id}>
-                    {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})</span>
+                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Full-time</Tag>}
+                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Part-time</Tag>}
+                      {(!s.applicableTo || s.applicableTo === 'ALL') && <Tag color="default" style={{ marginLeft: 6 }}>Tất cả</Tag>}
+                    </div>
                   </Select.Option>
                 ))}
               </Select>
@@ -2015,7 +2052,12 @@ const WorkSchedulePage = () => {
               <Select placeholder="Chọn ca trực...">
                 {shifts.map((s) => (
                   <Select.Option key={s.id} value={s.id}>
-                    {s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{s.name} ({s.startTime?.substring(0, 5)} - {s.endTime?.substring(0, 5)})</span>
+                      {s.applicableTo === 'FULL_TIME' && <Tag color="blue" style={{ marginLeft: 6 }}>Full-time</Tag>}
+                      {s.applicableTo === 'PART_TIME' && <Tag color="purple" style={{ marginLeft: 6 }}>Part-time</Tag>}
+                      {(!s.applicableTo || s.applicableTo === 'ALL') && <Tag color="default" style={{ marginLeft: 6 }}>Tất cả</Tag>}
+                    </div>
                   </Select.Option>
                 ))}
               </Select>

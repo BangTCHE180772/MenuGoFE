@@ -15,6 +15,7 @@ import {
   Tag,
   Tooltip,
   Popconfirm,
+  Radio,
   message,
 } from 'antd';
 import {
@@ -34,8 +35,14 @@ import {
 } from '../api/shiftApi';
 import { useAuth } from '../context/AuthContext';
 
+const ROLE_NAME_MAP = {
+  Manager: 'Quản lý',
+  Cashier: 'Thu ngân',
+  Chef: 'Bếp trưởng',
+  Waiter: 'Phục vụ',
+};
+
 const SYSTEM_ROLES = [
-  { id: 3, name: 'Quản lý', color: 'purple' },
   { id: 4, name: 'Thu ngân', color: 'blue' },
   { id: 5, name: 'Bếp trưởng', color: 'orange' },
   { id: 6, name: 'Phục vụ', color: 'green' },
@@ -101,6 +108,7 @@ const ShiftPage = () => {
         nightEndTime: record.nightEndTime ? dayjs(record.nightEndTime, 'HH:mm:ss') : null,
         nightHours: record.nightHours ?? 0,
         isActive: record.isActive ?? true,
+        applicableTo: record.applicableTo || 'ALL',
         minRoles: minRolesMap,
       });
     } else {
@@ -115,6 +123,7 @@ const ShiftPage = () => {
         nightEndTime: null,
         nightHours: 0,
         isActive: true,
+        applicableTo: 'ALL',
         minRoles: defaultMinRoles,
       });
     }
@@ -148,6 +157,7 @@ const ShiftPage = () => {
         nightEndTime: values.nightEndTime ? values.nightEndTime.format('HH:mm:ss') : null,
         nightHours: values.nightHours ?? 0,
         isActive: values.isActive ?? true,
+        applicableTo: values.applicableTo || 'ALL',
         roleRequirements: roleReqsPayload,
       };
 
@@ -202,17 +212,6 @@ const ShiftPage = () => {
   // Columns
   const baseColumns = [
     {
-      title: 'Mã ca',
-      dataIndex: 'id',
-      key: 'id',
-      width: 90,
-      defaultSortOrder: 'ascend',
-      render: (id) => (
-        <strong style={{ color: '#1890ff' }}>{id}</strong>
-      ),
-      sorter: (a, b) => a.id - b.id,
-    },
-    {
       title: 'Tên ca',
       dataIndex: 'name',
       key: 'name',
@@ -257,7 +256,17 @@ const ShiftPage = () => {
       render: (hrs) => `${hrs ?? 8.0}h`,
     },
     {
-      title: 'NV tối thiểu / Role',
+      title: 'Đối tượng áp dụng',
+      dataIndex: 'applicableTo',
+      key: 'applicableTo',
+      render: (app) => {
+        if (app === 'FULL_TIME') return <Tag color="blue">Toàn thời gian</Tag>;
+        if (app === 'PART_TIME') return <Tag color="purple">Bán thời gian</Tag>;
+        return <Tag color="default">Tất cả</Tag>;
+      },
+    },
+    {
+      title: 'NV tối thiểu theo Chức danh',
       dataIndex: 'roleRequirements',
       key: 'roleRequirements',
       render: (roleReqs) => {
@@ -266,7 +275,8 @@ const ShiftPage = () => {
           <Space wrap size={[4, 4]}>
             {roleReqs.map((req) => {
               const roleObj = SYSTEM_ROLES.find((r) => r.id === req.roleId);
-              const roleName = req.roleName || roleObj?.name || `Role ${req.roleId}`;
+              const rawName = req.roleName || roleObj?.name || `Role ${req.roleId}`;
+              const roleName = ROLE_NAME_MAP[rawName] || roleObj?.name || rawName;
               const color = roleObj?.color || 'blue';
               return (
                 <Tag key={req.roleId} color={color} style={{ borderRadius: '4px' }}>
@@ -288,13 +298,6 @@ const ShiftPage = () => {
           {isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'}
         </Tag>
       ),
-    },
-    {
-      title: 'Ngày tạo',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
-      sorter: (a, b) => dayjs(a.createdAt).unix() - dayjs(b.createdAt).unix(),
     },
   ];
 
@@ -500,6 +503,19 @@ const ShiftPage = () => {
             </Col>
           </Row>
 
+          <Form.Item
+            name="applicableTo"
+            label="Đối tượng áp dụng ca"
+            rules={[{ required: true, message: 'Vui lòng chọn đối tượng áp dụng!' }]}
+            style={{ marginBottom: 16 }}
+          >
+            <Radio.Group buttonStyle="solid">
+              <Radio.Button value="ALL">Tất cả</Radio.Button>
+              <Radio.Button value="FULL_TIME">Toàn thời gian</Radio.Button>
+              <Radio.Button value="PART_TIME">Bán thời gian</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
           <Card
             size="small"
             style={{
@@ -511,7 +527,7 @@ const ShiftPage = () => {
           >
             <div style={{ marginBottom: 10, fontSize: '13px', fontWeight: 600, color: '#274e13', display: 'flex', alignItems: 'center', gap: 6 }}>
               <UsergroupAddOutlined />
-              <span>👥 Số lượng nhân viên tối thiểu theo Role (Chức danh):</span>
+              <span>👥 Số lượng nhân viên tối thiểu theo Chức danh:</span>
             </div>
             <Row gutter={[12, 8]}>
               {SYSTEM_ROLES.map((r) => (
