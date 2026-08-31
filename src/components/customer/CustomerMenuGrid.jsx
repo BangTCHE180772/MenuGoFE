@@ -1,7 +1,7 @@
 import { Empty, Skeleton, Row, Col } from "antd";
 import CustomerMenuCard from "./CustomerMenuCard";
 
-const CustomerMenuGrid = ({ products, loading, onViewDetail }) => {
+const CustomerMenuGrid = ({ products, loading, onViewDetail, onConsult }) => {
   if (loading) {
     return (
       <div className="menu-grid-container">
@@ -42,7 +42,11 @@ const CustomerMenuGrid = ({ products, loading, onViewDetail }) => {
       <Row gutter={[24, 24]}>
         {products.map((product, idx) => (
           <Col key={product.id || product.Id || idx} xs={24} sm={12} md={8} lg={6}>
-            <CustomerMenuCard product={product} onViewDetail={onViewDetail} />
+            <CustomerMenuCard
+              product={product}
+              onViewDetail={onViewDetail}
+              onConsult={onConsult}
+            />
           </Col>
         ))}
       </Row>

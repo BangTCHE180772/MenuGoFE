@@ -12,7 +12,8 @@ import {
   UserOutlined,
   CalendarOutlined,
   MessageOutlined,
-  DownOutlined
+  DownOutlined,
+  LogoutOutlined
 } from "@ant-design/icons";
 
 const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
@@ -54,6 +55,18 @@ const CustomerHeader = ({ chainInfo, activeSection, onNavigate }) => {
       icon: <MessageOutlined style={{ color: "#ea580c" }} />,
       label: <span style={{ fontWeight: 600 }}>Tin nhắn</span>,
       onClick: () => navigate("/customer/chat")
+    },
+    {
+      type: "divider"
+    },
+    {
+      key: "logout",
+      icon: <LogoutOutlined style={{ color: "#ef4444" }} />,
+      label: <span style={{ fontWeight: 600, color: "#ef4444" }}>Đăng xuất</span>,
+      onClick: () => {
+        customerAuth.logout();
+        navigate("/welcome");
+      }
     }
   ];
 

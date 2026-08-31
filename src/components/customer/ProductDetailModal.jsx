@@ -15,7 +15,7 @@ const formatPrice = (price) => {
   }).format(price);
 };
 
-const ProductDetailModal = ({ product, open, onClose }) => {
+const ProductDetailModal = ({ product, open, onClose, onConsult }) => {
   if (!product) return null;
 
   const groupName = product.groupName || product.Group?.Name || product.category || "Món ăn";
@@ -71,10 +71,28 @@ const ProductDetailModal = ({ product, open, onClose }) => {
             </div>
           </div>
 
-          <div className="modal-actions">
-            <Button size="large" block onClick={onClose} className="btn-close-modal">
+          <div className="modal-actions" style={{ display: 'flex', gap: 10 }}>
+            <Button size="large" onClick={onClose} className="btn-close-modal" style={{ flex: 1 }}>
               Đóng
             </Button>
+            {onConsult && (
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => {
+                  onClose();
+                  onConsult(product);
+                }}
+                style={{
+                  flex: 1,
+                  background: '#ea580c',
+                  borderColor: '#ea580c',
+                  fontWeight: 600
+                }}
+              >
+                Tư vấn món này
+              </Button>
+            )}
           </div>
         </div>
       </div>

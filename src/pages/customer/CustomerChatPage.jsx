@@ -28,7 +28,8 @@ import {
   SearchOutlined,
   UpOutlined,
   DownOutlined,
-  CloseOutlined
+  CloseOutlined,
+  AppstoreAddOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerAuth } from '../../context/CustomerAuthContext';
@@ -40,6 +41,9 @@ import {
   openCustomerConversation,
   sendCustomerChatMessage
 } from '../../api/customerPortalApi';
+import { sendCustomerProductConsultation } from '../../api/guestChatApi';
+import ProductConsultationCard from '../../components/chat/ProductConsultationCard';
+import SelectProductConsultationModal from '../../components/chat/SelectProductConsultationModal';
 import dayjs from 'dayjs';
 
 const { Content, Sider } = Layout;
@@ -128,6 +132,8 @@ const CustomerChatPage = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const [submittingNewChat, setSubmittingNewChat] = useState(false);
+  const [consultModalOpen, setConsultModalOpen] = useState(false);
+  const [consultLoading, setConsultLoading] = useState(false);
 
   // Quick navigation modal (Chỉ Chủ đề)
   const [quickNavOpen, setQuickNavOpen] = useState(false);
@@ -315,6 +321,31 @@ const CustomerChatPage = () => {
       message.error(error.response?.data?.message || 'Không thể tạo cuộc trò chuyện.');
     } finally {
       setSubmittingNewChat(false);
+    }
+  };
+
+  const handleSendProductConsultation = async (productIds) => {
+    if (!activeConversation?.branchId || !productIds || productIds.length === 0) return;
+    setConsultLoading(true);
+    try {
+      const res = await sendCustomerProductConsultation({
+        branchId: activeConversation.branchId,
+        conversationId: activeConvId,
+        productIds: productIds
+      });
+      if (res.data) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === res.data.id)) return prev;
+          return [...prev, res.data];
+        });
+        scrollToBottom();
+        message.success('Đã gửi thông tin món ăn vào cuộc trò chuyện!');
+        fetchConversations(activeConvId);
+      }
+    } catch (error) {
+      message.error('Không thể gửi thông tin món ăn.');
+    } finally {
+      setConsultLoading(false);
     }
   };
 
@@ -675,6 +706,9 @@ const CustomerChatPage = () => {
                                   <div style={{ fontSize: 14, wordBreak: 'break-word', lineHeight: 1.5 }}>
                                     {renderHighlightedText(msg.content, showSearch ? searchTerm : '')}
                                   </div>
+                                  {msg.messageType === 'ProductReference' && (
+                                    <ProductConsultationCard metadataJson={msg.metadataJson} />
+                                  )}
                                   <div
                                     style={{
                                       fontSize: 10,
@@ -765,6 +799,26 @@ const CustomerChatPage = () => {
                         flexShrink: 0
                       }}
                     >
+                      {/* Nút Chọn món ăn tư vấn */}
+                      <Button
+                        icon={<AppstoreAddOutlined />}
+                        onClick={() => setConsultModalOpen(true)}
+                        style={{
+                          height: 38,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          borderRadius: 8,
+                          borderColor: '#fed7aa',
+                          color: '#ea580c',
+                          background: '#fffaf5',
+                          fontWeight: 600
+                        }}
+                        title="Chọn món ăn từ thực đơn để gửi tư vấn"
+                      >
+                        Chọn món
+                      </Button>
+
                       {/* Nút Kính Lúp bên trái Nhập tin nhắn */}
                       <Button
                         icon={<SearchOutlined />}
@@ -997,6 +1051,15 @@ const CustomerChatPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Modal Chọn món ăn tư vấn */}
+      <SelectProductConsultationModal
+        open={consultModalOpen}
+        onClose={() => setConsultModalOpen(false)}
+        branchId={activeConversation?.branchId}
+        onConfirmSend={handleSendProductConsultation}
+        loading={consultLoading}
+      />
     </div>
   );
 };
