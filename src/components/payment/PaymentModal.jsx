@@ -4,6 +4,7 @@ import { PrinterOutlined } from '@ant-design/icons';
 import { payOrder } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
 import { checkVoucher, getAllVouchers } from '../../api/voucherApi';
+import { configApi } from '../../api/configApi';
 import CustomerSearchInput from '../common/CustomerSearchInput';
 import { useSignalR } from '../../context/SignalRContext';
 
@@ -24,6 +25,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
   const [usePoints, setUsePoints] = useState(false);
   const [allVouchers, setAllVouchers] = useState([]);
   const [cashTendered, setCashTendered] = useState('');
+  const [pointConfig, setPointConfig] = useState({ minPointsToUse: 50000, maxDiscountPercentage: 50 });
 
   const connection = useSignalR();
 
@@ -48,7 +50,17 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
           console.error('Lỗi khi tải voucher:', error);
         }
       };
+      const fetchConfig = async () => {
+        try {
+          const config = await configApi.getPointSystemConfig();
+          setPointConfig(config || { minPointsToUse: 50000, maxDiscountPercentage: 50 });
+        } catch (error) {
+          console.error('Lỗi khi tải cấu hình điểm:', error);
+        }
+      };
+
       fetchVouchers();
+      fetchConfig();
     }
   }, [visible]);
 
@@ -161,9 +173,10 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
   const pointsAvailable = customerData?.point || 0;
 
   let pointsDiscount = 0;
-  if (usePoints && pointsAvailable > 0) {
+  if (usePoints && pointsAvailable > 0 && pointsAvailable >= pointConfig.minPointsToUse) {
     const afterVoucher = baseTotal - voucherDiscount;
-    pointsDiscount = Math.min(pointsAvailable, afterVoucher); // 1 point = 1 VND
+    const maxPointsAllowed = afterVoucher * (pointConfig.maxDiscountPercentage / 100);
+    pointsDiscount = Math.min(pointsAvailable, Math.round(maxPointsAllowed)); // 1 point = 1 VND
   }
 
   const grandTotalRaw = baseTotal - voucherDiscount - pointsDiscount;
@@ -484,9 +497,20 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
             </Text>
             {customerData.point > 0 && (
               <div style={{ marginTop: 4 }}>
-                <Checkbox checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)}>
-                  Sử dụng điểm trừ vào hoá đơn
+                <Checkbox 
+                  checked={usePoints} 
+                  onChange={(e) => setUsePoints(e.target.checked)}
+                  disabled={customerData.point < pointConfig.minPointsToUse}
+                >
+                  Sử dụng điểm trừ vào hoá đơn (Tối đa {pointConfig.maxDiscountPercentage}%)
                 </Checkbox>
+                {customerData.point < pointConfig.minPointsToUse && (
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: '12px', color: '#ff4d4f' }}>
+                      * Cần tối thiểu {pointConfig.minPointsToUse.toLocaleString('vi-VN')} điểm để sử dụng
+                    </Text>
+                  </div>
+                )}
               </div>
             )}
           </div>
