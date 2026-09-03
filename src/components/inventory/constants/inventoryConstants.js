@@ -17,6 +17,7 @@ export const SIDEBAR_HEADER_TITLES = {
   Check: 'KIỂM KHO',
   Adjustment: 'ĐIỀU CHỈNH GIÁ VỐN',
   Partner: 'ĐỐI TÁC',
+  Customer: 'KHÁCH HÀNG',
   Product: 'DANH SÁCH NGUYÊN LIỆU, MẶT HÀNG',
   BatchExpiry: 'THEO DÕI HẠN SỬ DỤNG & LÔ HÀNG'
 };
