@@ -186,7 +186,7 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
         customerPhone: values.customerPhone,
         reservationTime: values.reservationTime.toISOString(),
         numberOfGuests: values.numberOfGuests,
-        tableCount: values.tableCount,
+        tableCount: values.tableIds ? values.tableIds.length : 1,
         note: values.note || '',
         tableIds: values.tableIds || [],
         preOrderItems: preOrderItems.map(item => ({
@@ -338,15 +338,6 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item
-              name="tableCount"
-              label="Số Bàn"
-              rules={[{ required: true, message: 'Vui lòng nhập số bàn' }]}
-              initialValue={1}
-              style={{ flex: 1 }}
-            >
-              <InputNumber min={1} max={20} style={{ width: '100%' }} />
-            </Form.Item>
           </div>
 
           <Form.Item name="note" label="Ghi Chú Đặt Bàn">
@@ -367,17 +358,44 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
             </Form.Item>
           )}
 
-          <Form.Item name="tableIds" label="Xếp Bàn (Tùy chọn)">
+          <Form.Item
+            name="tableIds"
+            label="Xếp Bàn"
+            rules={[
+              { required: true, message: 'Vui lòng chọn bàn!' },
+              { type: 'array', min: 1, message: 'Vui lòng chọn ít nhất 1 bàn!' }
+            ]}
+          >
             <Select
               mode="multiple"
               placeholder="Chọn bàn..."
               optionFilterProp="children"
               style={{ width: '100%' }}
+              onChange={(value) => {
+                if (!value || value.length <= 1) return;
+                const selectedAreas = new Set(
+                  value.map(id => tables.find(t => t.id === id)?.areaName)
+                );
+                if (selectedAreas.size > 1) {
+                  message.warning('Khuyến cáo: Các bàn đã chọn thuộc các khu vực khác nhau!');
+                }
+              }}
             >
-              {tables.map(t => (
-                <Select.Option key={t.id} value={t.id}>
-                  {t.name}
-                </Select.Option>
+              {Object.entries(
+                tables.reduce((acc, table) => {
+                  const areaName = table.areaName || 'Khu vực khác';
+                  acc[areaName] = acc[areaName] || [];
+                  acc[areaName].push(table);
+                  return acc;
+                }, {})
+              ).map(([areaName, areaTables]) => (
+                <Select.OptGroup key={areaName} label={`Khu vực: ${areaName}`}>
+                  {areaTables.map(t => (
+                    <Select.Option key={t.id} value={t.id}>
+                      {t.name}
+                    </Select.Option>
+                  ))}
+                </Select.OptGroup>
               ))}
             </Select>
           </Form.Item>
