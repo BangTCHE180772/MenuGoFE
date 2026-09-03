@@ -38,6 +38,7 @@ const ProcessedProductModal = ({
 
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -50,8 +51,8 @@ const ProcessedProductModal = ({
           sellPrice: editingProduct.sellPrice || 0,
           isSellable: editingProduct.isSellable !== undefined ? editingProduct.isSellable : true,
           description: editingProduct.description || '',
-          imageUrl: editingProduct.imageUrl || '',
-          imageId: editingProduct.imageId || null,
+          imageUrl: editingProduct.imageUrl || editingProduct.imageLink || editingProduct.image?.imageLink || editingProduct.avatar || '',
+          imageId: editingProduct.imageId || editingProduct.image?.id || null,
           menuIds: editingProduct.menuIds || [],
           recipe: editingProduct.recipeItems
             ? editingProduct.recipeItems.map(item => ({ productId: item.ingredientProductId || item.productId, quantity: item.quantity }))
@@ -77,16 +78,18 @@ const ProcessedProductModal = ({
   if (!open) return null;
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
     try {
       const res = await uploadImage(file);
-      if (res.data && res.data.imageLink) {
+      const imgLink = res.data?.imageLink || res.data?.imageUrl || res.data?.secureUrl || (typeof res.data === 'string' ? res.data : '');
+      const imgId = res.data?.id || res.data?.imageId || null;
+      if (imgLink) {
         setFormData(prev => ({
           ...prev,
-          imageUrl: res.data.imageLink,
-          imageId: res.data.id || null,
+          imageUrl: imgLink,
+          imageId: imgId,
         }));
         notifySuccess('Tải ảnh lên thành công!');
       }
@@ -95,6 +98,15 @@ const ProcessedProductModal = ({
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const handleRemoveImage = (e) => {
+    e.stopPropagation();
+    setFormData(prev => ({
+      ...prev,
+      imageUrl: '',
+      imageId: null,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -246,6 +258,7 @@ const ProcessedProductModal = ({
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#475569', marginBottom: 6 }}>Hình ảnh</label>
                 <div
+                  onClick={() => !uploadingImage && fileInputRef.current?.click()}
                   style={{
                     width: 120,
                     height: 120,
@@ -258,22 +271,80 @@ const ProcessedProductModal = ({
                     position: 'relative',
                     overflow: 'hidden',
                     background: '#f8fafc',
+                    cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                    transition: 'border-color 0.2s',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#8b5cf6')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
                 >
-                  {formData.imageUrl ? (
-                    <img src={formData.imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {uploadingImage ? (
+                    <div style={{ textAlign: 'center', color: '#8b5cf6', fontSize: 12 }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>⏳</div>
+                      <div>Đang tải...</div>
+                    </div>
+                  ) : formData.imageUrl ? (
+                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                      <img
+                        src={formData.imageUrl}
+                        alt="preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(0, 0, 0, 0.45)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          opacity: 0,
+                          transition: 'opacity 0.2s',
+                          color: '#fff',
+                          fontSize: 11,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = 0)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                          <PictureOutlined /> Đổi ảnh
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          style={{
+                            background: '#ef4444',
+                            border: 'none',
+                            borderRadius: 4,
+                            color: '#fff',
+                            fontSize: 10,
+                            padding: '3px 8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            fontWeight: 600,
+                          }}
+                        >
+                          <DeleteOutlined /> Xóa ảnh
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div style={{ textAlign: 'center', color: '#94a3b8' }}>
                       <PictureOutlined style={{ fontSize: 24, marginBottom: 4 }} />
-                      <div style={{ fontSize: 11 }}>Tải ảnh lên</div>
+                      <div style={{ fontSize: 11, fontWeight: 500 }}>Tải ảnh lên</div>
                     </div>
                   )}
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/*"
+                    onClick={(e) => { e.target.value = null; }}
                     onChange={handleImageUpload}
                     disabled={uploadingImage}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                    style={{ display: 'none' }}
                   />
                 </div>
               </div>
