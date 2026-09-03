@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ReloadOutlined,
   LeftOutlined,
@@ -232,6 +233,55 @@ const ProductTable = ({
   const totalStockQty = useMemo(() => {
     return filteredData.reduce((acc, item) => acc + Number(item.stockQuantity ?? item.quantity ?? 0), 0);
   }, [filteredData]);
+
+  const [searchParams] = useSearchParams();
+
+  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho
+  useEffect(() => {
+    const listToSearch = filteredData.length > 0 ? filteredData : rawList;
+    if (!listToSearch || listToSearch.length === 0) return;
+
+    const invIdParam = searchParams.get('inventoryId') ? Number(searchParams.get('inventoryId')) : null;
+    const prodIdParam = searchParams.get('productId') ? Number(searchParams.get('productId')) : null;
+    const batchParam = searchParams.get('batchId') ? Number(searchParams.get('batchId')) : null;
+    const activeTabParam = searchParams.get('activeTab');
+
+    let matched = null;
+    if (invIdParam) {
+      matched = listToSearch.find((i) => i.id === invIdParam || i.bInventoryId === invIdParam);
+    }
+    if (!matched && prodIdParam) {
+      matched = listToSearch.find((i) => i.productId === prodIdParam || i.product?.id === prodIdParam);
+    }
+    if (!matched && searchText) {
+      const lower = searchText.toLowerCase().trim();
+      matched = listToSearch.find((i) => {
+        const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+        const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+        return pName === lower || pCode === lower || pName.includes(lower);
+      });
+    }
+
+    if (matched) {
+      // Tự chuyển subTab nếu cần
+      const isProcessed = checkIsProcessed(matched);
+      const neededSubTab = isProcessed ? 'monan' : 'nguyenlieu';
+      if (subTab !== neededSubTab && setSubTab) {
+        setSubTab(neededSubTab);
+      }
+
+      setExpandedId(matched.id);
+      const tabToActivate = activeTabParam || (batchParam ? 'batches' : 'info');
+      setActiveTabMap((prev) => ({ ...prev, [matched.id]: tabToActivate }));
+
+      // Tự chuyển sang đúng trang chứa nguyên liệu
+      const matchedIdx = filteredData.findIndex((i) => i.id === matched.id);
+      if (matchedIdx >= 0) {
+        const targetPage = Math.floor(matchedIdx / pageSize) + 1;
+        setCurrentPage(targetPage);
+      }
+    }
+  }, [filteredData, rawList, searchParams, searchText, subTab, setSubTab]);
 
   const totalStockValue = useMemo(() => {
     return filteredData.reduce((acc, item) => {

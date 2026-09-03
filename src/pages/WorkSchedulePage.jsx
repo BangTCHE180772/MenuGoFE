@@ -67,7 +67,9 @@ import { getAllShifts } from '../api/shiftApi';
 import { getShiftChangeRequestsByBranch, approveShiftChangeRequest, rejectShiftChangeRequest } from '../api/shiftChangeRequestApi';
 import { getContracts } from '../api/contractApi';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import MyWorkSchedulePage from './MyWorkSchedulePage';
+import AccountDetailModal from '../components/account/AccountDetailModal';
 
 const STATUS_OPTIONS = [
   { value: 'Pending', label: 'Chờ thực hiện', color: 'warning' },
@@ -175,6 +177,47 @@ const WorkSchedulePage = () => {
   const [selectedManagerApproved, setSelectedManagerApproved] = useState(null);
   const [searchDate, setSearchDate] = useState(null);
   const [searchEmpText, setSearchEmpText] = useState('');
+
+  const [searchParams] = useSearchParams();
+
+  // Modal states - Employee Detail
+  const [detailAccount, setDetailAccount] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Tự động nhận diện và lọc theo nhân viên khi điều hướng từ thông báo chấm công
+  useEffect(() => {
+    const accIdParam = searchParams.get('accountId');
+    const searchParam = searchParams.get('search');
+    const dateParam = searchParams.get('date');
+    const openDetailParam = searchParams.get('openDetail') === 'true' || searchParams.get('openDetail') === '1';
+
+    if (accIdParam) {
+      setSelectedAccount(Number(accIdParam));
+    }
+    if (searchParam) {
+      setSearchEmpText(searchParam);
+    }
+    if (dateParam && dayjs(dateParam).isValid()) {
+      const d = dayjs(dateParam);
+      setSearchDate(d);
+      setCurrentWeekStart(d.startOf('isoWeek'));
+    }
+
+    if (openDetailParam && accounts && accounts.length > 0) {
+      let matched = null;
+      if (accIdParam) {
+        matched = accounts.find((a) => a.id === Number(accIdParam));
+      }
+      if (!matched && searchParam) {
+        const lower = searchParam.toLowerCase().trim();
+        matched = accounts.find((a) => (a.name || '').toLowerCase().includes(lower));
+      }
+      if (matched) {
+        setDetailAccount(matched);
+        setIsDetailModalOpen(true);
+      }
+    }
+  }, [searchParams, accounts]);
 
   // Weekly Matrix Grid Navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => dayjs().startOf('isoWeek'));
@@ -2118,6 +2161,14 @@ const WorkSchedulePage = () => {
           </div>
         )}
       </Modal>
+
+      {/* Employee Detail Modal */}
+      <AccountDetailModal
+        open={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        account={detailAccount}
+        branches={branches}
+      />
     </div>
   );
 };

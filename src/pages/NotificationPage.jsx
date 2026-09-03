@@ -13,21 +13,21 @@ import {
   Empty,
   Skeleton,
   message,
-  Space,
-  Avatar
+  Space
 } from 'antd';
 import {
   HomeOutlined,
   BellOutlined,
   SearchOutlined,
-  CheckCircleOutlined,
   ClockCircleOutlined,
   ShopOutlined,
-  FilterOutlined
+  ArrowRightOutlined,
+  CheckOutlined
 } from '@ant-design/icons';
 import { useBranch } from '../context/BranchContext';
 import { useAuth } from '../context/AuthContext';
-import { getNotifications, markAsRead } from '../api/notificationApi';
+import { getNotifications, markAsRead, markAllAsRead } from '../api/notificationApi';
+import { getNotificationVisualMeta, NOTIFICATION_CATEGORIES, getNotificationSmartRedirectUrl } from '../utils/notificationHelper';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -38,16 +38,6 @@ dayjs.locale('vi');
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
-
-const NOTIFICATION_TYPES = [
-  { value: 'All', label: 'Tất cả loại cảnh báo' },
-  { value: 'Operational', label: 'Cảnh báo vận hành' },
-  { value: 'ShelfLife', label: 'Hạn sử dụng nguyên liệu' },
-  { value: 'Quality', label: 'Kiểm tra chất lượng & Hao hụt' },
-  { value: 'Order', label: 'Hóa đơn & Đơn hàng' },
-  { value: 'Inventory', label: 'Tồn kho nguyên liệu' },
-  { value: 'Other', label: 'Cảnh báo khác' }
-];
 
 const DATE_PRESETS = [
   { value: 'today', label: 'Hôm nay' },
@@ -100,13 +90,10 @@ const NotificationPage = () => {
     try {
       setLoading(true);
       
-      // Xác định branchId để gửi lên API
       let branchIdParam = null;
       if (currentBranchId) {
-        // Sidebar chọn branch cụ thể -> ép buộc lọc theo branch đó
         branchIdParam = currentBranchId;
       } else if (selectedBranch !== 'All') {
-        // Sidebar chọn All Branches + Page chọn branch cụ thể
         branchIdParam = Number(selectedBranch);
       }
 
@@ -149,36 +136,66 @@ const NotificationPage = () => {
         );
       }
       
-      if (item.redirectUrl) {
-        navigate(item.redirectUrl);
+      const targetUrl = getNotificationSmartRedirectUrl(item);
+      if (targetUrl) {
+        navigate(targetUrl);
       }
     } catch (err) {
       console.error('Lỗi khi đánh dấu đã đọc:', err);
     }
   };
 
-  const getNotifIcon = (type, isImportant) => {
-    if (isImportant) return <Avatar style={{ backgroundColor: '#fff1f0', color: '#ff4d4f' }} className="notif-pulse">🔴</Avatar>;
+  const [markingAll, setMarkingAll] = useState(false);
 
-    switch (type) {
-      case 'Inventory':
-        return <Avatar style={{ backgroundColor: '#e6f7ff', color: '#1890ff' }}>📦</Avatar>;
-      case 'Order':
-        return <Avatar style={{ backgroundColor: '#f6ffed', color: '#52c41a' }}>🍽️</Avatar>;
-      case 'Quality':
-        return <Avatar style={{ backgroundColor: '#fff7e6', color: '#faad14' }}>🔍</Avatar>;
-      case 'ShelfLife':
-        return <Avatar style={{ backgroundColor: '#fff2e8', color: '#fa541c' }}>⏳</Avatar>;
-      case 'Operational':
-      default:
-        return <Avatar style={{ backgroundColor: '#f9f0ff', color: '#722ed1' }}>⚠️</Avatar>;
+  const handleMarkAllAsRead = async () => {
+    try {
+      setMarkingAll(true);
+      let branchIdParam = null;
+      if (currentBranchId) {
+        branchIdParam = currentBranchId;
+      } else if (selectedBranch !== 'All') {
+        branchIdParam = Number(selectedBranch);
+      }
+
+      try {
+        await markAllAsRead(branchIdParam);
+      } catch (apiErr) {
+        const unreadItems = notifications.filter((n) => !n.isRead);
+        if (unreadItems.length > 0) {
+          await Promise.allSettled(unreadItems.map((n) => markAsRead(n.id)));
+        }
+      }
+
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      message.success('Đã đánh dấu tất cả thông báo là đã đọc.');
+    } catch (err) {
+      console.error('Lỗi khi đọc tất cả thông báo:', err);
+      message.error('Không thể đánh dấu đã đọc tất cả.');
+    } finally {
+      setMarkingAll(false);
     }
   };
 
-  const getPriorityTag = (priority) => {
-    if (priority === 'Critical') return <Tag color="error">Cực kỳ quan trọng</Tag>;
-    if (priority === 'Warning') return <Tag color="warning">Cảnh báo</Tag>;
-    return <Tag color="blue">Thông tin</Tag>;
+  const renderPriorityTag = (priority, isImportant) => {
+    if (isImportant || priority === 'Critical') {
+      return (
+        <Tag style={{ background: '#fef2f2', color: '#dc2626', borderColor: '#fca5a5', fontWeight: 700, borderRadius: 4 }}>
+          🔴 Cấp bách
+        </Tag>
+      );
+    }
+    if (priority === 'Warning') {
+      return (
+        <Tag style={{ background: '#fffbeb', color: '#d97706', borderColor: '#fde68a', fontWeight: 600, borderRadius: 4 }}>
+          🟡 Cảnh báo
+        </Tag>
+      );
+    }
+    return (
+      <Tag style={{ background: '#eff6ff', color: '#2563eb', borderColor: '#bfdbfe', fontWeight: 500, borderRadius: 4 }}>
+        🔵 Thông tin
+      </Tag>
+    );
   };
 
   return (
@@ -198,15 +215,44 @@ const NotificationPage = () => {
         <div className="notif-title-area">
           <Title level={3}>Nhật Ký Cảnh Báo & Thông Báo Hệ Thống</Title>
           <Text type="secondary">
-            Xem lịch sử tất cả các cảnh báo tự động về kho nguyên liệu, hạn sử dụng, chấm công và chi phí vận hành chi tiết theo chi nhánh.
+            Nhận diện trực quan mọi loại cảnh báo: Hàng Hết, Hết hạn, Chưa chấm công chi tiết theo chi nhánh.
           </Text>
         </div>
+        <Button
+          type="primary"
+          icon={<CheckOutlined />}
+          onClick={handleMarkAllAsRead}
+          loading={markingAll}
+          style={{
+            borderRadius: 8,
+            fontWeight: 600,
+            background: 'var(--color-primary, #ea580c)',
+            borderColor: 'var(--color-primary, #ea580c)',
+            height: 38
+          }}
+        >
+          Đọc tất cả
+        </Button>
+      </div>
+
+      {/* ── QUICK CATEGORY CHIPS BAR ─────────────────────────────────────────── */}
+      <div className="notif-category-chips">
+        {NOTIFICATION_CATEGORIES.map((cat) => (
+          <div
+            key={cat.value}
+            className={`notif-category-chip ${selectedType === cat.value ? 'active' : ''}`}
+            onClick={() => setSelectedType(cat.value)}
+          >
+            <span>{cat.emoji}</span>
+            <span>{cat.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* ── FILTER CARD ─────────────────────────────────────────────────────── */}
       <Card className="notif-filter-card">
         <div className="notif-filter-row">
-          {/* Branch filter (Chỉ hiện nếu đang ở chế độ xem All Branches ở sidebar) */}
+          {/* Branch filter */}
           {!currentBranchId && branches && branches.length > 0 && (
             <div className="notif-filter-item">
               <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>Chi nhánh</span>
@@ -246,14 +292,17 @@ const NotificationPage = () => {
             </div>
           )}
 
-          {/* Type Category Filter */}
+          {/* Type Category Dropdown */}
           <div className="notif-filter-item">
             <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>Loại cảnh báo</span>
             <Select
               value={selectedType}
               onChange={setSelectedType}
               style={{ width: '100%' }}
-              options={NOTIFICATION_TYPES}
+              options={NOTIFICATION_CATEGORIES.map((c) => ({
+                value: c.value,
+                label: `${c.emoji} ${c.label}`
+              }))}
             />
           </div>
 
@@ -298,52 +347,82 @@ const NotificationPage = () => {
             <List
               itemLayout="horizontal"
               dataSource={notifications}
-              renderItem={(item) => (
-                <div
-                  className={`notif-item ${item.isRead ? 'read' : 'unread'}`}
-                  onClick={() => handleItemClick(item)}
-                >
-                  <div className="notif-item-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {getNotifIcon(item.type, item.isImportant)}
-                      <div>
-                        <span className="notif-item-title">{item.title}</span>
-                        {item.isImportant && (
-                          <Tag className="notif-tag-important">Quan trọng</Tag>
-                        )}
-                        {getPriorityTag(item.priority)}
+              renderItem={(item) => {
+                const meta = getNotificationVisualMeta(item);
+                return (
+                  <div
+                    className={`notif-item ${item.isRead ? 'read' : 'unread'}`}
+                    style={{
+                      borderLeftColor: meta.accentColor,
+                      backgroundColor: item.isRead ? '#ffffff' : meta.cardBg
+                    }}
+                    onClick={() => handleItemClick(item)}
+                  >
+                    <div className="notif-item-body-layout">
+                      {/* ICON AVATAR */}
+                      <div
+                        className="notif-icon-avatar"
+                        style={{
+                          backgroundColor: meta.iconBg,
+                          color: meta.iconColor,
+                          border: `1px solid ${meta.borderColor}`
+                        }}
+                      >
+                        {meta.icon}
+                      </div>
+
+                      {/* CONTENT */}
+                      <div className="notif-item-content">
+                        <div className="notif-item-header">
+                          {/* CATEGORY RECOGNITION PILL */}
+                          <span
+                            className="notif-badge-pill"
+                            style={{
+                              backgroundColor: meta.tagBg,
+                              color: meta.tagColor,
+                              borderColor: meta.borderColor
+                            }}
+                          >
+                            <span>{meta.badgeEmoji}</span>
+                            <span>{meta.badgeText}</span>
+                          </span>
+
+                          <span className="notif-item-title">{item.title}</span>
+
+                          {renderPriorityTag(item.priority, item.isImportant)}
+                        </div>
+
+                        <div className="notif-item-desc">
+                          {item.message}
+                        </div>
+
+                        <div className="notif-item-meta">
+                          <span className="notif-meta-point">
+                            <ClockCircleOutlined />
+                            {dayjs(item.createdAt).format('HH:mm - DD/MM/YYYY')} ({dayjs(item.createdAt).fromNow()})
+                          </span>
+
+                          {item.branchName && (
+                            <span className="notif-meta-point" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                              <ShopOutlined />
+                              {item.branchName}
+                            </span>
+                          )}
+
+                          {item.redirectUrl && (
+                            <span
+                              className="notif-action-btn"
+                              style={{ color: meta.accentColor }}
+                            >
+                              {meta.actionText} <ArrowRightOutlined style={{ fontSize: 10 }} />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {!item.isRead && (
-                      <span className="notif-unread-dot" />
-                    )}
                   </div>
-                  
-                  <div className="notif-item-desc">
-                    {item.message}
-                  </div>
-
-                  <div className="notif-item-meta">
-                    <span className="notif-meta-point">
-                      <ClockCircleOutlined />
-                      {dayjs(item.createdAt).format('HH:mm - DD/MM/YYYY')} ({dayjs(item.createdAt).fromNow()})
-                    </span>
-
-                    {item.branchName && (
-                      <span className="notif-meta-point" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                        <ShopOutlined />
-                        {item.branchName}
-                      </span>
-                    )}
-
-                    {item.redirectUrl && (
-                      <Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }}>
-                        Xem chi tiết & xử lý &rarr;
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
+                );
+              }}
             />
 
             {/* PAGINATION */}
