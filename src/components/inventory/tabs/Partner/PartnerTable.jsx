@@ -1,5 +1,161 @@
-import React, { useState } from 'react';
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { PlusOutlined, ReloadOutlined, SearchOutlined, DollarOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons';
+import { getPartnerFinancialSummary, getPartnerImportDocuments, getPartnerCashFlows } from '../../../../api/partnerApi';
+import dayjs from 'dayjs';
+
+const PartnerFinancialDetailSection = ({ partnerId }) => {
+  const [summary, setSummary] = useState(null);
+  const [docs, setDocs] = useState([]);
+  const [cashFlows, setCashFlows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [sumRes, docsRes, cfRes] = await Promise.allSettled([
+          getPartnerFinancialSummary(partnerId),
+          getPartnerImportDocuments(partnerId),
+          getPartnerCashFlows(partnerId)
+        ]);
+
+        if (isMounted) {
+          if (sumRes.status === 'fulfilled') setSummary(sumRes.value);
+          if (docsRes.status === 'fulfilled') setDocs(docsRes.value || []);
+          if (cfRes.status === 'fulfilled') setCashFlows(cfRes.value || []);
+        }
+      } catch (err) {
+        console.error('Error fetching partner financial details:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { isMounted = false; };
+  }, [partnerId]);
+
+  if (loading) {
+    return <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 12 }}>Đang tải dữ liệu tài chính công nợ...</div>;
+  }
+
+  const totalImport = summary?.totalImportAmount || 0;
+  const totalPaid = summary?.totalPaidAmount || 0;
+  const remainingDebt = summary?.remainingDebt || 0;
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* 3 CARDS TỔNG QUAN TÀI CHÍNH */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 16 }}>
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+          <div style={{ fontSize: 10.5, color: '#1e40af', fontWeight: 600, textTransform: 'uppercase' }}>
+            <FileTextOutlined style={{ marginRight: 4 }} /> Tổng tiền nhập hàng
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#1d4ed8', marginTop: 4 }}>
+            {totalImport.toLocaleString('vi-VN')} VNĐ
+          </div>
+        </div>
+
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          <div style={{ fontSize: 10.5, color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>
+            <DollarOutlined style={{ marginRight: 4 }} /> Đã thanh toán NCC
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#15803d', marginTop: 4 }}>
+            {totalPaid.toLocaleString('vi-VN')} VNĐ
+          </div>
+        </div>
+
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca' }}>
+          <div style={{ fontSize: 10.5, color: '#991b1b', fontWeight: 600, textTransform: 'uppercase' }}>
+            <HistoryOutlined style={{ marginRight: 4 }} /> Còn nợ NCC
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#dc2626', marginTop: 4 }}>
+            {remainingDebt.toLocaleString('vi-VN')} VNĐ
+          </div>
+        </div>
+      </div>
+
+      {/* LỊCH SỬ DÒNG TIỀN */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <HistoryOutlined style={{ color: '#ea580c' }} /> Lịch sử giao dịch tài chính
+        </div>
+        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: 9.5 }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Ngày</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Loại giao dịch</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Mã</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Số tiền</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cashFlows.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 12, color: '#94a3b8' }}>Chưa có phát sinh dòng tiền</td></tr>
+              ) : (
+                cashFlows.map((cf) => (
+                  <tr key={cf.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '6px 10px', color: '#64748b' }}>{dayjs(cf.transactionDate).format('DD/MM/YYYY')}</td>
+                    <td style={{ padding: '6px 10px', fontWeight: 600, color: cf.amount < 0 ? '#16a34a' : '#2563eb' }}>{cf.transactionType}</td>
+                    <td style={{ padding: '6px 10px', fontWeight: 700 }}>{cf.code}</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: cf.amount < 0 ? '#16a34a' : '#dc2626' }}>
+                      {cf.amount > 0 ? `+${cf.amount.toLocaleString('vi-VN')}` : cf.amount.toLocaleString('vi-VN')} VNĐ
+                    </td>
+                    <td style={{ padding: '6px 10px', color: '#475569' }}>{cf.note}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* PHIẾU NHẬP HÀNG */}
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FileTextOutlined style={{ color: '#2563eb' }} /> Phiếu nhập hàng
+        </div>
+        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: 9.5 }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Mã phiếu nhập</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left' }}>Ngày nhập</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Tổng tiền</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Đã thanh toán</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right' }}>Còn nợ</th>
+                <th style={{ padding: '6px 10px', textAlign: 'center' }}>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 12, color: '#94a3b8' }}>Chưa có phiếu nhập hàng nào</td></tr>
+              ) : (
+                docs.map((d) => (
+                  <tr key={d.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '6px 10px', fontWeight: 700, color: '#2563eb' }}>{d.code}</td>
+                    <td style={{ padding: '6px 10px', color: '#64748b' }}>{dayjs(d.importDate).format('DD/MM/YYYY')}</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600 }}>{d.totalAmount.toLocaleString('vi-VN')} VNĐ</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>{d.amountPaid.toLocaleString('vi-VN')} VNĐ</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>{d.debtAmount.toLocaleString('vi-VN')} VNĐ</td>
+                    <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                      <span style={{ padding: '2px 6px', borderRadius: 4, background: d.debtAmount === 0 ? '#f0fdf4' : '#fff7ed', color: d.debtAmount === 0 ? '#16a34a' : '#ea580c', fontSize: 10, fontWeight: 600 }}>
+                        {d.debtAmount === 0 ? 'Đã hoàn tất' : 'Còn nợ'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PartnerTable = ({
   partners = [],
@@ -350,23 +506,7 @@ const PartnerTable = ({
 
                             {/* TAB 2: CÔNG NỢ & TÀI CHÍNH */}
                             {currentTab === 'debt' && (
-                              <div style={{ padding: 16 }}>
-                                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
-                                  <div style={{ flex: 1, minWidth: 200, padding: 14, borderRadius: 6, background: '#fef2f2', border: '1px solid #fecaca' }}>
-                                    <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600 }}>CÔNG NỢ HIỆN TẠI</div>
-                                    <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626', marginTop: 4 }}>
-                                      {p.totalDebt ? Number(p.totalDebt).toLocaleString('vi-VN') : 0} VNĐ
-                                    </div>
-                                  </div>
-
-                                  <div style={{ flex: 1, minWidth: 200, padding: 14, borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                                    <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>TRẠNG THÁI THANH TOÁN</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#15803d', marginTop: 6 }}>
-                                      {p.totalDebt && Number(p.totalDebt) > 0 ? 'Đang có công nợ cần thanh toán' : 'Không có công nợ'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              <PartnerFinancialDetailSection partnerId={p.id} />
                             )}
                           </div>
                         </td>

@@ -10,18 +10,22 @@ const PartnerTab = ({ partners = [], fetchPartners, selectedBranchId }) => {
 
   const filteredPartners = useMemo(() => {
     return partners.filter((p) => {
-      if (partnerType !== 'ALL') {
-        const normalizeType = (t) => {
-          if (t === 1 || t === '1' || t === 'Supplier' || t === 'Nhà cung cấp' || t === 'NCC') return 'NCC';
-          if (t === 2 || t === '2' || t === 'Customer' || t === 'Khách hàng' || t === 'KH') return 'KH';
-          if (t === 3 || t === '3' || t === 'Transporter' || t === 'Vận chuyển' || t === 'VC') return 'VC';
-          if (t === 4 || t === '4' || t === 'Other' || t === 'Khác' || t === 'OTHER') return 'OTHER';
-          return 'OTHER';
-        };
+      const normalizeType = (t) => {
+        if (t === 1 || t === '1' || t === 'Supplier' || t === 'Nhà cung cấp' || t === 'NCC') return 'NCC';
+        if (t === 2 || t === '2' || t === 'Customer' || t === 'Khách hàng' || t === 'KH') return 'KH';
+        if (t === 3 || t === '3' || t === 'Transporter' || t === 'Vận chuyển' || t === 'VC') return 'VC';
+        if (t === 4 || t === '4' || t === 'Other' || t === 'Khác' || t === 'OTHER') return 'OTHER';
+        return 'OTHER';
+      };
 
-        if (normalizeType(p.type) !== partnerType) {
-          return false;
-        }
+      // Tuyệt đối không hiển thị Khách hàng ở trang Đối tác
+      const nType = normalizeType(p.type);
+      if (nType === 'KH') {
+        return false;
+      }
+
+      if (partnerType !== 'ALL' && nType !== partnerType) {
+        return false;
       }
 
       if (searchText) {

@@ -33,3 +33,28 @@ export const deletePartner = async (id) => {
   return response.data;
 };
 
+export const getPartnerFinancialSummary = async (partnerId) => {
+  const response = await axiosInstance.get(`/api/Partner/${partnerId}/financial-summary`);
+  return response.data;
+};
+
+export const getPartnerImportDocuments = async (partnerId) => {
+  const response = await axiosInstance.get(`/api/Partner/${partnerId}/import-documents`);
+  return response.data;
+};
+
+export const getPartnerCashFlows = async (partnerId) => {
+  const response = await axiosInstance.get(`/api/Partner/${partnerId}/cash-flows`);
+  return response.data;
+};
+
+export const getCustomerPurchases = async (customerId) => {
+  const response = await axiosInstance.get(`/api/Partner/customer/${customerId}/purchases`);
+  return response.data;
+};
+
+export const getCustomerPoints = async (customerId) => {
+  const response = await axiosInstance.get(`/api/Partner/customer/${customerId}/points`);
+  return response.data;
+};
+
