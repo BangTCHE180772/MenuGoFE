@@ -219,7 +219,7 @@ const BranchChatPage = () => {
             return [conv, ...prev];
           });
           message.info(
-            `Có cuộc trò chuyện mới từ khách hàng: ${conv.customerName}`,
+            `Có cuộc trò chuyện mới từ khách hàng: ${conv.customerName || conv.guestName || "Khách hàng"}`,
           );
         }
       };
@@ -585,7 +585,7 @@ const BranchChatPage = () => {
                                   color: "#1e293b",
                                 }}
                               >
-                                {item.customerName}
+                                {item.customerName || item.guestName || "Khách hàng"}
                               </span>
                               <span style={{ fontSize: 11, color: "#94a3b8" }}>
                                 {dayjs(item.updatedAt).format("HH:mm")}
@@ -677,7 +677,7 @@ const BranchChatPage = () => {
                         display: "block",
                       }}
                     >
-                      {activeConversation?.customerName}
+                      {activeConversation?.customerName || activeConversation?.guestName || "Khách hàng"}
                     </span>
                     <Text type="secondary" style={{ fontSize: 13 }}>
                       Chủ đề: {formatTopicLabel(activeConversation?.topic, activeConversation?.subject)}
@@ -823,7 +823,7 @@ const BranchChatPage = () => {
                                       marginBottom: 4,
                                     }}
                                   >
-                                    {activeConversation?.customerName || msg.guestName || "Khách hàng"}
+                                    {activeConversation?.customerName || activeConversation?.guestName || msg.customerName || msg.guestName || "Khách hàng"}
                                   </div>
                                 )}
                                 <div

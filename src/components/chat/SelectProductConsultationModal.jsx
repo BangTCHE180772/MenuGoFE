@@ -92,8 +92,10 @@ const SelectProductConsultationModal = ({
   };
 
   const handleConfirm = () => {
-    if (selectedProductIds.length === 0) {
-      message.warning('Vui lòng chọn ít nhất một món ăn.');
+    if (loading || selectedProductIds.length === 0) {
+      if (selectedProductIds.length === 0) {
+        message.warning('Vui lòng chọn ít nhất một món ăn.');
+      }
       return;
     }
     onConfirmSend(selectedProductIds);
@@ -120,7 +122,7 @@ const SelectProductConsultationModal = ({
           icon={<SendOutlined />}
           onClick={handleConfirm}
           loading={loading}
-          disabled={selectedProductIds.length === 0}
+          disabled={selectedProductIds.length === 0 || loading}
           style={{ background: '#ea580c', borderColor: '#ea580c', borderRadius: 6, fontWeight: 600 }}
         >
           Gửi tư vấn ({selectedProductIds.length} món)
@@ -177,6 +179,7 @@ const SelectProductConsultationModal = ({
                     padding: '8px 12px',
                     borderRadius: 8,
                     cursor: 'pointer',
+                    userSelect: 'none',
                     background: isSelected ? '#fff7ed' : '#fff',
                     border: isSelected ? '1px solid #fdba74' : '1px solid #f1f5f9',
                     marginBottom: 8,
@@ -186,7 +189,7 @@ const SelectProductConsultationModal = ({
                     gap: 12
                   }}
                 >
-                  <Checkbox checked={isSelected} onChange={() => handleToggleSelect(item.id)} />
+                  <Checkbox checked={isSelected} style={{ pointerEvents: 'none' }} />
 
                   <img
                     src={item.imageLink}
