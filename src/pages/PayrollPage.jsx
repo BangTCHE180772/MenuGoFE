@@ -43,6 +43,10 @@ import {
   CloseCircleOutlined,
   DownOutlined,
   UpOutlined,
+  WarningOutlined,
+  BellOutlined,
+  ExclamationCircleOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -80,7 +84,7 @@ const STATUS_CONFIG = {
   [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   [PAYROLL_STATUS.Paid]: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   [PAYROLL_STATUS.Cancelled]: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)', color: 'purple', badge: 'purple' },
   [PAYROLL_STATUS.Rejected]: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 
   Draft: { label: 'Bản nháp', color: 'default', badge: 'default' },
@@ -88,7 +92,7 @@ const STATUS_CONFIG = {
   Approved: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   Paid: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   Cancelled: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  Locked: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  Locked: { label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)', color: 'purple', badge: 'purple' },
   Rejected: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 };
 
@@ -112,7 +116,7 @@ const STATUS_TO_NUM = {
 const STATUS_FILTER_OPTIONS = [
   { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
   { value: PAYROLL_STATUS.Pending, label: 'Chờ chốt' },
-  { value: PAYROLL_STATUS.Locked, label: 'Đã chốt (Chờ Owner duyệt)' },
+  { value: PAYROLL_STATUS.Locked, label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)' },
   { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt (Chờ thanh toán)' },
   { value: PAYROLL_STATUS.Rejected, label: 'Từ chối (Cần tính lại)' },
   { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán' },
@@ -219,7 +223,7 @@ const PayrollPage = () => {
   const availableStatusOptions = useMemo(() => {
     if (isOwnerOrAdmin) {
       return [
-        { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+        { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Chủ cửa hàng duyệt)' },
         { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
         { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
         { value: PAYROLL_STATUS.Rejected, label: '🚫 Từ chối (Cần tính lại)' },
@@ -228,7 +232,7 @@ const PayrollPage = () => {
     return [
       { value: PAYROLL_STATUS.Draft, label: '📝 Bản nháp' },
       { value: PAYROLL_STATUS.Pending, label: '⏳ Chờ chốt' },
-      { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+      { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Chủ cửa hàng duyệt)' },
       { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
       { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
       { value: PAYROLL_STATUS.Cancelled, label: '❌ Đã hủy' },
@@ -268,6 +272,29 @@ const PayrollPage = () => {
     if (val === undefined || val === null) return '0 đ';
     return `${new Intl.NumberFormat('vi-VN').format(val)} đ`;
   };
+
+  // Branch & Payday Deadline Calculations
+  const activeBranch = useMemo(() => {
+    if (selectedBranch) {
+      return branches.find((b) => b.id === selectedBranch);
+    }
+    return branches[0] || null;
+  }, [branches, selectedBranch]);
+
+  const payrollPayday = activeBranch?.payrollPayday ?? activeBranch?.PayrollPayday ?? 15;
+  const lockDeadlineDay = payrollPayday >= 3 ? payrollPayday - 2 : 1;
+  const lockWarningStartDay = payrollPayday >= 4 ? payrollPayday - 3 : 1;
+  const todayDay = dayjs().date();
+
+  const unlockedStaffCount = useMemo(() => {
+    return payrolls.filter((p) => {
+      const statusVal = p.status;
+      return statusVal === 'Draft' || statusVal === 'Pending' || statusVal === 1 || statusVal === 2;
+    }).length;
+  }, [payrolls]);
+
+  const isNearOrPastLockDeadline = todayDay >= lockWarningStartDay;
+  const isPaydayToday = todayDay === payrollPayday;
 
   // Load Data
   const loadData = useCallback(async () => {
@@ -866,11 +893,11 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            {/* If Pending: allow Lock (Chốt bảng lương & Gửi Owner) */}
+            {/* If Pending: allow Lock (Chốt bảng lương & Gửi Chủ cửa hàng) */}
             {isPending && (
-              <Tooltip title="Chốt (Khóa) bảng lương & Gửi Owner duyệt">
+              <Tooltip title="Chốt (Khóa) bảng lương & Gửi Chủ cửa hàng duyệt">
                 <Popconfirm
-                  title="Chốt bảng lương này và gửi cho Owner phê duyệt?"
+                  title="Chốt bảng lương này và gửi cho Chủ cửa hàng phê duyệt?"
                   okText="Chốt lương"
                   cancelText="Hủy"
                   onConfirm={() => handleLockPayroll(record.id)}
@@ -880,8 +907,22 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            {/* Owner Reject button: When Locked or Approved */}
-            {(isLocked || isApproved) && isOwnerOrAdmin && (
+            {/* Unlock button for Manager or Owner when Locked */}
+            {isLocked && (
+              <Tooltip title="Mở khóa chốt (để chỉnh sửa lại)">
+                <Popconfirm
+                  title="Mở khóa chốt bảng lương này để chỉnh sửa lại?"
+                  okText="Mở khóa"
+                  cancelText="Hủy"
+                  onConfirm={() => handleUnlockPayroll(record.id)}
+                >
+                  <Button type="text" icon={<UnlockOutlined style={{ color: '#fa8c16' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {/* Owner Reject button: When Approved */}
+            {isApproved && isOwnerOrAdmin && (
               <Tooltip title="Từ chối phê duyệt (Yêu cầu Quản lý tính lại)">
                 <Popconfirm
                   title="Từ chối bảng lương này để yêu cầu Quản lý tính lại?"
@@ -897,7 +938,7 @@ const PayrollPage = () => {
 
             {/* Owner Approval button (When Locked) */}
             {isLocked && isOwnerOrAdmin && (
-              <Tooltip title="Phê duyệt bảng lương (Owner)">
+              <Tooltip title="Phê duyệt bảng lương (Chủ cửa hàng)">
                 <Popconfirm
                   title="Phê duyệt bảng lương này?"
                   okText="Duyệt"
@@ -1081,6 +1122,115 @@ const PayrollPage = () => {
         </div>
       </Card>
 
+      {/* Timeline & Payday Info Card */}
+      <Card
+        style={{
+          marginBottom: 16,
+          borderRadius: '12px',
+          border: '1px solid #e5e7eb',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        }}
+        bodyStyle={{ padding: '14px 20px' }}
+      >
+        <Row gutter={[16, 12]} align="middle">
+          <Col xs={24} sm={12} md={6}>
+            <Space align="center">
+              <CalendarOutlined style={{ fontSize: 22, color: '#722ed1', background: '#f9f0ff', padding: 10, borderRadius: '50%' }} />
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Ngày Trả Lương Chi Nhánh</div>
+                <strong style={{ fontSize: 15, color: '#722ed1' }}>
+                  Ngày {payrollPayday} hàng tháng
+                </strong>
+              </div>
+            </Space>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <Space align="center">
+              <ClockCircleOutlined style={{ fontSize: 22, color: '#d97706', background: '#fffbebe', padding: 10, borderRadius: '50%' }} />
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Hạn Quản Lý Chốt Lương</div>
+                <strong style={{ fontSize: 15, color: '#d97706' }}>
+                  Ngày {lockWarningStartDay} - {lockDeadlineDay} hàng tháng
+                </strong>
+              </div>
+            </Space>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <Space align="center">
+              <CheckCircleOutlined style={{ fontSize: 22, color: '#16a34a', background: '#f0fdf4', padding: 10, borderRadius: '50%' }} />
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Thời Gian Duyệt (Chủ cửa hàng)</div>
+                <strong style={{ fontSize: 15, color: '#16a34a' }}>
+                  Trước ngày {payrollPayday}
+                </strong>
+              </div>
+            </Space>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <Space align="center">
+              <DollarCircleOutlined style={{ fontSize: 22, color: unlockedStaffCount > 0 ? '#dc2626' : '#16a34a', background: unlockedStaffCount > 0 ? '#fef2f2' : '#f0fdf4', padding: 10, borderRadius: '50%' }} />
+              <div>
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Trạng Thái Tiến Độ</div>
+                <strong style={{ fontSize: 15, color: unlockedStaffCount > 0 ? '#dc2626' : '#16a34a' }}>
+                  {unlockedStaffCount > 0 ? `${unlockedStaffCount} nhân sự chưa chốt` : '✅ Đã chốt hoàn tất'}
+                </strong>
+              </div>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* 1. Manager Warning Alert (Shown when near/at lock deadline & unlocked count > 0) */}
+      {(!isOwnerOrAdmin || !isManagerTab) && unlockedStaffCount > 0 && isNearOrPastLockDeadline && (
+        <Alert
+          message={
+            <Space>
+              <WarningOutlined style={{ color: '#d97706', fontSize: 16 }} />
+              <strong style={{ color: '#b45309' }}>⚠️ CẢNH BÁO HẠN CHỐT LƯƠNG DÀNH CHO QUẢN LÝ</strong>
+            </Space>
+          }
+          description={`Chi nhánh ${activeBranch?.name || ''} quy định trả lương vào ngày ${payrollPayday} hàng tháng. Quản lý phải hoàn tất chốt bảng lương trước ngày ${lockDeadlineDay}! Hiện đang có ${unlockedStaffCount} nhân sự chưa được chốt lương. Vui lòng rà soát và bấm "Chốt lương" gửi Chủ cửa hàng phê duyệt.`}
+          type="warning"
+          showIcon={false}
+          style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb' }}
+        />
+      )}
+
+      {/* 2. Owner Escalation Alert (Shown to Owner when past/at lock deadline & unlocked count > 0) */}
+      {isOwnerOrAdmin && unlockedStaffCount > 0 && todayDay >= lockDeadlineDay && (
+        <Alert
+          message={
+            <Space>
+              <ExclamationCircleOutlined style={{ color: '#dc2626', fontSize: 16 }} />
+              <strong style={{ color: '#dc2626' }}>🚨 THÔNG BÁO CHO CHỦ CỬA HÀNG: QUẢN LÝ CHƯA CHỐT LƯƠNG ĐÚNG HẠN</strong>
+            </Space>
+          }
+          description={`Chi nhánh ${activeBranch?.name || ''} có ${unlockedStaffCount} nhân sự chưa được Quản lý chốt lương đúng hạn! (Hạn chốt quy định: Ngày ${lockDeadlineDay}, Ngày trả lương: Ngày ${payrollPayday}). Vui lòng nhắc nhở Quản lý chi nhánh hoặc trực tiếp kiểm tra và chốt/duyệt bảng lương.`}
+          type="error"
+          showIcon={false}
+          style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #fca5a5', background: '#fef2f2' }}
+        />
+      )}
+
+      {/* 3. Due Date Payment Reminder Alert (Shown when today is payday) */}
+      {isPaydayToday && (
+        <Alert
+          message={
+            <Space>
+              <BellOutlined style={{ color: '#2563eb', fontSize: 16 }} />
+              <strong style={{ color: '#1d4ed8' }}>🔔 ĐÃ ĐẾN NGÀY THANH TOÁN LƯƠNG HÀNG THÁNG (NGÀY {payrollPayday})</strong>
+            </Space>
+          }
+          description={`Hôm nay là ngày ${payrollPayday} (Ngày trả lương hàng tháng của chi nhánh ${activeBranch?.name || ''}). Vui lòng kiểm tra và thực hiện thanh toán cho các nhân sự đã được Chủ cửa hàng phê duyệt lương!`}
+          type="info"
+          showIcon={false}
+          style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #bfdbfe', background: '#eff6ff' }}
+        />
+      )}
+
 
 
       {/* Filter and Table Card */}
@@ -1174,7 +1324,7 @@ const PayrollPage = () => {
           dataSource={filteredPayrolls}
           rowKey="id"
           loading={loading}
-          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25', '50'], showSizeChanger: true }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 1100 }}
           bordered
         />
@@ -1184,6 +1334,7 @@ const PayrollPage = () => {
       {/* 1. Modal Auto-Generate Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#e8442a' }}>
             <CalculatorOutlined />
@@ -1220,9 +1371,12 @@ const PayrollPage = () => {
             <Select
               placeholder="Chọn nhân viên cần tính lương..."
               showSearch
-              filterOption={(input, option) =>
-                (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                if (!input) return true;
+                if (option?.children || option?.value === undefined) return true;
+                const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+                return targetText.toLowerCase().includes(input.toLowerCase());
+              }}
               optionLabelProp="label"
               dropdownStyle={{ maxHeight: 360 }}
               onChange={(val) => {
@@ -1336,6 +1490,7 @@ const PayrollPage = () => {
       {/* 2. Modal Manual Create / Edit Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <DollarCircleOutlined />
@@ -1374,9 +1529,12 @@ const PayrollPage = () => {
                 <Select
                   placeholder="Chọn nhân viên..."
                   showSearch
-                  filterOption={(input, option) =>
-                    (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-                  }
+                  filterOption={(input, option) => {
+                    if (!input) return true;
+                    if (option?.children || option?.value === undefined) return true;
+                    const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+                    return targetText.toLowerCase().includes(input.toLowerCase());
+                  }}
                   optionLabelProp="label"
                   dropdownStyle={{ maxHeight: 360 }}
                   onChange={(val) => {
@@ -1683,6 +1841,7 @@ const PayrollPage = () => {
       {/* 3. Modal View Payroll Detail */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <EyeOutlined />
@@ -1963,6 +2122,7 @@ const PayrollPage = () => {
       {/* 4. Modal Quick Update Status */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title="CẬP NHẬT TRẠNG THÁI BẢNG LƯƠNG"
         open={isStatusModalOpen}
         onCancel={() => setIsStatusModalOpen(false)}
@@ -2008,6 +2168,7 @@ const PayrollPage = () => {
       {/* 5. Modal Batch Generate Payroll */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#1890ff' }}>
             <ThunderboltOutlined />

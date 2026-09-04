@@ -8,9 +8,12 @@ import { Spin, message } from 'antd';
 import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 import { getBInventories } from '../../api/binventoryApi';
 import { getAvailableQuantities } from '../../api/orderApi';
+import { getReusableLeftovers } from '../../api/leftoverApi';
 
 const formatPrice = (price) =>
   Number(price).toLocaleString('vi-VN') + 'đ';
+
+const REUSE_POLL_MS = 20000;
 
 const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
   const [products, setProducts] = useState([]);
@@ -19,8 +22,49 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
   const [error, setError] = useState(null);
   const [activeGroup, setActiveGroup] = useState('all');
   const [search, setSearch] = useState('');
+  const [reusableLeftovers, setReusableLeftovers] = useState([]);
+  const [now, setNow] = useState(() => Date.now());
 
   const searchTimeout = useRef(null);
+
+  /* ── Gợi ý dùng lại món thừa (Return, Processed, còn trong 30p) ─────────── */
+  useEffect(() => {
+    if (!branchId) return undefined;
+    let cancelled = false;
+    const fetchReusable = () => {
+      getReusableLeftovers(branchId)
+        .then((res) => { if (!cancelled) setReusableLeftovers(res.data || []); })
+        .catch(() => {});
+    };
+    fetchReusable();
+    const poll = setInterval(fetchReusable, REUSE_POLL_MS);
+    return () => { cancelled = true; clearInterval(poll); };
+  }, [branchId]);
+
+  // Đếm ngược phút còn lại của từng gợi ý
+  useEffect(() => {
+    if (reusableLeftovers.length === 0) return undefined;
+    const tick = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(tick);
+  }, [reusableLeftovers.length]);
+
+  const handleReuseClick = (item) => {
+    if (!canOrder) return;
+    const product = products.find((p) => p.id === item.productId);
+    onAddItem({
+      id: item.productId,
+      name: item.productName,
+      price: product ? Number(product.sellPrice) : 0,
+      desc: product?.description || '',
+      category: product?.groupName || 'Món thừa',
+      qty: item.quantity,
+      reuseLeftoverId: item.id,
+      reuseTableName: item.tableName,
+    });
+    // Bỏ khỏi danh sách gợi ý ngay để tránh bấm dùng lại 2 lần trước khi gọi món;
+    // nếu không xác nhận gọi món, lần poll kế tiếp sẽ tự hiện lại (BE vẫn coi là chưa dùng).
+    setReusableLeftovers((prev) => prev.filter((l) => l.id !== item.id));
+  };
 
   /* ── Fetch sản phẩm từ API ─────────────────────────────────────────────── */
   /* ── Lấy danh sách danh mục lúc ban đầu ────────────────────────────────── */
@@ -182,6 +226,54 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
         </div>
         <span className="pos-menu-count">{products.length} món</span>
       </div>
+
+      {/* Gợi ý dùng lại món thừa — món đã nấu xong bị trả trong 30p gần nhất */}
+      {reusableLeftovers.length > 0 && (
+        <div style={{
+          background: '#fffbeb',
+          border: '1px solid #fde68a',
+          borderRadius: 8,
+          padding: '8px 10px',
+          margin: '0 12px 10px',
+        }}>
+          <div style={{ fontWeight: 600, fontSize: 12, color: '#b45309', marginBottom: 6 }}>
+            💡 Gợi ý dùng lại món thừa (còn trong 30 phút)
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {reusableLeftovers.map((item) => {
+              const minutesLeft = Math.max(0, Math.round((new Date(item.expiresAt).getTime() - now) / 60000));
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={!canOrder}
+                  onClick={() => handleReuseClick(item)}
+                  title={canOrder ? `Dùng lại ${item.productName} thay vì gọi bếp làm mới` : 'Chọn bàn Có khách để gọi món'}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: 2,
+                    padding: '6px 10px',
+                    borderRadius: 6,
+                    border: '1px solid #f59e0b',
+                    background: canOrder ? '#fff' : '#f3f4f6',
+                    cursor: canOrder ? 'pointer' : 'not-allowed',
+                    opacity: canOrder ? 1 : 0.6,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 12.5 }}>
+                    {item.productName} x{item.quantity}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#92400e' }}>
+                    {item.tableName ? `Từ ${item.tableName} · ` : ''}còn {minutesLeft}p — Dùng lại
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Category Tabs — tạo động từ DB */}
       <div className="pos-menu-cats">

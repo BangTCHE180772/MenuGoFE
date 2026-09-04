@@ -29,8 +29,8 @@ export const checkInReservation = async (id) => {
   return response.data;
 };
 
-export const assignTablesToReservation = async (id, tableIds) => {
-  const response = await axiosInstance.post(`/api/Reservation/${id}/assign-tables`, tableIds);
+export const assignTablesToReservation = async (id, tableIds, ignoreWarning = false) => {
+  const response = await axiosInstance.post(`/api/Reservation/${id}/assign-tables?ignoreWarning=${ignoreWarning}`, tableIds);
   return response.data;
 };
 

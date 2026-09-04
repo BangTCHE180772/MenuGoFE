@@ -153,12 +153,13 @@ const AccountPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const targetBranchId = selectedBranch || (!isOwnerOrAdmin && currentBranchId ? Number(currentBranchId) : undefined);
       const [accRes, branchRes] = await Promise.all([
-        getRoleRange(selectedBranch || undefined),
-        isOwnerOrAdmin ? getAllBranches().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        getRoleRange(targetBranchId),
+        getAllBranches().catch(() => ({ data: [] })),
       ]);
       setAccounts(accRes.data || []);
-      if (isOwnerOrAdmin) setBranches(branchRes.data || []);
+      setBranches(branchRes.data || []);
     } catch (err) {
       console.error(err);
       const errMsg = err.response?.data?.message || 'Không thể tải danh sách tài khoản!';
@@ -166,7 +167,7 @@ const AccountPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedBranch, isOwnerOrAdmin]);
+  }, [selectedBranch, isOwnerOrAdmin, currentBranchId]);
 
   useEffect(() => {
     loadData();
@@ -324,7 +325,19 @@ const AccountPage = () => {
   };
 
   // Filter
+  const effectiveBranchId = selectedBranch || (!isOwnerOrAdmin && currentBranchId ? Number(currentBranchId) : null);
+
   const filteredAccounts = accounts.filter((a) => {
+    if (effectiveBranchId) {
+      const activeContract = (a.contracts || []).find(
+        (c) => c.status === 'Active' || c.status === 1 || (c.status || '').toLowerCase() === 'active'
+      );
+      const accBranchId = activeContract?.branchId || a.branchId;
+      if (accBranchId && Number(accBranchId) !== Number(effectiveBranchId)) {
+        return false;
+      }
+    }
+
     const search = searchText.toLowerCase();
     const matchText =
       (a.name || '').toLowerCase().includes(search) ||
@@ -347,13 +360,6 @@ const AccountPage = () => {
   // Columns
   const columns = [
     {
-      title: 'Mã NV',
-      dataIndex: 'id',
-      key: 'id',
-      width: 80,
-      sorter: (a, b) => a.id - b.id,
-    },
-    {
       title: 'Nhân viên',
       key: 'employee',
       render: (_, record) => (
@@ -373,7 +379,6 @@ const AccountPage = () => {
             />
             <div>
               <strong style={{ color: '#e8442a', transition: 'color 0.2s' }}>{record.name}</strong>
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>ID: {record.id}</div>
             </div>
           </div>
         </Tooltip>
@@ -412,6 +417,11 @@ const AccountPage = () => {
       dataIndex: 'roleIds',
       key: 'roleIds',
       width: 140,
+      sorter: (a, b) => {
+        const roleA = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : 99;
+        const roleB = b.roleIds && b.roleIds.length > 0 ? b.roleIds[0] : 99;
+        return roleA - roleB;
+      },
       render: (roleIds) => (
         <Space size={4} wrap>
           {(roleIds || []).map((rid) => {
@@ -645,6 +655,7 @@ const AccountPage = () => {
 
       {/* Modal */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <TeamOutlined />
