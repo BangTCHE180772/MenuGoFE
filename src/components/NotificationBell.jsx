@@ -27,21 +27,90 @@ const NotificationBell = ({ collapsed }) => {
   const connection = useSignalR();
   const navigate = useNavigate();
 
+  // Inject Dynamic Payroll Deadline & Payday Alerts
+  const generatePayrollAlerts = useCallback(() => {
+    const activeBranch = branches.find((b) => b.id === currentBranchId) || branches[0];
+    if (!activeBranch) return [];
+
+    const payday = activeBranch.payrollPayday ?? activeBranch.PayrollPayday ?? 10;
+    const lockDeadlineDay = payday >= 3 ? payday - 2 : 1;
+    const lockWarningStartDay = payday >= 4 ? payday - 3 : 1;
+    const todayDay = dayjs().date();
+
+    const isManagement = role === 'Owner' || role === 'Admin' || role === 'Manager';
+    const alerts = [];
+
+    if (isManagement) {
+      // 1. Management Alerts
+      if (todayDay >= lockWarningStartDay && todayDay < payday) {
+        alerts.push({
+          id: `payroll-lock-deadline-${activeBranch.id}-${dayjs().format('YYYY-MM')}`,
+          title: (role === 'Owner' || role === 'Admin')
+            ? '🚨 THÔNG BÁO CHO CHỦ CỬA HÀNG: QUẢN LÝ CHƯA CHỐT LƯƠNG ĐÚNG HẠN'
+            : '⚠️ CẢNH BÁO HẠN CHỐT LƯƠNG CHI NHÁNH',
+          message: `Chi nhánh ${activeBranch.name} quy định trả lương ngày ${payday} hàng tháng. Quản lý cần hoàn tất chốt bảng lương trước ngày ${lockDeadlineDay}!`,
+          createdAt: dayjs().toISOString(),
+          isRead: false,
+          type: 'Payroll',
+          branchName: activeBranch.name,
+          redirectUrl: '/payroll',
+        });
+      }
+
+      if (todayDay === payday) {
+        alerts.push({
+          id: `payroll-payday-${activeBranch.id}-${dayjs().format('YYYY-MM')}`,
+          title: `🔔 ĐÃ ĐẾN NGÀY THANH TOÁN LƯƠNG HÀNG THÁNG (NGÀY ${payday})`,
+          message: `Hôm nay là ngày ${payday} (Ngày trả lương chi nhánh ${activeBranch.name}). Vui lòng kiểm tra và thực hiện thanh toán cho nhân sự!`,
+          createdAt: dayjs().toISOString(),
+          isRead: false,
+          type: 'Payroll',
+          branchName: activeBranch.name,
+          redirectUrl: '/payroll',
+        });
+      }
+    } else {
+      // 2. Employee Alerts (Staff: Cashier, Chef, Waiter, etc.)
+      if (todayDay >= lockWarningStartDay) {
+        const isPastPayday = todayDay >= payday;
+        alerts.push({
+          id: `employee-payroll-status-${activeBranch.id}-${dayjs().format('YYYY-MM')}`,
+          title: isPastPayday
+            ? `⚠️ THÔNG BÁO TIẾN ĐỘ BẢNG LƯƠNG (NGÀY ${payday})`
+            : `🔔 THÔNG BÁO TIẾN ĐỘ CHỐT LƯƠNG HÀNG THÁNG`,
+          message: isPastPayday
+            ? `Hôm nay là ngày ${payday} (Ngày trả lương chi nhánh ${activeBranch.name}). Vui lòng kiểm tra tiến độ chốt và thanh toán bảng lương của bạn!`
+            : `Chi nhánh ${activeBranch.name} quy định trả lương vào ngày ${payday} hàng tháng. Hạn Quản lý chốt lương: Ngày ${lockDeadlineDay}.`,
+          createdAt: dayjs().toISOString(),
+          isRead: false,
+          type: 'Payroll',
+          branchName: activeBranch.name,
+          redirectUrl: '/my-payroll',
+        });
+      }
+    }
+
+    return alerts;
+  }, [branches, currentBranchId, role]);
+
   // Load số lượng chưa đọc và thông báo gần nhất
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const countRes = await getUnreadCount(currentBranchId);
-      setUnreadCount(countRes.count);
-
       const recentRes = await getRecentNotifications(currentBranchId);
-      setNotifications(recentRes);
+
+      const payrollAlerts = generatePayrollAlerts();
+      const combined = [...payrollAlerts, ...recentRes];
+
+      setUnreadCount((countRes?.count || 0) + payrollAlerts.length);
+      setNotifications(combined);
     } catch (err) {
       console.error('Lỗi khi tải thông báo:', err);
     } finally {
       setLoading(false);
     }
-  }, [currentBranchId]);
+  }, [currentBranchId, generatePayrollAlerts]);
 
   useEffect(() => {
     loadData();
