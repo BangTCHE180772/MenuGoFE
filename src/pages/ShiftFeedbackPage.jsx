@@ -18,6 +18,7 @@ import {
   Statistic,
   Space,
   Tooltip,
+  DatePicker,
 } from 'antd';
 import {
   MessageOutlined,
@@ -28,6 +29,7 @@ import {
   EditOutlined,
   ClockCircleOutlined,
   FilterOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getBranchShiftFeedbacks, processShiftFeedback } from '../api/shiftFeedbackApi';
@@ -56,6 +58,12 @@ const ShiftFeedbackPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [loading, setLoading] = useState(false);
 
+  // Advanced Filters & Pagination
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [feedbackTypeFilter, setFeedbackTypeFilter] = useState('ALL');
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [pageSize, setPageSize] = useState(10);
+
   // Process Modal State
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -81,8 +89,7 @@ const ShiftFeedbackPage = () => {
     if (!selectedBranchId) return;
     setLoading(true);
     try {
-      const statusParam = selectedStatus === 'ALL' ? undefined : selectedStatus;
-      const res = await getBranchShiftFeedbacks(selectedBranchId, statusParam);
+      const res = await getBranchShiftFeedbacks(selectedBranchId);
       setFeedbacks(res.data || []);
     } catch (err) {
       console.error(err);
@@ -90,7 +97,7 @@ const ShiftFeedbackPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId, selectedStatus]);
+  }, [selectedBranchId]);
 
   useEffect(() => {
     loadBranches();
@@ -167,102 +174,149 @@ const ShiftFeedbackPage = () => {
 
   // Stats calculation
   const totalCount = feedbacks.length;
-  const pendingCount = feedbacks.filter((f) => f.status === 'Pending').length;
-  const resolvedCount = feedbacks.filter((f) => f.status === 'Resolved').length;
-  const rejectedCount = feedbacks.filter((f) => f.status === 'Rejected').length;
+  const pendingCount = feedbacks.filter((f) => (f.status || '').toUpperCase() === 'PENDING').length;
+  const resolvedCount = feedbacks.filter((f) => (f.status || '').toUpperCase() === 'RESOLVED').length;
+  const rejectedCount = feedbacks.filter((f) => (f.status || '').toUpperCase() === 'REJECTED').length;
+
+  // Filtered data calculation
+  const filteredFeedbacks = feedbacks.filter((item) => {
+    // Status filter
+    if (selectedStatus !== 'ALL') {
+      if ((item.status || '').toUpperCase() !== selectedStatus.toUpperCase()) return false;
+    }
+    // Type filter
+    if (feedbackTypeFilter !== 'ALL') {
+      if (item.feedbackType !== feedbackTypeFilter) return false;
+    }
+    // Month filter
+    if (selectedMonth) {
+      const workMonth = dayjs(item.workDate).format('YYYY-MM');
+      if (workMonth !== selectedMonth.format('YYYY-MM')) return false;
+    }
+    // Search keyword filter
+    if (searchKeyword.trim()) {
+      const kw = searchKeyword.trim().toLowerCase();
+      const empName = (item.employeeName || '').toLowerCase();
+      const empCode = (item.employeeCode || '').toLowerCase();
+      const title = (item.title || '').toLowerCase();
+      const content = (item.content || '').toLowerCase();
+      if (!empName.includes(kw) && !empCode.includes(kw) && !title.includes(kw) && !content.includes(kw)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const columns = [
     {
       title: 'Mã & Nhân viên',
       key: 'employee',
-      width: 180,
+      width: 120,
       render: (_, record) => (
         <div>
-          <div style={{ fontWeight: '600', color: '#1e293b' }}>{record.employeeName}</div>
-          <div style={{ fontSize: '12px', color: '#64748b' }}>Mã NV: {record.employeeCode}</div>
+          <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '12px' }}>{record.employeeName}</div>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>Mã: {record.employeeCode}</div>
         </div>
       ),
     },
     {
-      title: 'Thông tin ca làm',
+      title: 'Thông tin ca',
       key: 'shift',
-      width: 220,
+      width: 140,
       render: (_, record) => (
-        <div style={{ fontSize: '13px' }}>
-          <div>📅 Ngày: <strong>{dayjs(record.workDate).format('DD/MM/YYYY')}</strong></div>
-          <div>🕒 Ca: <strong>{record.shiftName}</strong> ({record.shiftTime})</div>
+        <div style={{ fontSize: '12px' }}>
+          <div>📅 {dayjs(record.workDate).format('DD/MM/YYYY')}</div>
+          <div>🕒 <strong>{record.shiftName}</strong></div>
           {record.checkInAt && (
-            <div style={{ fontSize: '11px', color: '#16a34a' }}>
-              Vào: {dayjs(record.checkInAt).format('HH:mm')} | Ra: {record.checkOutAt ? dayjs(record.checkOutAt).format('HH:mm') : '—'}
+            <div style={{ fontSize: '10px', color: '#16a34a' }}>
+              In: {dayjs(record.checkInAt).format('HH:mm')} | Out: {record.checkOutAt ? dayjs(record.checkOutAt).format('HH:mm') : '—'}
             </div>
           )}
         </div>
       ),
     },
     {
-      title: 'Giờ công & OT ca này',
+      title: 'Giờ công & OT',
       key: 'ot',
-      width: 170,
+      width: 110,
       render: (_, record) => (
-        <div style={{ fontSize: '13px' }}>
-          <div>Giờ thực tế: <strong>{record.actualHours !== null ? `${record.actualHours}h` : '—'}</strong></div>
-          <div>
-            OT hiện tại:{' '}
-            <Tag color={record.approvedOTHours > 0 ? 'orange' : 'default'} style={{ fontSize: '11px' }}>
-              {record.approvedOTHours || 0}h ({formatOtStatus(record.otStatus)})
+        <div style={{ fontSize: '12px' }}>
+          <div>Công: <strong>{record.actualHours !== null ? `${record.actualHours}h` : '—'}</strong></div>
+          <div style={{ marginTop: '2px' }}>
+            <Tag color={record.approvedOTHours > 0 ? 'orange' : 'default'} style={{ fontSize: '10px', margin: 0, padding: '0 4px' }}>
+              OT: {record.approvedOTHours || 0}h
             </Tag>
           </div>
         </div>
       ),
     },
     {
-      title: 'Nội dung phản hồi',
+      title: 'Nội dung phản hồi / Khiếu nại',
       key: 'content',
       render: (_, record) => (
         <div>
-          <div style={{ marginBottom: '4px' }}>
+          <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
             {getFeedbackTypeTag(record.feedbackType)}
-            <strong style={{ color: '#0f172a', marginLeft: '6px' }}>{record.title}</strong>
+            <strong style={{ color: '#0f172a', fontSize: '13px' }}>{record.title}</strong>
           </div>
           <div
             style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              padding: '6px 10px',
+              padding: '6px 8px',
               borderRadius: '6px',
-              fontSize: '13px',
+              fontSize: '12px',
               color: '#334155',
+              lineHeight: '1.4',
             }}
           >
             {record.content}
           </div>
-          {record.responseMessage && (
-            <div
-              style={{
-                marginTop: '6px',
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: '#166534',
-              }}
-            >
-              <strong>💬 Trả lời ({record.resolverName}):</strong> {record.responseMessage}
-            </div>
-          )}
         </div>
       ),
     },
     {
+      title: 'Quản lý trả lời',
+      key: 'managerResponse',
+      render: (_, record) => {
+        if (!record.responseMessage) {
+          return <span style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Chưa có phản hồi</span>;
+        }
+
+        const isRejected = (record.status || '').toUpperCase() === 'REJECTED';
+        return (
+          <div
+            style={{
+              background: isRejected ? '#fef2f2' : '#f0fdf4',
+              border: isRejected ? '1px solid #fecaca' : '1px solid #bbf7d0',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: isRejected ? '#991b1b' : '#166534',
+            }}
+          >
+            <div style={{ fontWeight: '600', marginBottom: '2px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '2px', fontSize: '11px' }}>
+              <span>💬 Trả lời ({record.resolverName || 'Quản lý'}):</span>
+              {record.resolvedAt && (
+                <span style={{ opacity: 0.8 }}>
+                  {dayjs(record.resolvedAt).format('HH:mm DD/MM')}
+                </span>
+              )}
+            </div>
+            <div style={{ lineHeight: '1.3' }}>{record.responseMessage}</div>
+          </div>
+        );
+      },
+    },
+    {
       title: 'Trạng thái',
       key: 'status',
-      width: 140,
+      width: 100,
       align: 'center',
       render: (_, record) => (
         <div>
           {getStatusTag(record.status)}
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
             {dayjs(record.createdAt).format('HH:mm DD/MM')}
           </div>
         </div>
@@ -271,7 +325,7 @@ const ShiftFeedbackPage = () => {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 110,
+      width: 90,
       align: 'center',
       render: (_, record) => (
         <Button
@@ -283,10 +337,11 @@ const ShiftFeedbackPage = () => {
             borderColor: record.status === 'Pending' ? '#f97316' : '#0284c7',
             fontWeight: '600',
             borderRadius: '6px',
+            fontSize: '11px',
           }}
           onClick={() => handleOpenProcessModal(record)}
         >
-          {record.status === 'Pending' ? 'Xử lý' : 'Xem / Sửa'}
+          {record.status === 'Pending' ? 'Xử lý' : 'Xem/Sửa'}
         </Button>
       ),
     },
@@ -362,34 +417,98 @@ const ShiftFeedbackPage = () => {
         </Col>
       </Row>
 
+      {/* Filter Bar */}
+      <Card bodyStyle={{ padding: '12px 16px' }} style={{ marginBottom: '16px', borderRadius: '12px', background: '#ffffff' }}>
+        <Row gutter={[12, 12]} align="middle">
+          <Col xs={24} sm={10} md={8}>
+            <Input
+              placeholder="Tìm theo tên NV, mã NV, tiêu đề..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={12} sm={7} md={6}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="Loại phản hồi"
+              value={feedbackTypeFilter}
+              onChange={setFeedbackTypeFilter}
+              options={[
+                { value: 'ALL', label: 'Tất cả loại phản hồi' },
+                { value: 'OTDispute', label: 'Quản lý duyệt sai OT' },
+                { value: 'HoursDispute', label: 'Sai tổng giờ công' },
+                { value: 'AttendanceDispute', label: 'Nhầm điểm danh' },
+                { value: 'Other', label: 'Ý kiến / Khác' },
+              ]}
+            />
+          </Col>
+          <Col xs={12} sm={7} md={6}>
+            <DatePicker
+              picker="month"
+              format="MM/YYYY"
+              placeholder="Lọc theo tháng"
+              style={{ width: '100%' }}
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+            />
+          </Col>
+          {(searchKeyword || feedbackTypeFilter !== 'ALL' || selectedMonth) && (
+            <Col xs={24} sm={24} md={4}>
+              <Button
+                type="link"
+                danger
+                onClick={() => {
+                  setSearchKeyword('');
+                  setFeedbackTypeFilter('ALL');
+                  setSelectedMonth(null);
+                }}
+                style={{ padding: 0 }}
+              >
+                Xóa lọc
+              </Button>
+            </Col>
+          )}
+        </Row>
+      </Card>
+
       {/* Table Card */}
       <Card
         style={{ borderRadius: '12px' }}
         bodyStyle={{ padding: '16px' }}
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: '700', fontSize: '15px' }}>Danh sách phản hồi ca</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px' }}>
+              Danh sách phản hồi ({filteredFeedbacks.length})
+            </span>
             <Radio.Group
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               buttonStyle="solid"
               size="small"
             >
-              <Radio.Button value="ALL">Tất cả</Radio.Button>
+              <Radio.Button value="ALL">Tất cả ({totalCount})</Radio.Button>
               <Radio.Button value="Pending">Chờ xử lý ({pendingCount})</Radio.Button>
-              <Radio.Button value="Resolved">Đã giải quyết</Radio.Button>
-              <Radio.Button value="Rejected">Đã từ chối</Radio.Button>
+              <Radio.Button value="Resolved">Đã giải quyết ({resolvedCount})</Radio.Button>
+              <Radio.Button value="Rejected">Đã từ chối ({rejectedCount})</Radio.Button>
             </Radio.Group>
           </div>
         }
       >
         <Spin spinning={loading}>
           <Table
-            dataSource={feedbacks}
+            dataSource={filteredFeedbacks}
             columns={columns}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
-            locale={{ emptyText: 'Chưa có phản hồi nào trong chi nhánh này.' }}
+            pagination={{
+              pageSize: pageSize,
+              onShowSizeChange: (_, size) => setPageSize(size),
+              showSizeChanger: true,
+              pageSizeOptions: ['5', '10', '25'],
+              position: ['bottomRight'],
+            }}
+            locale={{ emptyText: 'Không tìm thấy phản hồi nào phù hợp.' }}
           />
         </Spin>
       </Card>

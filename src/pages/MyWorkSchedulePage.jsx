@@ -30,6 +30,7 @@ import {
   AimOutlined,
   SyncOutlined,
   MessageOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import ShiftFeedbackModal from '../components/workSchedule/ShiftFeedbackModal';
 import dayjs from 'dayjs';
@@ -88,8 +89,7 @@ const MyWorkSchedulePage = () => {
 
   const handleOpenFeedback = (schedule = null) => {
     setDetailModalOpen(false);
-    const target = schedule || selectedSchedule || (schedules.length > 0 ? schedules[0] : null);
-    setFeedbackSchedule(target);
+    setFeedbackSchedule(schedule);
     setFeedbackModalOpen(true);
   };
 
@@ -786,6 +786,15 @@ const MyWorkSchedulePage = () => {
               onClick={() => handleOpenFeedback()}
             >
               Phản hồi ca
+            </Button>
+            <Button
+              type="default"
+              size="small"
+              style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', borderColor: 'transparent', fontWeight: 'bold', borderRadius: '14px' }}
+              icon={<HistoryOutlined />}
+              onClick={() => navigate('/my-shift-feedbacks')}
+            >
+              Lịch sử phản hồi
             </Button>
             <Button
               type="text"
