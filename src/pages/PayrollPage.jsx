@@ -1174,7 +1174,7 @@ const PayrollPage = () => {
           dataSource={filteredPayrolls}
           rowKey="id"
           loading={loading}
-          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25', '50'], showSizeChanger: true }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 1100 }}
           bordered
         />

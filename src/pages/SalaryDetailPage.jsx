@@ -772,7 +772,7 @@ const SalaryDetailPage = () => {
           dataSource={filteredData}
           rowKey="id"
           loading={loading}
-          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25', '50'], showSizeChanger: true }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 950 }}
           bordered
         />
