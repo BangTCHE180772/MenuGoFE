@@ -288,3 +288,21 @@
   flex-direction: column;
   gap: 8px;
 }
+
+@media screen and (max-width: 992px) {
+  .tablemap-page {
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .tablemap-left-col {
+    border-right: none;
+    border-bottom: 1px solid #e8e8e8;
+    overflow-y: visible;
+  }
+  .tablemap-right-col {
+    width: 100%;
+    border-left: none;
+    min-height: 400px;
+  }
+}
