@@ -80,7 +80,7 @@ const STATUS_CONFIG = {
   [PAYROLL_STATUS.Approved]: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   [PAYROLL_STATUS.Paid]: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   [PAYROLL_STATUS.Cancelled]: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  [PAYROLL_STATUS.Locked]: { label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)', color: 'purple', badge: 'purple' },
   [PAYROLL_STATUS.Rejected]: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 
   Draft: { label: 'Bản nháp', color: 'default', badge: 'default' },
@@ -88,7 +88,7 @@ const STATUS_CONFIG = {
   Approved: { label: 'Đã duyệt (Chờ thanh toán)', color: 'processing', badge: 'processing' },
   Paid: { label: 'Đã thanh toán', color: 'success', badge: 'success' },
   Cancelled: { label: 'Đã hủy', color: 'error', badge: 'error' },
-  Locked: { label: 'Đã chốt (Chờ Owner duyệt)', color: 'purple', badge: 'purple' },
+  Locked: { label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)', color: 'purple', badge: 'purple' },
   Rejected: { label: 'Từ chối (Cần tính lại)', color: 'red', badge: 'error' },
 };
 
@@ -112,7 +112,7 @@ const STATUS_TO_NUM = {
 const STATUS_FILTER_OPTIONS = [
   { value: PAYROLL_STATUS.Draft, label: 'Bản nháp' },
   { value: PAYROLL_STATUS.Pending, label: 'Chờ chốt' },
-  { value: PAYROLL_STATUS.Locked, label: 'Đã chốt (Chờ Owner duyệt)' },
+  { value: PAYROLL_STATUS.Locked, label: 'Đã chốt (Chờ Chủ cửa hàng duyệt)' },
   { value: PAYROLL_STATUS.Approved, label: 'Đã duyệt (Chờ thanh toán)' },
   { value: PAYROLL_STATUS.Rejected, label: 'Từ chối (Cần tính lại)' },
   { value: PAYROLL_STATUS.Paid, label: 'Đã thanh toán' },
@@ -219,7 +219,7 @@ const PayrollPage = () => {
   const availableStatusOptions = useMemo(() => {
     if (isOwnerOrAdmin) {
       return [
-        { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+        { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Chủ cửa hàng duyệt)' },
         { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
         { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
         { value: PAYROLL_STATUS.Rejected, label: '🚫 Từ chối (Cần tính lại)' },
@@ -228,7 +228,7 @@ const PayrollPage = () => {
     return [
       { value: PAYROLL_STATUS.Draft, label: '📝 Bản nháp' },
       { value: PAYROLL_STATUS.Pending, label: '⏳ Chờ chốt' },
-      { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Owner duyệt)' },
+      { value: PAYROLL_STATUS.Locked, label: '🔒 Đã chốt (Chờ Chủ cửa hàng duyệt)' },
       { value: PAYROLL_STATUS.Approved, label: '✅ Đã duyệt' },
       { value: PAYROLL_STATUS.Paid, label: '💳 Đã thanh toán' },
       { value: PAYROLL_STATUS.Cancelled, label: '❌ Đã hủy' },
@@ -866,11 +866,11 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            {/* If Pending: allow Lock (Chốt bảng lương & Gửi Owner) */}
+            {/* If Pending: allow Lock (Chốt bảng lương & Gửi Chủ cửa hàng) */}
             {isPending && (
-              <Tooltip title="Chốt (Khóa) bảng lương & Gửi Owner duyệt">
+              <Tooltip title="Chốt (Khóa) bảng lương & Gửi Chủ cửa hàng duyệt">
                 <Popconfirm
-                  title="Chốt bảng lương này và gửi cho Owner phê duyệt?"
+                  title="Chốt bảng lương này và gửi cho Chủ cửa hàng phê duyệt?"
                   okText="Chốt lương"
                   cancelText="Hủy"
                   onConfirm={() => handleLockPayroll(record.id)}
@@ -880,8 +880,22 @@ const PayrollPage = () => {
               </Tooltip>
             )}
 
-            {/* Owner Reject button: When Locked or Approved */}
-            {(isLocked || isApproved) && isOwnerOrAdmin && (
+            {/* Unlock button for Manager or Owner when Locked */}
+            {isLocked && (
+              <Tooltip title="Mở khóa chốt (để chỉnh sửa lại)">
+                <Popconfirm
+                  title="Mở khóa chốt bảng lương này để chỉnh sửa lại?"
+                  okText="Mở khóa"
+                  cancelText="Hủy"
+                  onConfirm={() => handleUnlockPayroll(record.id)}
+                >
+                  <Button type="text" icon={<UnlockOutlined style={{ color: '#fa8c16' }} />} />
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {/* Owner Reject button: When Approved */}
+            {isApproved && isOwnerOrAdmin && (
               <Tooltip title="Từ chối phê duyệt (Yêu cầu Quản lý tính lại)">
                 <Popconfirm
                   title="Từ chối bảng lương này để yêu cầu Quản lý tính lại?"
@@ -897,7 +911,7 @@ const PayrollPage = () => {
 
             {/* Owner Approval button (When Locked) */}
             {isLocked && isOwnerOrAdmin && (
-              <Tooltip title="Phê duyệt bảng lương (Owner)">
+              <Tooltip title="Phê duyệt bảng lương (Chủ cửa hàng)">
                 <Popconfirm
                   title="Phê duyệt bảng lương này?"
                   okText="Duyệt"
@@ -1221,9 +1235,12 @@ const PayrollPage = () => {
             <Select
               placeholder="Chọn nhân viên cần tính lương..."
               showSearch
-              filterOption={(input, option) =>
-                (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                if (!input) return true;
+                if (option?.children || option?.value === undefined) return true;
+                const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+                return targetText.toLowerCase().includes(input.toLowerCase());
+              }}
               optionLabelProp="label"
               dropdownStyle={{ maxHeight: 360 }}
               onChange={(val) => {
@@ -1376,9 +1393,12 @@ const PayrollPage = () => {
                 <Select
                   placeholder="Chọn nhân viên..."
                   showSearch
-                  filterOption={(input, option) =>
-                    (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-                  }
+                  filterOption={(input, option) => {
+                    if (!input) return true;
+                    if (option?.children || option?.value === undefined) return true;
+                    const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+                    return targetText.toLowerCase().includes(input.toLowerCase());
+                  }}
                   optionLabelProp="label"
                   dropdownStyle={{ maxHeight: 360 }}
                   onChange={(val) => {

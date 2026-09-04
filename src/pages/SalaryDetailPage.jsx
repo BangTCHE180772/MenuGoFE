@@ -661,9 +661,12 @@ const SalaryDetailPage = () => {
             style={{ width: 260 }}
             allowClear
             showSearch
-            filterOption={(input, option) =>
-              (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-            }
+            filterOption={(input, option) => {
+              if (!input) return true;
+              if (option?.children || option?.value === undefined) return true;
+              const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+              return targetText.toLowerCase().includes(input.toLowerCase());
+            }}
             optionLabelProp="label"
             dropdownStyle={{ maxHeight: 360 }}
             value={selectedPayroll}

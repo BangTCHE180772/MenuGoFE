@@ -530,7 +530,15 @@ const WorkSchedulePage = () => {
 
       let checkOutAt = null;
       if (values.checkOutTime) {
-        checkOutAt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`).toISOString();
+        let outDt = dayjs(`${workDateStr} ${values.checkOutTime.format('HH:mm:ss')}`);
+        if (values.checkInTime) {
+          const inMins = values.checkInTime.hour() * 60 + values.checkInTime.minute();
+          const outMins = values.checkOutTime.hour() * 60 + values.checkOutTime.minute();
+          if (outMins <= inMins) {
+            outDt = outDt.add(1, 'day');
+          }
+        }
+        checkOutAt = outDt.toISOString();
       }
 
       // Validations
@@ -1905,7 +1913,10 @@ const WorkSchedulePage = () => {
           onValuesChange={(changedValues, allValues) => {
             if (changedValues.checkInTime || changedValues.checkOutTime) {
               if (allValues.checkInTime && allValues.checkOutTime) {
-                const diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
+                let diff = allValues.checkOutTime.diff(allValues.checkInTime, 'hour', true);
+                if (diff <= 0) {
+                  diff += 24; // Ca vắt qua đêm (VD: 16:00 đến 00:00 = 8h)
+                }
                 if (diff > 0) {
                   const otH = editingRecord?.approvedOTHours || 0;
                   form.setFieldsValue({ actualHours: parseFloat((diff + otH).toFixed(2)) });
@@ -1927,6 +1938,7 @@ const WorkSchedulePage = () => {
                 showSearch
                 filterOption={(input, option) => {
                   if (!input) return true;
+                  if (option?.children || option?.value === undefined) return true;
                   const searchValue = option?.searchValue || '';
                   return searchValue.toLowerCase().includes(input.toLowerCase());
                 }}
