@@ -7,7 +7,7 @@
  *  3. Bàn "Có khách" → hiện giỏ hàng + nút gọi món + nút thanh toán
  */
 import { useState } from 'react';
-import { Spin, Tooltip, Modal, AutoComplete, message } from 'antd';
+import { Spin, Tooltip, Modal, AutoComplete, message, Tag } from 'antd';
 import { getStatusConfig, TABLE_STATUS } from '../../data/tableConstants';
 import ReturnItemModal from './ReturnItemModal';
 import '../../styles/pos-order-panel.css';
@@ -33,23 +33,30 @@ const STATUS_TRANSITIONS = {
 /* ── Cart Item Row ────────────────────────────────────────────────────────── */
 const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
   const [showNote, setShowNote] = useState(false);
+  const isReuse = !!item.reuseLeftoverId;
   return (
     <div className="pos-cart-item">
       <div className="pos-cart-item-top">
         <div className="pos-cart-item-emoji">{item.emoji}</div>
         <div className="pos-cart-item-info">
-          <div className="pos-cart-item-name">{item.name}</div>
-          <div className="pos-cart-item-unit">{formatPrice(item.price)} / phần</div>
+          <div className="pos-cart-item-name">
+            {item.name}
+            {isReuse && <Tag color="blue" style={{ marginLeft: 6 }}>Dùng lại món thừa</Tag>}
+          </div>
+          <div className="pos-cart-item-unit">
+            {formatPrice(item.price)} / phần
+            {isReuse && item.reuseTableName && ` · Từ ${item.reuseTableName}`}
+          </div>
         </div>
-        <button className="pos-cart-item-remove" onClick={() => onRemove(item.id)} title="Xoá">✕</button>
+        <button className="pos-cart-item-remove" onClick={() => onRemove(item.cartKey)} title="Xoá">✕</button>
       </div>
 
       <div className="pos-cart-item-bottom">
-        {/* Qty control */}
+        {/* Qty control — khoá số lượng khi dùng lại món thừa (phải khớp đúng lô gốc) */}
         <div className="pos-qty-ctrl">
-          <button className="pos-qty-btn pos-qty-btn--minus" onClick={() => onUpdateQty(item.id, item.qty - 1)}>−</button>
+          <button className="pos-qty-btn pos-qty-btn--minus" disabled={isReuse} onClick={() => onUpdateQty(item.cartKey, item.qty - 1)}>−</button>
           <span className="pos-qty-val">{item.qty}</span>
-          <button className="pos-qty-btn pos-qty-btn--plus" onClick={() => onUpdateQty(item.id, item.qty + 1)}>+</button>
+          <button className="pos-qty-btn pos-qty-btn--plus" disabled={isReuse} onClick={() => onUpdateQty(item.cartKey, item.qty + 1)}>+</button>
         </div>
         {/* Line total */}
         <div className="pos-cart-item-total">{formatPrice(item.price * item.qty)}</div>
@@ -66,7 +73,7 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
           className="pos-cart-item-note"
           placeholder="Ghi chú (VD: ít cay, không hành...)"
           value={item.note || ''}
-          onChange={(e) => onNoteChange(item.id, e.target.value)}
+          onChange={(e) => onNoteChange(item.cartKey, e.target.value)}
         />
       )}
     </div>
@@ -376,7 +383,7 @@ const OrderPanel = ({
                 ) : (
                   cartItems.map((item) => (
                     <CartItem
-                      key={item.id}
+                      key={item.cartKey}
                       item={item}
                       onUpdateQty={onUpdateQty}
                       onRemove={onRemoveItem}

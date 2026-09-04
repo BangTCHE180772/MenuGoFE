@@ -123,29 +123,38 @@ const OrderPage = ({ isWaiterMode }) => {
   };
 
   const handleAddItem = useCallback((item) => {
+    // Món "dùng lại từ đồ thừa" luôn là một dòng riêng (khoá theo leftoverId) —
+    // không gộp với dòng gọi món bình thường của cùng sản phẩm, vì số lượng phải
+    // khớp đúng với món thừa gốc khi gửi lên BE.
+    if (item.reuseLeftoverId) {
+      const cartKey = `reuse-${item.reuseLeftoverId}`;
+      setCartItems((prev) => [...prev, { ...item, cartKey, qty: item.qty || 1, note: item.note || '' }]);
+      return;
+    }
     setCartItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const cartKey = String(item.id);
+      const existing = prev.find((i) => i.cartKey === cartKey);
       if (existing) {
-        return prev.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map((i) => i.cartKey === cartKey ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...prev, { ...item, qty: 1, note: '' }];
+      return [...prev, { ...item, cartKey, qty: 1, note: '' }];
     });
   }, []);
 
-  const handleUpdateQty = useCallback((id, qty) => {
+  const handleUpdateQty = useCallback((cartKey, qty) => {
     if (qty <= 0) {
-      setCartItems((prev) => prev.filter((i) => i.id !== id));
+      setCartItems((prev) => prev.filter((i) => i.cartKey !== cartKey));
     } else {
-      setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, qty } : i));
+      setCartItems((prev) => prev.map((i) => i.cartKey === cartKey ? { ...i, qty } : i));
     }
   }, []);
 
-  const handleRemoveItem = useCallback((id) => {
-    setCartItems((prev) => prev.filter((i) => i.id !== id));
+  const handleRemoveItem = useCallback((cartKey) => {
+    setCartItems((prev) => prev.filter((i) => i.cartKey !== cartKey));
   }, []);
 
-  const handleNoteChange = useCallback((id, note) => {
-    setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, note } : i));
+  const handleNoteChange = useCallback((cartKey, note) => {
+    setCartItems((prev) => prev.map((i) => i.cartKey === cartKey ? { ...i, note } : i));
   }, []);
 
 
@@ -300,7 +309,8 @@ const OrderPage = ({ isWaiterMode }) => {
         price: item.price,
         note: item.note || '',
         status: 'Confirmed',
-        cookingStatus: 'Waiting',
+        cookingStatus: item.reuseLeftoverId ? 'Ready' : 'Waiting',
+        reuseLeftoverId: item.reuseLeftoverId || null,
       }));
 
       await createBulkOrderDetail(orderId, dtos);
