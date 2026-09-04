@@ -143,7 +143,6 @@ const LeftoverPage = () => {
         reason: values.reason,
         orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
         handlingAction: values.type === 'Return' ? values.handlingAction : null,
-        refundAmount: values.type === 'Return' ? values.refundAmount ?? null : null,
         discountAmount: values.type === 'Return' ? values.discountAmount ?? null : null,
         shiftId: values.shiftId ?? null,
         recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
@@ -187,12 +186,10 @@ const LeftoverPage = () => {
           <Space direction="vertical" size={0}>
             {r.tableName && <span>Bàn: {r.tableName}</span>}
             {r.handlingAction && <Tag>{HANDLING_ACTION_LABELS[r.handlingAction] || r.handlingAction}</Tag>}
-            {(r.refundAmount || r.discountAmount) && (
-              <span style={{ color: '#cf1322', fontSize: 12 }}>
-                {r.refundAmount ? `Hoàn: ${r.refundAmount.toLocaleString('vi-VN')}đ` : ''}
-                {r.discountAmount ? ` Giảm: ${r.discountAmount.toLocaleString('vi-VN')}đ` : ''}
-              </span>
-            )}
+            {r.discountAmount ? (
+              <span style={{ color: '#cf1322', fontSize: 12 }}>Giảm: {r.discountAmount.toLocaleString('vi-VN')}đ</span>
+            ) : null}
+            {r.usedAt && <Tag color="blue">Đã dùng lại</Tag>}
           </Space>
         ) : (
           <span>{r.shiftName || '—'}</span>
@@ -219,9 +216,9 @@ const LeftoverPage = () => {
       key: 'category',
       render: (c) =>
         c === 'Completed' ? (
-          <Tag color="red">Đơn đã hoàn thành (bếp làm chậm)</Tag>
+          <Tag color="red">Món đã làm xong (bếp làm chậm)</Tag>
         ) : (
-          <Tag color="default">Đơn chờ xác nhận</Tag>
+          <Tag color="default">Món chưa chế biến</Tag>
         ),
     },
     { title: 'Món', dataIndex: 'productName', key: 'productName' },
@@ -310,9 +307,6 @@ const LeftoverPage = () => {
                   ]}
                 />
               </Form.Item>
-              <Form.Item name="refundAmount" label="Số tiền hoàn (nếu có)" style={{ width: 200 }}>
-                <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
-              </Form.Item>
               <Form.Item name="discountAmount" label="Số tiền giảm giá (nếu có)" style={{ width: 200 }}>
                 <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
               </Form.Item>
@@ -374,8 +368,8 @@ const LeftoverPage = () => {
           value={cancelledCategoryFilter}
           onChange={setCancelledCategoryFilter}
           options={[
-            { value: 'Completed', label: 'Đơn đã hoàn thành' },
-            { value: 'Pending', label: 'Đơn chờ xác nhận' },
+            { value: 'Completed', label: 'Món đã làm xong' },
+            { value: 'Pending', label: 'Món chưa chế biến' },
           ]}
         />
       }
@@ -397,7 +391,7 @@ const LeftoverPage = () => {
 
   return (
     <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-      <Title level={3}>Món thừa &amp; Lịch sử hủy món</Title>
+      <Title level={3}>Trả món &amp; Lịch sử huỷ món</Title>
 
       <Tabs
         defaultActiveKey="leftover"
