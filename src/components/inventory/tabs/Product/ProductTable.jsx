@@ -321,8 +321,8 @@ const ProductTable = ({
       const rawLedgerItems = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
       // Sort by latest date descending
       const sortedItems = [...rawLedgerItems].sort((a, b) => {
-        const tA = new Date(a.createdDate || a.time || a.date || 0).getTime();
-        const tB = new Date(b.createdDate || b.time || b.date || 0).getTime();
+        const tA = new Date(a.businessDate || a.createdAt || a.createdDate || a.time || a.date || 0).getTime();
+        const tB = new Date(b.businessDate || b.createdAt || b.createdDate || b.time || b.date || 0).getTime();
         return tB - tA;
       });
 

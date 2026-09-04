@@ -12,6 +12,7 @@ import {
   ArrowRightOutlined
 } from '@ant-design/icons';
 import { getCustomerPurchases, getCustomerPoints } from '../../../../api/customerManagementApi';
+import { useSignalR } from '../../../../context/SignalRContext';
 import dayjs from 'dayjs';
 
 const CustomerDetailSection = ({
@@ -23,6 +24,7 @@ const CustomerDetailSection = ({
   onDeletePointTransaction
 }) => {
   const navigate = useNavigate();
+  const connection = useSignalR();
   const [purchases, setPurchases] = useState([]);
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,10 +52,46 @@ const CustomerDetailSection = ({
     fetchDetailHistory();
   }, [customer?.id]);
 
+  // Lắng nghe SignalR để tự động cập nhật lịch sử mua hàng và biến động điểm theo thời gian thực
+  useEffect(() => {
+    if (!connection || !customer?.id) return;
+
+    const handleCustomerUpdate = (data) => {
+      if (!data?.customerId || data.customerId === customer.id) {
+        fetchDetailHistory();
+      }
+    };
+
+    const handleNotification = (notif) => {
+      if (
+        (notif?.type === 'payment_completed' || notif?.type === 'order_completed') &&
+        (!notif?.customerId || notif.customerId === customer.id)
+      ) {
+        fetchDetailHistory();
+      }
+    };
+
+    connection.on('ReceiveCustomerUpdate', handleCustomerUpdate);
+    connection.on('ReceiveNotification', handleNotification);
+
+    return () => {
+      connection.off('ReceiveCustomerUpdate', handleCustomerUpdate);
+      connection.off('ReceiveNotification', handleNotification);
+    };
+  }, [connection, customer?.id]);
+
+  // Chuẩn hóa mã hóa đơn: đảm bảo dạng chuẩn HD{Id}, loại bỏ số 0 thừa từ dữ liệu cũ (HD014935 -> HD14935)
+  const formatInvoiceCode = (code, orderId) => {
+    if (orderId) return `HD${orderId}`;
+    if (!code) return '';
+    return code.replace(/^HD0+(\d+)$/i, 'HD$1');
+  };
+
   // Click vào mã hóa đơn để mở trực tiếp Invoice Detail trong tab Hóa đơn
-  const handleOpenInvoice = (invoiceCode) => {
-    if (!invoiceCode) return;
-    navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(invoiceCode)}`);
+  const handleOpenInvoice = (invoiceCode, orderId) => {
+    const formatted = formatInvoiceCode(invoiceCode, orderId);
+    if (!formatted) return;
+    navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(formatted)}`);
   };
 
   const currentPoints = customer?.point ?? 0;
@@ -323,24 +361,26 @@ const CustomerDetailSection = ({
                         </td>
                       </tr>
                     ) : (
-                      purchases.map((p) => (
-                        <tr
-                          key={p.orderId}
-                          onClick={() => handleOpenInvoice(p.invoiceCode)}
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <td style={{ padding: '7px 10px', color: '#64748b' }}>
-                            {dayjs(p.createdAt).format('DD/MM/YYYY HH:mm')}
-                          </td>
-                          <td style={{ padding: '7px 10px', fontWeight: 700, color: '#2563eb' }}>
-                            {p.invoiceCode}
-                          </td>
+                      purchases.map((p) => {
+                        const invoiceCode = formatInvoiceCode(p.invoiceCode, p.orderId);
+                        return (
+                          <tr
+                            key={p.orderId}
+                            onClick={() => handleOpenInvoice(invoiceCode, p.orderId)}
+                            style={{
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <td style={{ padding: '7px 10px', color: '#64748b' }}>
+                              {dayjs(p.createdAt).format('DD/MM/YYYY HH:mm')}
+                            </td>
+                            <td style={{ padding: '7px 10px', fontWeight: 700, color: '#2563eb' }}>
+                              {invoiceCode}
+                            </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', color: '#475569' }}>
                             {p.totalAmount.toLocaleString('vi-VN')} đ
                           </td>
@@ -357,8 +397,9 @@ const CustomerDetailSection = ({
                             <ArrowRightOutlined style={{ fontSize: 11 }} />
                           </td>
                         </tr>
-                      ))
-                    )}
+                      );
+                    })
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -416,7 +457,10 @@ const CustomerDetailSection = ({
                       </tr>
                     ) : (
                       points.map((pt) => {
-                        const isInvoiceRelated = Boolean(pt.relatedCode && pt.relatedCode.startsWith('HD'));
+                        const formattedRelatedCode = formatInvoiceCode(pt.relatedCode, pt.orderId);
+                        const isInvoiceRelated = Boolean(
+                          pt.orderId || (formattedRelatedCode && formattedRelatedCode.startsWith('HD'))
+                        );
                         const isManual = Boolean(pt.isManual);
                         const isReversed = Boolean(pt.isReversed);
 
@@ -460,7 +504,7 @@ const CustomerDetailSection = ({
                             <td style={{ padding: '7px 10px' }}>
                               {isInvoiceRelated ? (
                                 <span
-                                  onClick={() => handleOpenInvoice(pt.relatedCode)}
+                                  onClick={() => handleOpenInvoice(formattedRelatedCode, pt.orderId)}
                                   style={{
                                     fontWeight: 700,
                                     color: '#2563eb',
@@ -469,7 +513,7 @@ const CustomerDetailSection = ({
                                   }}
                                   title="Nhấp để xem chi tiết hóa đơn"
                                 >
-                                  {pt.relatedCode}
+                                  {formattedRelatedCode}
                                 </span>
                               ) : (
                                 <span style={{ color: '#64748b', fontStyle: 'italic' }}>

@@ -3,8 +3,10 @@ import CustomerTable from './CustomerTable';
 import CustomerProfileModal from './CustomerProfileModal';
 import CustomerPointModal from './CustomerPointModal';
 import { getCustomers, deleteCustomer } from '../../../../api/customerManagementApi';
+import { useSignalR } from '../../../../context/SignalRContext';
 
 const CustomerTab = ({ selectedBranchId }) => {
+  const connection = useSignalR();
   const [customers, setCustomers] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,39 @@ const CustomerTab = ({ selectedBranchId }) => {
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
+
+  // Lắng nghe SignalR để tự động cập nhật danh sách khách hàng theo thời gian thực
+  useEffect(() => {
+    if (!connection) return;
+
+    if (selectedBranchId) {
+      connection.invoke('JoinBranchGroup', selectedBranchId).catch(() => {});
+    }
+
+    const handleCustomerUpdate = () => {
+      fetchCustomers();
+    };
+
+    const handleNotification = (notif) => {
+      if (
+        notif?.type === 'payment_completed' ||
+        notif?.type === 'order_completed' ||
+        notif?.type === 'order_status_changed' ||
+        notif?.type === 'customer_updated' ||
+        notif?.type === 'customer_point_changed'
+      ) {
+        fetchCustomers();
+      }
+    };
+
+    connection.on('ReceiveCustomerUpdate', handleCustomerUpdate);
+    connection.on('ReceiveNotification', handleNotification);
+
+    return () => {
+      connection.off('ReceiveCustomerUpdate', handleCustomerUpdate);
+      connection.off('ReceiveNotification', handleNotification);
+    };
+  }, [connection, selectedBranchId, fetchCustomers]);
 
   // Bộ lọc khách hàng trên giao diện
   const filteredCustomers = useMemo(() => {
