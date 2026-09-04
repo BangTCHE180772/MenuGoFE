@@ -37,6 +37,8 @@ import PayrollPage from '../pages/PayrollPage';
 import MyPayrollPage from '../pages/MyPayrollPage';
 import SalaryDetailPage from '../pages/SalaryDetailPage';
 import HolidayConfigPage from '../pages/HolidayConfigPage';
+import ShiftFeedbackPage from '../pages/ShiftFeedbackPage';
+import MyShiftFeedbackPage from '../pages/MyShiftFeedbackPage';
 
 
 import CustomerOrderPage from '../pages/CustomerOrderPage';
@@ -156,6 +158,7 @@ const AppRouter = () => {
               />
               <Route path="/my-contract" element={<MyContractPage />} />
               <Route path="/my-payroll" element={<MyPayrollPage />} />
+              <Route path="/my-shift-feedbacks" element={<MyShiftFeedbackPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
               {/* Manager, Owner, Admin */}
@@ -175,6 +178,7 @@ const AppRouter = () => {
                 <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/salary-details" element={<SalaryDetailPage />} />
                 <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />
+                <Route path="/work-schedule-feedback" element={<ShiftFeedbackPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
                 <Route path="/chat" element={<BranchChatPage />} />
                 <Route path="/reports/revenue" element={<ReportRevenuePage />} />

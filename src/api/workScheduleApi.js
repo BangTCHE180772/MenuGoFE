@@ -35,3 +35,8 @@ export const verifyPOSActivity = (id) =>
 
 export const checkInWithLocation = (data) =>
   axiosInstance.post('/api/WorkSchedule/check-in-with-location', data);
+
+export const autoAssignWorkSchedules = (data) =>
+  axiosInstance.post('/api/WorkSchedule/auto-assign', data);
+
+

@@ -661,9 +661,12 @@ const SalaryDetailPage = () => {
             style={{ width: 260 }}
             allowClear
             showSearch
-            filterOption={(input, option) =>
-              (option?.searchValue || option?.label || '').toLowerCase().includes(input.toLowerCase())
-            }
+            filterOption={(input, option) => {
+              if (!input) return true;
+              if (option?.children || option?.value === undefined) return true;
+              const targetText = option?.searchValue || (typeof option?.label === 'string' ? option.label : '');
+              return targetText.toLowerCase().includes(input.toLowerCase());
+            }}
             optionLabelProp="label"
             dropdownStyle={{ maxHeight: 360 }}
             value={selectedPayroll}
@@ -772,7 +775,7 @@ const SalaryDetailPage = () => {
           dataSource={filteredData}
           rowKey="id"
           loading={loading}
-          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25', '50'], showSizeChanger: true }}
+          pagination={{ defaultPageSize: 10, pageSizeOptions: ['5', '10', '25'], showSizeChanger: true }}
           scroll={{ x: 950 }}
           bordered
         />
@@ -782,6 +785,7 @@ const SalaryDetailPage = () => {
       {/* Create / Edit Form Modal */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 17, color: '#e8442a' }}>
             <DollarCircleOutlined />
@@ -948,6 +952,7 @@ const SalaryDetailPage = () => {
       {/* Detail View Modal */}
       {/* ========================================================================= */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#e8442a' }}>
             <EyeOutlined />
