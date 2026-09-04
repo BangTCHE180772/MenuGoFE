@@ -50,6 +50,7 @@ const INVENTORY_SUB_MENU = [
   { label: "Kiểm kho", path: "/inventory-management?tab=Check", tabKey: "Check" },
   { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
+  { label: "Khách hàng", path: "/inventory-management?tab=Customer", tabKey: "Customer" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
   { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];

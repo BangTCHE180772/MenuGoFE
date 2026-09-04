@@ -255,7 +255,10 @@ const FloatingChatWidget = ({
       }
 
       if (res.data) {
-        setMessages((prev) => [...prev, res.data]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === res.data.id)) return prev;
+          return [...prev, res.data];
+        });
         if (!activeConversation) {
           loadConversations(currentBranchId);
         }
@@ -269,7 +272,7 @@ const FloatingChatWidget = ({
 
   // Gửi tư vấn món ăn
   const handleSendProductConsultation = async (productIds) => {
-    if (!productIds || productIds.length === 0 || !currentBranchId) return;
+    if (!productIds || productIds.length === 0 || !currentBranchId || sending) return;
 
     setSending(true);
     try {
@@ -298,7 +301,10 @@ const FloatingChatWidget = ({
       }
 
       if (res.data) {
-        setMessages((prev) => [...prev, res.data]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === res.data.id)) return prev;
+          return [...prev, res.data];
+        });
         antMessage.success('Đã gửi yêu cầu tư vấn món ăn tới nhân viên.');
         if (!activeConversation) {
           loadConversations(currentBranchId);
@@ -476,7 +482,7 @@ const FloatingChatWidget = ({
                 </div>
               ) : (
                 messages.map((m) => {
-                  const isMe = isAuthenticated ? (m.customerId === customer?.id) : (!m.employeeId);
+                  const isMe = isAuthenticated ? (m.customerId === customer?.id) : (!m.employeeName);
                   return (
                     <div
                       key={m.id}

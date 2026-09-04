@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Table,
   Button,
@@ -66,6 +67,7 @@ const STAFF_ROLES_MAP = {
 const AccountPage = () => {
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
+  const [searchParams] = useSearchParams();
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -169,6 +171,38 @@ const AccountPage = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Tự động nhận diện và bật Modal chi tiết nhân viên khi điều hướng từ thông báo
+  useEffect(() => {
+    if (!accounts || accounts.length === 0) return;
+    const accIdParam = searchParams.get('accountId') ? Number(searchParams.get('accountId')) : null;
+    const searchParam = searchParams.get('search');
+    const openDetailParam = searchParams.get('openDetail') === 'true' || searchParams.get('openDetail') === '1';
+
+    if (searchParam && !searchText) {
+      setSearchText(searchParam);
+    }
+
+    if (openDetailParam || accIdParam || searchParam) {
+      let matched = null;
+      if (accIdParam) {
+        matched = accounts.find((a) => a.id === accIdParam);
+      }
+      if (!matched && searchParam) {
+        const lower = searchParam.toLowerCase().trim();
+        matched = accounts.find((a) => {
+          const name = (a.name || '').toLowerCase();
+          const email = (a.email || '').toLowerCase();
+          const phone = (a.phone || '').toLowerCase();
+          return name === lower || name.includes(lower) || email.includes(lower) || phone.includes(lower);
+        });
+      }
+
+      if (matched) {
+        handleOpenDetailModal(matched);
+      }
+    }
+  }, [accounts, searchParams]);
 
   // Open modal
   const handleOpenModal = (type, record = null) => {
