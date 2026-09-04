@@ -6,12 +6,11 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const actionRef = useRef(false);
+  const isIntact = Form.useWatch('isIntact', form);
 
   if (!item) return null;
 
   const maxReturnable = item.quantity - (item.returnedQuantity || 0);
-
-  const isIntact = Form.useWatch('isIntact', form);
 
   const getReasonOptions = () => {
     // Nếu là đồ thường (Regular) và nguyên vẹn: được phép chọn lý do mở rộng

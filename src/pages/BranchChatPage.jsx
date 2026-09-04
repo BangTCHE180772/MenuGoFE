@@ -13,7 +13,10 @@ import {
   Tabs,
   Divider,
   Tag,
+  Select,
   message,
+  Tooltip,
+  InputNumber,
 } from "antd";
 import {
   MessageOutlined,
@@ -26,11 +29,15 @@ import {
   UpOutlined,
   DownOutlined,
   CloseOutlined,
+  SettingOutlined,
+  QuestionCircleOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
 import { useSignalR } from "../context/SignalRContext";
 import axiosInstance from "../api/axiosInstance";
+import { getBranchRetentionSettings, updateBranchRetentionSettings } from "../api/guestChatApi";
+import ProductConsultationCard from "../components/chat/ProductConsultationCard";
 import dayjs from "dayjs";
 
 const { Content, Sider } = Layout;
@@ -121,6 +128,13 @@ const BranchChatPage = () => {
   const [quickNavTab, setQuickNavTab] = useState("staff");
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
 
+  // Retention setting modal state
+  const [retentionModalOpen, setRetentionModalOpen] = useState(false);
+  const [retentionInputVal, setRetentionInputVal] = useState(30);
+  const [retentionUnit, setRetentionUnit] = useState(1440);
+  const [savingRetention, setSavingRetention] = useState(false);
+  const [loadingRetention, setLoadingRetention] = useState(false);
+
   // In-chat message search state
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -205,7 +219,7 @@ const BranchChatPage = () => {
             return [conv, ...prev];
           });
           message.info(
-            `Có cuộc trò chuyện mới từ khách hàng: ${conv.customerName}`,
+            `Có cuộc trò chuyện mới từ khách hàng: ${conv.customerName || conv.guestName || "Khách hàng"}`,
           );
         }
       };
@@ -288,6 +302,55 @@ const BranchChatPage = () => {
     } catch (error) {
       message.error("Không thể gửi tin nhắn.");
       setInputText(textToSend);
+    }
+  };
+
+  const handleOpenRetentionModal = async () => {
+    if (!currentBranchId) {
+      message.warning("Vui lòng chọn chi nhánh trước.");
+      return;
+    }
+    setRetentionModalOpen(true);
+    setLoadingRetention(true);
+    try {
+      const res = await getBranchRetentionSettings(currentBranchId);
+      if (res.data && res.data.anonymousChatRetentionMinutes !== undefined) {
+        const mins = res.data.anonymousChatRetentionMinutes;
+        if (mins % 1440 === 0) {
+          setRetentionInputVal(mins / 1440);
+          setRetentionUnit(1440);
+        } else if (mins % 60 === 0) {
+          setRetentionInputVal(mins / 60);
+          setRetentionUnit(60);
+        } else {
+          setRetentionInputVal(mins);
+          setRetentionUnit(1);
+        }
+      }
+    } catch {
+      // Dùng giá trị mặc định 1 giờ
+      setRetentionInputVal(1);
+      setRetentionUnit(60);
+    } finally {
+      setLoadingRetention(false);
+    }
+  };
+
+  const handleSaveRetention = async () => {
+    if (!currentBranchId) return;
+    const finalMinutes = retentionInputVal * retentionUnit;
+    setSavingRetention(true);
+    try {
+      await updateBranchRetentionSettings({
+        branchId: currentBranchId,
+        anonymousChatRetentionMinutes: finalMinutes,
+      });
+      message.success("Đã cập nhật thời gian lưu trữ tin nhắn thành công!");
+      setRetentionModalOpen(false);
+    } catch {
+      message.error("Không thể cập nhật cấu hình lưu trữ tin nhắn.");
+    } finally {
+      setSavingRetention(false);
     }
   };
 
@@ -446,9 +509,26 @@ const BranchChatPage = () => {
                   fontSize: 16,
                   flexShrink: 0,
                   background: "#fff",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                Khách Hàng Đang Chat
+                <span>Khách Hàng Đang Chat</span>
+                <Button
+                  type="text"
+                  icon={<SettingOutlined style={{ fontSize: 18, color: "#64748b" }} />}
+                  onClick={handleOpenRetentionModal}
+                  title="Cài đặt thời gian lưu trữ chat của khách chưa đăng nhập"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                  }}
+                />
               </div>
 
               {/* Danh sách khách hàng cuộn độc lập */}
@@ -505,7 +585,7 @@ const BranchChatPage = () => {
                                   color: "#1e293b",
                                 }}
                               >
-                                {item.customerName}
+                                {item.customerName || item.guestName || "Khách hàng"}
                               </span>
                               <span style={{ fontSize: 11, color: "#94a3b8" }}>
                                 {dayjs(item.updatedAt).format("HH:mm")}
@@ -597,7 +677,7 @@ const BranchChatPage = () => {
                         display: "block",
                       }}
                     >
-                      {activeConversation?.customerName}
+                      {activeConversation?.customerName || activeConversation?.guestName || "Khách hàng"}
                     </span>
                     <Text type="secondary" style={{ fontSize: 13 }}>
                       Chủ đề: {formatTopicLabel(activeConversation?.topic, activeConversation?.subject)}
@@ -644,7 +724,7 @@ const BranchChatPage = () => {
                   ) : (
                     <>
                       {messages.map((msg, index) => {
-                        const isCustomer = msg.customerId !== null; // Sent by customer
+                        const isCustomer = !msg.employeeId; // Sent by customer or guest
                         const prevMsg = index > 0 ? messages[index - 1] : null;
                         const renderSeparator = shouldRenderSeparator(msg, prevMsg, index);
                         const separatorText = renderSeparator ? getSeparatorText(msg, index) : "";
@@ -743,7 +823,7 @@ const BranchChatPage = () => {
                                       marginBottom: 4,
                                     }}
                                   >
-                                    {activeConversation?.customerName || "Khách hàng"}
+                                    {activeConversation?.customerName || activeConversation?.guestName || msg.customerName || msg.guestName || "Khách hàng"}
                                   </div>
                                 )}
                                 <div
@@ -755,6 +835,9 @@ const BranchChatPage = () => {
                                 >
                                   {renderHighlightedText(msg.content, showSearch ? searchTerm : "")}
                                 </div>
+                                {msg.messageType === "ProductReference" && (
+                                  <ProductConsultationCard metadataJson={msg.metadataJson} />
+                                )}
                                 <div
                                   style={{
                                     fontSize: 10,
@@ -1093,6 +1176,67 @@ const BranchChatPage = () => {
             },
           ]}
         />
+      </Modal>
+
+      {/* Modal Cài đặt thời gian lưu trữ đoạn chat khách ẩn danh */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            <SettingOutlined style={{ color: "#ea580c" }} />
+            <span>Cài đặt</span>
+          </div>
+        }
+        open={retentionModalOpen}
+        onCancel={() => setRetentionModalOpen(false)}
+        onOk={handleSaveRetention}
+        confirmLoading={savingRetention}
+        okText="Lưu cài đặt"
+        cancelText="Hủy"
+        okButtonProps={{ style: { background: "#ea580c", borderColor: "#ea580c", fontWeight: 600 } }}
+        centered
+        width={550}
+      >
+        <div style={{ padding: "12px 0" }}>
+          {loadingRetention ? (
+            <div style={{ textAlign: "center", padding: 24 }}>
+              <Spin />
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Tooltip title="Hệ thống sẽ tự động dọn dẹp các đoạn chat và phiên làm việc của khách hàng chưa đăng nhập nếu không có hoạt động mới sau khoảng thời gian đã thiết lập.">
+                  <QuestionCircleOutlined style={{ color: "#94a3b8", fontSize: 16, cursor: "pointer" }} />
+                </Tooltip>
+
+                <span style={{ fontWeight: 600, color: "#1e293b", fontSize: 13, flexShrink: 0 }}>
+                  Xóa đoạn chat của khách chưa đăng nhập:
+                </span>
+
+                <InputNumber
+                  min={1}
+                  value={retentionInputVal}
+                  onChange={(val) => setRetentionInputVal(val)}
+                  style={{ width: 80 }}
+                />
+
+                <Select
+                  value={retentionUnit}
+                  onChange={(val) => setRetentionUnit(val)}
+                  style={{ width: 100 }}
+                  options={[
+                    { value: 1, label: "Phút" },
+                    { value: 60, label: "Giờ" },
+                    { value: 1440, label: "Ngày" },
+                  ]}
+                />
+              </div>
+
+              <div style={{ marginTop: 24, fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>
+                * Áp dụng riêng cho chi nhánh hiện tại.
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );

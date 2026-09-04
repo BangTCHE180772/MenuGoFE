@@ -4,6 +4,7 @@ import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, AppstoreOutline
 import { getReservations, checkInReservation, cancelReservation } from '../api/reservationApi';
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
 import ReservationEditModal from '../components/reservation/ReservationEditModal';
+import AssignTableModal from '../components/reservation/AssignTableModal';
 import dayjs from 'dayjs';
 import { useBranch } from '../context/BranchContext';
 import { useSignalR } from '../context/SignalRContext';
@@ -16,7 +17,9 @@ const ReservationPage = ({ isPosHub }) => {
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
   const [editingReservation, setEditingReservation] = useState(null);
+  const [assigningReservation, setAssigningReservation] = useState(null);
 
   const [viewMode, setViewMode] = useState('cards');
   const [selectedDate, setSelectedDate] = useState(dayjs());
@@ -26,24 +29,25 @@ const ReservationPage = ({ isPosHub }) => {
   const connection = useSignalR();
   const [now, setNow] = useState(dayjs());
 
-  const fetchReservations = async () => {
+  const fetchReservations = React.useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getReservations(currentBranchId);
+      // Pass selectedDate formatted as ISO string (or YYYY-MM-DD depending on backend parsing)
+      const data = await getReservations(currentBranchId, selectedDate ? selectedDate.toISOString() : null);
       setReservations(data);
     } catch (error) {
       message.error('Không thể tải danh sách đặt bàn');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentBranchId, selectedDate]);
 
   useEffect(() => {
     fetchReservations();
 
     const interval = setInterval(() => setNow(dayjs()), 60000);
     return () => clearInterval(interval);
-  }, [currentBranchId]);
+  }, [fetchReservations]);
 
   // Realtime SignalR listener
   useEffect(() => {
@@ -77,7 +81,7 @@ const ReservationPage = ({ isPosHub }) => {
         connection.off('ReceiveNotification', handleNotification);
       };
     }
-  }, [connection, currentBranchId]);
+  }, [connection, currentBranchId, fetchReservations]);
 
   const handleCheckIn = async (id) => {
     Modal.confirm({
@@ -226,12 +230,20 @@ const ReservationPage = ({ isPosHub }) => {
           {isActive && (
             <div className="card-action-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {isPending && (
-                <Button block type="dashed" onClick={() => {
-                  setEditingReservation(r);
-                  setIsEditModalVisible(true);
-                }} style={{ height: 40, borderRadius: 8, borderColor: '#1890ff', color: '#1890ff' }}>
-                  Duyệt Đơn & Sửa TT
-                </Button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                  <Button block type="primary" onClick={() => {
+                    setAssigningReservation(r);
+                    setIsAssignModalVisible(true);
+                  }} style={{ height: 40, borderRadius: 8, fontWeight: 600 }}>
+                    Xác Nhận & Xếp Bàn
+                  </Button>
+                  <Button block type="dashed" onClick={() => {
+                    setEditingReservation(r);
+                    setIsEditModalVisible(true);
+                  }} style={{ height: 40, borderRadius: 8, borderColor: '#1890ff', color: '#1890ff' }}>
+                    Sửa Thông Tin
+                  </Button>
+                </div>
               )}
               {isConfirmed && (!r.tableNames || r.tableNames.length === 0) && (
                 <Button block onClick={() => {
@@ -353,6 +365,20 @@ const ReservationPage = ({ isPosHub }) => {
         onSuccess={() => {
           setIsEditModalVisible(false);
           setEditingReservation(null);
+          fetchReservations();
+        }}
+      />
+
+      <AssignTableModal
+        visible={isAssignModalVisible}
+        reservation={assigningReservation}
+        onClose={() => {
+          setIsAssignModalVisible(false);
+          setAssigningReservation(null);
+        }}
+        onSuccess={() => {
+          setIsAssignModalVisible(false);
+          setAssigningReservation(null);
           fetchReservations();
         }}
       />

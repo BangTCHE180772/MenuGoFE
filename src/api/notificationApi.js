@@ -30,10 +30,22 @@ export const getUnreadCount = async (branchId) => {
 };
 
 /**
- * Đánh dấu thông báo đã đọc
+ * Đánh dấu một thông báo đã đọc
  * @param {number} id - ID thông báo
  */
 export const markAsRead = async (id) => {
   const res = await axiosInstance.put(`/api/notification/${id}/read`);
   return res.data;
 };
+
+/**
+ * Đánh dấu tất cả thông báo đã đọc
+ * @param {number} branchId - ID chi nhánh (tùy chọn)
+ */
+export const markAllAsRead = async (branchId = null) => {
+  const params = branchId ? { branchId } : {};
+  const res = await axiosInstance.put('/api/notification/read-all', null, { params });
+  return res.data;
+};
+
+

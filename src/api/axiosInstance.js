@@ -17,7 +17,7 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     let token = localStorage.getItem('access_token');
-    const isCustomerPortalRoute = config.url && (config.url.includes('/api/CustomerPortal') || config.url.includes('/api/CustomerAuth') || config.url.includes('/api/Customer'));
+    const isCustomerPortalRoute = config.url && !config.url.includes('/api/CustomerManagement') && (config.url.includes('/api/CustomerPortal') || config.url.includes('/api/CustomerAuth') || config.url.includes('/api/Customer/'));
     if (isCustomerPortalRoute) {
       const customerToken = localStorage.getItem('customer_access_token');
       if (customerToken) {
@@ -116,7 +116,7 @@ axiosInstance.interceptors.response.use(
     // Xử lý lỗi toàn cục
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
-      const isCustomerRoute = url.includes('/api/CustomerPortal') || url.includes('/api/CustomerAuth') || url.includes('/api/Customer');
+      const isCustomerRoute = !url.includes('/api/CustomerManagement') && (url.includes('/api/CustomerPortal') || url.includes('/api/CustomerAuth') || url.includes('/api/Customer/'));
       if (isCustomerRoute) {
         localStorage.removeItem('customer_access_token');
         localStorage.removeItem('customer');

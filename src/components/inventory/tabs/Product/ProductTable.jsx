@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ReloadOutlined,
   LeftOutlined,
@@ -216,9 +217,12 @@ const ProductTable = ({
       // Search filter
       if (searchText) {
         const lower = searchText.toLowerCase().trim();
-        const nameMatch = item.name?.toLowerCase().includes(lower);
-        const codeMatch = item.code?.toLowerCase().includes(lower);
-        const unitMatch = item.unitName?.toLowerCase().includes(lower);
+        const pName = String(item.name || item.productName || item.product?.name || '').toLowerCase();
+        const pCode = String(item.code || item.productCode || item.product?.code || '').toLowerCase();
+        const pUnit = String(item.unitName || item.unit || '').toLowerCase();
+        const nameMatch = pName.includes(lower);
+        const codeMatch = pCode.includes(lower);
+        const unitMatch = pUnit.includes(lower);
         if (!nameMatch && !codeMatch && !unitMatch) return false;
       }
       return true;
@@ -229,6 +233,55 @@ const ProductTable = ({
   const totalStockQty = useMemo(() => {
     return filteredData.reduce((acc, item) => acc + Number(item.stockQuantity ?? item.quantity ?? 0), 0);
   }, [filteredData]);
+
+  const [searchParams] = useSearchParams();
+
+  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho
+  useEffect(() => {
+    const listToSearch = filteredData.length > 0 ? filteredData : rawList;
+    if (!listToSearch || listToSearch.length === 0) return;
+
+    const invIdParam = searchParams.get('inventoryId') ? Number(searchParams.get('inventoryId')) : null;
+    const prodIdParam = searchParams.get('productId') ? Number(searchParams.get('productId')) : null;
+    const batchParam = searchParams.get('batchId') ? Number(searchParams.get('batchId')) : null;
+    const activeTabParam = searchParams.get('activeTab');
+
+    let matched = null;
+    if (invIdParam) {
+      matched = listToSearch.find((i) => i.id === invIdParam || i.bInventoryId === invIdParam);
+    }
+    if (!matched && prodIdParam) {
+      matched = listToSearch.find((i) => i.productId === prodIdParam || i.product?.id === prodIdParam);
+    }
+    if (!matched && searchText) {
+      const lower = searchText.toLowerCase().trim();
+      matched = listToSearch.find((i) => {
+        const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+        const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+        return pName === lower || pCode === lower || pName.includes(lower);
+      });
+    }
+
+    if (matched) {
+      // Tự chuyển subTab nếu cần
+      const isProcessed = checkIsProcessed(matched);
+      const neededSubTab = isProcessed ? 'monan' : 'nguyenlieu';
+      if (subTab !== neededSubTab && setSubTab) {
+        setSubTab(neededSubTab);
+      }
+
+      setExpandedId(matched.id);
+      const tabToActivate = activeTabParam || (batchParam ? 'batches' : 'info');
+      setActiveTabMap((prev) => ({ ...prev, [matched.id]: tabToActivate }));
+
+      // Tự chuyển sang đúng trang chứa nguyên liệu
+      const matchedIdx = filteredData.findIndex((i) => i.id === matched.id);
+      if (matchedIdx >= 0) {
+        const targetPage = Math.floor(matchedIdx / pageSize) + 1;
+        setCurrentPage(targetPage);
+      }
+    }
+  }, [filteredData, rawList, searchParams, searchText, subTab, setSubTab]);
 
   const totalStockValue = useMemo(() => {
     return filteredData.reduce((acc, item) => {
@@ -481,6 +534,7 @@ const ProductTable = ({
                   checked={currentData.length > 0 && currentData.every((item) => selectedIds.includes(item.bInventoryId || item.id))}
                 />
               </th>
+              <th style={{ padding: '10px 8px', width: 140 }}>{subTab === 'nguyenlieu' ? 'Mã nguyên liệu' : 'Mã món ăn'}</th>
               <th style={{ padding: '10px 8px' }}>{subTab === 'nguyenlieu' ? 'Tên nguyên liệu' : 'Tên món ăn'}</th>
               <th style={{ padding: '10px 8px', textAlign: 'center' }}>Loại sản phẩm</th>
               <th style={{ padding: '10px 8px' }}>Đơn vị</th>
@@ -494,7 +548,7 @@ const ProductTable = ({
           <tbody>
             {/* SUMMARY ROW (TỔNG CỘNG) */}
             <tr style={{ background: '#f8fafc', fontWeight: 700, borderBottom: '1px solid #e2e8f0', fontSize: 11.5 }}>
-              <td colSpan={5} style={{ padding: '10px 8px', color: '#0f172a', textTransform: 'uppercase' }}>
+              <td colSpan={6} style={{ padding: '10px 8px', color: '#0f172a', textTransform: 'uppercase' }}>
                 TỔNG CỘNG
               </td>
               <td style={{ padding: '10px 8px', textAlign: 'right', color: '#0f172a' }}>
@@ -509,13 +563,13 @@ const ProductTable = ({
 
             {loading ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
                   Đang tải danh sách tồn kho từ API...
                 </td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                   Không tìm thấy dữ liệu nguyên liệu / mặt hàng nào
                 </td>
               </tr>
@@ -558,7 +612,10 @@ const ProductTable = ({
                         />
                       </td>
                       <td style={{ padding: '10px 8px', fontWeight: 600, color: '#2563eb' }}>
-                        {renderTruncatedText(item.code || item.name, 35)}
+                        {renderTruncatedText(item.code || item.productCode || item.product?.code || '---', 20)}
+                      </td>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: '#1e293b' }}>
+                        {renderTruncatedText(item.name || item.productName || item.product?.name || '---', 35)}
                       </td>
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                         {getProductTypeBadge(item)}
@@ -621,7 +678,7 @@ const ProductTable = ({
                     {/* ─── EXPANDED DETAILED DRAWER CONTAINER ─────────────────── */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={9} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={10} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -761,33 +818,25 @@ const ProductTable = ({
                                     flexShrink: 0
                                   }}
                                 >
-                                  {item.avatar || item.avatarImage || item.imageUrl || item.image ? (
-                                    <img
-                                      src={item.avatar || item.avatarImage || item.imageUrl || item.image}
-                                      alt={item.name}
-                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    />
-                                  ) : (
-                                    <span style={{ fontSize: 32 }}>📦</span>
-                                  )}
+                                  {(() => {
+                                    const imgSrc = item.imageUrl || item.imageLink || item.avatar || item.avatarImage || item.product?.imageUrl || item.product?.imageLink || (typeof item.image === 'string' ? item.image : item.image?.imageLink);
+                                    return imgSrc ? (
+                                      <img
+                                        src={imgSrc}
+                                        alt={item.name}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <span style={{ fontSize: 32 }}>📦</span>
+                                    );
+                                  })()}
                                 </div>
 
                                 <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 12 }}>
+                                  {/* ROW 1 */}
                                   <div>
                                     <span style={{ color: '#64748b' }}>Mã sản phẩm:</span>{' '}
-                                    <strong style={{ color: '#2563eb' }}>{item.code}</strong>
-                                  </div>
-                                  <div>
-                                    <span style={{ color: '#64748b' }}>Tên sản phẩm:</span>{' '}
-                                    <strong style={{ color: '#0f172a' }}>{item.name}</strong>
-                                  </div>
-                                  <div>
-                                    <span style={{ color: '#64748b' }}>Nhóm hàng:</span>{' '}
-                                    <strong>{item.groupName || 'Mặc định'}</strong>
-                                  </div>
-                                  <div>
-                                    <span style={{ color: '#64748b' }}>Loại sản phẩm (product.type):</span>{' '}
-                                    <strong>{item.type || item.productType || 'Processed'}</strong>
+                                    <strong style={{ color: '#2563eb' }}>{item.code || item.productCode || item.product?.code || '---'}</strong>
                                   </div>
                                   <div>
                                     <span style={{ color: '#64748b' }}>Tồn kho hiện tại:</span>{' '}
@@ -796,9 +845,25 @@ const ProductTable = ({
                                     </strong>
                                   </div>
                                   <div>
-                                    <span style={{ color: '#64748b' }}>Giá trung bình / Giá vốn:</span>{' '}
-                                    <strong>{unitPrice.toLocaleString('vi-VN')} đ</strong>
+                                    <span style={{ color: '#64748b' }}>Nhóm hàng:</span>{' '}
+                                    <strong>{item.groupName || item.categoryName || 'Mặc định'}</strong>
                                   </div>
+
+                                  {/* ROW 2 */}
+                                  <div>
+                                    <span style={{ color: '#64748b' }}>Tên sản phẩm:</span>{' '}
+                                    <strong style={{ color: '#0f172a' }}>{item.name || item.productName || item.product?.name || '---'}</strong>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: '#64748b' }}>SL tối thiểu:</span>{' '}
+                                    <strong>{item.minStorage ?? 0} {item.unitName || item.unit || ''}</strong>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: '#64748b' }}>Loại sản phẩm:</span>{' '}
+                                    {getProductTypeBadge(item)}
+                                  </div>
+
+                                  {/* ROW 3 */}
                                   <div>
                                     <span style={{ color: '#64748b' }}>Giá bán:</span>{' '}
                                     <strong style={{ color: '#059669' }}>
@@ -806,12 +871,12 @@ const ProductTable = ({
                                     </strong>
                                   </div>
                                   <div>
-                                    <span style={{ color: '#64748b' }}>SL tối thiểu:</span>{' '}
-                                    <strong>{item.minStorage ?? 0}</strong>
+                                    <span style={{ color: '#64748b' }}>SL tối đa (Giới hạn):</span>{' '}
+                                    <strong>{item.maxStorage ?? 1000} {item.unitName || item.unit || ''}</strong>
                                   </div>
                                   <div>
-                                    <span style={{ color: '#64748b' }}>SL tối đa (Giới hạn):</span>{' '}
-                                    <strong>{item.maxStorage ?? 1000}</strong>
+                                    <span style={{ color: '#64748b' }}>Giá trung bình / Giá vốn:</span>{' '}
+                                    <strong>{unitPrice.toLocaleString('vi-VN')} đ</strong>
                                   </div>
                                 </div>
                               </div>

@@ -30,7 +30,18 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
     if (currentSearch !== searchText) {
       setSearchText(currentSearch);
     }
-  }, [searchParams]);
+
+    // Tự động mở rộng chi tiết hóa đơn nếu tìm kiếm khớp mã hóa đơn
+    if (currentSearch && invoices.length > 0) {
+      const lower = currentSearch.toLowerCase().trim();
+      const matched = invoices.find(
+        (i) => i.code?.toLowerCase() === lower || String(i.id) === lower || `hd${i.id}` === lower
+      );
+      if (matched && expandedInvoiceId !== matched.id) {
+        toggleExpand(matched.id);
+      }
+    }
+  }, [searchParams, invoices]);
 
   const handleSearchChange = (newVal) => {
     setSearchText(newVal);

@@ -80,11 +80,31 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
               placeholder="Chọn bàn..."
               optionFilterProp="children"
               style={{ width: '100%' }}
+              onChange={(value) => {
+                if (!value || value.length <= 1) return;
+                const selectedAreas = new Set(
+                  value.map(id => availableTables.find(t => t.id === id)?.areaName)
+                );
+                if (selectedAreas.size > 1) {
+                  message.warning('Khuyến cáo: Các bàn đã chọn thuộc các khu vực khác nhau!');
+                }
+              }}
             >
-              {availableTables.map(t => (
-                <Select.Option key={t.id} value={t.id}>
-                  {t.name}
-                </Select.Option>
+              {Object.entries(
+                availableTables.reduce((acc, table) => {
+                  const areaName = table.areaName || 'Khu vực khác';
+                  acc[areaName] = acc[areaName] || [];
+                  acc[areaName].push(table);
+                  return acc;
+                }, {})
+              ).map(([areaName, tables]) => (
+                <Select.OptGroup key={areaName} label={`Khu vực: ${areaName}`}>
+                  {tables.map(t => (
+                    <Select.Option key={t.id} value={t.id}>
+                      {t.name}
+                    </Select.Option>
+                  ))}
+                </Select.OptGroup>
               ))}
             </Select>
           </Form.Item>

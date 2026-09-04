@@ -22,6 +22,7 @@ import CustomerMenuGrid from "../../components/customer/CustomerMenuGrid";
 import CustomerBranchSection from "../../components/customer/CustomerBranchSection";
 import CustomerFooter from "../../components/customer/CustomerFooter";
 import ProductDetailModal from "../../components/customer/ProductDetailModal";
+import FloatingChatWidget from "../../components/chat/FloatingChatWidget";
 import ToTop from "../../components/ToTop";
 
 import "../../styles/CustomerHomePage.css";
@@ -108,6 +109,7 @@ const CustomerHomePage = () => {
   const [activeSection, setActiveSection] = useState("hero");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [consultProductItem, setConsultProductItem] = useState(null);
 
   //=================================================================================================================== Fetch Data
   const fetchChain = useCallback(async () => {
@@ -525,6 +527,7 @@ const CustomerHomePage = () => {
               products={filteredAndSortedProducts}
               loading={loadingMenu}
               onViewDetail={handleOpenDetailModal}
+              onConsult={(product) => setConsultProductItem(product)}
             />
           </div>
 
@@ -555,6 +558,18 @@ const CustomerHomePage = () => {
         product={selectedProduct}
         open={isDetailModalOpen}
         onClose={handleCloseDetailModal}
+        onConsult={(product) => setConsultProductItem(product)}
+      />
+
+      <FloatingChatWidget
+        activeBranchId={activeBranchId}
+        branches={branches}
+        onSelectBranch={(branchId) => {
+          setActiveBranchId(branchId);
+          setSearchParams({ branchId: branchId });
+        }}
+        externalConsultationItem={consultProductItem}
+        onClearExternalConsultation={() => setConsultProductItem(null)}
       />
 
       <ToTop />

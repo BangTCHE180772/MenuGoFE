@@ -12,6 +12,7 @@ import ExportDeleteTab from './tabs/ExportDelete/ExportDeleteTab';
 import TransferTab from './tabs/Transfer/TransferTab';
 import ProductionTab from './tabs/Production/ProductionTab';
 import PartnerTab from './tabs/Partner/PartnerTab';
+import CustomerTab from './tabs/Customer/CustomerTab';
 import ProductTab from './tabs/Product/ProductTab';
 import InvoiceTab from './tabs/Invoice/InvoiceTab';
 import AdjustmentTab from './tabs/Adjustment/AdjustmentTab';
@@ -196,6 +197,12 @@ const InventoryManagementTab = () => {
           <PartnerTab
             partners={partners}
             fetchPartners={fetchPartners}
+            selectedBranchId={currentBranchId}
+          />
+        )}
+
+        {activeTab === 'Customer' && (
+          <CustomerTab
             selectedBranchId={currentBranchId}
           />
         )}
