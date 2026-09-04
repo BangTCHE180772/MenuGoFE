@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -18,6 +19,9 @@ import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/bat
 import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
 
 const BatchExpiryTab = ({ selectedBranchId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get('search') || '';
+
   const [loading, setLoading] = useState(false);
   const [batches, setBatches] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -36,10 +40,31 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
   });
 
   // Filter States
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [expiryStatusFilter, setExpiryStatusFilter] = useState('ALL'); // ALL, expired, near_expiry, valid, no_expiry
   const [batchStatusFilter, setBatchStatusFilter] = useState(null); // null, 1(Active), 2(Depleted), 3(Expired), 4(Locked)
   const [nearExpiryDays, setNearExpiryDays] = useState(7);
+
+  // Sync searchText when URL searchParam changes
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (currentSearch !== searchText) {
+      setSearchText(currentSearch);
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (val) => {
+    setSearchText(val);
+    setCurrentPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    if (val) {
+      newParams.set('search', val);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
+  };
 
   // Traceability Drawer State
   const [traceDrawerOpen, setTraceDrawerOpen] = useState(false);
@@ -179,28 +204,28 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
           </div>
         </div>
 
-        {/* CÒN HẠN SỬ DỤNG (VALID) */}
+        {/* KHÔNG CÓ HẠN SỬ DỤNG (NO EXPIRY) */}
         <div
-          onClick={() => { setExpiryStatusFilter('valid'); setCurrentPage(1); }}
+          onClick={() => { setExpiryStatusFilter('no_expiry'); setCurrentPage(1); }}
           style={{
-            background: '#f0fdf4',
+            background: '#f8fafc',
             borderRadius: 8,
             padding: '12px 14px',
-            border: expiryStatusFilter === 'valid' ? '2px solid #16a34a' : '1px solid #bbf7d0',
+            border: expiryStatusFilter === 'no_expiry' ? '2px solid #64748b' : '1px solid #e2e8f0',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer',
             transition: 'all 0.15s ease'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#166534', fontSize: 11.5, fontWeight: 700 }}>
-            <span>Còn hạn an toàn</span>
-            <CheckCircleOutlined style={{ fontSize: 16, color: '#16a34a' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#334155', fontSize: 11.5, fontWeight: 700 }}>
+            <span>Không có HSD</span>
+            <ClockCircleOutlined style={{ fontSize: 16, color: '#64748b' }} />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a', marginTop: 4 }}>
-            {summary.validBatches}
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#334155', marginTop: 4 }}>
+            {summary.noExpiryBatches}
           </div>
-          <div style={{ fontSize: 10.5, color: '#15803d', marginTop: 2 }}>
-            Ưu tiên xuất theo FEFO
+          <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>
+            Hàng không áp dụng HSD
           </div>
         </div>
       </div>
@@ -228,10 +253,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
               type="text"
               placeholder="Tìm theo mã Lô, tên mặt hàng, SKU..."
               value={searchText}
-              onChange={(e) => {
-                setSearchText(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleSearchChange(e.target.value)}
               style={{
                 width: '100%',
                 height: 32,

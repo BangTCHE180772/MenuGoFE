@@ -58,3 +58,8 @@ export const getCustomerPoints = async (customerId) => {
   return response.data;
 };
 
+export const payPartnerImportDocument = async (partnerId, documentId, paymentData) => {
+  const response = await axiosInstance.post(`/api/Partner/${partnerId}/import-documents/${documentId}/pay`, paymentData);
+  return response.data;
+};
+

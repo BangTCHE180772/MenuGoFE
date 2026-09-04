@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ReloadOutlined,
   LeftOutlined,
@@ -101,27 +101,104 @@ const getProductTypeBadge = (item) => {
 };
 
 const mapMethodToTab = (methodName, docCode) => {
-  if (methodName === "Bán hàng" || (docCode && docCode.startsWith("PXBH"))) {
+  if (methodName === "Bán hàng" || (docCode && (docCode.startsWith("PXBH") || docCode.startsWith("HD")))) {
     return "Invoice";
   }
   switch (methodName) {
     case "Nhập hàng":
       return "Import";
     case "Trả hàng nhập":
+    case "Trả Hàng":
+    case "Trả hàng":
       return "ImportReturn";
     case "Kiểm kho":
       return "Check";
     case "Xuất hủy":
+    case "Xuất Hủy":
       return "ExportDelete";
     case "Xuất chuyển kho":
+    case "Chuyển Hàng":
+    case "Chuyển hàng":
       return "Transfer";
     case "Sản xuất":
       return "Production";
     case "Điều chỉnh":
+    case "Điều chỉnh giá vốn":
       return "Adjustment";
     default:
       return null;
   }
+};
+
+const renderMethodBadge = (ldg) => {
+  let method = ldg.methodName || ldg.method || ldg.type || '';
+  const docType = ldg.documentType || '';
+  const docCode = ldg.documentCode || ldg.docCode || '';
+
+  if (docType === 'Export' || docType === 'ExportDelete' || method.toLowerCase().includes('hủy') || docCode.startsWith('XH')) {
+    method = 'Xuất Hủy';
+  } else if (docType === 'Sale' || method.toLowerCase().includes('bán') || docCode.startsWith('PXBH') || docCode.startsWith('HD')) {
+    method = 'Bán hàng';
+  } else if (docType === 'Return' || (method.toLowerCase().includes('trả') && !method.toLowerCase().includes('khách')) || docCode.startsWith('THN') || docCode.startsWith('TH')) {
+    method = 'Trả Hàng';
+  } else if (docType === 'Transfer' || method.toLowerCase().includes('chuyển') || docCode.startsWith('CK')) {
+    method = 'Chuyển Hàng';
+  } else if (docType === 'CustomerReturn' || method.toLowerCase().includes('khách')) {
+    method = 'Khách trả hàng';
+  } else if (docType === 'Import' || method.toLowerCase().includes('nhập') || docCode.startsWith('NH')) {
+    method = 'Nhập hàng';
+  } else if (docType === 'Check' || method.toLowerCase().includes('kiểm')) {
+    method = 'Kiểm kho';
+  } else if (docType === 'Production' || method.toLowerCase().includes('sản xuất')) {
+    method = 'Sản xuất';
+  }
+
+  let bg = '#f1f5f9';
+  let color = '#334155';
+  let border = '#e2e8f0';
+
+  if (method === 'Bán hàng') {
+    bg = '#eff6ff';
+    color = '#1d4ed8';
+    border = '#bfdbfe';
+  } else if (method === 'Xuất Hủy') {
+    bg = '#fef2f2';
+    color = '#dc2626';
+    border = '#fecaca';
+  } else if (method === 'Trả Hàng') {
+    bg = '#fff7ed';
+    color = '#c2410c';
+    border = '#ffedd5';
+  } else if (method === 'Chuyển Hàng') {
+    bg = '#f5f3ff';
+    color = '#6d28d9';
+    border = '#ddd6fe';
+  } else if (method === 'Nhập hàng') {
+    bg = '#ecfdf5';
+    color = '#047857';
+    border = '#a7f3d0';
+  } else if (method === 'Khách trả hàng') {
+    bg = '#f0fdf4';
+    color = '#15803d';
+    border = '#bbf7d0';
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2.5px 8px',
+        borderRadius: 4,
+        fontSize: 10.5,
+        fontWeight: 700,
+        background: bg,
+        color: color,
+        border: `1px solid ${border}`
+      }}
+    >
+      {method}
+    </span>
+  );
 };
 
 const ProductTable = ({
@@ -134,6 +211,7 @@ const ProductTable = ({
   statusFilter = 'ALL',
   setStatusFilter
 }) => {
+  const navigate = useNavigate();
   const [bInventories, setBInventories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -898,7 +976,7 @@ const ProductTable = ({
                                           <thead>
                                             <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mã chứng từ</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Phương thức</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Nghiệp vụ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Thời gian</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn BQ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thay đổi tồn</th>
@@ -942,7 +1020,7 @@ const ProductTable = ({
                                                           textDecoration: 'underline'
                                                         }}
                                                         onClick={() => {
-                                                          const tab = mapMethodToTab(method, docCode);
+                                                          const tab = mapMethodToTab(ldg.methodName || method, docCode);
                                                           if (tab) {
                                                             window.location.href = `/inventory-management?tab=${tab}&search=${docCode}`;
                                                           }
@@ -951,8 +1029,8 @@ const ProductTable = ({
                                                         {renderTruncatedText(docCode, 18)}
                                                       </button>
                                                     </td>
-                                                    <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                                      {renderTruncatedText(method, 22)}
+                                                    <td style={{ padding: '8px 10px' }}>
+                                                      {renderMethodBadge(ldg)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', color: '#475569' }}>
                                                       {timeStr}
@@ -1146,8 +1224,25 @@ const ProductTable = ({
 
                                                 return (
                                                   <tr key={b.id || bIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
-                                                      {b.batchCode}
+                                                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>
+                                                      {b.batchCode ? (
+                                                        <span
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate(`/inventory-management?tab=BatchExpiry&search=${encodeURIComponent(b.batchCode)}`);
+                                                          }}
+                                                          style={{
+                                                            color: '#2563eb',
+                                                            cursor: 'pointer',
+                                                            textDecoration: 'underline'
+                                                          }}
+                                                          title="Nhấp để tìm Lô trong tab Quản lý HSD / Lô"
+                                                        >
+                                                          {b.batchCode}
+                                                        </span>
+                                                      ) : (
+                                                        <span style={{ color: '#94a3b8' }}>---</span>
+                                                      )}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                                                       {qOrig.toLocaleString('vi-VN')} {item.unitName || 'đv'}

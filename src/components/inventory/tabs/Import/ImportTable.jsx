@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   EnvironmentOutlined,
@@ -29,6 +30,7 @@ const ImportTable = ({
   onOpenReturnModal,
   onEditDocument
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' }
@@ -539,11 +541,46 @@ const ImportTable = ({
 
                                               return (
                                                 <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700 }}>
+                                                    {pCode && pCode !== '---' ? (
+                                                      <span
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(pCode)}&subTab=nguyenlieu`);
+                                                        }}
+                                                        style={{
+                                                          color: '#2563eb',
+                                                          cursor: 'pointer',
+                                                          textDecoration: 'underline'
+                                                        }}
+                                                        title="Nhấp để tìm nguyên liệu trong tab Sản phẩm / Kho hàng"
+                                                      >
+                                                        {pCode}
+                                                      </span>
+                                                    ) : (
+                                                      <span style={{ color: '#94a3b8' }}>---</span>
+                                                    )}
+                                                  </td>
                                                   <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
                                                   <td style={{ padding: '8px 10px', color: '#0f172a', fontWeight: 600 }}>
                                                     {bCode !== '---' ? (
-                                                      <span style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: 4, border: '1px solid #bfdbfe', fontSize: 10.5 }}>
+                                                      <span
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          navigate(`/inventory-management?tab=BatchExpiry&search=${encodeURIComponent(bCode)}`);
+                                                        }}
+                                                        style={{
+                                                          background: '#eff6ff',
+                                                          color: '#2563eb',
+                                                          padding: '2px 6px',
+                                                          borderRadius: 4,
+                                                          border: '1px solid #bfdbfe',
+                                                          fontSize: 10.5,
+                                                          cursor: 'pointer',
+                                                          textDecoration: 'underline'
+                                                        }}
+                                                        title="Nhấp để tìm Lô trong tab Quản lý HSD / Lô"
+                                                      >
                                                         {bCode}
                                                       </span>
                                                     ) : (
