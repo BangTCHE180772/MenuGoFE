@@ -433,7 +433,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
                       {renderBatchStatusBadge(b.status)}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry)}
+                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry, b.quantityRemaining, b.status)}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                       <button

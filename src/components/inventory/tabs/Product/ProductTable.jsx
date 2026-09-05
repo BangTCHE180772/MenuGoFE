@@ -1273,7 +1273,7 @@ const ProductTable = ({
                                                       {renderBatchStatusBadge(b.status)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry)}
+                                                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry, b.quantityRemaining, b.status)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                                                       <button

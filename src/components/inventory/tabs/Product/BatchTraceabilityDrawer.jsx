@@ -252,7 +252,7 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                     {renderBatchStatusBadge(currentBatch.status)}
                   </div>
                   <div>
-                    {renderExpiryStatusBadge(currentBatch.expiryDate, currentBatch.daysUntilExpiry)}
+                    {renderExpiryStatusBadge(currentBatch.expiryDate, currentBatch.daysUntilExpiry, currentBatch.quantityRemaining, currentBatch.status)}
                   </div>
                 </div>
 

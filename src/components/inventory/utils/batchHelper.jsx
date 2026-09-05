@@ -75,7 +75,24 @@ export const renderBatchStatusBadge = (status) => {
 /**
  * Trả về thông tin hạn sử dụng và cảnh báo
  */
-export const getExpiryStatusInfo = (expiryDate, daysUntilExpiry) => {
+export const getExpiryStatusInfo = (expiryDate, daysUntilExpiry, quantityRemaining, status) => {
+  // Nếu Lô đã hết hàng (tồn <= 0 hoặc trạng thái Depleted) thì không báo hết hạn nữa
+  const isDepleted =
+    (quantityRemaining !== undefined && quantityRemaining !== null && Number(quantityRemaining) <= 0) ||
+    status === 2 ||
+    String(status).toLowerCase() === 'depleted';
+
+  if (isDepleted) {
+    return {
+      status: 'Depleted',
+      label: 'Đã hết hàng',
+      color: '#64748b',
+      bg: '#f1f5f9',
+      border: '#cbd5e1',
+      isWarning: false
+    };
+  }
+
   if (!expiryDate) {
     return {
       status: 'NoExpiry',
@@ -148,8 +165,8 @@ export const getExpiryStatusInfo = (expiryDate, daysUntilExpiry) => {
 /**
  * Render thẻ Badge Hạn sử dụng
  */
-export const renderExpiryStatusBadge = (expiryDate, daysUntilExpiry) => {
-  const info = getExpiryStatusInfo(expiryDate, daysUntilExpiry);
+export const renderExpiryStatusBadge = (expiryDate, daysUntilExpiry, quantityRemaining, status) => {
+  const info = getExpiryStatusInfo(expiryDate, daysUntilExpiry, quantityRemaining, status);
   return (
     <span
       style={{
