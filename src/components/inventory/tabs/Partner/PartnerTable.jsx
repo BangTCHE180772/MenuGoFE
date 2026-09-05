@@ -80,6 +80,10 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
   };
 
   const handleOpenPayModal = (doc) => {
+    if (!doc || doc.debtAmount <= 0) {
+      message.warning('Phiếu nhập này không còn dư nợ để thanh toán!');
+      return;
+    }
     setSelectedPayDoc(doc);
     setPayAmount(doc.debtAmount || 0);
     setPayMethod(1);
@@ -313,41 +317,61 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
             <div>
               {/* CARDS TỔNG QUAN TÀI CHÍNH */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
-                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: 10.5, color: '#1e40af', fontWeight: 600, textTransform: 'uppercase' }}>
-                    <FileTextOutlined style={{ marginRight: 4 }} /> Tổng tiền nhập hàng
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 76 }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: '#1e40af', fontWeight: 700, textTransform: 'uppercase' }}>
+                      <FileTextOutlined style={{ marginRight: 4 }} /> Tổng giá trị hàng nhập
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#1d4ed8', marginTop: 4 }}>
+                      {totalImport.toLocaleString('vi-VN')} VNĐ
+                    </div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1d4ed8', marginTop: 4 }}>
-                    {totalImport.toLocaleString('vi-VN')} VNĐ
+                  <div style={{ fontSize: 9.5, color: '#64748b', marginTop: 2 }}>
+                    (Tổng giá trị hàng hóa đã nhận)
                   </div>
                 </div>
 
                 {totalReturn > 0 && (
-                  <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff7ed', border: '1px solid #fed7aa' }}>
-                    <div style={{ fontSize: 10.5, color: '#c2410c', fontWeight: 600, textTransform: 'uppercase' }}>
-                      <FileTextOutlined style={{ marginRight: 4 }} /> Tổng tiền trả hàng
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff7ed', border: '1px solid #fed7aa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 76 }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, color: '#c2410c', fontWeight: 700, textTransform: 'uppercase' }}>
+                        <FileTextOutlined style={{ marginRight: 4 }} /> Giá trị hàng xuất trả
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#ea580c', marginTop: 4 }}>
+                        {totalReturn.toLocaleString('vi-VN')} VNĐ
+                      </div>
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#ea580c', marginTop: 4 }}>
-                      {totalReturn.toLocaleString('vi-VN')} VNĐ
+                    <div style={{ fontSize: 9.5, color: '#9a3412', marginTop: 2 }}>
+                      (Hàng đã xuất gửi trả lại NCC)
                     </div>
                   </div>
                 )}
 
-                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                  <div style={{ fontSize: 10.5, color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>
-                    <DollarOutlined style={{ marginRight: 4 }} /> Đã thanh toán NCC
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 76 }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>
+                      <DollarOutlined style={{ marginRight: 4 }} /> Tiền đã chi cho NCC
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#15803d', marginTop: 4 }}>
+                      {totalPaid.toLocaleString('vi-VN')} VNĐ
+                    </div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#15803d', marginTop: 4 }}>
-                    {totalPaid.toLocaleString('vi-VN')} VNĐ
+                  <div style={{ fontSize: 9.5, color: '#64748b', marginTop: 2 }}>
+                    (Tiền mặt / CK thực tế đã trả)
                   </div>
                 </div>
 
-                <div style={{ padding: '10px 14px', borderRadius: 8, background: debtInfo.bgColor, border: `1px solid ${debtInfo.borderColor}` }}>
-                  <div style={{ fontSize: 10.5, color: debtInfo.color, fontWeight: 600, textTransform: 'uppercase' }}>
-                    <HistoryOutlined style={{ marginRight: 4 }} /> {debtInfo.label}
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: debtInfo.bgColor, border: `1px solid ${debtInfo.borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 76 }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: debtInfo.color, fontWeight: 700, textTransform: 'uppercase' }}>
+                      <HistoryOutlined style={{ marginRight: 4 }} /> {debtInfo.label}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: debtInfo.color, marginTop: 4 }}>
+                      {debtInfo.formattedAmount}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: debtInfo.color, marginTop: 4 }}>
-                    {debtInfo.formattedAmount}
+                  <div style={{ fontSize: 9.5, color: debtInfo.color, opacity: 0.85, marginTop: 2 }}>
+                    (Dư nợ sau khi bù trừ)
                   </div>
                 </div>
               </div>
@@ -488,6 +512,7 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                     ) : (
                       docs.map((d) => {
                         const isDocExpanded = expandedDocId === d.id;
+                        const isReturned = d.paymentStatus === 'Returned' || (d.returnedAmount > 0 && d.debtAmount === 0 && d.amountPaid === 0);
                         const hasPaid = d.debtAmount === 0;
 
                         return (
@@ -523,7 +548,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                 {dayjs(d.importDate).format('DD/MM/YYYY HH:mm')}
                               </td>
                               <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>
-                                {d.totalAmount.toLocaleString('vi-VN')} VNĐ
+                                <div>{d.totalAmount.toLocaleString('vi-VN')} VNĐ</div>
+                                {d.returnedAmount > 0 && (
+                                  <div style={{ fontSize: 9.5, color: '#ea580c', fontWeight: 600 }}>
+                                    (Đã trả: -{d.returnedAmount.toLocaleString('vi-VN')} VNĐ)
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '7px 10px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>
                                 {d.amountPaid.toLocaleString('vi-VN')} VNĐ
@@ -532,7 +562,21 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                 {d.debtAmount.toLocaleString('vi-VN')} VNĐ
                               </td>
                               <td style={{ padding: '7px 10px', textAlign: 'center' }}>
-                                {hasPaid ? (
+                                {isReturned ? (
+                                  <span
+                                    style={{
+                                      padding: '3px 8px',
+                                      borderRadius: 4,
+                                      background: '#f5f3ff',
+                                      color: '#7c3aed',
+                                      border: '1px solid #ddd6fe',
+                                      fontSize: 10.5,
+                                      fontWeight: 700
+                                    }}
+                                  >
+                                    Đã trả hàng
+                                  </span>
+                                ) : hasPaid ? (
                                   <span
                                     style={{
                                       padding: '3px 8px',
