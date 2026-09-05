@@ -15,6 +15,7 @@ import {
   RightOutlined
 } from '@ant-design/icons';
 import { getPartnerFinancialSummary, getPartnerImportDocuments, getPartnerCashFlows, payPartnerImportDocument } from '../../../../api/partnerApi';
+import { getDebtDisplayInfo } from '../../../../utils/debtHelper';
 import dayjs from 'dayjs';
 
 // Phân loại nhãn hiển thị cho đối tác
@@ -141,8 +142,10 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
 
   const badge = getPartnerBadge(partner.type);
   const totalImport = summary?.totalImportAmount || 0;
+  const totalReturn = summary?.totalReturnAmount || 0;
   const totalPaid = summary?.totalPaidAmount || 0;
   const remainingDebt = summary?.remainingDebt || 0;
+  const debtInfo = getDebtDisplayInfo(remainingDebt);
 
   return (
     <div style={{ padding: 16 }}>
@@ -308,7 +311,7 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
           {/* TAB 2: LỊCH SỬ GIAO DỊCH */}
           {activeSubTab === 'transactions' && (
             <div>
-              {/* 3 CARDS TỔNG QUAN TÀI CHÍNH */}
+              {/* CARDS TỔNG QUAN TÀI CHÍNH */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
                 <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
                   <div style={{ fontSize: 10.5, color: '#1e40af', fontWeight: 600, textTransform: 'uppercase' }}>
@@ -319,6 +322,17 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                   </div>
                 </div>
 
+                {totalReturn > 0 && (
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                    <div style={{ fontSize: 10.5, color: '#c2410c', fontWeight: 600, textTransform: 'uppercase' }}>
+                      <FileTextOutlined style={{ marginRight: 4 }} /> Tổng tiền trả hàng
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#ea580c', marginTop: 4 }}>
+                      {totalReturn.toLocaleString('vi-VN')} VNĐ
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <div style={{ fontSize: 10.5, color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>
                     <DollarOutlined style={{ marginRight: 4 }} /> Đã thanh toán NCC
@@ -328,12 +342,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                   </div>
                 </div>
 
-                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca' }}>
-                  <div style={{ fontSize: 10.5, color: '#991b1b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    <HistoryOutlined style={{ marginRight: 4 }} /> Còn nợ NCC
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: debtInfo.bgColor, border: `1px solid ${debtInfo.borderColor}` }}>
+                  <div style={{ fontSize: 10.5, color: debtInfo.color, fontWeight: 600, textTransform: 'uppercase' }}>
+                    <HistoryOutlined style={{ marginRight: 4 }} /> {debtInfo.label}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#dc2626', marginTop: 4 }}>
-                    {remainingDebt.toLocaleString('vi-VN')} VNĐ
+                  <div style={{ fontSize: 15, fontWeight: 800, color: debtInfo.color, marginTop: 4 }}>
+                    {debtInfo.formattedAmount}
                   </div>
                 </div>
               </div>
@@ -1088,8 +1102,8 @@ const PartnerTable = ({
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{p.phone || '---'}</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
-                        {p.totalDebt ? p.totalDebt.toLocaleString('vi-VN') : 0} VNĐ
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: getDebtDisplayInfo(p.totalDebt ?? p.remainingDebt ?? 0).color }}>
+                        {getDebtDisplayInfo(p.totalDebt ?? p.remainingDebt ?? 0).formattedAmount}
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button

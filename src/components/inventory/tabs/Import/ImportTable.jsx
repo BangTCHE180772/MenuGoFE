@@ -273,12 +273,14 @@ const ImportTable = ({
                 const supplierName = loadedDoc.partnerName || supplierPartner?.partnerName || loadedDoc.partner?.name || '---';
 
                 const totalInvoiceAmount = Number(loadedDoc.totalAmount || 0);
+                const matchDebt = (loadedDoc.note || '').match(/Trừ tiền NCC nợ:\s*([0-9.,]+)/);
+                const deductedDebt = matchDebt ? Number(matchDebt[1].replace(/\./g, '').replace(',', '.')) : 0;
                 const roundingCF = cashFlowsList.find((cf) => cf.type === 5 || cf.type === 'Rounding');
                 const roundingAmount = Number(roundingCF?.totalAmount || 0);
-                const effectivePayableAmount = totalInvoiceAmount - roundingAmount;
+                const effectivePayableAmount = Math.max(0, totalInvoiceAmount - roundingAmount - deductedDebt);
                 const paymentCashFlows = cashFlowsList.filter((cf) => cf.type !== 5 && cf.type !== 'Rounding');
                 const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? paymentCashFlows.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
-                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (effectivePayableAmount - supplierAmountPaid)));
+                const remainingDebt = Math.max(0, effectivePayableAmount - supplierAmountPaid);
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -500,9 +502,12 @@ const ImportTable = ({
                                         {roundingAmount !== 0 && (
                                           <div>ĐC Làm tròn (Rounding): <strong style={{ color: '#d97706' }}>{roundingAmount > 0 ? `-${roundingAmount.toLocaleString('vi-VN')}` : `+${Math.abs(roundingAmount).toLocaleString('vi-VN')}`} đ</strong></div>
                                         )}
+                                        {deductedDebt > 0 && (
+                                          <div>Trừ tiền NCC nợ: <strong style={{ color: '#16a34a' }}>-{deductedDebt.toLocaleString('vi-VN')} đ</strong></div>
+                                        )}
                                         <div>Cần trả NCC: <strong style={{ color: '#0f172a' }}>{effectivePayableAmount.toLocaleString('vi-VN')} đ</strong></div>
                                         <div>Đã trả NCC: <strong style={{ color: '#059669' }}>{supplierAmountPaid.toLocaleString('vi-VN')} đ</strong></div>
-                                        <div>Còn nợ NCC: <strong style={{ color: '#ef4444' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Còn nợ NCC: <strong style={{ color: remainingDebt > 0 ? '#ef4444' : '#64748b' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
                                       </div>
                                     </div>
 
@@ -623,14 +628,32 @@ const ImportTable = ({
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {cashFlowsList.length === 0 ? (
+                                          {cashFlowsList.length === 0 && deductedDebt === 0 ? (
                                             <tr>
                                               <td colSpan={5} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
                                                 Chưa có lịch sử giao dịch thanh toán
                                               </td>
                                             </tr>
                                           ) : (
-                                            cashFlowsList.map((cf, idx) => {
+                                            <>
+                                              {deductedDebt > 0 && (
+                                                <tr style={{ borderBottom: '1px solid #f1f5f9', background: '#f0fdf4' }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>{`DED-${loadedDoc.code}`}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                    {loadedDoc.orderDate ? dayjs(loadedDoc.orderDate).format('DD/MM/YYYY HH:mm') : dayjs(loadedDoc.createdAt).format('DD/MM/YYYY HH:mm')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: '#16a34a', fontWeight: 600 }}>Cấn trừ nợ NCC</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                                                    {deductedDebt.toLocaleString('vi-VN')} đ
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                    <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d', fontSize: 10, fontWeight: 600 }}>
+                                                      Đã trừ nợ
+                                                    </span>
+                                                  </td>
+                                                </tr>
+                                              )}
+                                              {cashFlowsList.map((cf, idx) => {
                                               const isRounding = cf.type === 5 || cf.type === 'Rounding';
                                               return (
                                                 <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: isRounding ? '#fffbeb' : 'transparent' }}>
@@ -651,7 +674,8 @@ const ImportTable = ({
                                                   </td>
                                                 </tr>
                                               );
-                                            })
+                                            })}
+                                            </>
                                           )}
                                         </tbody>
                                       </table>

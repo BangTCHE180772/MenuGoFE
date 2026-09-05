@@ -11,7 +11,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getSuppliers, getExtraPartners } from '../../../../api/partnerApi';
+import { getSuppliers, getExtraPartners, getPartnerFinancialSummary } from '../../../../api/partnerApi';
+import { getDebtDisplayInfo } from '../../../../utils/debtHelper';
 import { getBInventories, getProductsByDate } from '../../../../api/binventoryApi';
 import {
   createImportPending,
@@ -78,6 +79,9 @@ const ImportDocumentModal = ({
   });
 
   const [items, setItems] = useState([]);
+  const [supplierDebt, setSupplierDebt] = useState(null);
+  const [loadingSupplierDebt, setLoadingSupplierDebt] = useState(false);
+  const [deductDebt, setDeductDebt] = useState(false);
 
   // Fetch Suppliers & Product Search List when modal opens
   useEffect(() => {
@@ -193,6 +197,29 @@ const ImportDocumentModal = ({
     }
   }, [open, branchId, partners, editingDocument, products]);
 
+  useEffect(() => {
+    setDeductDebt(false);
+    if (!formData.supplierId) {
+      setSupplierDebt(null);
+      return;
+    }
+    let isMounted = true;
+    setLoadingSupplierDebt(true);
+    getPartnerFinancialSummary(formData.supplierId)
+      .then((res) => {
+        if (isMounted) setSupplierDebt(res);
+      })
+      .catch(() => {
+        if (isMounted) setSupplierDebt(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingSupplierDebt(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.supplierId]);
+
   // Live Product Search Trigger
   useEffect(() => {
     if (!open || !branchId || !searchQuery) return;
@@ -206,8 +233,6 @@ const ImportDocumentModal = ({
     }, 200);
     return () => clearTimeout(timer);
   }, [searchQuery, open, branchId]);
-
-  if (!open) return null;
 
   // Filtered Products for Search Dropdown (ONLY ProductType REGULAR, INGREDIENT, TOOL allowed)
   const searchOptions = bInventoryList.length > 0 ? bInventoryList : products;
@@ -333,6 +358,17 @@ const ImportDocumentModal = ({
   const roundedGoodsAmount = remainder < 0.5 ? Math.floor(goodsAmount) : Math.floor(goodsAmount) + 1;
   const roundingValue = goodsAmount - roundedGoodsAmount;
 
+  // Bù trừ công nợ khi NCC nợ cửa hàng (remainingDebt < 0)
+  const supplierCredit = (supplierDebt && supplierDebt.remainingDebt < 0) ? Math.abs(supplierDebt.remainingDebt) : 0;
+  const effectiveCreditDeduction = (deductDebt && supplierCredit > 0) ? Math.min(roundedGoodsAmount, supplierCredit) : 0;
+  const payableAmount = Math.max(0, roundedGoodsAmount - effectiveCreditDeduction);
+
+  useEffect(() => {
+    if (deductDebt && formData.paidAmount > payableAmount) {
+      setFormData((prev) => ({ ...prev, paidAmount: payableAmount }));
+    }
+  }, [payableAmount, deductDebt, formData.paidAmount]);
+
   // Build Payload (Matches ImportDocumentCreateDto and ImportDocumentUpdateDto schema)
   const buildPayload = () => {
     const formattedDetails = items.map((i) => ({
@@ -345,12 +381,20 @@ const ImportDocumentModal = ({
       expiryDateSnapshot: i.expiryDate ? new Date(i.expiryDate).toISOString() : undefined
     }));
 
+    const deductionNote = deductDebt && effectiveCreditDeduction > 0
+      ? `(Trừ tiền NCC nợ: ${effectiveCreditDeduction.toLocaleString('vi-VN')} đ)`
+      : '';
+    const finalNote = formData.note
+      ? (deductionNote && !formData.note.includes('Trừ tiền NCC nợ') ? `${formData.note} ${deductionNote}` : formData.note)
+      : (deductionNote ? `Trừ tiền NCC nợ: ${effectiveCreditDeduction.toLocaleString('vi-VN')} đ` : '');
+
     return {
       branchId: Number(branchId),
       partnerId: formData.supplierId ? Number(formData.supplierId) : null,
       orderDate: new Date().toISOString(),
-      note: formData.note || '',
+      note: finalNote,
       amountPaid: Number(formData.paidAmount || 0),
+      debtDeductionAmount: (deductDebt && effectiveCreditDeduction > 0) ? effectiveCreditDeduction : 0,
       details: formattedDetails
     };
   };
@@ -440,8 +484,9 @@ const ImportDocumentModal = ({
       }
     }
 
-    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > roundedGoodsAmount) {
-      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${roundedGoodsAmount.toLocaleString('vi-VN')} đ.`);
+    const maxPayable = deductDebt ? payableAmount : roundedGoodsAmount;
+    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > maxPayable) {
+      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${maxPayable.toLocaleString('vi-VN')} đ.`);
       return;
     }
     setLoading(true);
@@ -464,6 +509,8 @@ const ImportDocumentModal = ({
       setLoading(false);
     }
   };
+
+  if (!open) return null;
 
   return (
     <div
@@ -890,6 +937,34 @@ const ImportDocumentModal = ({
                   </option>
                 ))}
               </select>
+              {formData.supplierId && (
+                <div style={{ marginTop: 6 }}>
+                  {loadingSupplierDebt ? (
+                    <span style={{ fontSize: 10.5, color: '#64748b' }}>Đang nạp công nợ NCC...</span>
+                  ) : supplierDebt ? (() => {
+                    const info = getDebtDisplayInfo(supplierDebt.remainingDebt);
+                    return (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '3px 8px',
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: info.bgColor,
+                          color: info.color,
+                          border: `1px solid ${info.borderColor}`
+                        }}
+                      >
+                        <span>Công nợ hiện tại:</span>
+                        <strong>{info.text}</strong>
+                      </div>
+                    );
+                  })() : null}
+                </div>
+              )}
             </div>
 
             {/* DOCUMENT CODE */}
@@ -951,24 +1026,53 @@ const ImportDocumentModal = ({
               </div>
 
               {roundingValue !== 0 && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11.5, color: '#d97706' }}>
-                    <span>ĐC Làm tròn (Rounding):</span>
-                    <strong>{roundingValue > 0 ? `-${roundingValue.toLocaleString('vi-VN')}` : `+${Math.abs(roundingValue).toLocaleString('vi-VN')}`} đ</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                    <span style={{ color: '#0f172a', fontWeight: 700 }}>Cần trả NCC (Đã làm tròn):</span>
-                    <strong style={{ color: '#059669', fontSize: 15 }}>{roundedGoodsAmount.toLocaleString('vi-VN')} đ</strong>
-                  </div>
-                </>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11.5, color: '#d97706' }}>
+                  <span>ĐC Làm tròn (Rounding):</span>
+                  <strong>{roundingValue > 0 ? `-${roundingValue.toLocaleString('vi-VN')}` : `+${Math.abs(roundingValue).toLocaleString('vi-VN')}`} đ</strong>
+                </div>
               )}
+
+              {/* DÒNG TÍCH CHỌN TRỪ TIỀN NCC ĐANG NỢ MÌNH */}
+              {supplierCredit > 0 && (
+                <div style={{ margin: '8px 0', padding: '6px 10px', background: '#f0fdf4', borderRadius: 6, border: '1px solid #bbf7d0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#166534' }}>
+                    <input
+                      type="checkbox"
+                      checked={deductDebt}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setDeductDebt(checked);
+                        const ded = checked ? Math.min(roundedGoodsAmount, supplierCredit) : 0;
+                        const newPayable = Math.max(0, roundedGoodsAmount - ded);
+                        setFormData((prev) => ({ ...prev, paidAmount: newPayable }));
+                      }}
+                      style={{ accentColor: '#16a34a', width: 15, height: 15, cursor: 'pointer' }}
+                    />
+                    <span>Trừ tiền NCC nợ ({supplierCredit.toLocaleString('vi-VN')} đ)</span>
+                  </label>
+                </div>
+              )}
+
+              {/* DÒNG HIỂN THỊ SỐ TIỀN TRỪ NỢ (KHI ĐƯỢC TÍCH) */}
+              {deductDebt && effectiveCreditDeduction > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, color: '#16a34a' }}>
+                  <span style={{ fontWeight: 600 }}>Trừ tiền NCC nợ:</span>
+                  <strong style={{ fontWeight: 700 }}>-{effectiveCreditDeduction.toLocaleString('vi-VN')} đ</strong>
+                </div>
+              )}
+
+              {/* DÒNG TIỀN PHẢI TRẢ */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                <span style={{ color: '#0f172a', fontWeight: 700 }}>Tiền phải trả:</span>
+                <strong style={{ color: '#059669', fontSize: 15 }}>{payableAmount.toLocaleString('vi-VN')} đ</strong>
+              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px dashed #cbd5e1' }}>
                 <span style={{ color: '#475569', fontSize: 11.5, fontWeight: 600 }}>Tiền trả NCC:</span>
                 <input
                   type="number"
                   min={0}
-                  max={roundedGoodsAmount}
+                  max={payableAmount}
                   value={formData.paidAmount}
                   onChange={(e) => setFormData((prev) => ({ ...prev, paidAmount: Math.max(0, Number(e.target.value)) }))}
                   style={{

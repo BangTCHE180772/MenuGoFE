@@ -6,7 +6,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createCashFlow } from '../../api/cashFlowApi';
-import { getPartnersByBranch } from '../../api/partnerApi';
+import { getPartnersByBranch, getPartnerFinancialSummary } from '../../api/partnerApi';
+import { getDebtDisplayInfo } from '../../utils/debtHelper';
 
 const PAYMENT_METHODS = [
   { value: 1, label: 'Tiền mặt' },
@@ -17,6 +18,8 @@ const PAYMENT_METHODS = [
 const CreateCashFlowModal = ({ open, onClose, onSuccess, branchId, defaultDirection }) => {
   const [loading, setLoading] = useState(false);
   const [partners, setPartners] = useState([]);
+  const [partnerDebt, setPartnerDebt] = useState(null);
+  const [loadingDebt, setLoadingDebt] = useState(false);
   const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState({
@@ -39,6 +42,7 @@ const CreateCashFlowModal = ({ open, onClose, onSuccess, branchId, defaultDirect
         note: '',
       });
       setErrors({});
+      setPartnerDebt(null);
       setLoading(false);
 
       getPartnersByBranch(branchId)
@@ -49,6 +53,28 @@ const CreateCashFlowModal = ({ open, onClose, onSuccess, branchId, defaultDirect
         .catch(() => setPartners([]));
     }
   }, [open, branchId, defaultDirection]);
+
+  useEffect(() => {
+    if (!form.partnerId) {
+      setPartnerDebt(null);
+      return;
+    }
+    let isMounted = true;
+    setLoadingDebt(true);
+    getPartnerFinancialSummary(form.partnerId)
+      .then((res) => {
+        if (isMounted) setPartnerDebt(res);
+      })
+      .catch(() => {
+        if (isMounted) setPartnerDebt(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDebt(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [form.partnerId]);
 
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
@@ -217,6 +243,34 @@ const CreateCashFlowModal = ({ open, onClose, onSuccess, branchId, defaultDirect
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+            {form.partnerId && (
+              <div style={{ marginTop: 6 }}>
+                {loadingDebt ? (
+                  <span style={{ fontSize: 11, color: '#64748b' }}>Đang nạp công nợ đối tác...</span>
+                ) : partnerDebt ? (() => {
+                  const info = getDebtDisplayInfo(partnerDebt.remainingDebt);
+                  return (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: info.bgColor,
+                        color: info.color,
+                        border: `1px solid ${info.borderColor}`
+                      }}
+                    >
+                      <span>Tình trạng công nợ:</span>
+                      <strong>{info.text}</strong>
+                    </div>
+                  );
+                })() : null}
+              </div>
+            )}
           </div>
 
           {/* Note */}
