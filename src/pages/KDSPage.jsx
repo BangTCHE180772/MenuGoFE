@@ -26,7 +26,8 @@ import {
   AppstoreOutlined,
   BellOutlined,
 } from '@ant-design/icons';
-import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail } from '../api/kitchenApi';
+import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail, reuseLeftoverForOrderDetail } from '../api/kitchenApi';
+import { getReusableLeftovers } from '../api/leftoverApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -65,6 +66,7 @@ const KDSPage = () => {
   const currentBranchId = deviceInfo?.branchId || contextBranchId || user?.branchId || user?.contracts?.find((c) => (c.status === 'Active' || c.status === 1) && c.branchId)?.branchId;
 
   const [items, setItems] = useState([]);
+  const [reusableLeftovers, setReusableLeftovers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
@@ -132,6 +134,24 @@ const KDSPage = () => {
     const interval = setInterval(() => fetchItems(false), 15000);
     return () => clearInterval(interval);
   }, [fetchItems]);
+
+  // Món thừa (khách trả, bếp đã làm xong, còn trong 30p) — gợi ý dùng lại thay vì
+  // nấu trùng khi có món đang chờ chế biến khớp đúng sản phẩm + số lượng.
+  const fetchReusableLeftovers = useCallback(async () => {
+    if (!currentBranchId) return;
+    try {
+      const res = await getReusableLeftovers(currentBranchId);
+      setReusableLeftovers(res.data || []);
+    } catch {
+      // Chỉ là gợi ý — im lặng bỏ qua, không chặn luồng bếp
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchReusableLeftovers();
+    const interval = setInterval(fetchReusableLeftovers, 20000);
+    return () => clearInterval(interval);
+  }, [fetchReusableLeftovers]);
 
   // SignalR real-time event listener
   useEffect(() => {
@@ -216,6 +236,20 @@ const KDSPage = () => {
   };
 
 
+
+  // Dùng lại món thừa khớp đúng món + số lượng cho một món đang chờ chế biến —
+  // dừng chế biến luôn thay vì để bếp nấu trùng.
+  const handleReuseLeftover = async (item, leftover) => {
+    try {
+      await reuseLeftoverForOrderDetail(item.orderDetailId, leftover.id);
+      message.success(`Đã dùng lại ${leftover.productName} vừa trả — dừng chế biến món này.`);
+      setReusableLeftovers((prev) => prev.filter((l) => l.id !== leftover.id));
+      fetchItems(false);
+    } catch (err) {
+      console.error(err);
+      message.error(err?.response?.data?.message || 'Không thể dùng lại món thừa cho món này.');
+    }
+  };
 
   const handleCompleteBatch = async (itemsInBatch) => {
     try {
@@ -404,6 +438,12 @@ const KDSPage = () => {
       statusTag = <Tag color="green">READY</Tag>;
     }
 
+    // Món thừa khớp đúng sản phẩm + số lượng, còn trong 30p — chỉ gợi ý khi món
+    // này còn chờ (chưa bắt đầu nấu), tránh dừng món đang/đã nấu.
+    const matchingLeftover = (status === COOKING_STATUS.WAITING || status === COOKING_STATUS.ACCEPTED)
+      ? reusableLeftovers.find((l) => l.productId === item.productId && l.quantity === item.quantity)
+      : null;
+
     return (
       <Card
         key={item._splitKey || item.orderDetailId}
@@ -525,6 +565,24 @@ const KDSPage = () => {
 
         {/* Action Buttons (Normal Flow) */}
         <Space direction="vertical" style={{ width: '100%' }}>
+          {matchingLeftover && (
+            <Popconfirm
+              title={`Có món thừa "${matchingLeftover.productName}" x${matchingLeftover.quantity} khách vừa trả (còn trong 30 phút). Dùng lại thay vì nấu mới?`}
+              onConfirm={() => handleReuseLeftover(item, matchingLeftover)}
+              okText="Dùng lại, dừng nấu"
+              cancelText="Vẫn nấu mới"
+            >
+              <Button
+                block
+                size="large"
+                icon={<ThunderboltOutlined />}
+                style={{ backgroundColor: '#fffbeb', borderColor: '#f59e0b', color: '#b45309', fontWeight: 700, marginBottom: 8 }}
+              >
+                ♻️ Dùng món thừa vừa trả — Dừng chế biến
+              </Button>
+            </Popconfirm>
+          )}
+
           {(status === COOKING_STATUS.WAITING || status === COOKING_STATUS.ACCEPTED) && (
             <Button
               type="primary"
