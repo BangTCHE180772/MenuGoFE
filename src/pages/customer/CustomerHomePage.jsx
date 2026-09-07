@@ -12,6 +12,7 @@ import { getMainChain } from "../../api/chainApi";
 import { getAllBranches } from "../../api/branchApi";
 import { getAllMenus } from "../../api/menuApi";
 import { getBInventories } from "../../api/binventoryApi";
+import configApi from "../../api/configApi";
 
 import CustomerHeader from "../../components/customer/CustomerHeader";
 import CustomerHeroBanner from "../../components/customer/CustomerHeroBanner";
@@ -111,6 +112,30 @@ const CustomerHomePage = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [consultProductItem, setConsultProductItem] = useState(null);
 
+  // Cấu hình thứ tự ưu tiên nhóm hàng và thực đơn
+  const [catalogPriority, setCatalogPriority] = useState(() => {
+    const saved = localStorage.getItem("catalog_priority");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return { groupOrder: [], menuOrder: [], groupNames: [], menuNames: [] };
+  });
+
+  useEffect(() => {
+    const loadPriority = async () => {
+      try {
+        const res = await configApi.getCatalogPriority();
+        if (res && (res.groupOrder?.length > 0 || res.groupNames?.length > 0)) {
+          setCatalogPriority(res);
+          localStorage.setItem("catalog_priority", JSON.stringify(res));
+        }
+      } catch (err) {
+        console.warn("Dùng cấu hình catalog priority từ cache hoặc mặc định:", err.message);
+      }
+    };
+    loadPriority();
+  }, []);
+
   //=================================================================================================================== Fetch Data
   const fetchChain = useCallback(async () => {
     setLoadingChain(true);
@@ -179,13 +204,47 @@ const CustomerHomePage = () => {
             name: item.name,
             price: item.sellPrice || 0,
             imageLink: item.imageLink || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+            groupId: item.groupId,
             groupName: item.groupName || "Món ăn",
             description: item.description || "",
             isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
           }));
 
-          // Trích xuất danh mục động từ nhóm hàng của các sản phẩm thực tế
+          // Helper lấy vị trí ưu tiên của nhóm hàng
+          const getGroupPriority = (groupName, groupId) => {
+            const groupOrder = catalogPriority?.groupOrder || [];
+            const groupNames = catalogPriority?.groupNames || [];
+
+            if (groupId && groupOrder.length > 0) {
+              const idx = groupOrder.indexOf(groupId);
+              if (idx !== -1) return idx;
+            }
+            if (groupName && groupNames.length > 0) {
+              const idx = groupNames.findIndex(
+                (name) => name.toLowerCase() === groupName.toLowerCase()
+              );
+              if (idx !== -1) return idx;
+            }
+            return 9999;
+          };
+
+          // Sắp xếp các món ăn theo thứ tự ưu tiên của nhóm hàng (món chính trước, món phụ sau)
+          mapped.sort((a, b) => {
+            const prioA = getGroupPriority(a.groupName, a.groupId);
+            const prioB = getGroupPriority(b.groupName, b.groupId);
+            if (prioA !== prioB) return prioA - prioB;
+            return (a.name || "").localeCompare(b.name || "");
+          });
+
+          // Trích xuất danh mục động từ nhóm hàng của các sản phẩm thực tế và sắp xếp theo thứ tự ưu tiên
           const uniqueGroups = Array.from(new Set(mapped.map((p) => p.groupName).filter(Boolean)));
+          uniqueGroups.sort((a, b) => {
+            const prioA = getGroupPriority(a);
+            const prioB = getGroupPriority(b);
+            if (prioA !== prioB) return prioA - prioB;
+            return a.localeCompare(b);
+          });
+
           const catList = [{ id: "all", name: "Tất cả", icon: <AppstoreOutlined /> }];
           uniqueGroups.forEach((g) => {
             catList.push({
@@ -238,7 +297,7 @@ const CustomerHomePage = () => {
         setLoadingMenu(false);
       }
     },
-    [activeBranchId],
+    [activeBranchId, catalogPriority],
   );
 
   const fetchMenus = useCallback(async () => {

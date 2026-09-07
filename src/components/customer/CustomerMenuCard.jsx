@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Tag, Button, Modal } from "antd";
-import { EyeOutlined, CoffeeOutlined, CustomerServiceOutlined, MessageOutlined } from "@ant-design/icons";
+import { CoffeeOutlined, CustomerServiceOutlined, MessageOutlined } from "@ant-design/icons";
 
 const formatPrice = (price) => {
   if (price === undefined || price === null) return "0 đ";
@@ -31,7 +31,11 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
 
   return (
     <>
-      <div className="customer-menu-card">
+      <div 
+        className="customer-menu-card"
+        onClick={() => onViewDetail && onViewDetail(product)}
+        style={{ cursor: "pointer" }}
+      >
         <div className="card-image-wrapper">
           <img 
             src={image} 
@@ -44,20 +48,14 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
               e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'; 
             }}
           />
-          <div className="card-overlay" style={{ gap: 8 }}>
-            <Button
-              type="primary"
-              shape="round"
-              icon={<EyeOutlined />}
-              onClick={() => onViewDetail(product)}
-              className="btn-quick-view"
-            >
-              Xem chi tiết
-            </Button>
+          <div className="card-overlay">
             <Button
               shape="round"
               icon={<MessageOutlined />}
-              onClick={() => setConsultModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setConsultModalOpen(true);
+              }}
               style={{
                 background: '#ea580c',
                 borderColor: '#ea580c',
@@ -87,25 +85,18 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
           </h3>
           <div className="card-footer-row">
             <div className="card-price">{formatPrice(price)}</div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <Button
-                type="text"
-                size="small"
-                icon={<MessageOutlined style={{ color: '#ea580c' }} />}
-                onClick={() => setConsultModalOpen(true)}
-                style={{ color: '#ea580c', fontWeight: 600, fontSize: 12 }}
-              >
-                Tư vấn
-              </Button>
-              <Button
-                type="link"
-                icon={<EyeOutlined />}
-                onClick={() => onViewDetail(product)}
-                className="btn-link-detail"
-              >
-                Xem
-              </Button>
-            </div>
+            <Button
+              type="text"
+              size="small"
+              icon={<MessageOutlined style={{ color: '#ea580c' }} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setConsultModalOpen(true);
+              }}
+              style={{ color: '#ea580c', fontWeight: 600, fontSize: 13 }}
+            >
+              Tư vấn
+            </Button>
           </div>
         </div>
       </div>

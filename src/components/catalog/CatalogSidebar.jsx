@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Tooltip } from 'antd';
 import {
   SearchOutlined,
   PlusOutlined,
@@ -361,6 +362,8 @@ const CatalogSidebar = ({
   onResetFilters,
   onOpenAddGroupModal,
   onOpenAddMenuModal,
+  onOpenGroupPriorityModal,
+  onOpenMenuPriorityModal,
 }) => {
   const toggleArrayItem = (array, setArray, item) => {
     if (array.includes(item)) {
@@ -515,7 +518,37 @@ const CatalogSidebar = ({
               marginBottom: 8,
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {onOpenGroupPriorityModal && (
+                <Tooltip title="Tùy chỉnh thứ tự ưu tiên nhóm hàng">
+                  <span
+                    onClick={onOpenGroupPriorityModal}
+                    role="button"
+                    tabIndex={0}
+                    style={{
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      color: '#64748b',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#ea580c';
+                      e.currentTarget.style.backgroundColor = '#fff7ed';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#64748b';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <SettingOutlined style={{ fontSize: 13 }} />
+                  </span>
+                </Tooltip>
+              )}
               <FolderOutlined style={{ color: '#ea580c' }} />
               Nhóm hàng
             </div>
@@ -563,7 +596,37 @@ const CatalogSidebar = ({
               marginBottom: 8,
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {onOpenMenuPriorityModal && (
+                <Tooltip title="Tùy chỉnh thứ tự ưu tiên thực đơn">
+                  <span
+                    onClick={onOpenMenuPriorityModal}
+                    role="button"
+                    tabIndex={0}
+                    style={{
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      color: '#64748b',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#ea580c';
+                      e.currentTarget.style.backgroundColor = '#fff7ed';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#64748b';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <SettingOutlined style={{ fontSize: 13 }} />
+                  </span>
+                </Tooltip>
+              )}
               <BookOutlined style={{ color: '#ea580c' }} />
               Thực đơn
             </div>
