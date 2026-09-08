@@ -11,6 +11,8 @@ import {
 import dayjs from 'dayjs';
 
 import { createReturnDocument, getImportReturnDetails } from '../../../../api/documentApi';
+import { getPartnerFinancialSummary } from '../../../../api/partnerApi';
+import { getDebtDisplayInfo } from '../../../../utils/debtHelper';
 import KiotDateTimePicker from './KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 
@@ -32,6 +34,9 @@ const ReturnDocumentModal = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [supplierInfo, setSupplierInfo] = useState({ partnerName: '', partnerId: undefined });
+  const [parentAmountPaid, setParentAmountPaid] = useState(0);
+  const [supplierDebt, setSupplierDebt] = useState(null);
+  const [loadingSupplierDebt, setLoadingSupplierDebt] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -69,6 +74,8 @@ const ReturnDocumentModal = ({
                 partnerName: apiRes.partnerName || 'Nhà cung cấp',
                 partnerId: apiRes.partnerId ? Number(apiRes.partnerId) : undefined
               });
+              const actualPaid = Number(apiRes?.amountPaid ?? importDocument?.amountPaid ?? 0);
+              setParentAmountPaid(actualPaid);
 
               const mappedItems = apiRes.details.map((it) => {
                 const importQtyDisplay = Number(it.quantity ?? 0);
@@ -112,6 +119,8 @@ const ReturnDocumentModal = ({
             partnerName: supplierPartner?.partnerName || 'Nhà cung cấp',
             partnerId: suppId ? Number(suppId) : undefined
           });
+          const actualPaid = Number(importDocument?.amountPaid ?? 0);
+          setParentAmountPaid(actualPaid);
 
           const fallbackItems = (importDocument.details || []).map((d) => {
             const qty = Number(d.quantity || 1);
@@ -137,11 +146,35 @@ const ReturnDocumentModal = ({
         loadReturnDetails();
       } else {
         setSupplierInfo({ partnerName: '', partnerId: undefined });
+        setParentAmountPaid(0);
+        setSupplierDebt(null);
         setFormData({ paidAmount: 0, note: '' });
         setItems([]);
       }
     }
   }, [open, importDocument]);
+
+  useEffect(() => {
+    if (!supplierInfo?.partnerId) {
+      setSupplierDebt(null);
+      return;
+    }
+    let isMounted = true;
+    setLoadingSupplierDebt(true);
+    getPartnerFinancialSummary(supplierInfo.partnerId)
+      .then((res) => {
+        if (isMounted) setSupplierDebt(res);
+      })
+      .catch(() => {
+        if (isMounted) setSupplierDebt(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingSupplierDebt(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [supplierInfo?.partnerId]);
 
   const handleDateChange = (dateObj) => {
     setSelectedDateTime(dateObj);
@@ -181,7 +214,9 @@ const ReturnDocumentModal = ({
   const roundingValue = totalGoodsAmount - netAmount;
   const paidAmount = Number(formData.paidAmount) || 0;
   const debtAmount = Math.max(0, netAmount - paidAmount);
+  const paidAmountExceedsParentPaid = paidAmount > parentAmountPaid;
   const paidAmountExceedsTotal = paidAmount > netAmount && netAmount > 0;
+  const hasPaidAmountError = paidAmountExceedsParentPaid || paidAmountExceedsTotal;
 
   const handleSubmit = async () => {
     if (!importDocument || !importDocument.id) {
@@ -205,6 +240,17 @@ const ReturnDocumentModal = ({
         setErrorMsg(`Đơn giá hoàn tiền của "${item.name}" không được âm.`);
         return;
       }
+    }
+
+    // Validate: NCC không hoàn tiền nếu mình chưa thanh toán phiếu nhập
+    if (parentAmountPaid <= 0 && paidAmount > 0) {
+      setErrorMsg('Số tiền NCC hoàn trả không được vượt quá số tiền bạn đã thanh toán cho phiếu nhập này.');
+      return;
+    }
+
+    if (paidAmount > parentAmountPaid) {
+      setErrorMsg('Số tiền NCC hoàn trả không được vượt quá số tiền bạn đã thanh toán cho phiếu nhập này.');
+      return;
     }
 
     // Validate: tiền NCC đã trả không được vượt quá tổng tiền cần thu
@@ -586,17 +632,47 @@ const ReturnDocumentModal = ({
                   borderRadius: 6,
                   padding: '10px 12px',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 10
+                  flexDirection: 'column',
+                  gap: 6
                 }}
               >
-                <UserOutlined style={{ color: '#e8442a', fontSize: 16 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 10, color: '#64748b' }}>Nhà cung cấp (từ phiếu nhập gốc)</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                    {supplierInfo.partnerName || 'Đang tải...'}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <UserOutlined style={{ color: '#e8442a', fontSize: 16 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 10, color: '#64748b' }}>Nhà cung cấp (từ phiếu nhập gốc)</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+                      {supplierInfo.partnerName || 'Đang tải...'}
+                    </span>
+                  </div>
                 </div>
+                {supplierInfo.partnerId && (
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 6 }}>
+                    {loadingSupplierDebt ? (
+                      <span style={{ fontSize: 10.5, color: '#64748b' }}>Đang nạp công nợ NCC...</span>
+                    ) : supplierDebt ? (() => {
+                      const info = getDebtDisplayInfo(supplierDebt.remainingDebt);
+                      return (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '3px 8px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: info.bgColor,
+                            color: info.color,
+                            border: `1px solid ${info.borderColor}`
+                          }}
+                        >
+                          <span>Công nợ hiện tại:</span>
+                          <strong>{info.text}</strong>
+                        </div>
+                      );
+                    })() : null}
+                  </div>
+                )}
               </div>
 
               {/* TOTALS & PAYMENT */}
@@ -627,26 +703,46 @@ const ReturnDocumentModal = ({
                 {/* SỐ TIỀN NHÀ CUNG CẤP ĐÃ TRẢ */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ color: '#475569', fontWeight: 600, flexShrink: 0 }}>NCC đã trả tiền</span>
+                    <div>
+                      <span style={{ color: '#475569', fontWeight: 600, flexShrink: 0 }}>NCC đã trả tiền</span>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>
+                        Đã trả phiếu nhập: <strong style={{ color: '#0f172a' }}>{parentAmountPaid.toLocaleString('vi-VN')} ₫</strong>
+                      </div>
+                    </div>
                     <input
                       type="number"
                       min={0}
-                      max={netAmount}
-                      value={formData.paidAmount}
+                      max={parentAmountPaid > 0 ? Math.min(netAmount, parentAmountPaid) : 0}
+                      disabled={parentAmountPaid <= 0}
+                      value={parentAmountPaid <= 0 ? 0 : formData.paidAmount}
                       onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
                       style={{
                         width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px',
-                        border: paidAmountExceedsTotal ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        border: hasPaidAmountError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                         fontSize: 11, fontWeight: 700,
-                        color: paidAmountExceedsTotal ? '#ef4444' : '#16a34a',
+                        color: hasPaidAmountError ? '#ef4444' : (parentAmountPaid <= 0 ? '#94a3b8' : '#16a34a'),
                         outline: 'none',
-                        background: paidAmountExceedsTotal ? '#fef2f2' : '#ffffff'
+                        background: hasPaidAmountError ? '#fef2f2' : (parentAmountPaid <= 0 ? '#f1f5f9' : '#ffffff'),
+                        cursor: parentAmountPaid <= 0 ? 'not-allowed' : 'text'
                       }}
+                      placeholder={parentAmountPaid <= 0 ? '0' : 'Nhập tiền...'}
                     />
                   </div>
+                  {parentAmountPaid <= 0 && (
+                    <div style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
+                      * Chưa thanh toán phiếu nhập nên không hoàn tiền mặt
+                    </div>
+                  )}
+                  {paidAmountExceedsParentPaid && parentAmountPaid > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <span style={{ color: '#ef4444', fontSize: 10, fontWeight: 600, textAlign: 'right' }}>
+                        ⚠ Không được vượt quá số tiền đã thanh toán ({parentAmountPaid.toLocaleString('vi-VN')} ₫)
+                      </span>
+                    </div>
+                  )}
                   {paidAmountExceedsTotal && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <span style={{ color: '#ef4444', fontSize: 10, fontWeight: 600 }}>
+                      <span style={{ color: '#ef4444', fontSize: 10, fontWeight: 600, textAlign: 'right' }}>
                         ⚠ Vượt quá tổng cần thu ({netAmount.toLocaleString('vi-VN')} ₫)
                       </span>
                     </div>
@@ -704,19 +800,19 @@ const ReturnDocumentModal = ({
               </button>
               <button
                 type="button"
-                disabled={loading || items.filter(i => i.quantity > 0).length === 0}
+                disabled={loading || items.filter(i => i.quantity > 0).length === 0 || hasPaidAmountError}
                 onClick={handleSubmit}
                 style={{
                   flex: 2,
-                  background: loading ? '#cbd5e1' : 'linear-gradient(135deg, #e8442a, #d9381e)',
+                  background: (loading || hasPaidAmountError) ? '#cbd5e1' : 'linear-gradient(135deg, #e8442a, #d9381e)',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 700,
                   borderRadius: 6,
                   padding: '8px 0',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: (loading || hasPaidAmountError) ? 'not-allowed' : 'pointer',
                   fontSize: 12,
-                  boxShadow: loading ? 'none' : '0 2px 6px rgba(232,68,42,0.3)'
+                  boxShadow: (loading || hasPaidAmountError) ? 'none' : '0 2px 6px rgba(232,68,42,0.3)'
                 }}
               >
                 {loading ? 'Đang lưu...' : 'Hoàn thành phiếu trả'}

@@ -34,9 +34,18 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
     // Tự động mở rộng chi tiết hóa đơn nếu tìm kiếm khớp mã hóa đơn
     if (currentSearch && invoices.length > 0) {
       const lower = currentSearch.toLowerCase().trim();
-      const matched = invoices.find(
-        (i) => i.code?.toLowerCase() === lower || String(i.id) === lower || `hd${i.id}` === lower
-      );
+      const numMatch = lower.match(/^hd0*(\d+)$/) || lower.match(/^0*(\d+)$/);
+      const searchNum = numMatch ? numMatch[1] : null;
+
+      const matched = invoices.find((i) => {
+        const invLower = i.code?.toLowerCase() || '';
+        return (
+          invLower === lower ||
+          String(i.id) === lower ||
+          `hd${i.id}` === lower ||
+          (searchNum && (String(i.id) === searchNum || invLower === `hd${searchNum}`))
+        );
+      });
       if (matched && expandedInvoiceId !== matched.id) {
         toggleExpand(matched.id);
       }
@@ -157,8 +166,15 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
           return inv.id.toString() === searchOrderId || inv.code?.toLowerCase().includes(searchOrderId);
         }
       }
+      const numMatch = lower.match(/^hd0*(\d+)$/) || lower.match(/^0*(\d+)$/);
+      const searchNum = numMatch ? numMatch[1] : null;
+      const codeLower = inv.code?.toLowerCase() || '';
+      const isCodeMatch =
+        codeLower.includes(lower) ||
+        (searchNum && (String(inv.id) === searchNum || codeLower.includes(`hd${searchNum}`)));
+
       return (
-        inv.code?.toLowerCase().includes(lower) ||
+        isCodeMatch ||
         inv.customer?.toLowerCase().includes(lower) ||
         inv.tableName?.toLowerCase().includes(lower) ||
         inv.createdByName?.toLowerCase().includes(lower)

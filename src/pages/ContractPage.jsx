@@ -332,13 +332,6 @@ const ContractPage = () => {
   // Columns definition
   const columns = [
     {
-      title: 'Mã HĐ',
-      dataIndex: 'id',
-      key: 'id',
-      width: 80,
-      sorter: (a, b) => a.id - b.id,
-    },
-    {
       title: 'Nhân viên',
       dataIndex: 'accountId',
       key: 'accountId',
@@ -375,6 +368,8 @@ const ContractPage = () => {
       title: 'Chức danh',
       dataIndex: 'roleId',
       key: 'roleId',
+      width: 140,
+      sorter: (a, b) => (a.roleId || 99) - (b.roleId || 99),
       render: (id) => getRoleName(id),
     },
     ...(isOwnerOrAdmin
@@ -613,6 +608,7 @@ const ContractPage = () => {
 
       {/* Add / Edit Modal Form */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <FileProtectOutlined />
@@ -695,15 +691,17 @@ const ContractPage = () => {
                         }
                       >
                         {group.items.map((a) => {
-                          const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : (a.roleId || 6);
-                          const roleInfo = ROLES_MAP[primaryRoleId] || { label: 'Nhân viên', color: 'default' };
-                          const searchValue = `${a.name} ${a.id} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
+                          const primaryRoleId = a.roleIds && a.roleIds.length > 0 ? a.roleIds[0] : a.roleId;
+                          const roleInfo = primaryRoleId && ROLES_MAP[primaryRoleId]
+                            ? ROLES_MAP[primaryRoleId]
+                            : { label: 'Chưa phân vai trò', color: 'default' };
+                          const searchValue = `${a.name} ${a.phone || ''} ${a.email || ''} ${roleInfo.label}`;
 
                           return (
                             <Select.Option
                               key={a.id}
                               value={a.id}
-                              label={`${a.name} (Mã: #${a.id})`}
+                              label={a.name}
                               searchValue={searchValue}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
@@ -718,9 +716,11 @@ const ContractPage = () => {
                                     <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937', lineHeight: '1.2' }}>
                                       {a.name}
                                     </div>
-                                    <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                                      Mã: #{a.id} {a.phone ? `• SĐT: ${a.phone}` : ''}
-                                    </div>
+                                    {a.phone && (
+                                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                        SĐT: {a.phone}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <Tag color={roleInfo.color} style={{ margin: 0, fontSize: '11px', borderRadius: '4px' }}>
@@ -953,10 +953,11 @@ const ContractPage = () => {
 
       {/* Contract Detail Modal */}
       <Modal
+        maskClosable={false}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#e8442a' }}>
             <FileProtectOutlined />
-            <span>CHI TIẾT HỢP ĐỒNG LAO ĐỘNG #{detailRecord?.id}</span>
+            <span>CHI TIẾT HỢP ĐỒNG LAO ĐỘNG</span>
           </div>
         }
         open={isDetailModalOpen}
@@ -1005,7 +1006,7 @@ const ContractPage = () => {
               >
                 <div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#e8442a' }}>
-                    Hợp Đồng #{detailRecord.id}
+                    Hợp Đồng Lao Động
                   </div>
                   {detailRecord.createdAt && (
                     <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 2 }}>
@@ -1078,24 +1079,34 @@ const ContractPage = () => {
                 style={{ borderRadius: '8px', marginBottom: 16 }}
               >
                 <Row gutter={[16, 16]}>
-                  <Col span={8}>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Mức lương cơ bản</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: 4 }}>
-                      {new Intl.NumberFormat('vi-VN').format(detailRecord.baseSalary || 0)} đ
-                    </div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Hình thức lương</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
-                      {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || (detailRecord.salaryType === 'Fixed' ? 'Theo tháng' : detailRecord.salaryType)}
-                    </div>
-                  </Col>
-                  <Col span={8}>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Số ngày công chuẩn / tháng</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
-                      {detailRecord.baseWorkDay ? `${detailRecord.baseWorkDay} ngày` : 'N/A (Lương giờ / Quản lý)'}
-                    </div>
-                  </Col>
+                  {(() => {
+                    const hideDay = detailRecord.type === 'Part-time' || detailRecord.salaryType === 'Hourly' || detailRecord.roleId === 3 || !detailRecord.baseWorkDay;
+                    const colSpan = hideDay ? 12 : 8;
+                    return (
+                      <>
+                        <Col span={colSpan}>
+                          <div style={{ fontSize: '12px', color: '#6b7280' }}>Mức lương cơ bản</div>
+                          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a', marginTop: 4 }}>
+                            {new Intl.NumberFormat('vi-VN').format(detailRecord.baseSalary || 0)} đ
+                          </div>
+                        </Col>
+                        <Col span={colSpan}>
+                          <div style={{ fontSize: '12px', color: '#6b7280' }}>Hình thức lương</div>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                            {SALARY_TYPES.find((st) => st.value === detailRecord.salaryType)?.label || (detailRecord.salaryType === 'Fixed' ? 'Theo tháng' : detailRecord.salaryType)}
+                          </div>
+                        </Col>
+                        {!hideDay && (
+                          <Col span={colSpan}>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>Số ngày công chuẩn / tháng</div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginTop: 4 }}>
+                              {detailRecord.baseWorkDay} ngày
+                            </div>
+                          </Col>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Row>
               </Card>
 

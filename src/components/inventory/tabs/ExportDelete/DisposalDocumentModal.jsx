@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 
 import { getProductsByDate, getPreviousLedgerSnapshots } from '../../../../api/binventoryApi';
+import { getBatches } from '../../../../api/batchApi';
 import {
   createExportDeletePending,
   createExportDeleteCompleted,
@@ -31,7 +32,7 @@ const showToast = (text, type = 'success') => {
     position: fixed;
     top: 24px;
     right: 24px;
-    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : type === 'info' ? '#3b82f6' : '#10b981'};
     color: #ffffff;
     padding: 10px 20px;
     border-radius: 6px;
@@ -50,13 +51,15 @@ const DisposalDocumentModal = ({
   onSuccess,
   branchId,
   products = [],
-  editDocumentId = null
+  editDocumentId = null,
+  initialData = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
   const creatorName = user?.name || user?.email || 'Mno';
 
   const [loading, setLoading] = useState(false);
+  const [loadingExpiredInModal, setLoadingExpiredInModal] = useState(false);
   const [selectedDateTime, setSelectedDateTime] = useState(dayjs());
   const [openTimeFormatted, setOpenTimeFormatted] = useState('');
   const [openTimeISO, setOpenTimeISO] = useState('');
@@ -160,16 +163,16 @@ const DisposalDocumentModal = ({
 
         setFormData({
           docCode: '',
-          note: ''
+          note: initialData?.note || ''
         });
-        setItems([]);
+        setItems(initialData?.items || []);
 
         if (branchId) {
           fetchBInventories(branchId, now.toISOString(), '');
         }
       }
     }
-  }, [open, editDocumentId, branchId, fetchBInventories]);
+  }, [open, editDocumentId, branchId, fetchBInventories, initialData]);
 
   // Trigger search on user typing
   useEffect(() => {
@@ -190,6 +193,97 @@ const DisposalDocumentModal = ({
 
     if (branchId) {
       fetchBInventories(branchId, isoStr, searchQuery);
+    }
+  };
+
+  // Tự động tìm và chọn các nguyên liệu đã hết hạn ngay trong modal
+  const handleSelectAllExpiredInModal = async () => {
+    if (!branchId) return;
+    setLoadingExpiredInModal(true);
+    try {
+      const batchesRes = await getBatches({
+        branchId: branchId,
+        expiryStatus: 'expired',
+        pageSize: 1000
+      });
+
+      const batches = Array.isArray(batchesRes?.items) ? batchesRes.items : [];
+      const expiredBatches = batches.filter(
+        (b) => Number(b.quantityRemaining) > 0 && b.status !== 2 && b.status !== 'Depleted'
+      );
+
+      if (expiredBatches.length === 0) {
+        showToast('Không tìm thấy nguyên liệu nào đã hết hạn còn tồn kho trong chi nhánh.', 'info');
+        return;
+      }
+
+      const existingIds = new Set(items.map((i) => Number(i.bInventoryId)));
+      const rawList = bInventoryList.length > 0 ? bInventoryList : products;
+
+      const groupedByInv = {};
+      expiredBatches.forEach((batch) => {
+        const invId = Number(batch.bInventoryId);
+        if (!groupedByInv[invId]) groupedByInv[invId] = [];
+        groupedByInv[invId].push(batch);
+      });
+
+      const newItemsToAdd = [];
+      Object.entries(groupedByInv).forEach(([invIdStr, bList]) => {
+        const invId = Number(invIdStr);
+        if (existingIds.has(invId)) return;
+
+        const matchP = (rawList || []).find((b) => Number(b.id ?? b.bInventoryId) === invId);
+        const totalExpiredQty = bList.reduce((sum, b) => sum + Number(b.quantityRemaining || 0), 0);
+        const baseStockVal = Number(matchP?.runningQuantity ?? matchP?.quantity ?? matchP?.stockQuantity ?? 0);
+
+        // Nếu tồn kho sản phẩm đã hết (<= 0) hoặc lượng hết hạn <= 0 thì đã xuất hủy hết
+        if (baseStockVal <= 0 || totalExpiredQty <= 0) return;
+
+        const conversions = matchP?.unitConversions || matchP?.product?.unitConversions || [];
+        const defaultUc = conversions.length > 0 ? conversions[0] : null;
+        const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
+        const avgVal = matchP?.runningAverageCost > 0 ? matchP.runningAverageCost : (matchP?.avg > 0 ? matchP.avg : (bList[0].unitCost || 0));
+
+        const batchDesc = bList.map((b) => {
+          const exp = b.expiryDate ? dayjs(b.expiryDate).format('DD/MM/YYYY') : '---';
+          return `${b.batchCode} (${b.quantityRemaining} ${b.unitName}, HSD: ${exp})`;
+        }).join('; ');
+
+        newItemsToAdd.push({
+          rowId: `expired-${invId}-${Date.now()}-${Math.random()}`,
+          bInventoryId: invId,
+          code: matchP?.code || bList[0].productCode || `SP${invId}`,
+          name: matchP?.name || bList[0].productName || 'Nguyên liệu',
+          baseStock: baseStockVal,
+          stock: baseStockVal,
+          baseAvgCost: avgVal,
+          costPrice: avgVal,
+          unitConversionId: defaultUc ? defaultUc.id : null,
+          unitName: defaultUc ? (defaultUc.unitName || defaultUc.name) : (matchP?.unitName || bList[0].unitName || 'Đơn vị'),
+          unitConversions: conversions,
+          conversionPoint: conversionPoint,
+          quantity: Math.min(totalExpiredQty, baseStockVal),
+          note: `Lô hết hạn: ${batchDesc}`,
+          isExpiredAutoSelected: true,
+          editingNote: false
+        });
+      });
+
+      if (newItemsToAdd.length === 0) {
+        showToast('Tất cả các nguyên liệu hết hạn đã có trong danh sách xuất hủy.', 'warning');
+        return;
+      }
+
+      setItems((prev) => [...prev, ...newItemsToAdd]);
+      if (!formData.note) {
+        setFormData((prev) => ({ ...prev, note: `Xuất hủy nguyên liệu hết hạn sử dụng (${expiredBatches.length} lô hết hạn)` }));
+      }
+      showToast(`Đã thêm ${newItemsToAdd.length} mặt hàng hết hạn vào danh sách xuất hủy.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Có lỗi xảy ra khi lấy hàng hết hạn.', 'error');
+    } finally {
+      setLoadingExpiredInModal(false);
     }
   };
 
@@ -510,6 +604,38 @@ const DisposalDocumentModal = ({
               </div>
             )}
           </div>
+
+          {/* NÚT CHỌN HÀNG HẾT HẠN NGAY TRONG MODAL */}
+          <button
+            type="button"
+            onClick={handleSelectAllExpiredInModal}
+            disabled={loadingExpiredInModal}
+            title="Tự động tìm và chọn các nguyên liệu đã hết hạn"
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: 16,
+              padding: '4px 12px',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: loadingExpiredInModal ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (!loadingExpiredInModal) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+            }}
+            onMouseLeave={(e) => {
+              if (!loadingExpiredInModal) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            }}
+          >
+            <WarningOutlined />
+            <span>{loadingExpiredInModal ? 'Đang tìm...' : 'Chọn hàng hết hạn'}</span>
+          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -624,6 +750,22 @@ const DisposalDocumentModal = ({
                         <td style={{ padding: '6px 8px' }}>
                           <div>
                             <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
+                            {(record.isExpiredAutoSelected || record.note?.includes('Lô hết hạn')) && (
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 9.5,
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fca5a5',
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  fontWeight: 700
+                                }}
+                              >
+                                Hết hạn
+                              </span>
+                            )}
                           </div>
                           <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <EditOutlined style={{ fontSize: 11, color: '#94a3b8' }} />

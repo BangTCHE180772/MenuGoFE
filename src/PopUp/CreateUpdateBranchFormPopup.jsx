@@ -3,6 +3,7 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Button,
   Row,
   Col,
@@ -19,6 +20,7 @@ import {
   ClockCircleOutlined,
   AimOutlined,
   GlobalOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { createBranch, updateBranch } from "../api/branchApi";
@@ -74,6 +76,7 @@ const CreateUpdateBranchFormPopup = ({
           latitude: branchObject.latitude ?? "",
           longitude: branchObject.longitude ?? "",
           checkinRadiusMeters: branchObject.checkinRadiusMeters ?? 100,
+          payrollPayday: branchObject.payrollPayday ?? branchObject.PayrollPayday ?? 15,
         });
 
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -151,6 +154,7 @@ const CreateUpdateBranchFormPopup = ({
         latitude: values.latitude !== "" && values.latitude != null ? Number(values.latitude) : null,
         longitude: values.longitude !== "" && values.longitude != null ? Number(values.longitude) : null,
         checkinRadiusMeters: values.checkinRadiusMeters ? Number(values.checkinRadiusMeters) : 100,
+        payrollPayday: values.payrollPayday ? Number(values.payrollPayday) : 15,
         address: {
           newWardId: newAddressState.wardId
             ? Number(newAddressState.wardId)
@@ -287,6 +291,34 @@ const CreateUpdateBranchFormPopup = ({
                   format="HH:mm"
                   needConfirm={false}
                   placeholder="Chọn giờ đóng cửa"
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Ngày trả lương hàng tháng */}
+            <Col span={24}>
+              <Form.Item
+                label={
+                  <Space>
+                    <CalendarOutlined style={{ color: "#722ed1" }} />
+                    <Text strong>Ngày trả lương hàng tháng (1 - 31)</Text>
+                  </Space>
+                }
+                name="payrollPayday"
+                initialValue={15}
+                rules={[
+                  { required: true, message: "Vui lòng chọn ngày trả lương hàng tháng" },
+                  { type: "number", min: 1, max: 31, message: "Ngày trả lương phải từ 1 đến 31" }
+                ]}
+              >
+                <InputNumber
+                  style={{ width: "100%" }}
+                  min={1}
+                  max={31}
+                  placeholder="Ví dụ: 15 (Ngày 15 hàng tháng)"
+                  size="large"
+                  addonBefore="Ngày"
+                  addonAfter="hàng tháng"
                 />
               </Form.Item>
             </Col>

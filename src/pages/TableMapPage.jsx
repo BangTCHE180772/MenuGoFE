@@ -247,9 +247,9 @@ const TableMapPage = ({ isPosHub, isWaiterMode, isDeviceMode }) => {
   return (
     <div className="tablemap-page">
       <div className="tablemap-left-col">
-        <div className="tablemap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <h2>Sơ đồ Bàn</h2>
+        <div className="tablemap-header" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
+            <h2 style={{ margin: 0, whiteSpace: 'nowrap' }}>Sơ đồ Bàn</h2>
             {isWaiterMode && (
               <>
                 <Button 

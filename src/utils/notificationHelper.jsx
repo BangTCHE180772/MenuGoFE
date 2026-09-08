@@ -22,7 +22,44 @@ export const getNotificationVisualMeta = (item = {}) => {
   const message = (item.message || '').toLowerCase();
   const isImportant = item.isImportant || item.priority === 'Critical';
 
-  // 1. HẠN SỬ DỤNG & LÔ NGUYÊN LIỆU (ShelfLife / Expiry)
+  // 1. BẢNG LƯƠNG & CHỐT LƯƠNG CHI NHÁNH (Payroll)
+  if (type === 'Payroll' || title.includes('chốt lương') || title.includes('trả lương') || title.includes('bảng lương') || message.includes('chốt lương')) {
+    const isUrgent = title.includes('cảnh báo') || title.includes('chủ cửa hàng') || title.includes('chưa chốt') || isImportant;
+    if (isUrgent) {
+      return {
+        categoryKey: 'PayrollAlert',
+        badgeText: 'LƯƠNG - HẠN CHỐT',
+        badgeEmoji: '🚨',
+        accentColor: '#ef4444',
+        cardBg: '#fef2f2',
+        borderColor: '#fca5a5',
+        tagBg: '#fee2e2',
+        tagColor: '#991b1b',
+        iconBg: '#fee2e2',
+        iconColor: '#dc2626',
+        icon: <DollarOutlined />,
+        actionText: 'Mở trang Bảng lương ➜',
+        defaultTitle: 'Cảnh báo hạn chốt lương chi nhánh',
+      };
+    }
+    return {
+      categoryKey: 'PayrollPayday',
+      badgeText: 'LƯƠNG - THANH TOÁN',
+      badgeEmoji: '💰',
+      accentColor: '#2563eb',
+      cardBg: '#eff6ff',
+      borderColor: '#bfdbfe',
+      tagBg: '#dbeafe',
+      tagColor: '#1e40af',
+      iconBg: '#dbeafe',
+      iconColor: '#2563eb',
+      icon: <DollarOutlined />,
+      actionText: 'Mở trang Bảng lương ➜',
+      defaultTitle: 'Thông báo thanh toán lương',
+    };
+  }
+
+  // 2. HẠN SỬ DỤNG & LÔ NGUYÊN LIỆU (ShelfLife / Expiry)
   if (type === 'ShelfLife' || title.includes('hết hạn') || message.includes('hết hạn') || title.includes('hạn sử dụng')) {
     const isExpired = title.includes('đã hết hạn') || message.includes('đã hết hạn') || isImportant;
     if (isExpired) {
@@ -338,12 +375,17 @@ export const getNotificationSmartRedirectUrl = (item) => {
     return targetUrl;
   }
 
-  // 3. ĐƠN HÀNG & PHỤC VỤ
+  // 3. BẢNG LƯƠNG & CHỐT LƯƠNG CHI NHÁNH
+  if (type === 'Payroll' || rawUrl.includes('/payroll') || title.includes('lương')) {
+    return '/payroll';
+  }
+
+  // 4. ĐƠN HÀNG & PHỤC VỤ
   if (type === 'Order' || rawUrl.includes('/orders')) {
     return rawUrl || '/orders';
   }
 
-  // 4. SỔ QUỸ & CHI PHÍ
+  // 5. SỔ QUỸ & CHI PHÍ
   if (type === 'Operational' && (title.includes('chi phí') || message.includes('chi phí') || rawUrl.includes('/cashflow'))) {
     return '/cashflow';
   }

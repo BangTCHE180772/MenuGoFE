@@ -12,6 +12,7 @@ import {
   ArrowRightOutlined
 } from '@ant-design/icons';
 import { getCustomerPurchases, getCustomerPoints } from '../../../../api/customerManagementApi';
+import { useSignalR } from '../../../../context/SignalRContext';
 import dayjs from 'dayjs';
 
 const CustomerDetailSection = ({
@@ -23,6 +24,7 @@ const CustomerDetailSection = ({
   onDeletePointTransaction
 }) => {
   const navigate = useNavigate();
+  const connection = useSignalR();
   const [purchases, setPurchases] = useState([]);
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,10 +52,46 @@ const CustomerDetailSection = ({
     fetchDetailHistory();
   }, [customer?.id]);
 
+  // Lắng nghe SignalR để tự động cập nhật lịch sử mua hàng và biến động điểm theo thời gian thực
+  useEffect(() => {
+    if (!connection || !customer?.id) return;
+
+    const handleCustomerUpdate = (data) => {
+      if (!data?.customerId || data.customerId === customer.id) {
+        fetchDetailHistory();
+      }
+    };
+
+    const handleNotification = (notif) => {
+      if (
+        (notif?.type === 'payment_completed' || notif?.type === 'order_completed') &&
+        (!notif?.customerId || notif.customerId === customer.id)
+      ) {
+        fetchDetailHistory();
+      }
+    };
+
+    connection.on('ReceiveCustomerUpdate', handleCustomerUpdate);
+    connection.on('ReceiveNotification', handleNotification);
+
+    return () => {
+      connection.off('ReceiveCustomerUpdate', handleCustomerUpdate);
+      connection.off('ReceiveNotification', handleNotification);
+    };
+  }, [connection, customer?.id]);
+
+  // Chuẩn hóa mã hóa đơn: đảm bảo dạng chuẩn HD{Id}, loại bỏ số 0 thừa từ dữ liệu cũ (HD014935 -> HD14935)
+  const formatInvoiceCode = (code, orderId) => {
+    if (orderId) return `HD${orderId}`;
+    if (!code) return '';
+    return code.replace(/^HD0+(\d+)$/i, 'HD$1');
+  };
+
   // Click vào mã hóa đơn để mở trực tiếp Invoice Detail trong tab Hóa đơn
-  const handleOpenInvoice = (invoiceCode) => {
-    if (!invoiceCode) return;
-    navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(invoiceCode)}`);
+  const handleOpenInvoice = (invoiceCode, orderId) => {
+    const formatted = formatInvoiceCode(invoiceCode, orderId);
+    if (!formatted) return;
+    navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(formatted)}`);
   };
 
   const currentPoints = customer?.point ?? 0;
@@ -230,64 +268,6 @@ const CustomerDetailSection = ({
                   <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 12 }}>{customer.email || 'Chưa cập nhật'}</div>
                 </div>
               </div>
-
-              {/* ACTION CALLOUT: HIỆN SỬA THÔNG TIN VÀ XÓA KHÁCH HÀNG */}
-              <div
-                style={{
-                  background: '#f8fafc',
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                  padding: '10px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: 11.5
-                }}
-              >
-                <span style={{ color: '#475569' }}>
-                  Quản lý hồ sơ: Bạn có thể cập nhật thông tin liên hệ hoặc xóa khách hàng này khỏi hệ thống.
-                </span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => onEditCustomer && onEditCustomer(customer)}
-                    style={{
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: 5,
-                      padding: '5px 12px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4
-                    }}
-                  >
-                    <EditOutlined /> Sửa thông tin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteCustomer && onDeleteCustomer(customer.id)}
-                    style={{
-                      background: '#ffffff',
-                      color: '#dc2626',
-                      border: '1px solid #fecaca',
-                      borderRadius: 5,
-                      padding: '5px 12px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4
-                    }}
-                  >
-                    <DeleteOutlined /> Xóa khách hàng
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -306,41 +286,42 @@ const CustomerDetailSection = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: 9.5 }}>
-                      <th style={{ padding: '7px 10px', textAlign: 'left' }}>Ngày giao dịch</th>
                       <th style={{ padding: '7px 10px', textAlign: 'left' }}>Mã hóa đơn</th>
+                      <th style={{ padding: '7px 10px', textAlign: 'left' }}>Ngày giao dịch</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Tổng tiền</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Điểm nhận</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Điểm dùng</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Thực thanh toán</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'center' }}>Xem</th>
                     </tr>
                   </thead>
                   <tbody>
                     {purchases.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: 18, color: '#94a3b8' }}>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: 18, color: '#94a3b8' }}>
                           Khách hàng chưa có lịch sử mua hàng trong hệ thống
                         </td>
                       </tr>
                     ) : (
-                      purchases.map((p) => (
-                        <tr
-                          key={p.orderId}
-                          onClick={() => handleOpenInvoice(p.invoiceCode)}
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <td style={{ padding: '7px 10px', color: '#64748b' }}>
-                            {dayjs(p.createdAt).format('DD/MM/YYYY HH:mm')}
-                          </td>
-                          <td style={{ padding: '7px 10px', fontWeight: 700, color: '#2563eb' }}>
-                            {p.invoiceCode}
-                          </td>
+                      purchases.map((p) => {
+                        const invoiceCode = formatInvoiceCode(p.invoiceCode, p.orderId);
+                        return (
+                          <tr
+                            key={p.orderId}
+                            onClick={() => handleOpenInvoice(invoiceCode, p.orderId)}
+                            style={{
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <td style={{ padding: '7px 10px', fontWeight: 700, color: '#2563eb' }}>
+                              {invoiceCode}
+                            </td>
+                            <td style={{ padding: '7px 10px', color: '#64748b' }}>
+                              {dayjs(p.createdAt).format('DD/MM/YYYY HH:mm')}
+                            </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', color: '#475569' }}>
                             {p.totalAmount.toLocaleString('vi-VN')} đ
                           </td>
@@ -353,12 +334,10 @@ const CustomerDetailSection = ({
                           <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                             {p.finalAmount.toLocaleString('vi-VN')} đ
                           </td>
-                          <td style={{ padding: '7px 10px', textAlign: 'center', color: '#2563eb' }}>
-                            <ArrowRightOutlined style={{ fontSize: 11 }} />
-                          </td>
                         </tr>
-                      ))
-                    )}
+                      );
+                    })
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -368,39 +347,17 @@ const CustomerDetailSection = ({
           {/* TAB 3: LỊCH SỬ ĐIỂM (TÍCH ĐIỂM, TIÊU ĐIỂM, ĐIỀU CHỈNH THỦ CÔNG) */}
           {activeSubTab === 'points' && (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <HistoryOutlined style={{ color: '#ea580c' }} /> Sổ cái lịch sử tăng / giảm điểm
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onAdjustPoints && onAdjustPoints(customer)}
-                  style={{
-                    background: 'linear-gradient(135deg, #ea580c, #f97316)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: 4,
-                    padding: '4px 10px',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)'
-                  }}
-                >
-                  <TrophyOutlined /> Điều chỉnh điểm
-                </button>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <HistoryOutlined style={{ color: '#ea580c' }} /> Sổ cái lịch sử tích điểm
               </div>
 
               <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: 9.5 }}>
+                      <th style={{ padding: '7px 10px', textAlign: 'left' }}>Mã hóa đơn / Nguồn</th>
                       <th style={{ padding: '7px 10px', textAlign: 'left' }}>Thời gian</th>
                       <th style={{ padding: '7px 10px', textAlign: 'left' }}>Loại giao dịch</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'left' }}>Mã hóa đơn / Nguồn</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Thay đổi điểm</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Điểm sau GD</th>
                       <th style={{ padding: '7px 10px', textAlign: 'left' }}>Lý do</th>
@@ -416,7 +373,10 @@ const CustomerDetailSection = ({
                       </tr>
                     ) : (
                       points.map((pt) => {
-                        const isInvoiceRelated = Boolean(pt.relatedCode && pt.relatedCode.startsWith('HD'));
+                        const formattedRelatedCode = formatInvoiceCode(pt.relatedCode, pt.orderId);
+                        const isInvoiceRelated = Boolean(
+                          pt.orderId || (formattedRelatedCode && formattedRelatedCode.startsWith('HD'))
+                        );
                         const isManual = Boolean(pt.isManual);
                         const isReversed = Boolean(pt.isReversed);
 
@@ -429,6 +389,26 @@ const CustomerDetailSection = ({
                               opacity: isReversed ? 0.6 : 1
                             }}
                           >
+                            <td style={{ padding: '7px 10px' }}>
+                              {isInvoiceRelated ? (
+                                <span
+                                  onClick={() => handleOpenInvoice(formattedRelatedCode, pt.orderId)}
+                                  style={{
+                                    fontWeight: 700,
+                                    color: '#2563eb',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline'
+                                  }}
+                                  title="Nhấp để xem chi tiết hóa đơn"
+                                >
+                                  {formattedRelatedCode}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#64748b', fontStyle: 'italic' }}>
+                                  {pt.relatedCode || 'Điều chỉnh thủ công'}
+                                </span>
+                              )}
+                            </td>
                             <td style={{ padding: '7px 10px', color: '#64748b' }}>
                               {dayjs(pt.time).format('DD/MM/YYYY HH:mm')}
                             </td>
@@ -456,26 +436,6 @@ const CustomerDetailSection = ({
                               >
                                 {pt.type}
                               </span>
-                            </td>
-                            <td style={{ padding: '7px 10px' }}>
-                              {isInvoiceRelated ? (
-                                <span
-                                  onClick={() => handleOpenInvoice(pt.relatedCode)}
-                                  style={{
-                                    fontWeight: 700,
-                                    color: '#2563eb',
-                                    cursor: 'pointer',
-                                    textDecoration: 'underline'
-                                  }}
-                                  title="Nhấp để xem chi tiết hóa đơn"
-                                >
-                                  {pt.relatedCode}
-                                </span>
-                              ) : (
-                                <span style={{ color: '#64748b', fontStyle: 'italic' }}>
-                                  {pt.relatedCode || 'Điều chỉnh thủ công'}
-                                </span>
-                              )}
                             </td>
                             <td
                               style={{

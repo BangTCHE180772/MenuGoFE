@@ -77,6 +77,7 @@ const PartnerTab = ({ partners = [], fetchPartners, selectedBranchId }) => {
         }}
         onEdit={handleEditPartner}
         onDelete={handleDeletePartner}
+        onRefresh={() => fetchPartners && selectedBranchId && fetchPartners(selectedBranchId)}
       />
 
       <PartnerModal

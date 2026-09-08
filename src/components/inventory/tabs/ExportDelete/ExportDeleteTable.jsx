@@ -7,7 +7,8 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   DeleteOutlined,
-  EnvironmentOutlined
+  EnvironmentOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import { getExportDeleteById } from '../../../../api/documentApi';
 
@@ -21,7 +22,10 @@ const ExportDeleteTable = ({
   setModalExportOpen,
   onEditDocument,
   handleDeleteDocument,
-  onRefresh
+  onRefresh,
+  onOpenExpiredDisposal,
+  loadingExpired = false,
+  expiredCount = 0
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
@@ -140,6 +144,63 @@ const ExportDeleteTable = ({
 
         {/* ACTION BUTTONS */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* NÚT XUẤT HỎNG (BÊN TRÁI NÚT XUẤT HỦY) */}
+          <button
+            type="button"
+            onClick={onOpenExpiredDisposal}
+            disabled={loadingExpired}
+            title="Tự động tìm và chọn các nguyên liệu đã hết hạn để xuất hủy"
+            style={{
+              background: '#fff1f2',
+              color: '#e11d48',
+              border: '1px solid #fecdd3',
+              borderRadius: 6,
+              padding: '0 12px',
+              height: 32,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: loadingExpired ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 2px rgba(225, 29, 72, 0.08)',
+              transition: 'all 0.2s ease',
+              opacity: loadingExpired ? 0.7 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!loadingExpired) {
+                e.currentTarget.style.background = '#ffe4e6';
+                e.currentTarget.style.borderColor = '#fda4af';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loadingExpired) {
+                e.currentTarget.style.background = '#fff1f2';
+                e.currentTarget.style.borderColor = '#fecdd3';
+              }
+            }}
+          >
+            <WarningOutlined style={{ color: '#e11d48', fontSize: 13 }} />
+            <span>{loadingExpired ? 'Đang tìm...' : 'Xuất hỏng'}</span>
+            {expiredCount > 0 && (
+              <span
+                style={{
+                  background: '#e11d48',
+                  color: '#ffffff',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 10,
+                  padding: '1px 6px',
+                  lineHeight: '14px',
+                  marginLeft: 2
+                }}
+              >
+                {expiredCount}
+              </span>
+            )}
+          </button>
+
+          {/* NÚT XUẤT HỦY */}
           <button
             type="button"
             onClick={() => {

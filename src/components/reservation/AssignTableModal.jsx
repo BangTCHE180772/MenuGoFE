@@ -43,6 +43,31 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
       onSuccess();
     } catch (error) {
       if (error.errorFields) return;
+      
+      // Handle Reservation Warning
+      if (error.response?.status === 422 && error.response.data?.isWarning) {
+        Modal.confirm({
+          title: 'Cảnh báo xếp bàn',
+          content: error.response.data.message,
+          okText: 'Vẫn xếp bàn',
+          cancelText: 'Huỷ',
+          onOk: async () => {
+            try {
+              setSubmitting(true);
+              // Retry with ignoreWarning = true
+              await assignTablesToReservation(reservation.id, tableIds, true);
+              message.success('Xếp bàn thành công!');
+              onSuccess();
+            } catch (retryError) {
+              message.error(retryError.response?.data?.message || 'Xếp bàn thất bại');
+            } finally {
+              setSubmitting(false);
+            }
+          }
+        });
+        return;
+      }
+
       message.error(error.response?.data?.message || 'Xếp bàn thất bại');
     } finally {
       setSubmitting(false);
