@@ -34,6 +34,7 @@ const ProcessedProductModal = ({
     imageId: null,
     menuIds: [],
     recipe: [],
+    recommendedTimeMinutes: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ const ProcessedProductModal = ({
           recipe: editingProduct.recipeItems
             ? editingProduct.recipeItems.map(item => ({ productId: item.ingredientProductId || item.productId, quantity: item.quantity }))
             : [],
+          recommendedTimeMinutes: editingProduct.recommendedTimeMinutes ?? '',
         });
       } else {
         setFormData({
@@ -70,6 +72,7 @@ const ProcessedProductModal = ({
           imageId: null,
           menuIds: [],
           recipe: [],
+          recommendedTimeMinutes: '',
         });
       }
     }
@@ -127,6 +130,10 @@ const ProcessedProductModal = ({
       notifyError('Giá bán không được vượt quá 10 tỷ.');
       return;
     }
+    if (formData.recommendedTimeMinutes !== '' && (isNaN(Number(formData.recommendedTimeMinutes)) || Number(formData.recommendedTimeMinutes) < 1)) {
+      notifyError('Thời gian chế biến gợi ý phải là số phút lớn hơn 0.');
+      return;
+    }
     if (formData.recipe.length === 0) {
       notifyError('Món Chế Biến bắt buộc phải có công thức.');
       return;
@@ -155,6 +162,7 @@ const ProcessedProductModal = ({
         description: formData.description,
         isSellable: formData.isSellable,
         sellPrice: Number(formData.sellPrice),
+        recommendedTimeMinutes: formData.recommendedTimeMinutes === '' ? null : Number(formData.recommendedTimeMinutes),
         menuIds: formData.menuIds.map(Number),
         recipe: formData.recipe.map(r => ({
           productId: Number(r.productId),
@@ -439,6 +447,26 @@ const ProcessedProductModal = ({
                     placeholder="Tự động tạo nếu trống"
                     value={formData.skuCode}
                     onChange={e => setFormData({ ...formData, skuCode: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: 14,
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#334155', marginBottom: 4 }}>
+                    Thời gian chế biến gợi ý (phút)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="VD: 15"
+                    value={formData.recommendedTimeMinutes}
+                    onChange={e => setFormData({ ...formData, recommendedTimeMinutes: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
