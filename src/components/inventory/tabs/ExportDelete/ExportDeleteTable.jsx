@@ -8,7 +8,8 @@ import {
   EditOutlined,
   DeleteOutlined,
   EnvironmentOutlined,
-  WarningOutlined
+  WarningOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { getExportDeleteById } from '../../../../api/documentApi';
 
@@ -94,7 +95,7 @@ const ExportDeleteTable = ({
               style={{
                 width: '100%',
                 height: 32,
-                padding: '4px 10px 4px 30px',
+                padding: '4px 28px 4px 30px',
                 fontSize: 12,
                 fontWeight: 500,
                 color: '#1e293b',
@@ -104,6 +105,21 @@ const ExportDeleteTable = ({
                 transition: 'border 0.2s ease'
               }}
             />
+            {searchText && (
+              <CloseOutlined
+                onClick={() => setSearchText('')}
+                title="Xóa tìm kiếm"
+                style={{
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8',
+                  fontSize: 11,
+                  cursor: 'pointer'
+                }}
+              />
+            )}
           </div>
 
           {/* STATUS FILTER PILLS */}

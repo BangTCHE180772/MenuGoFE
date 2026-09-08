@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '../../../../context/AuthContext';
+import { useBranch } from '../../../../context/BranchContext';
 import { receiveTransferDocument, rejectTransferDocument, getTransferById } from '../../../../api/documentApi';
 import { extractErrorMessage } from '../../utils/errorHelper';
 
@@ -21,6 +22,9 @@ const ReceiveTransferDocumentModal = ({
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
   const creatorName = user?.name || user?.email || 'Mno';
+
+  const branchContext = useBranch ? useBranch() : {};
+  const { branches = [], currentBranch } = branchContext;
 
   const [loading, setLoading] = useState(false);
   const [fullDoc, setFullDoc] = useState(null);
@@ -119,6 +123,10 @@ const ReceiveTransferDocumentModal = ({
       setErrorMessage('Không tìm thấy thông tin phiếu chuyển kho.');
       return;
     }
+    if (isReceiverInactive) {
+      setErrorMessage('Chi nhánh nhận đã ngừng kinh doanh. Không thể nhận hàng vào kho chi nhánh này.');
+      return;
+    }
     if (!receivingNote || !receivingNote.trim()) {
       setErrorMessage('Bắt buộc phải nhập Ghi chú (Note) khi xác nhận nhận hàng.');
       return;
@@ -196,6 +204,9 @@ const ReceiveTransferDocumentModal = ({
     ? dayjs(activeDoc.orderDate || activeDoc.businessDate || activeDoc.createdAt).format('DD/MM/YYYY HH:mm')
     : dayjs().format('DD/MM/YYYY HH:mm');
   const docCreatorName = activeDoc?.createdByName || activeDoc?.snapshotCreatedByName || activeDoc?.creator?.name || activeDoc?.creator?.email || creatorName;
+  const receiverBranchId = activeDoc?.toBranchId || activeDoc?.targetBranchId || activeDoc?.toBranch?.id;
+  const receiverBranch = (branches || []).find((b) => Number(b.id) === Number(receiverBranchId)) || currentBranch;
+  const isReceiverInactive = receiverBranch ? (receiverBranch.isDeleted || receiverBranch.status === 'Ngừng kinh doanh') : false;
 
   return (
     <div
@@ -493,6 +504,12 @@ const ReceiveTransferDocumentModal = ({
               <span style={{ fontWeight: 700, color: '#0066ff', fontSize: 13 }}>{totalReceiveQty}</span>
             </div>
 
+            {isReceiverInactive && (
+              <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 6, color: '#b91c1c', fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Chi nhánh nhận đã ngừng kinh doanh. Không thể nhận hàng vào kho (chỉ có thể Từ chối nhận để hoàn trả hàng về kho gửi).
+              </div>
+            )}
+
             <div>
               <textarea
                 value={receivingNote}
@@ -526,14 +543,14 @@ const ReceiveTransferDocumentModal = ({
                 fontWeight: 600,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: loading ? 'not-allowed' : 'pointer'
               }}
             >
               Từ chối nhận
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || isReceiverInactive}
               onClick={handleSubmit}
               style={{
                 flex: 1,
@@ -543,7 +560,8 @@ const ReceiveTransferDocumentModal = ({
                 fontWeight: 700,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: (loading || isReceiverInactive) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isReceiverInactive) ? 0.5 : 1
               }}
             >
               Nhận hàng
