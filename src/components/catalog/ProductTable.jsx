@@ -11,6 +11,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 
 const TYPE_CONFIG = {
@@ -30,11 +31,13 @@ const ProductTable = ({
   products = [],
   groups = [],
   units = [],
+  promotions = [],
   loading = false,
   selectedRowKeys = [],
   setSelectedRowKeys,
   onEditProduct,
   onDeleteProduct,
+  onDiscountProduct,
 }) => {
   const [deleteConfirmProduct, setDeleteConfirmProduct] = useState(null);
 
@@ -208,7 +211,27 @@ const ProductTable = ({
 
                     {/* NAME */}
                     <td style={{ padding: '8px 12px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.name}</div>
+                        {(() => {
+                          const activePromo = promotions?.find(p => 
+                            p.isActive && p.status === 'Active' && 
+                            (p.products?.length === 0 || p.products?.some(prod => prod.productId === item.id))
+                          );
+                          if (activePromo) {
+                            return (
+                              <span style={{ 
+                                display: 'inline-flex', alignItems: 'center', gap: 4, 
+                                fontSize: 10, fontWeight: 700, color: '#ffffff', 
+                                background: '#ea580c', padding: '2px 6px', borderRadius: 4 
+                              }} title={activePromo.name}>
+                                <AppstoreOutlined style={{ fontSize: 10 }} /> Khuyến mãi
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                       {item.description && (
                         <div
                           style={{
@@ -308,6 +331,18 @@ const ProductTable = ({
                     {/* ACTIONS */}
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        {item.isSellable !== false && (
+                          <button
+                            onClick={() => onDiscountProduct && onDiscountProduct(item)}
+                            title="Giảm giá / Khuyến mãi"
+                            style={{
+                              background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: 4, width: 26, height: 26,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', cursor: 'pointer',
+                            }}
+                          >
+                            <GiftOutlined style={{ fontSize: 12 }} />
+                          </button>
+                        )}
                         <button
                           onClick={() => onEditProduct(item)}
                           title="Sửa sản phẩm"
