@@ -4,6 +4,7 @@ import {
   DollarOutlined,
   PlusOutlined,
   ReloadOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 
 const CatalogHeaderNav = ({
@@ -15,7 +16,7 @@ const CatalogHeaderNav = ({
 }) => {
   const tabs = [
     { key: 'ProductCatalog', label: 'Sản phẩm', icon: <AppstoreOutlined /> },
-    { key: 'Price', label: 'Quản lý giá bán', icon: <DollarOutlined /> },
+    { key: 'PricePromo', label: 'Giá bán & Khuyến mãi', icon: <DollarOutlined /> },
   ];
 
   return (
