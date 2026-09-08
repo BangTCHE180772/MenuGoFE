@@ -27,6 +27,13 @@ export const cancelOrderDetail = (detailId) =>
   axiosInstance.put(`/api/Order/details/${detailId}/cancel`);
 
 /**
+ * Dùng lại món thừa (khách trả, bếp đã làm xong, còn trong 30p) cho một món
+ * đang chờ chế biến — khớp đúng món + số lượng thì dừng chế biến luôn.
+ */
+export const reuseLeftoverForOrderDetail = (detailId, leftoverId) =>
+  axiosInstance.put(`/api/Order/details/${detailId}/reuse-leftover`, { leftoverId });
+
+/**
  * Gửi yêu cầu bếp (nước chấm, v.v.)
  */
 export const requestRestock = (data) =>

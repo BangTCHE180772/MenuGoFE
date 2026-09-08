@@ -1,12 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Card,
-  Form,
   Select,
-  InputNumber,
-  Input,
-  DatePicker,
-  Radio,
   Button,
   Table,
   Tag,
@@ -16,12 +11,10 @@ import {
   Typography,
   Tabs,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/leftoverApi';
-import { getCancelledHistory, getAllOrders } from '../api/orderApi';
-import { getAllProducts } from '../api/productApi';
-import { getAllShifts } from '../api/shiftApi';
+import { getLeftoverRecordsByBranch, deleteLeftoverRecord } from '../api/leftoverApi';
+import { getCancelledHistory } from '../api/orderApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 
@@ -38,15 +31,8 @@ const LeftoverPage = () => {
   const { currentBranchId } = useBranch();
   const branchId = currentBranchId || user?.branchId;
 
-  const [form] = Form.useForm();
-  const type = Form.useWatch('type', form);
-
-  const [products, setProducts] = useState([]);
-  const [shifts, setShifts] = useState([]);
-  const [orderDetailOptions, setOrderDetailOptions] = useState([]);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState(undefined);
 
   // ── Lịch sử hủy món (đơn đã hoàn thành vs đơn chờ xác nhận) ──────────
@@ -87,76 +73,6 @@ const LeftoverPage = () => {
   useEffect(() => {
     fetchRecords();
   }, [fetchRecords]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [prodRes, shiftRes] = await Promise.all([getAllProducts(), getAllShifts()]);
-        setProducts(prodRes.data || []);
-        setShifts(shiftRes.data || []);
-      } catch {
-        message.error('Không thể tải danh mục sản phẩm/ca làm việc.');
-      }
-    })();
-  }, []);
-
-  const fetchOrderDetailOptions = useCallback(async () => {
-    if (!branchId) return;
-    try {
-      const res = await getAllOrders(branchId);
-      const orders = res.data || [];
-      const options = orders
-        .slice()
-        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
-        .flatMap((order) =>
-          (order.orderDetails || [])
-            .filter((d) => d.status !== 'Cancelled')
-            .map((d) => ({
-              value: d.id,
-              label: `HD${order.id} · Bàn ${order.tableName || '?'} · ${d.productName} x${d.quantity}`,
-              productId: d.productId,
-              quantity: d.quantity,
-            }))
-        );
-      setOrderDetailOptions(options);
-    } catch {
-      message.error('Không thể tải danh sách chi tiết đơn hàng.');
-    }
-  }, [branchId]);
-
-  useEffect(() => {
-    fetchOrderDetailOptions();
-  }, [fetchOrderDetailOptions]);
-
-  const handleSubmit = async (values) => {
-    if (!branchId) {
-      message.error('Không xác định được chi nhánh hiện tại.');
-      return;
-    }
-    setSaving(true);
-    try {
-      await createLeftoverRecord({
-        branchId,
-        type: values.type,
-        productId: values.productId,
-        quantity: values.quantity,
-        reason: values.reason,
-        orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
-        handlingAction: values.type === 'Return' ? values.handlingAction : null,
-        discountAmount: values.type === 'Return' ? values.discountAmount ?? null : null,
-        shiftId: values.shiftId ?? null,
-        recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
-      });
-      message.success('Đã ghi nhận món thừa');
-      form.resetFields();
-      form.setFieldsValue({ type: values.type, recordDate: dayjs() });
-      fetchRecords();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Lỗi khi ghi nhận món thừa.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDelete = async (id) => {
     try {
@@ -240,94 +156,6 @@ const LeftoverPage = () => {
 
   const leftoverTab = (
     <>
-      <Card title="Ghi nhận món thừa" style={{ marginBottom: 20, borderRadius: 12 }}>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          initialValues={{ type: 'Return', recordDate: dayjs() }}
-        >
-          <Form.Item name="type" label="Loại" rules={[{ required: true }]}>
-            <Radio.Group>
-              <Radio.Button value="Return">Khách trả món (Return)</Radio.Button>
-              <Radio.Button value="Extra">Bếp làm dư (Extra)</Radio.Button>
-            </Radio.Group>
-          </Form.Item>
-
-          <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-            <Form.Item name="productId" label="Món" rules={[{ required: true, message: 'Chọn món' }]} style={{ width: 260 }}>
-              <Select
-                showSearch
-                placeholder="Chọn món"
-                optionFilterProp="label"
-                options={products.map((p) => ({ value: p.id, label: p.name }))}
-              />
-            </Form.Item>
-
-            <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]} style={{ width: 120 }}>
-              <InputNumber min={1} style={{ width: '100%' }} />
-            </Form.Item>
-
-            {type === 'Return' && (
-              <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 340 }}>
-                <Select
-                  showSearch
-                  placeholder="Tìm theo bàn hoặc tên món..."
-                  optionFilterProp="label"
-                  options={orderDetailOptions}
-                  onChange={(value, option) => {
-                    if (option) {
-                      form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
-                    }
-                  }}
-                />
-              </Form.Item>
-            )}
-
-            {type === 'Extra' && (
-              <Form.Item name="shiftId" label="Ca làm việc" style={{ width: 200 }}>
-                <Select allowClear placeholder="Chọn ca" options={shifts.map((s) => ({ value: s.id, label: s.name }))} />
-              </Form.Item>
-            )}
-
-            <Form.Item name="recordDate" label="Ngày" style={{ width: 160 }}>
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-            </Form.Item>
-          </Space>
-
-          {type === 'Return' && (
-            <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-              <Form.Item name="handlingAction" label="Cách xử lý" rules={[{ required: true, message: 'Chọn cách xử lý' }]} style={{ width: 220 }}>
-                <Select
-                  placeholder="Chọn cách xử lý"
-                  options={[
-                    { value: 'Discard', label: 'Huỷ' },
-                    { value: 'StaffUse', label: 'Nhân viên dùng' },
-                    { value: 'Reuse', label: 'Tái sử dụng (nếu cho phép)' },
-                  ]}
-                />
-              </Form.Item>
-              <Form.Item name="discountAmount" label="Số tiền giảm giá (nếu có)" style={{ width: 200 }}>
-                <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
-              </Form.Item>
-            </Space>
-          )}
-
-          <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }]}>
-            <Input.TextArea
-              rows={2}
-              placeholder={type === 'Extra' ? 'VD: làm dư, ước tính sai...' : 'VD: món bị nguội, khách gọi nhầm...'}
-            />
-          </Form.Item>
-
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Button type="primary" icon={<PlusOutlined />} htmlType="submit" loading={saving}>
-              Ghi nhận
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-
       <Card
         title="Lịch sử món thừa"
         style={{ borderRadius: 12 }}
