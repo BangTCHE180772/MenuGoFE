@@ -5,6 +5,7 @@ import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
 import ProductPagination from './ProductPagination';
 import PriceManagementTab from './PriceManagementTab';
+import PromotionManagementTab from './PromotionManagementTab';
 
 // Modals
 import ProductTypeSelectModal from './modals/ProductTypeSelectModal';
@@ -13,6 +14,7 @@ import ManufacturedProductModal from './modals/ManufacturedProductModal';
 import RegularProductModal from './modals/RegularProductModal';
 import IngredientProductModal from './modals/IngredientProductModal';
 import ToolProductModal from './modals/ToolProductModal';
+import ProductDiscountModal from './modals/ProductDiscountModal';
 
 import QuickAddGroupModal from './modals/QuickAddGroupModal';
 import QuickAddMenuModal from './modals/QuickAddMenuModal';
@@ -45,6 +47,7 @@ const ProductCatalogView = () => {
   const [groups, setGroups] = useState([]);
   const [units, setUnits] = useState([]);
   const [menus, setMenus] = useState([]);
+  const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Custom Toast Notification State
@@ -72,6 +75,9 @@ const ProductCatalogView = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedProductType, setSelectedProductType] = useState('Regular');
+  
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [discountingProduct, setDiscountingProduct] = useState(null);
 
   // Secondary Sub-Modals
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
@@ -83,16 +89,19 @@ const ProductCatalogView = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, groupRes, unitRes, menuRes] = await Promise.all([
+      const { getAllPromotions } = await import('../../api/promotionApi');
+      const [prodRes, groupRes, unitRes, menuRes, promoRes] = await Promise.all([
         getAllProducts(),
         getAllGroups(),
         getAllUnits(),
         getAllMenus(),
+        getAllPromotions().catch(() => []),
       ]);
       setProducts(prodRes.data || []);
       setGroups(groupRes.data || []);
       setUnits(unitRes.data || []);
       setMenus(menuRes.data || []);
+      setPromotions(promoRes || []);
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu catalog:', err);
       showToast('error', 'Không thể tải dữ liệu danh mục sản phẩm.');
@@ -199,6 +208,11 @@ const ProductCatalogView = () => {
     const pType = prod.type || prod.productType || 'Regular';
     setSelectedProductType(pType);
     setIsFormModalOpen(true);
+  };
+
+  const handleDiscountProduct = (prod) => {
+    setDiscountingProduct(prod);
+    setIsDiscountModalOpen(true);
   };
 
   const handleDeleteProduct = async (id) => {
@@ -333,11 +347,13 @@ const ProductCatalogView = () => {
                 products={paginatedProducts}
                 groups={groups}
                 units={units}
+                promotions={promotions}
                 loading={loading}
                 selectedRowKeys={selectedRowKeys}
                 setSelectedRowKeys={setSelectedRowKeys}
                 onEditProduct={handleEditProduct}
                 onDeleteProduct={handleDeleteProduct}
+                onDiscountProduct={handleDiscountProduct}
               />
               <ProductPagination
                 currentPage={currentPage}
@@ -353,14 +369,17 @@ const ProductCatalogView = () => {
           </>
         )}
 
-        {activeTab === 'Price' && (
-          <PriceManagementTab
-            products={products}
-            groups={groups}
-            onRefreshData={fetchData}
-            notifySuccess={(msg) => showToast('success', msg)}
-            notifyError={(msg) => showToast('error', msg)}
-          />
+        {activeTab === 'PricePromo' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <PriceManagementTab
+              products={products}
+              groups={groups}
+              onRefreshData={fetchData}
+              notifySuccess={(msg) => showToast('success', msg)}
+              notifyError={(msg) => showToast('error', msg)}
+            />
+            <PromotionManagementTab />
+          </div>
         )}
       </div>
 
@@ -461,6 +480,24 @@ const ProductCatalogView = () => {
         onSave={handleSaveQuickUnit}
         loading={quickLoading}
       />
+
+      {isDiscountModalOpen && discountingProduct && (
+        <ProductDiscountModal
+          product={discountingProduct}
+          existingPromotion={promotions.find(p => p.products?.some(prod => prod.productId === discountingProduct.id))}
+          onClose={() => {
+            setIsDiscountModalOpen(false);
+            setDiscountingProduct(null);
+          }}
+          onSuccess={() => {
+            setIsDiscountModalOpen(false);
+            setDiscountingProduct(null);
+            fetchData();
+          }}
+          notifySuccess={(msg) => showToast('success', msg)}
+          notifyError={(msg) => showToast('error', msg)}
+        />
+      )}
     </div>
   );
 };
