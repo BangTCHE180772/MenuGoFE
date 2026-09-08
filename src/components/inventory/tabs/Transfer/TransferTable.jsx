@@ -19,12 +19,16 @@ const TransferTable = ({
   statusFilter = 'ALL',
   setStatusFilter,
   loading,
+  branches = [],
   setModalTransferOpen,
   onEditDocument,
   handleReceiveTransfer,
   handleDeleteDocument,
   onRefresh
 }) => {
+  const currentBranch = (branches || []).find((b) => Number(b.id) === Number(selectedBranchId));
+  const isBranchInactive = currentBranch ? (currentBranch.isDeleted || currentBranch.status === 'Ngừng kinh doanh') : false;
+
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [loadedDoc, setLoadedDoc] = useState(null);
@@ -120,14 +124,22 @@ const TransferTable = ({
 
         {/* ACTION BUTTONS */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isBranchInactive && (
+            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecdd3', fontSize: 11, fontWeight: 600 }}>
+              Ngừng kinh doanh
+            </span>
+          )}
           <button
             type="button"
+            disabled={isBranchInactive}
+            title={isBranchInactive ? 'Chi nhánh này đã ngừng kinh doanh, không thể tạo phiếu chuyển hàng' : 'Tạo phiếu chuyển hàng'}
             onClick={() => {
+              if (isBranchInactive) return;
               if (onEditDocument) onEditDocument(null);
               else if (setModalTransferOpen) setModalTransferOpen(true);
             }}
             style={{
-              background: 'linear-gradient(135deg, #e8442a, #f97316)',
+              background: isBranchInactive ? '#cbd5e1' : 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
               borderRadius: 6,
@@ -135,11 +147,12 @@ const TransferTable = ({
               height: 32,
               fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isBranchInactive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
+              boxShadow: isBranchInactive ? 'none' : '0 2px 4px rgba(232, 68, 42, 0.25)',
+              opacity: isBranchInactive ? 0.65 : 1
             }}
           >
             <PlusOutlined /> Chuyển hàng

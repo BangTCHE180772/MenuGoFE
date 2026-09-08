@@ -41,16 +41,16 @@ import { useBranch } from "../context/BranchContext";
 
 // ─── Tùy chọn con của Quản Lý Kho ──────────────────────────────────────────
 const INVENTORY_SUB_MENU = [
+  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Nhập hàng", path: "/inventory-management?tab=Import", tabKey: "Import" },
   { label: "Trả hàng nhập", path: "/inventory-management?tab=ImportReturn", tabKey: "ImportReturn" },
-  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
   { label: "Xuất hủy", path: "/inventory-management?tab=ExportDelete", tabKey: "ExportDelete" },
-  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
   { label: "Chuyển hàng", path: "/inventory-management?tab=Transfer", tabKey: "Transfer" },
   { label: "Kiểm kho", path: "/inventory-management?tab=Check", tabKey: "Check" },
-  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
   { label: "Khách hàng", path: "/inventory-management?tab=Customer", tabKey: "Customer" },
+  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
+  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
   { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];
@@ -209,7 +209,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
 
   const menuItems = ROLE_MENUS[role] ?? [];
   const searchParams = new URLSearchParams(location.search);
-  const activeTabParam = searchParams.get("tab") || "Import";
+  const activeTabParam = searchParams.get("tab") || "Adjustment";
 
   const handleLogout = async () => {
     await logout();

@@ -111,8 +111,10 @@ const VoucherCreateModal = ({ visible, onClose, onSuccess, branches }) => {
 
         <Form.Item name="branchId" label="Chi nhánh áp dụng (Để trống = Toàn hệ thống)">
           <Select allowClear placeholder="Chọn chi nhánh">
-            {branches.map(b => (
-              <Option key={b.id} value={b.id}>{b.name}</Option>
+            {branches
+              .filter((b) => !b.isDeleted && b.status !== 'Ngừng kinh doanh')
+              .map((b) => (
+                <Option key={b.id} value={b.id}>{b.name}</Option>
             ))}
           </Select>
         </Form.Item>

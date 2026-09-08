@@ -75,16 +75,20 @@ const TransferDocumentModal = ({
   });
   const [items, setItems] = useState([]);
 
-  // Fetch branches excluding current branch
+  // Fetch branches excluding current branch and inactive branches
   useEffect(() => {
     if (open) {
       getAllBranches()
         .then((res) => {
           const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
           setBranches(list);
-          const otherBranches = list.filter((b) => Number(b.id) !== Number(branchId));
-          if (otherBranches.length > 0) {
-            setTargetBranchId(otherBranches[0].id);
+          const validOtherBranches = list.filter(
+            (b) => Number(b.id) !== Number(branchId) && !b.isDeleted && b.status !== 'Ngừng kinh doanh'
+          );
+          if (validOtherBranches.length > 0) {
+            setTargetBranchId(validOtherBranches[0].id);
+          } else {
+            setTargetBranchId('');
           }
         })
         .catch((err) => {
@@ -321,16 +325,33 @@ const TransferDocumentModal = ({
   }, [items]);
 
   const otherBranches = useMemo(() => {
-    return branches.filter((b) => Number(b.id) !== Number(branchId));
+    return branches.filter(
+      (b) => Number(b.id) !== Number(branchId) && !b.isDeleted && b.status !== 'Ngừng kinh doanh'
+    );
   }, [branches, branchId]);
 
+  const currentBranch = useMemo(() => {
+    return branches.find((b) => Number(b.id) === Number(branchId));
+  }, [branches, branchId]);
+
+  const isSenderInactive = currentBranch ? (currentBranch.isDeleted || currentBranch.status === 'Ngừng kinh doanh') : false;
+
   const handleSubmit = async (isDraft = false) => {
+    if (isSenderInactive) {
+      showToast('Chi nhánh gửi hiện tại đã ngừng kinh doanh, không thể tạo hoặc chuyển hàng.', 'error');
+      return;
+    }
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 sản phẩm để chuyển hàng.', 'error');
       return;
     }
     if (!targetBranchId) {
-      showToast('Vui lòng chọn chi nhánh nhận.', 'error');
+      showToast('Vui lòng chọn chi nhánh nhận hợp lệ.', 'error');
+      return;
+    }
+    const targetBranch = branches.find((b) => Number(b.id) === Number(targetBranchId));
+    if (!targetBranch || targetBranch.isDeleted || targetBranch.status === 'Ngừng kinh doanh') {
+      showToast('Chi nhánh nhận đã ngừng kinh doanh. Không thể chuyển hàng tới chi nhánh này.', 'error');
       return;
     }
 
@@ -883,10 +904,23 @@ const TransferDocumentModal = ({
               </span>
             </div>
 
+            {isSenderInactive && (
+              <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 6, color: '#b91c1c', fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Chi nhánh hiện tại đã ngừng kinh doanh. Không thể tạo hoặc chuyển hàng.
+              </div>
+            )}
+
+            {!isSenderInactive && otherBranches.length === 0 && (
+              <div style={{ padding: '8px 10px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 6, color: '#b45309', fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Hiện không có chi nhánh nào khác đang hoạt động để nhận hàng.
+              </div>
+            )}
+
             <div>
               <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Tới chi nhánh</div>
               <select
                 value={targetBranchId}
+                disabled={isSenderInactive || otherBranches.length === 0}
                 onChange={(e) => setTargetBranchId(e.target.value)}
                 style={{
                   width: '100%',
@@ -895,12 +929,13 @@ const TransferDocumentModal = ({
                   border: '1px solid #cbd5e1',
                   outline: 'none',
                   fontSize: 11,
-                  background: '#ffffff',
-                  color: '#0f172a'
+                  background: isSenderInactive || otherBranches.length === 0 ? '#f1f5f9' : '#ffffff',
+                  color: isSenderInactive || otherBranches.length === 0 ? '#94a3b8' : '#0f172a',
+                  cursor: isSenderInactive || otherBranches.length === 0 ? 'not-allowed' : 'pointer'
                 }}
               >
                 {otherBranches.length === 0 ? (
-                  <option value="">Không có chi nhánh khác</option>
+                  <option value="">-- Không có chi nhánh đang hoạt động --</option>
                 ) : (
                   otherBranches.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -934,7 +969,7 @@ const TransferDocumentModal = ({
           <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId}
               onClick={() => handleSubmit(true)}
               style={{
                 flex: 1,
@@ -944,14 +979,15 @@ const TransferDocumentModal = ({
                 fontWeight: 600,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 0.5 : 1
               }}
             >
               Lưu tạm
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId}
               onClick={() => handleSubmit(false)}
               style={{
                 flex: 1,
@@ -961,7 +997,8 @@ const TransferDocumentModal = ({
                 fontWeight: 700,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 0.5 : 1
               }}
             >
               Hoàn thành

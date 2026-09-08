@@ -23,8 +23,8 @@ const InventoryManagementTab = () => {
   const { currentBranchId, branches } = useBranch();
   const [loading, setLoading] = useState(false);
 
-  // Read tab parameter from URL query parameter, fallback to 'Import'
-  const tabFromUrl = searchParams.get('tab') || 'Import';
+  // Read tab parameter from URL query parameter, fallback to 'Adjustment'
+  const tabFromUrl = searchParams.get('tab') || 'Adjustment';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
 
   // Sync activeTab when URL searchParams change

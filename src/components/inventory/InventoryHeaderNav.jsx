@@ -3,17 +3,18 @@ import { AppstoreOutlined } from '@ant-design/icons';
 import { SIDEBAR_HEADER_TITLES } from './constants/inventoryConstants';
 
 const INVENTORY_OPTIONS = [
+  { key: 'Adjustment', label: 'Điều chỉnh giá vốn' },
   { key: 'Import', label: 'Nhập hàng' },
   { key: 'ImportReturn', label: 'Trả hàng nhập' },
-  { key: 'Invoice', label: 'Hóa đơn' },
   { key: 'ExportDelete', label: 'Xuất hủy' },
-  { key: 'Production', label: 'Sản xuất' },
   { key: 'Transfer', label: 'Chuyển hàng' },
   { key: 'Check', label: 'Kiểm kho' },
-  { key: 'Adjustment', label: 'Điều chỉnh giá vốn' },
   { key: 'Partner', label: 'Đối tác' },
-  { key: 'Product', label: 'Danh sách nguyên liệu, mặt hàng' },
-  { key: 'BatchExpiry', label: 'Theo dõi Hạn sử dụng & Lô hàng' }
+  { key: 'Customer', label: 'Khách hàng' },
+  { key: 'Invoice', label: 'Hóa đơn' },
+  { key: 'Production', label: 'Sản xuất' },
+  { key: 'Product', label: 'Danh sách nguyên liệu' },
+  { key: 'BatchExpiry', label: 'Lô hàng & Hạn sử dụng' }
 ];
 
 const InventoryHeaderNav = ({ activeTab }) => {
