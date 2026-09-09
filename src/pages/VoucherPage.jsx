@@ -116,7 +116,14 @@ const VoucherPage = () => {
     {
       title: 'SL',
       key: 'quantity',
-      render: (_, record) => `${record.usedCount} / ${record.quantity}`
+      render: (_, record) => (
+        <div>
+          <div>{record.usedCount} / {record.quantity}</div>
+          <div style={{ fontSize: 11, color: '#64748b' }}>
+            {record.maxUsagePerCustomer ? `(Tối đa ${record.maxUsagePerCustomer}/khách)` : '(Không giới hạn/khách)'}
+          </div>
+        </div>
+      )
     },
     {
       title: 'Trạng thái',
