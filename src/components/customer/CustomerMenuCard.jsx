@@ -84,19 +84,33 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
             {name}
           </h3>
           <div className="card-footer-row">
-            <div className="card-price">{formatPrice(price)}</div>
-            <Button
-              type="text"
-              size="small"
-              icon={<MessageOutlined style={{ color: '#ea580c' }} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setConsultModalOpen(true);
-              }}
-              style={{ color: '#ea580c', fontWeight: 600, fontSize: 13 }}
-            >
-              Tư vấn
-            </Button>
+            <div className="card-price" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#ea580c' }}>{formatPrice(price)}</span>
+              {product.originalPrice && (
+                <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#94a3b8' }}>
+                  {formatPrice(product.originalPrice)}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <Button
+                type="text"
+                size="small"
+                icon={<MessageOutlined style={{ color: '#ea580c' }} />}
+                onClick={() => setConsultModalOpen(true)}
+                style={{ color: '#ea580c', fontWeight: 600, fontSize: 12 }}
+              >
+                Tư vấn
+              </Button>
+              <Button
+                type="link"
+                icon={<EyeOutlined />}
+                onClick={() => onViewDetail(product)}
+                className="btn-link-detail"
+              >
+                Xem
+              </Button>
+            </div>
           </div>
         </div>
       </div>

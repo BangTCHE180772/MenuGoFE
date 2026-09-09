@@ -197,18 +197,39 @@ const CustomerHomePage = () => {
             (b) => b.type === "Processed" || b.type === "Manufactured" || b.type === "Regular"
           );
 
+          const { getAllPromotions } = await import("../../api/promotionApi");
+          const allPromos = await getAllPromotions().catch(() => []);
+          const activePromos = allPromos.filter(p => p.isActive && p.status === 'Active' && (p.scope === 0 || p.branches?.some(b => b.branchId === bid)));
+
           // Map sang định dạng sản phẩm của Menu
-          const mapped = sellableList.map((item) => ({
-            id: item.productId, // ProductId để order
-            bInventoryId: item.bInventoryId,
-            name: item.name,
-            price: item.sellPrice || 0,
-            imageLink: item.imageLink || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
-            groupId: item.groupId,
-            groupName: item.groupName || "Món ăn",
-            description: item.description || "",
-            isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
-          }));
+          const mapped = sellableList.map((item) => {
+            let originalPrice = item.sellPrice || 0;
+            let finalPrice = originalPrice;
+            
+            // Check for promotions
+            const itemPromo = activePromos.find(p => p.products?.length === 0 || p.products?.some(prod => prod.productId === item.productId));
+            if (itemPromo) {
+              if (itemPromo.discountType === 'Percentage') {
+                const discount = (originalPrice * itemPromo.discountValue) / 100;
+                const actualDiscount = itemPromo.maxDiscount > 0 ? Math.min(discount, itemPromo.maxDiscount) : discount;
+                finalPrice = Math.max(0, originalPrice - actualDiscount);
+              } else {
+                finalPrice = Math.max(0, originalPrice - itemPromo.discountValue);
+              }
+            }
+
+            return {
+              id: item.productId, // ProductId để order
+              bInventoryId: item.bInventoryId,
+              name: item.name,
+              price: finalPrice,
+              originalPrice: originalPrice > finalPrice ? originalPrice : null,
+              imageLink: item.imageLink || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+              groupName: item.groupName || "Món ăn",
+              description: item.description || "",
+              isNew: item.createdAt ? isCreatedInCurrentMonth(item.createdAt) : false,
+            };
+          });
 
           // Helper lấy vị trí ưu tiên của nhóm hàng
           const getGroupPriority = (groupName, groupId) => {
