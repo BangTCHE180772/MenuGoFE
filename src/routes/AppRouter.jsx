@@ -16,6 +16,8 @@ import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import WaiterStationPage from '../pages/WaiterStationPage';
 import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
+import CashierSessionPage from '../pages/CashierSessionPage';
+import KitchenSessionPage from '../pages/KitchenSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import BranchChatPage from '../pages/BranchChatPage';
@@ -161,6 +163,8 @@ const AppRouter = () => {
               <Route path="/my-shift-feedbacks" element={<MyShiftFeedbackPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
+              <Route path="/cashier-session" element={<CashierSessionPage />} />
+              <Route path="/kitchen-session" element={<KitchenSessionPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />

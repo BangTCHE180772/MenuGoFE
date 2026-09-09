@@ -134,6 +134,8 @@ const ROLE_MENUS = {
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
+    { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
@@ -155,12 +157,14 @@ const ROLE_MENUS = {
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CASHIER]: [
+    { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CHEF]: [
+    { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",

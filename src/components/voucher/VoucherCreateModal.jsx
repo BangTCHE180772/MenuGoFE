@@ -124,8 +124,12 @@ const VoucherCreateModal = ({ visible, onClose, onSuccess, branches }) => {
         </Form.Item>
 
         <div style={{ display: 'flex', gap: 16 }}>
-          <Form.Item name="quantity" label="Số lượng phát hành" rules={[{ required: true }]}>
+          <Form.Item name="quantity" label="Số lượng phát hành" rules={[{ required: true }]} style={{ flex: 1 }}>
             <InputNumber style={{ width: '100%' }} min={1} />
+          </Form.Item>
+
+          <Form.Item name="maxUsagePerCustomer" label="Giới hạn dùng/khách" style={{ flex: 1 }}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="Không giới hạn" />
           </Form.Item>
 
           <Form.Item name="isActive" label="Trạng thái" valuePropName="checked">
