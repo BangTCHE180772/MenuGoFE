@@ -102,6 +102,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
             bInventoryId: p.bInventoryId,
             name: p.name,
             sellPrice: p.sellPrice || 0,
+            originalPrice: p.originalPrice || null,
             description: p.description || '',
             groupId: null,
             groupName: p.groupName || 'Khác',
@@ -349,7 +350,14 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                 )}
                 <div className="pos-menu-item-tag">{item.groupName}</div>
               </div>
-              <div className="pos-menu-item-price">{formatPrice(item.sellPrice)}</div>
+              <div className="pos-menu-item-price" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{formatPrice(item.sellPrice)}</span>
+                {item.originalPrice && (
+                  <span style={{ fontSize: '10px', textDecoration: 'line-through', color: '#9ca3af', fontWeight: 'normal' }}>
+                    {formatPrice(item.originalPrice)}
+                  </span>
+                )}
+              </div>
               <div className="pos-menu-item-add">+</div>
             </button>
           ))}

@@ -14,7 +14,8 @@ import {
   Form,
   Input,
   Tabs,
-  message
+  message,
+  Switch
 } from 'antd';
 import {
   CalendarOutlined,
@@ -73,6 +74,9 @@ const CustomerDashboardPage = () => {
 
   const navigate = useNavigate();
 
+  const [vouchers, setVouchers] = useState([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+
   const fetchReservations = async () => {
     setLoading(true);
     try {
@@ -85,8 +89,23 @@ const CustomerDashboardPage = () => {
     }
   };
 
+  const fetchVouchers = async () => {
+    setLoadingVouchers(true);
+    try {
+      const { getAvailableVouchers } = await import('../../api/voucherApi');
+      const res = await getAvailableVouchers();
+      // Lọc các voucher khả dụng cho customer này
+      setVouchers(res || []);
+    } catch (error) {
+      console.error('Không thể tải danh sách voucher:', error);
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
   useEffect(() => {
     fetchReservations();
+    fetchVouchers();
   }, []);
 
   // Realtime SignalR listener for Customer
@@ -160,7 +179,8 @@ const CustomerDashboardPage = () => {
     profileForm.setFieldsValue({
       name: customer?.name || '',
       phone: customer?.phone || '',
-      email: customer?.email || ''
+      email: customer?.email || '',
+      receivePromoEmails: customer?.receivePromoEmails !== false, // default true
     });
     passwordForm.resetFields();
     setActiveProfileTab('info');
@@ -173,7 +193,8 @@ const CustomerDashboardPage = () => {
       const res = await updateCustomerProfile({
         name: values.name,
         phone: values.phone,
-        email: values.email || null
+        email: values.email || null,
+        receivePromoEmails: values.receivePromoEmails
       });
 
       if (res.data && res.data.customer) {
@@ -564,29 +585,73 @@ const CustomerDashboardPage = () => {
 
           {/* Right reservation list */}
           <Col xs={24} lg={16} xl={17}>
-            <Card
-              title={<span style={{ fontWeight: 700, color: '#1e293b' }}>Lịch Sử Đặt Bàn</span>}
-              style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', height: '100%' }}
-              bodyStyle={{ padding: 16 }}
-            >
-              <div style={{ overflowX: 'auto' }}>
-                <Table
-                  columns={columns}
-                  dataSource={reservations}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ pageSize: 5 }}
-                  locale={{ emptyText: 'Bạn chưa có yêu cầu đặt bàn nào.' }}
-                  size="middle"
-                  scroll={{ x: 650 }}
-                  rowClassName={() => 'customer-reservation-row'}
-                  onRow={(record) => ({
-                    onClick: () => handleOpenDetail(record),
-                    style: { cursor: 'pointer' }
-                  })}
-                />
-              </div>
-            </Card>
+            <Space direction="vertical" style={{ width: '100%' }} size="large">
+              <Card
+                title={<span style={{ fontWeight: 700, color: '#1e293b' }}>Lịch Sử Đặt Bàn</span>}
+                style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+                bodyStyle={{ padding: 16 }}
+              >
+                <div style={{ overflowX: 'auto' }}>
+                  <Table
+                    columns={columns}
+                    dataSource={reservations}
+                    rowKey="id"
+                    loading={loading}
+                    pagination={{ pageSize: 5 }}
+                    locale={{ emptyText: 'Bạn chưa có yêu cầu đặt bàn nào.' }}
+                    size="middle"
+                    scroll={{ x: 650 }}
+                    rowClassName={() => 'customer-reservation-row'}
+                    onRow={(record) => ({
+                      onClick: () => handleOpenDetail(record),
+                      style: { cursor: 'pointer' }
+                    })}
+                  />
+                </div>
+              </Card>
+
+              {/* Kho Voucher Khả Dụng */}
+              <Card
+                title={<span style={{ fontWeight: 700, color: '#1e293b' }}>Kho Voucher Ưu Đãi</span>}
+                style={{ borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+                bodyStyle={{ padding: 16 }}
+                loading={loadingVouchers}
+              >
+                {vouchers.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
+                    Hiện tại chưa có Voucher khả dụng nào.
+                  </div>
+                ) : (
+                  <Row gutter={[16, 16]}>
+                    {vouchers.map(v => (
+                      <Col xs={24} sm={12} xl={8} key={v.id}>
+                        <div style={{
+                          border: '1px dashed #ea580c',
+                          borderRadius: 8,
+                          padding: 16,
+                          background: '#fff7ed',
+                          position: 'relative'
+                        }}>
+                          <div style={{ fontWeight: 700, color: '#ea580c', fontSize: 16, marginBottom: 4 }}>
+                            {v.name}
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>
+                            Mã: <span style={{ padding: '2px 6px', background: '#ea580c', color: '#fff', borderRadius: 4 }}>{v.code}</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: '#475569', marginTop: 8 }}>
+                            Giảm {v.discountType === 'Percentage' ? `${v.discountValue}%` : formatCurrency(v.discountValue)}
+                            <br />Đơn từ {formatCurrency(v.minOrderValue)}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 12 }}>
+                            HSD: {dayjs(v.endDate).format('DD/MM/YYYY HH:mm')}
+                          </div>
+                        </div>
+                      </Col>
+                    ))}
+                  </Row>
+                )}
+              </Card>
+            </Space>
           </Col>
         </Row>
       </div>
@@ -789,6 +854,19 @@ const CustomerDashboardPage = () => {
                     rules={[{ type: 'email', message: 'Địa chỉ email không hợp lệ!' }]}
                   >
                     <Input prefix={<MailOutlined style={{ color: '#94a3b8' }} />} placeholder="Địa chỉ email (dùng để nhận OTP và thông báo)" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="receivePromoEmails"
+                    valuePropName="checked"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5' }}>
+                      <Switch />
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#9a3412', fontSize: '14px' }}>Nhận thông báo ưu đãi</div>
+                        <div style={{ fontSize: '12px', color: '#c2410c' }}>Đồng ý nhận email thông báo khi có Voucher hoặc Khuyến mãi mới</div>
+                      </div>
+                    </div>
                   </Form.Item>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>

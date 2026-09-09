@@ -48,8 +48,15 @@ const ProductDetailModal = ({ product, open, onClose, onConsult }) => {
             <Title level={3} className="modal-product-title">
               {product.name || product.Name}
             </Title>
-            <div className="modal-product-price">
-              {formatPrice(product.price ?? product.Price)}
+            <div className="modal-product-price" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 24, fontWeight: 700, color: '#ea580c' }}>
+                {formatPrice(product.price ?? product.Price)}
+              </span>
+              {product.originalPrice && (
+                <span style={{ fontSize: 16, textDecoration: 'line-through', color: '#94a3b8' }}>
+                  {formatPrice(product.originalPrice)}
+                </span>
+              )}
             </div>
           </div>
 
