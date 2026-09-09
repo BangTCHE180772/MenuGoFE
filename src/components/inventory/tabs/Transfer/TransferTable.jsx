@@ -261,10 +261,6 @@ const TransferTable = ({
                           <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
                             Đã nhận đủ
                           </span>
-                        ) : isPartial ? (
-                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontSize: 10, fontWeight: 600 }}>
-                            Nhận 1 phần
-                          </span>
                         ) : isRejected ? (
                           <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
                             Bị từ chối

@@ -3,7 +3,6 @@ import {
   CloseOutlined,
   FullscreenOutlined,
   PrinterOutlined,
-  EditOutlined,
   AlertOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
@@ -53,8 +52,7 @@ const ReceiveTransferDocumentModal = ({
                 const uName = detail.unitName || detail.snapshotUnitName || detail.currentUnitName || detail.baseUnitName || 'Đơn vị';
                 const stock = detail.currentStockQuantity ?? detail.stock ?? 0;
                 const qty = Number(detail.quantity || detail.baseQuantity || 1);
-                const recQty = detail.receivedQuantity != null ? Number(detail.receivedQuantity) : qty;
-                const price = Number(detail.unitPrice || detail.snapshotAvgCost || 0);
+                const price = Number(detail.snapshotAvgCost || detail.unitPrice || 0);
 
                 return {
                   id: detail.id,
@@ -64,10 +62,9 @@ const ReceiveTransferDocumentModal = ({
                   unitName: uName,
                   stock: stock,
                   transferQty: qty,
-                  receiveQty: recQty,
+                  receiveQty: qty, // Hạch toán tập trung: Nhận đủ 100% số lượng gửi
                   unitPrice: price,
-                  note: detail.note || '',
-                  editingNote: false
+                  note: detail.note || ''
                 };
               })
             );
@@ -93,25 +90,16 @@ const ReceiveTransferDocumentModal = ({
     }
   }, [open, documentData]);
 
-  const handleReceiveQtyChange = (index, val) => {
-    const rawQty = val !== '' && val != null ? Math.max(0, Number(val) || 0) : 0;
-    const targetItem = items[index];
-    const maxQty = Number(targetItem?.transferQty) || 0;
-    const qty = Math.min(rawQty, maxQty);
-    const updated = [...items];
-    updated[index] = { ...updated[index], receiveQty: qty };
-    setItems(updated);
-  };
-
   const totalTransferQty = useMemo(() => {
     return items.reduce((sum, i) => sum + (Number(i.transferQty) || 0), 0);
   }, [items]);
 
-  const totalReceiveQty = useMemo(() => {
-    return items.reduce((sum, i) => sum + (Number(i.receiveQty) || 0), 0);
+  const totalTransferValue = useMemo(() => {
+    return items.reduce((sum, i) => sum + (Number(i.transferQty) || 0) * (Number(i.unitPrice) || 0), 0);
   }, [items]);
 
-  const handleSubmit = async () => {
+  // Xử lý Chấp nhận toàn bộ (Nhận 100%)
+  const handleAcceptAll = async () => {
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -128,50 +116,48 @@ const ReceiveTransferDocumentModal = ({
       return;
     }
     if (!receivingNote || !receivingNote.trim()) {
-      setErrorMessage('Bắt buộc phải nhập Ghi chú (Note) khi xác nhận nhận hàng.');
+      setErrorMessage('Bắt buộc phải nhập Ghi chú xác nhận khi chấp nhận nhận hàng.');
       return;
     }
-
-    const hasPartial = items.some((i) => (Number(i.receiveQty) || 0) < (Number(i.transferQty) || 0));
-    const targetStatus = hasPartial ? 'PartialReceived' : 'Received';
 
     setLoading(true);
     try {
       const dto = {
         transferDocumentId: documentData.id,
-        status: targetStatus,
+        status: 'Received',
         note: receivingNote.trim(),
         details: items.map((i) => ({
           detailId: i.id,
-          receivedQuantity: Number(i.receiveQty) || 0
+          receivedQuantity: Number(i.transferQty) || 0
         }))
       };
       await receiveTransferDocument(dto);
-      setSuccessMessage('Xác nhận nhận hàng chuyển kho thành công!');
+      setSuccessMessage('Đã chấp nhận toàn bộ hàng chuyển kho vào tồn kho chi nhánh thành công!');
       setTimeout(() => {
         onSuccess?.();
         onClose();
       }, 500);
     } catch (err) {
       console.error(err);
-      const errMsg = extractErrorMessage(err, 'Lỗi khi xử lý nhận hàng.');
+      const errMsg = extractErrorMessage(err, 'Lỗi khi xử lý chấp nhận nhận hàng.');
       setErrorMessage(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReject = async () => {
+  // Xử lý Từ chối toàn bộ (Hoàn trả 100% về kho gửi)
+  const handleRejectAll = async () => {
     setErrorMessage('');
     setSuccessMessage('');
 
     if (!documentData?.id) return;
     if (!receivingNote || !receivingNote.trim()) {
-      setErrorMessage('Bắt buộc phải nhập Lý do / Ghi chú (Note) khi từ chối nhận hàng.');
+      setErrorMessage('Bắt buộc phải nhập Lý do từ chối vào ô Ghi chú.');
       return;
     }
 
-    if (!window.confirm('Bạn có chắc chắn muốn từ chối phiếu chuyển kho này? Hàng hóa sẽ được hoàn lại kho bên gửi.')) {
+    if (!window.confirm('Bạn có chắc chắn muốn từ chối toàn bộ phiếu chuyển kho này? Toàn bộ 100% hàng hóa sẽ được hoàn trả lại kho chi nhánh gửi.')) {
       return;
     }
 
@@ -181,7 +167,7 @@ const ReceiveTransferDocumentModal = ({
         transferDocumentId: documentData.id,
         reason: receivingNote.trim()
       });
-      setSuccessMessage('Đã từ chối nhận hàng. Hàng hóa đã hoàn quay trở lại kho gửi.');
+      setSuccessMessage('Đã từ chối nhận hàng. Toàn bộ hàng hóa đã được hoàn trả về kho gửi thành công!');
       setTimeout(() => {
         onSuccess?.();
         onClose();
@@ -216,14 +202,17 @@ const ReceiveTransferDocumentModal = ({
         left: 0,
         right: 0,
         bottom: 0,
+        height: '100vh',
+        maxHeight: '100vh',
         zIndex: 1000,
         background: '#f8fafc',
         display: 'flex',
         flexDirection: 'column',
-        fontSize: 12
+        fontSize: 12,
+        overflow: 'hidden'
       }}
     >
-      {/* HEADER BAR - LIGHT BLUE BACKGROUND */}
+      {/* THANH TIÊU ĐỀ (HEADER) */}
       <div
         style={{
           height: 48,
@@ -239,7 +228,7 @@ const ReceiveTransferDocumentModal = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-            Chuyển hàng
+            Xác nhận chuyển kho nội bộ
           </span>
           <span
             style={{
@@ -252,37 +241,11 @@ const ReceiveTransferDocumentModal = ({
               fontWeight: 600
             }}
           >
-            Đang chuyển
+            Đang vận chuyển
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            type="button"
-            title="Toàn màn hình"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#64748b',
-              cursor: 'pointer',
-              fontSize: 16
-            }}
-          >
-            <FullscreenOutlined />
-          </button>
-          <button
-            type="button"
-            title="In phiếu"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#64748b',
-              cursor: 'pointer',
-              fontSize: 16
-            }}
-          >
-            <PrinterOutlined />
-          </button>
           <button
             type="button"
             title="Đóng"
@@ -304,44 +267,45 @@ const ReceiveTransferDocumentModal = ({
         </div>
       </div>
 
-      {/* ERROR / SUCCESS NOTIFICATION BANNERS */}
+      {/* THÔNG BÁO LỖI / THÀNH CÔNG */}
       {errorMessage && (
-        <div style={{ background: '#fef2f2', color: '#dc2626', borderBottom: '1px solid #fecdd3', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ background: '#fef2f2', color: '#dc2626', borderBottom: '1px solid #fecdd3', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <AlertOutlined /> {errorMessage}
         </div>
       )}
       {successMessage && (
-        <div style={{ background: '#ecfdf5', color: '#059669', borderBottom: '1px solid #a7f3d0', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ background: '#ecfdf5', color: '#059669', borderBottom: '1px solid #a7f3d0', padding: '8px 16px', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <CheckCircleOutlined /> {successMessage}
         </div>
       )}
 
-      {/* BODY CONTENT */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT AREA: PRODUCTS TABLE */}
-        <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* NỘI DUNG CHÍNH (BODY) - KHÓA CHIỀU CAO VỪA VẶN */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: 'calc(100vh - 48px)' }}>
+        {/* KHU VỰC TRÁI: BẢNG DANH SÁCH MẶT HÀNG */}
+        <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
           <div
             style={{
               flex: 1,
               background: '#ffffff',
               borderRadius: 8,
               border: '1px solid #cbd5e1',
-              overflow: 'auto',
+              overflowY: 'auto',
+              maxHeight: 'calc(100vh - 72px)',
               display: 'flex',
               flexDirection: 'column'
             }}
           >
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
                   <th style={{ padding: '8px 8px', width: 40, textAlign: 'center' }}>STT</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 140 }}>MÃ HÀNG</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', width: 130 }}>MÃ HÀNG</th>
                   <th style={{ padding: '8px 10px', textAlign: 'left' }}>TÊN HÀNG</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 100 }}>TỒN KHO</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 90 }}>TỒN KHO B</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right', width: 110 }}>SL CHUYỂN</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 120 }}>SL NHẬN</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 120 }}>GIÁ NHẬN</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>THÀNH TIỀN</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', width: 130 }}>SL NHẬN (100%)</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 120 }}>ĐƠN GIÁ VỐN</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'right', width: 130 }}>GIÁ TRỊ XUẤT</th>
                 </tr>
               </thead>
               <tbody>
@@ -353,7 +317,7 @@ const ReceiveTransferDocumentModal = ({
                   </tr>
                 ) : (
                   items.map((record, index) => {
-                    const total = (Number(record.receiveQty) || 0) * (Number(record.unitPrice) || 0);
+                    const total = (Number(record.transferQty) || 0) * (Number(record.unitPrice) || 0);
 
                     return (
                       <tr key={record.id || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -368,67 +332,40 @@ const ReceiveTransferDocumentModal = ({
                               </span>
                             )}
                           </div>
-                          <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <EditOutlined style={{ fontSize: 11, color: '#94a3b8' }} />
-                            {record.editingNote ? (
-                              <input
-                                type="text"
-                                value={record.note || ''}
-                                autoFocus
-                                onBlur={() => {
-                                  const updated = [...items];
-                                  updated[index] = { ...updated[index], editingNote: false };
-                                  setItems(updated);
-                                }}
-                                onChange={(e) => {
-                                  const updated = [...items];
-                                  updated[index] = { ...updated[index], note: e.target.value };
-                                  setItems(updated);
-                                }}
-                                placeholder="Nhập ghi chú..."
-                                style={{
-                                  fontSize: 10,
-                                  padding: '1px 4px',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: 4,
-                                  outline: 'none'
-                                }}
-                              />
-                            ) : (
-                              <span
-                                onClick={() => {
-                                  const updated = [...items];
-                                  updated[index] = { ...updated[index], editingNote: true };
-                                  setItems(updated);
-                                }}
-                                style={{
-                                  fontSize: 10,
-                                  color: record.note ? '#475569' : '#94a3b8',
-                                  cursor: 'pointer',
-                                  fontStyle: record.note ? 'normal' : 'italic'
-                                }}
-                              >
-                                {record.note || 'Ghi chú'}
-                              </span>
-                            )}
-                          </div>
+                          {record.note && (
+                            <div style={{ marginTop: 2, fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>
+                              Ghi chú: {record.note}
+                            </div>
+                          )}
                         </td>
                         <td style={{ textAlign: 'right', padding: '6px 10px', color: '#64748b' }}>
                           {(record.stock != null ? record.stock : 0).toLocaleString('vi-VN')}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '6px 10px', color: '#475569' }}>
+                        <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: '#334155' }}>
                           {(record.transferQty != null ? record.transferQty : 0).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ textAlign: 'center', padding: '6px 10px' }}>
-                          <span style={{ fontWeight: 600, color: '#16a34a', display: 'inline-block', padding: '3px 8px', background: '#f0fdf4', borderRadius: 4, fontSize: 11 }}>
-                            {(record.receiveQty ?? 0).toLocaleString('vi-VN')}
+                          <span
+                            title="Số lượng nhận cố định 100% theo quy trình hạch toán tập trung"
+                            style={{
+                              fontWeight: 700,
+                              color: '#15803d',
+                              display: 'inline-block',
+                              padding: '3px 12px',
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: 4,
+                              fontSize: 11
+                            }}
+                          >
+                            {(record.transferQty ?? 0).toLocaleString('vi-VN')}
                           </span>
                         </td>
                         <td style={{ textAlign: 'right', padding: '6px 10px', color: '#475569' }}>
-                          {(record.unitPrice != null ? record.unitPrice : 0).toLocaleString('vi-VN')}
+                          {(record.unitPrice != null ? record.unitPrice : 0).toLocaleString('vi-VN')} đ
                         </td>
                         <td style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: '#0f172a' }}>
-                          {total.toLocaleString('vi-VN')}
+                          {total.toLocaleString('vi-VN')} đ
                         </td>
                       </tr>
                     );
@@ -439,7 +376,7 @@ const ReceiveTransferDocumentModal = ({
           </div>
         </div>
 
-        {/* RIGHT: SUMMARY SIDEBAR */}
+        {/* KHU VỰC PHẢI: THÔNG TIN TỔNG QUAN & NÚT THAO TÁC */}
         <div
           style={{
             width: 340,
@@ -450,11 +387,13 @@ const ReceiveTransferDocumentModal = ({
             flexDirection: 'column',
             justifyContent: 'space-between',
             position: 'relative',
+            height: '100%',
+            overflowY: 'auto',
             zIndex: 100
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-            {/* CREATOR & STATUS HEADER */}
+            {/* THÔNG TIN NGƯỜI TẠO VÀ TRẠNG THÁI */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
               <span style={{ fontWeight: 600, color: '#1e293b' }}>
                 {docCreatorName} {dayjs().format('DD/MM/YYYY HH:mm')}
@@ -470,7 +409,7 @@ const ReceiveTransferDocumentModal = ({
                   fontWeight: 600
                 }}
               >
-                Đang chuyển
+                Đang vận chuyển
               </span>
             </div>
 
@@ -489,19 +428,19 @@ const ReceiveTransferDocumentModal = ({
               <span style={{ fontWeight: 600, color: '#0f172a' }}>{transferDate}</span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-              <span style={{ color: '#64748b' }}>Ghi chú</span>
-              <span style={{ color: '#94a3b8' }}>---</span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 4, borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
               <span style={{ color: '#475569' }}>Tổng số lượng chuyển</span>
-              <span style={{ fontWeight: 700, color: '#0f172a' }}>{totalTransferQty}</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{totalTransferQty.toLocaleString('vi-VN')}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-              <span style={{ color: '#475569' }}>Tổng số lượng nhận</span>
-              <span style={{ fontWeight: 700, color: '#0066ff', fontSize: 13 }}>{totalReceiveQty}</span>
+              <span style={{ color: '#475569' }}>Tổng số lượng nhận (100%)</span>
+              <span style={{ fontWeight: 700, color: '#16a34a', fontSize: 13 }}>{totalTransferQty.toLocaleString('vi-VN')}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, background: '#f8fafc', padding: '6px 8px', borderRadius: 4, border: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#475569', fontWeight: 600 }}>Tổng giá trị chuyển</span>
+              <span style={{ fontWeight: 700, color: '#0f172a' }}>{totalTransferValue.toLocaleString('vi-VN')} đ</span>
             </div>
 
             {isReceiverInactive && (
@@ -510,12 +449,15 @@ const ReceiveTransferDocumentModal = ({
               </div>
             )}
 
-            <div>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ marginBottom: 4, color: '#475569', fontSize: 11, fontWeight: 600 }}>
+                Ghi chú / Lý do thao tác:
+              </div>
               <textarea
                 value={receivingNote}
                 onChange={(e) => setReceivingNote(e.target.value)}
                 rows={4}
-                placeholder="Ghi chú nhận hàng"
+                placeholder="Nhập ghi chú xác nhận hoặc lý do từ chối (bắt buộc)..."
                 style={{
                   width: '100%',
                   borderRadius: 6,
@@ -529,29 +471,31 @@ const ReceiveTransferDocumentModal = ({
             </div>
           </div>
 
-          {/* ACTION BUTTONS */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+          {/* 2 NÚT HÀNH ĐỘNG DUY NHẤT: TỪ CHỐI TOÀN BỘ & CHẤP NHẬN TOÀN BỘ */}
+          <div style={{ display: 'flex', gap: 10, paddingTop: 14, borderTop: '1px solid #f1f5f9', marginTop: 12 }}>
             <button
               type="button"
               disabled={loading}
-              onClick={handleReject}
+              onClick={handleRejectAll}
               style={{
                 flex: 1,
                 background: '#fff1f2',
                 border: '1px solid #fecdd3',
                 color: '#e11d48',
-                fontWeight: 600,
+                fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
-                cursor: loading ? 'not-allowed' : 'pointer'
+                padding: '10px 0',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: 12,
+                transition: 'all 0.15s ease'
               }}
             >
-              Từ chối nhận
+              Từ chối toàn bộ
             </button>
             <button
               type="button"
               disabled={loading || isReceiverInactive}
-              onClick={handleSubmit}
+              onClick={handleAcceptAll}
               style={{
                 flex: 1,
                 background: '#0066ff',
@@ -559,12 +503,14 @@ const ReceiveTransferDocumentModal = ({
                 color: '#ffffff',
                 fontWeight: 700,
                 borderRadius: 6,
-                padding: '8px 0',
+                padding: '10px 0',
                 cursor: (loading || isReceiverInactive) ? 'not-allowed' : 'pointer',
-                opacity: (loading || isReceiverInactive) ? 0.5 : 1
+                opacity: (loading || isReceiverInactive) ? 0.5 : 1,
+                fontSize: 12,
+                transition: 'all 0.15s ease'
               }}
             >
-              Nhận hàng
+              Chấp nhận toàn bộ
             </button>
           </div>
         </div>
