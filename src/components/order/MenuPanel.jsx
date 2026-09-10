@@ -305,7 +305,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
               })}
               disabled={!canOrder || item.availableQuantity <= 0}
               title={!canOrder ? 'Chọn bàn Có khách để gọi món' : (item.availableQuantity <= 0 ? 'Hết hàng' : `Thêm ${item.name}`)}
-              style={{ opacity: item.availableQuantity <= 0 ? 0.6 : 1 }}
+              style={{ opacity: item.availableQuantity <= 0 ? 0.6 : 1, position: 'relative' }}
             >
               <div style={{ 
                 height: '70px', 
@@ -318,8 +318,25 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                position: 'relative'
               }}>
+                {item.originalPrice && item.originalPrice > item.sellPrice && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: '#ea580c',
+                    color: '#fff',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    padding: '2px 4px',
+                    borderBottomLeftRadius: '6px',
+                    zIndex: 1
+                  }}>
+                    -{Math.round(((item.originalPrice - item.sellPrice) / item.originalPrice) * 100)}%
+                  </div>
+                )}
                 {item.imageLink ? (
                   <img 
                     src={item.imageLink} 
@@ -351,12 +368,14 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
                 <div className="pos-menu-item-tag">{item.groupName}</div>
               </div>
               <div className="pos-menu-item-price" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{formatPrice(item.sellPrice)}</span>
-                {item.originalPrice && (
-                  <span style={{ fontSize: '10px', textDecoration: 'line-through', color: '#9ca3af', fontWeight: 'normal' }}>
+                {item.originalPrice && item.originalPrice > item.sellPrice && (
+                  <span style={{ fontSize: '11px', textDecoration: 'line-through', color: '#9ca3af', fontWeight: 'normal', marginBottom: '-2px' }}>
                     {formatPrice(item.originalPrice)}
                   </span>
                 )}
+                <span style={{ fontSize: '14px', fontWeight: '800', color: item.originalPrice && item.originalPrice > item.sellPrice ? '#ea580c' : '#0f172a' }}>
+                  {formatPrice(item.sellPrice)}
+                </span>
               </div>
               <div className="pos-menu-item-add">+</div>
             </button>
