@@ -16,6 +16,8 @@ import OrderPage from '../pages/OrderPage';
 import TableMapPage from '../pages/TableMapPage';
 import WaiterStationPage from '../pages/WaiterStationPage';
 import WaiterMobileSessionPage from '../pages/WaiterMobileSessionPage';
+import CashierSessionPage from '../pages/CashierSessionPage';
+import KitchenSessionPage from '../pages/KitchenSessionPage';
 import BranchPage from "../pages/BranchPage";
 import ReservationPage from '../pages/ReservationPage';
 import BranchChatPage from '../pages/BranchChatPage';
@@ -172,6 +174,10 @@ const AppRouter = () => {
               <Route path="/my-shift-feedbacks" element={<MyShiftFeedbackPage />} />
 
               <Route path="/waiter-session" element={<WaiterMobileSessionPage />} />
+              <Route path="/cashier-session" element={<CashierSessionPage />} />
+              <Route path="/kitchen-session" element={<KitchenSessionPage />} />
+              {/* Mọi nhân viên đã đăng nhập: nhân viên điền form ghi nhận món thừa, quản lý chỉ xem lịch sử */}
+              <Route path="/leftover" element={<LeftoverPage />} />
               {/* Manager, Owner, Admin */}
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
@@ -219,7 +225,6 @@ const AppRouter = () => {
                 <Route path="/reports/profit" element={<ReportProfitPage />} />
                 <Route path="/reports/inventory" element={<ReportInventoryPage />} />
                 <Route path="/inventoryreport" element={<ReportInventoryPage />} />
-                <Route path="/leftover" element={<LeftoverPage />} />
                 <Route path="/kds" element={<KDSPage />} />
               </Route>
 
