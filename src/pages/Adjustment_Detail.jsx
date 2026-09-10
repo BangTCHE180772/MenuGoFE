@@ -25,6 +25,7 @@ import {
   completeCostAdjustmentDocument,
   deleteCostAdjustmentPendingDocument
 } from '../api/documentApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Adjustment_Detail = () => {
   const { id } = useParams();
@@ -404,6 +405,17 @@ const Adjustment_Detail = () => {
                 <span style={{ color: '#64748b' }}>Mã phiếu:</span>
                 <strong style={{ color: '#0f172a' }}>{doc?.code || '---'}</strong>
               </div>
+              {doc?.parentDocumentId && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Chứng từ tham chiếu:</span>
+                  <ReferenceLink
+                    code={doc?.parentDocumentCode}
+                    id={doc?.parentDocumentId}
+                    navigate={navigate}
+                    style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}
+                  />
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Trạng thái:</span>
                 <div>{renderStatusBadge()}</div>
@@ -667,8 +679,19 @@ const Adjustment_Detail = () => {
                           transition: 'background 0.15s ease'
                         }}
                       >
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
-                          {item.pCode}
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(item.pCode || item.code || '')}`)}
+                            style={{
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                            title="Nhấp để chuyển tới Quản lý tồn kho hàng hóa"
+                          >
+                            {item.pCode}
+                          </span>
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
                           {item.pName}

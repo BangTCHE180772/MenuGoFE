@@ -28,6 +28,7 @@ import {
   getPartnersByBranch
 } from '../api/partnerApi';
 import { getDebtDisplayInfo } from '../utils/debtHelper';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 // Phân loại nhãn hiển thị cho đối tác
 const getPartnerBadge = (t) => {
@@ -448,7 +449,19 @@ const Partner_Detail = () => {
                                 ) : (
                                   <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
                                 )}
-                                <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`);
+                                  }}
+                                  style={{
+                                    color: '#2563eb',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline'
+                                  }}
+                                  title="Nhấp để chuyển tới Quản lý nhập hàng"
+                                >
                                   {d.code}
                                 </span>
                               </div>
@@ -536,7 +549,7 @@ const Partner_Detail = () => {
                                   fontWeight: 600,
                                   textDecoration: 'underline'
                                 }}
-                                title="Nhấp để xem chi tiết chứng từ nhập kho"
+                                title="Nhấp để chuyển tới Quản lý nhập hàng"
                               >
                                 Xem chứng từ
                               </span>
@@ -624,7 +637,7 @@ const Partner_Detail = () => {
                                                       cursor: 'pointer',
                                                       textDecoration: 'underline'
                                                     }}
-                                                    title="Nhấp để xem phiếu trong sổ quỹ"
+                                                    title="Nhấp để xem sổ quỹ"
                                                   >
                                                     {tx.code}
                                                   </span>
@@ -713,7 +726,7 @@ const Partner_Detail = () => {
                                   cursor: 'pointer',
                                   textDecoration: 'underline'
                                 }}
-                                title="Nhấp để xem chi tiết phiếu nhập hàng"
+                                title="Nhấp để chuyển tới Quản lý nhập hàng"
                               >
                                 {cf.importCode}
                               </span>
@@ -734,7 +747,7 @@ const Partner_Detail = () => {
                               <span
                                 onClick={() => navigate(`/cashflow?search=${encodeURIComponent(cf.code)}`)}
                                 style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                                title="Nhấp để xem chi tiết phiếu thu chi"
+                                title="Nhấp để xem sổ quỹ"
                               >
                                 {cf.code}
                               </span>

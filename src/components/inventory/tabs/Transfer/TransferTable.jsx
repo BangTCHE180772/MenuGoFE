@@ -61,6 +61,16 @@ const TransferTable = ({
     }
   };
 
+  // Auto-expand matching document from searchText
+  React.useEffect(() => {
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleRowExpand(matched.id);
+    }
+  }, [documents, searchText]);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
       {/* TOP ACTION TOOLBAR */}

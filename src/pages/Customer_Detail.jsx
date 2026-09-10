@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getCustomerById, getCustomerPurchases, getCustomerPoints } from '../api/customerManagementApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Customer_Detail = () => {
   const { id } = useParams();
@@ -243,11 +244,16 @@ const Customer_Detail = () => {
                       const invoiceCode = formatInvoiceCode(p.invoiceCode, p.orderId) || (p.orderId ? `HD${p.orderId}` : `#${p.id}`);
                       return (
                         <tr key={p.orderId || p.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
+                          <td style={{ padding: '10px 12px' }}>
                             <span
                               onClick={() => navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(invoiceCode)}`)}
-                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                              title="Nhấp để xem chi tiết hóa đơn"
+                              style={{
+                                color: '#2563eb',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                              title="Nhấp để xem danh sách hóa đơn bán hàng"
                             >
                               {invoiceCode}
                             </span>
@@ -320,12 +326,12 @@ const Customer_Detail = () => {
                               <span
                                 onClick={() => navigate(`/inventory-management?tab=Invoice&search=${encodeURIComponent(formattedRelatedCode)}`)}
                                 style={{
-                                  fontWeight: 700,
                                   color: '#2563eb',
+                                  fontWeight: 700,
                                   cursor: 'pointer',
                                   textDecoration: 'underline'
                                 }}
-                                title="Nhấp để xem chi tiết hóa đơn"
+                                title="Nhấp để xem danh sách hóa đơn bán hàng"
                               >
                                 {formattedRelatedCode}
                               </span>

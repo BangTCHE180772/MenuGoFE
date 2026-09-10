@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getImportById } from '../api/documentApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Import_Detail = () => {
   const { id } = useParams();
@@ -174,8 +175,25 @@ const Import_Detail = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Nhà cung cấp:</span>
-                <strong style={{ color: '#0f172a' }}>{doc?.partnerName || doc?.snapshotPartnerName || 'Nhà cung cấp'}</strong>
+                {doc?.partnerId ? (
+                  <ReferenceLink id={doc.partnerId} type="Partner" navigate={navigate} style={{ fontWeight: 700 }}>
+                    {doc?.partnerName || doc?.snapshotPartnerName || `NCC #${doc.partnerId}`}
+                  </ReferenceLink>
+                ) : (
+                  <strong style={{ color: '#0f172a' }}>{doc?.partnerName || doc?.snapshotPartnerName || 'Nhà cung cấp'}</strong>
+                )}
               </div>
+              {doc?.parentDocumentId && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Chứng từ tham chiếu:</span>
+                  <ReferenceLink
+                    code={doc?.parentDocumentCode}
+                    id={doc?.parentDocumentId}
+                    navigate={navigate}
+                    style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}
+                  />
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Chi nhánh nhập:</span>
                 <span style={{ fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -345,7 +363,20 @@ const Import_Detail = () => {
                   ) : (
                     detailsList.map((item, idx) => (
                       <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>{item.pCode}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(item.pCode || item.code || '')}`)}
+                            style={{
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                            title="Nhấp để chuyển tới Quản lý tồn kho hàng hóa"
+                          >
+                            {item.pCode}
+                          </span>
+                        </td>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{item.pName}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{item.uName}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>

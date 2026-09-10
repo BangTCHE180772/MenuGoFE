@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getProductionById } from '../api/documentApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Production_Detail = () => {
   const { id } = useParams();
@@ -230,7 +231,20 @@ const Production_Detail = () => {
               <tbody>
                 {finishedProducts.map((item, idx) => (
                   <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#9333ea' }}>{item.pCode}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span
+                        onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(item.pCode || item.code || '')}`)}
+                        style={{
+                          color: '#9333ea',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                        title="Nhấp để chuyển tới Quản lý tồn kho hàng hóa"
+                      >
+                        {item.pCode}
+                      </span>
+                    </td>
                     <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{item.pName}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{item.uName}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>{item.qty.toLocaleString('vi-VN')}</td>
@@ -268,7 +282,20 @@ const Production_Detail = () => {
                 <tbody>
                   {ingredients.map((item, idx) => (
                     <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>{item.pCode}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                      <span
+                        onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(item.pCode || item.code || '')}`)}
+                        style={{
+                          color: '#2563eb',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                        title="Nhấp để chuyển tới Quản lý tồn kho hàng hóa"
+                      >
+                        {item.pCode}
+                      </span>
+                    </td>
                       <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{item.pName}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{item.uName}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>{item.qty.toLocaleString('vi-VN')}</td>

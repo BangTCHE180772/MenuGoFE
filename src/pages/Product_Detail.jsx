@@ -18,6 +18,7 @@ import { getBInventoryDetail, getBInventoryLedger, getBInventories } from '../ap
 import { getBatchesByBInventoryId } from '../api/batchApi';
 import BatchTraceabilityDrawer from '../components/inventory/tabs/Product/BatchTraceabilityDrawer';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../components/inventory/utils/batchHelper';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const renderMethodBadge = (ldg) => {
   let method = ldg.methodName || ldg.method || ldg.type || '';
@@ -98,6 +99,32 @@ const Product_Detail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleDocumentCodeClick = (code, docType) => {
+    const upper = String(code || '').toUpperCase().trim();
+    const typeStr = String(docType || '');
+    const searchParam = code ? `&search=${encodeURIComponent(code)}` : '';
+
+    if (upper.startsWith('NH') || typeStr === 'Import') {
+      navigate(`/inventory-management?tab=Import${searchParam}`);
+    } else if (upper.startsWith('CK') || typeStr === 'Transfer') {
+      navigate(`/inventory-management?tab=Transfer${searchParam}`);
+    } else if (upper.startsWith('THN') || upper.startsWith('TH') || typeStr === 'Return') {
+      navigate(`/inventory-management?tab=ImportReturn${searchParam}`);
+    } else if (upper.startsWith('XH') || typeStr === 'ExportDelete' || typeStr === 'Export') {
+      navigate(`/inventory-management?tab=ExportDelete${searchParam}`);
+    } else if (upper.startsWith('KK') || typeStr === 'Check') {
+      navigate(`/inventory-management?tab=Check${searchParam}`);
+    } else if (upper.startsWith('SX') || typeStr === 'Production') {
+      navigate(`/inventory-management?tab=Production${searchParam}`);
+    } else if (upper.startsWith('HD') || upper.startsWith('PXBH') || typeStr === 'Sale' || typeStr === 'Invoice') {
+      navigate(`/inventory-management?tab=Invoice${searchParam}`);
+    } else if (upper.startsWith('DC') || typeStr === 'CostAdjustment') {
+      navigate(`/inventory-management?tab=Adjustment${searchParam}`);
+    } else {
+      navigate(`/inventory-management?tab=Import${searchParam}`);
+    }
+  };
 
   const initialProduct = location.state?.product || location.state?.item || location.state?.document || null;
   const [product, setProduct] = useState(initialProduct);
@@ -265,7 +292,24 @@ const Product_Detail = () => {
               <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
                 {pName}
               </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 11, fontWeight: 700 }}>
+              <span
+                onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(pCode)}`)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '3px 10px',
+                  borderRadius: 6,
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+                title="Nhấp để quay về Quản lý tồn kho hàng hóa"
+              >
                 <BarcodeOutlined /> {pCode}
               </span>
             </div>
@@ -509,8 +553,19 @@ const Product_Detail = () => {
 
                       return (
                         <tr key={lg.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
-                            {lg.documentCode || lg.code || '---'}
+                          <td style={{ padding: '10px 12px' }}>
+                            <span
+                              onClick={() => handleDocumentCodeClick(lg.documentCode || lg.code, lg.documentType)}
+                              style={{
+                                color: '#2563eb',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                              title="Nhấp để chuyển tới tab quản lý chứng từ"
+                            >
+                              {lg.documentCode || lg.code || '---'}
+                            </span>
                           </td>
                           <td style={{ padding: '10px 12px' }}>
                             {renderMethodBadge(lg)}
@@ -569,8 +624,23 @@ const Product_Detail = () => {
 
                       return (
                         <tr key={b.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
-                            {b.batchCode || '---'}
+                          <td style={{ padding: '10px 12px' }}>
+                            {b.batchCode ? (
+                              <span
+                                onClick={() => navigate(`/inventory-management?tab=BatchExpiry&search=${encodeURIComponent(b.batchCode)}`)}
+                                style={{
+                                  color: '#2563eb',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline'
+                                }}
+                                title="Nhấp để chuyển tới Quản lý Lô & Hạn sử dụng"
+                              >
+                                {b.batchCode}
+                              </span>
+                            ) : (
+                              '---'
+                            )}
                           </td>
                           <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
                             {qOrig.toLocaleString('vi-VN')} {uName}

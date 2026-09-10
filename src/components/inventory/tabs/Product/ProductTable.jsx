@@ -243,7 +243,53 @@ const ProductTable = ({
     try {
       // mode = 4 for 'monan' (only Processed), mode = 2 for 'nguyenlieu' (all non-Processed)
       const modeParam = subTab === 'monan' ? 4 : 2;
-      const data = await getBInventories(selectedBranchId, '', '', modeParam);
+      let data = await getBInventories(selectedBranchId, '', '', modeParam);
+
+      // Nếu có tìm kiếm từ URL hoặc tham số sản phẩm mà không tìm thấy trong subTab hiện tại, kiểm tra toàn bộ kho
+      const searchParam = searchParams.get('search') || searchText;
+      const prodIdParam = searchParams.get('productId');
+      const invIdParam = searchParams.get('inventoryId');
+      if (searchParam || prodIdParam || invIdParam) {
+        const lowerSearch = (searchParam || '').toLowerCase().trim();
+        const found = (data || []).some((i) => {
+          if (invIdParam && (i.id === Number(invIdParam) || i.bInventoryId === Number(invIdParam))) return true;
+          if (prodIdParam && (i.productId === Number(prodIdParam) || i.product?.id === Number(prodIdParam))) return true;
+          if (lowerSearch) {
+            const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+            const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+            return pName === lowerSearch || pCode === lowerSearch || pCode.includes(lowerSearch) || pName.includes(lowerSearch);
+          }
+          return false;
+        });
+
+        if (!found) {
+          try {
+            const allData = await getBInventories(selectedBranchId, '', '', 0);
+            const matchedItem = (allData || []).find((i) => {
+              if (invIdParam && (i.id === Number(invIdParam) || i.bInventoryId === Number(invIdParam))) return true;
+              if (prodIdParam && (i.productId === Number(prodIdParam) || i.product?.id === Number(prodIdParam))) return true;
+              if (lowerSearch) {
+                const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+                const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+                return pName === lowerSearch || pCode === lowerSearch || pCode.includes(lowerSearch) || pName.includes(lowerSearch);
+              }
+              return false;
+            });
+
+            if (matchedItem) {
+              const isProcessed = checkIsProcessed(matchedItem);
+              const neededSubTab = isProcessed ? 'monan' : 'nguyenlieu';
+              if (subTab !== neededSubTab && setSubTab) {
+                setSubTab(neededSubTab);
+                return;
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
       if (Array.isArray(data)) {
         setBInventories(data);
       } else {
@@ -315,9 +361,9 @@ const ProductTable = ({
 
   const [searchParams] = useSearchParams();
 
-  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho
+  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho hoặc tìm kiếm
   useEffect(() => {
-    const listToSearch = filteredData.length > 0 ? filteredData : rawList;
+    const listToSearch = (rawList && rawList.length > 0) ? rawList : filteredData;
     if (!listToSearch || listToSearch.length === 0) return;
 
     const invIdParam = searchParams.get('inventoryId') ? Number(searchParams.get('inventoryId')) : null;
@@ -337,7 +383,7 @@ const ProductTable = ({
       matched = listToSearch.find((i) => {
         const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
         const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
-        return pName === lower || pCode === lower || pName.includes(lower);
+        return pName === lower || pCode === lower || pCode.includes(lower) || pName.includes(lower);
       });
     }
 

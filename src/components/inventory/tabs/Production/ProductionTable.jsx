@@ -55,6 +55,16 @@ const ProductionTable = ({
     }
   };
 
+  // Auto-expand matching document from searchText
+  React.useEffect(() => {
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleRowExpand(matched.id);
+    }
+  }, [documents, searchText]);
+
   const getStatusBadge = (status) => {
     if (status === 0 || status === 'Pending') {
       return (

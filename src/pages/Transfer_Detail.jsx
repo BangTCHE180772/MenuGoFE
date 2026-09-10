@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getTransferById } from '../api/documentApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Transfer_Detail = () => {
   const { id } = useParams();
@@ -180,6 +181,17 @@ const Transfer_Detail = () => {
                 <span style={{ color: '#64748b' }}>Mã chứng từ:</span>
                 <span style={{ fontWeight: 700, color: '#0891b2' }}>{doc?.code}</span>
               </div>
+              {doc?.parentDocumentId && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Chứng từ tham chiếu:</span>
+                  <ReferenceLink
+                    code={doc?.parentDocumentCode}
+                    id={doc?.parentDocumentId}
+                    navigate={navigate}
+                    style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -266,7 +278,20 @@ const Transfer_Detail = () => {
                 ) : (
                   detailsList.map((item, idx) => (
                     <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0891b2' }}>{item.pCode}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span
+                          onClick={() => navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(item.pCode || item.code || '')}`)}
+                          style={{
+                            color: '#2563eb',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                          title="Nhấp để chuyển tới Quản lý tồn kho hàng hóa"
+                        >
+                          {item.pCode}
+                        </span>
+                      </td>
                       <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{item.pName}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{item.uName}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>{item.sendQty.toLocaleString('vi-VN')}</td>

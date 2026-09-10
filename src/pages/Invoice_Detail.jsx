@@ -17,6 +17,7 @@ import {
 import { message } from 'antd';
 import { getDocumentById, getSaleById } from '../api/documentApi';
 import { getOrderById } from '../api/orderApi';
+import { ReferenceLink } from '../utils/documentNavHelper';
 
 const Invoice_Detail = () => {
   const { id } = useParams();
@@ -209,10 +210,21 @@ const Invoice_Detail = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Khách hàng:</span>
-                <span style={{ color: '#334155', fontWeight: 600 }}>
-                  {invoice?.customerName || invoice?.customer?.name || invoice?.partnerName || 'Khách lẻ'}
-                  {(invoice?.customerPhone || invoice?.customer?.phone) ? ` (${invoice?.customerPhone || invoice?.customer?.phone})` : ''}
-                </span>
+                {invoice?.customerId || invoice?.customer?.id ? (
+                  <ReferenceLink
+                    id={invoice?.customerId || invoice?.customer?.id}
+                    type="Customer"
+                    navigate={navigate}
+                    style={{ fontWeight: 600, color: '#2563eb' }}
+                  >
+                    {invoice?.customerName || invoice?.customer?.name || `KH #${invoice?.customerId || invoice?.customer?.id}`}
+                    {(invoice?.customerPhone || invoice?.customer?.phone) ? ` (${invoice?.customerPhone || invoice?.customer?.phone})` : ''}
+                  </ReferenceLink>
+                ) : (
+                  <span style={{ color: '#334155', fontWeight: 600 }}>
+                    {invoice?.customerName || invoice?.partnerName || 'Khách lẻ'}
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Phương thức:</span>
@@ -290,7 +302,20 @@ const Invoice_Detail = () => {
                 ) : (
                   itemsList.map((item, idx) => (
                     <tr key={item.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>{item.code}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            onClick={() => navigate(`/product-catalog?search=${encodeURIComponent(item.code || item.name || '')}`)}
+                            style={{
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                            title="Nhấp để chuyển tới Danh mục món ăn"
+                          >
+                            {item.code}
+                          </span>
+                        </td>
                       <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{item.name}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{item.unit}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{item.qty}</td>

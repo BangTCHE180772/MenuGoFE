@@ -70,13 +70,13 @@ const ImportTable = ({
     }
   };
 
-  // Auto-expand single result matching searchText
+  // Auto-expand matching document from searchText
   React.useEffect(() => {
-    if (documents.length === 1 && searchText && documents[0].code?.toLowerCase() === searchText.toLowerCase()) {
-      const singleDocId = documents[0].id;
-      if (expandedDocId !== singleDocId) {
-        toggleExpand(singleDocId);
-      }
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleExpand(matched.id);
     }
   }, [documents, searchText]);
 

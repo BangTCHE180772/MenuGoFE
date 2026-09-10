@@ -73,9 +73,17 @@ const ProductCatalogView = () => {
   };
 
   // Filter States
-  const [searchText, setSearchText] = useState('');
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
   const [selectedTypes, setSelectedTypes] = useState([]);
+
+  useEffect(() => {
+    const s = searchParams.get('search') || '';
+    if (s !== searchText) {
+      setSearchText(s);
+    }
+  }, [searchParams]);
   const [selectedMenuIds, setSelectedMenuIds] = useState([]);
   const [selectedSellableFilter, setSelectedSellableFilter] = useState('all');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -240,7 +248,7 @@ const ProductCatalogView = () => {
       // 1. Text Search (Code, Name)
       if (searchText.trim()) {
         const query = searchText.toLowerCase();
-        const codeMatch = p.skuCode && p.skuCode.toLowerCase().includes(query);
+        const codeMatch = (p.skuCode && p.skuCode.toLowerCase().includes(query)) || (p.code && p.code.toLowerCase().includes(query));
         const nameMatch = p.name && p.name.toLowerCase().includes(query);
         if (!codeMatch && !nameMatch) return false;
       }
