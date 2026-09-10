@@ -24,3 +24,8 @@ export const deletePromotion = async (id) => {
     const response = await axiosInstance.delete(`/api/Promotion/${id}`);
     return response.data;
 };
+
+export const removeProductFromPromotion = async (promoId, productId) => {
+    const response = await axiosInstance.put(`/api/Promotion/${promoId}/remove-product/${productId}`);
+    return response.data;
+};

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Tag, Button, Modal } from "antd";
-import { CoffeeOutlined, CustomerServiceOutlined, MessageOutlined } from "@ant-design/icons";
+import { CoffeeOutlined, CustomerServiceOutlined, MessageOutlined, EyeOutlined } from "@ant-design/icons";
 
 const formatPrice = (price) => {
   if (price === undefined || price === null) return "0 đ";
@@ -72,6 +72,22 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
               Mới
             </span>
           )}
+          {product.originalPrice && product.originalPrice > price && (
+            <span className="card-discount-badge" style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              background: '#ea580c',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              padding: '4px 8px',
+              borderBottomLeftRadius: '8px',
+              zIndex: 10
+            }}>
+              -{Math.round(((product.originalPrice - price) / product.originalPrice) * 100)}%
+            </span>
+          )}
         </div>
 
         <div className="card-info">
@@ -85,12 +101,14 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
           </h3>
           <div className="card-footer-row">
             <div className="card-price" style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#ea580c' }}>{formatPrice(price)}</span>
-              {product.originalPrice && (
-                <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#94a3b8' }}>
+              {product.originalPrice && product.originalPrice > price && (
+                <span style={{ fontSize: 12, textDecoration: 'line-through', color: '#94a3b8', marginBottom: '-2px' }}>
                   {formatPrice(product.originalPrice)}
                 </span>
               )}
+              <span style={{ fontSize: 15, fontWeight: 800, color: product.originalPrice && product.originalPrice > price ? '#ea580c' : '#1e293b' }}>
+                {formatPrice(price)}
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <Button

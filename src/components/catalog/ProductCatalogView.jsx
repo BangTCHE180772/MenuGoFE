@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Collapse } from 'antd';
 import CatalogHeaderNav from './CatalogHeaderNav';
 import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
@@ -14,7 +15,6 @@ import ManufacturedProductModal from './modals/ManufacturedProductModal';
 import RegularProductModal from './modals/RegularProductModal';
 import IngredientProductModal from './modals/IngredientProductModal';
 import ToolProductModal from './modals/ToolProductModal';
-import ProductDiscountModal from './modals/ProductDiscountModal';
 
 import QuickAddGroupModal from './modals/QuickAddGroupModal';
 import QuickAddMenuModal from './modals/QuickAddMenuModal';
@@ -98,8 +98,6 @@ const ProductCatalogView = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedProductType, setSelectedProductType] = useState('Regular');
   
-  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
-  const [discountingProduct, setDiscountingProduct] = useState(null);
 
   // Secondary Sub-Modals
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
@@ -300,11 +298,6 @@ const ProductCatalogView = () => {
     setIsFormModalOpen(true);
   };
 
-  const handleDiscountProduct = (prod) => {
-    setDiscountingProduct(prod);
-    setIsDiscountModalOpen(true);
-  };
-
   const handleDeleteProduct = async (id) => {
     try {
       await deleteProduct(id);
@@ -445,7 +438,6 @@ const ProductCatalogView = () => {
                 setSelectedRowKeys={setSelectedRowKeys}
                 onEditProduct={handleEditProduct}
                 onDeleteProduct={handleDeleteProduct}
-                onDiscountProduct={handleDiscountProduct}
               />
               <ProductPagination
                 currentPage={currentPage}
@@ -463,14 +455,20 @@ const ProductCatalogView = () => {
 
         {activeTab === 'PricePromo' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <PriceManagementTab
-              products={products}
-              groups={groups}
-              onRefreshData={fetchData}
-              notifySuccess={(msg) => showToast('success', msg)}
-              notifyError={(msg) => showToast('error', msg)}
-            />
-            <PromotionManagementTab />
+            <Collapse defaultActiveKey={['1', '2']} style={{ background: '#fff' }}>
+              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Quản lý giá sản phẩm</span>} key="1">
+                <PriceManagementTab
+                  products={products}
+                  groups={groups}
+                  onRefreshData={fetchData}
+                  notifySuccess={(msg) => showToast('success', msg)}
+                  notifyError={(msg) => showToast('error', msg)}
+                />
+              </Collapse.Panel>
+              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Chương trình khuyến mãi</span>} key="2">
+                <PromotionManagementTab />
+              </Collapse.Panel>
+            </Collapse>
           </div>
         )}
       </div>
@@ -593,24 +591,6 @@ const ProductCatalogView = () => {
         onSave={handleSaveMenuPriority}
         loading={prioritySaving}
       />
-
-      {isDiscountModalOpen && discountingProduct && (
-        <ProductDiscountModal
-          product={discountingProduct}
-          existingPromotion={promotions.find(p => p.products?.some(prod => prod.productId === discountingProduct.id))}
-          onClose={() => {
-            setIsDiscountModalOpen(false);
-            setDiscountingProduct(null);
-          }}
-          onSuccess={() => {
-            setIsDiscountModalOpen(false);
-            setDiscountingProduct(null);
-            fetchData();
-          }}
-          notifySuccess={(msg) => showToast('success', msg)}
-          notifyError={(msg) => showToast('error', msg)}
-        />
-      )}
     </div>
   );
 };

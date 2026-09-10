@@ -37,7 +37,6 @@ const ProductTable = ({
   setSelectedRowKeys,
   onEditProduct,
   onDeleteProduct,
-  onDiscountProduct,
 }) => {
   const [deleteConfirmProduct, setDeleteConfirmProduct] = useState(null);
 
@@ -331,18 +330,7 @@ const ProductTable = ({
                     {/* ACTIONS */}
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        {item.isSellable !== false && (
-                          <button
-                            onClick={() => onDiscountProduct && onDiscountProduct(item)}
-                            title="Giảm giá / Khuyến mãi"
-                            style={{
-                              background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: 4, width: 26, height: 26,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', cursor: 'pointer',
-                            }}
-                          >
-                            <GiftOutlined style={{ fontSize: 12 }} />
-                          </button>
-                        )}
+
                         <button
                           onClick={() => onEditProduct(item)}
                           title="Sửa sản phẩm"

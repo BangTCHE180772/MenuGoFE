@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, message } from 'antd';
 import { createVoucher } from '../../api/voucherApi';
+import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -120,7 +121,12 @@ const VoucherCreateModal = ({ visible, onClose, onSuccess, branches }) => {
         </Form.Item>
 
         <Form.Item name="dateRange" label="Thời gian áp dụng" rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}>
-          <RangePicker style={{ width: '100%' }} showTime format="DD/MM/YYYY HH:mm" />
+          <RangePicker 
+            style={{ width: '100%' }} 
+            showTime 
+            format="DD/MM/YYYY HH:mm" 
+            disabledDate={(current) => current && current < dayjs().startOf('day')}
+          />
         </Form.Item>
 
         <div style={{ display: 'flex', gap: 16 }}>

@@ -89,7 +89,6 @@ const CustomerHomePage = () => {
   const [chainInfo, setChainInfo] = useState(MOCK_CHAIN);
   const [branches, setBranches] = useState(MOCK_BRANCHES);
   const [products, setProducts] = useState(MOCK_PRODUCTS);
-  const [menus, setMenus] = useState([]);
 
   const [, setLoadingChain] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(false);
@@ -197,26 +196,10 @@ const CustomerHomePage = () => {
             (b) => b.type === "Processed" || b.type === "Manufactured" || b.type === "Regular"
           );
 
-          const { getAllPromotions } = await import("../../api/promotionApi");
-          const allPromos = await getAllPromotions().catch(() => []);
-          const activePromos = allPromos.filter(p => p.isActive && p.status === 'Active' && (p.scope === 0 || p.branches?.some(b => b.branchId === bid)));
-
           // Map sang định dạng sản phẩm của Menu
           const mapped = sellableList.map((item) => {
-            let originalPrice = item.sellPrice || 0;
-            let finalPrice = originalPrice;
-            
-            // Check for promotions
-            const itemPromo = activePromos.find(p => p.products?.length === 0 || p.products?.some(prod => prod.productId === item.productId));
-            if (itemPromo) {
-              if (itemPromo.discountType === 'Percentage') {
-                const discount = (originalPrice * itemPromo.discountValue) / 100;
-                const actualDiscount = itemPromo.maxDiscount > 0 ? Math.min(discount, itemPromo.maxDiscount) : discount;
-                finalPrice = Math.max(0, originalPrice - actualDiscount);
-              } else {
-                finalPrice = Math.max(0, originalPrice - itemPromo.discountValue);
-              }
-            }
+            const finalPrice = item.sellPrice || 0;
+            const originalPrice = item.originalPrice || finalPrice;
 
             return {
               id: item.productId, // ProductId để order
