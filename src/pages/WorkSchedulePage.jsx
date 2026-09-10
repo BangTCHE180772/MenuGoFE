@@ -90,8 +90,27 @@ const normalizeStatusString = (status) => {
   if (s === 'WORKING' || s === 'ĐANG LÀM VIỆC') return 'Working';
   if (s === 'COMPLETED' || s === 'HOÀN THÀNH' || s === 'ĐÃ HOÀN THÀNH') return 'Completed';
   if (s === 'ABSENT' || s === 'VẮNG MẶT') return 'Absent';
-  if (s === 'LEAVE_APPROVED' || s === 'ĐÃ XIN NGHỈ' || s === 'ĐÃ NGHỈ PHÉP') return 'LEAVE_APPROVED';
+  if (s.startsWith('LEAVE_APPROVED') || s === 'ĐÃ XIN NGHỈ' || s === 'ĐÃ NGHỈ PHÉP') return 'LEAVE_APPROVED';
   return status;
+};
+
+// Parse status dạng "LEAVE_REQUEST:<lý do NV>" hoặc "LEAVE_APPROVED:<lý do NV>|<ghi chú QL>"
+// — ghi chú quản lý là phần thêm sau dấu '|', tuỳ chọn.
+const parseLeaveStatus = (status) => {
+  const raw = status || '';
+  const upper = raw.toUpperCase();
+  const isPending = upper.startsWith('LEAVE_REQUEST');
+  const isApproved = upper.startsWith('LEAVE_APPROVED') || upper === 'ĐÃ XIN NGHỈ' || upper === 'ĐÃ NGHỈ PHÉP';
+  if (!isPending && !isApproved) return null;
+
+  const body = raw.split(':').slice(1).join(':');
+  const [employeeReasonRaw, adminNoteRaw] = body.split('|');
+  return {
+    isPending,
+    isApproved,
+    employeeReason: (employeeReasonRaw || '').trim() || 'Xin nghỉ phép',
+    adminNote: (adminNoteRaw || '').trim(),
+  };
 };
 
 // Helper: match status không phân biệt hoa thường (fallback cho dữ liệu cũ)
@@ -276,6 +295,16 @@ const WorkSchedulePage = () => {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [cancelForm] = Form.useForm();
+
+  // Approve Leave Request Modal state — quản lý có thể thêm ghi chú riêng khi duyệt nghỉ
+  const [isApproveLeaveModalOpen, setIsApproveLeaveModalOpen] = useState(false);
+  const [approveLeaveTarget, setApproveLeaveTarget] = useState(null);
+  const [approveLeaveSubmitting, setApproveLeaveSubmitting] = useState(false);
+  const [approveLeaveForm] = Form.useForm();
+
+  // Leave Request Detail Modal state — bấm vào note trên Lịch tuần để xem chi tiết
+  const [isLeaveDetailModalOpen, setIsLeaveDetailModalOpen] = useState(false);
+  const [leaveDetailTarget, setLeaveDetailTarget] = useState(null);
 
   const handleOpenOTModal = async (record) => {
     setSelectedOTRecord(record);
@@ -742,6 +771,34 @@ const WorkSchedulePage = () => {
     }
   };
 
+  const handleOpenApproveLeaveModal = (item, employeeReason, empName) => {
+    setApproveLeaveTarget({ item, employeeReason, empName });
+    approveLeaveForm.resetFields();
+    setIsApproveLeaveModalOpen(true);
+  };
+
+  const handleApproveLeaveSubmit = async () => {
+    try {
+      const values = await approveLeaveForm.validateFields();
+      if (!approveLeaveTarget) return;
+      setApproveLeaveSubmitting(true);
+      const { item, employeeReason, empName } = approveLeaveTarget;
+      const adminNote = (values.adminNote || '').trim();
+      const newStatus = adminNote ? `LEAVE_APPROVED:${employeeReason}|${adminNote}` : `LEAVE_APPROVED:${employeeReason}`;
+      await updateWorkSchedule({ ...item, status: newStatus, managerApproved: true });
+      message.success(`🟢 Đã duyệt cho nhân viên ${empName} nghỉ làm ca này!`);
+      setIsApproveLeaveModalOpen(false);
+      setApproveLeaveTarget(null);
+      loadData();
+    } catch (err) {
+      if (err?.errorFields) return; // validation error — antd đã tự hiển thị
+      console.error(err);
+      message.error('Lỗi khi duyệt nghỉ!');
+    } finally {
+      setApproveLeaveSubmitting(false);
+    }
+  };
+
   // Submit Handler - Auto Assign
   const handleAutoAssignSubmit = async (values) => {
     if (autoAssignSubmitting) return;
@@ -1128,6 +1185,9 @@ const WorkSchedulePage = () => {
   const renderShiftCard = (item, isCompact = false) => {
     const shiftInfo = getShiftDetails(item.shiftId);
     const normSt = (item.status || '').toUpperCase();
+    const leaveParsed = parseLeaveStatus(item.status);
+    const isLeaveRequest = !!leaveParsed?.isPending;
+    const isLeaveApproved = !!leaveParsed?.isApproved;
 
     let bgColor = '#fffbe6';
     let borderColor = '#ffe58f';
@@ -1145,10 +1205,14 @@ const WorkSchedulePage = () => {
       bgColor = '#fff2f0';
       borderColor = '#ffccc7';
       textColor = '#a8071a';
-    } else if (normSt === 'LEAVE_APPROVED' || normSt === 'ĐÃ XIN NGHỈ') {
+    } else if (isLeaveApproved) {
       bgColor = '#f9f0ff';
       borderColor = '#d3adf7';
       textColor = '#531dab';
+    } else if (isLeaveRequest) {
+      bgColor = '#fff0f6';
+      borderColor = '#ffadd2';
+      textColor = '#9e1068';
     }
 
     const checkInStr = item.checkInAt ? dayjs(item.checkInAt).format('HH:mm') : null;
@@ -1209,6 +1273,25 @@ const WorkSchedulePage = () => {
         <div style={{ fontSize: '10px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           ({timeText})
         </div>
+
+        {leaveParsed && (
+          <Tooltip title="Bấm để xem chi tiết đơn xin nghỉ">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setLeaveDetailTarget({ item, parsed: leaveParsed });
+                setIsLeaveDetailModalOpen(true);
+              }}
+              style={{
+                marginTop: 2, fontSize: '10px', fontStyle: 'italic', opacity: 0.9,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                textDecoration: 'underline', textDecorationStyle: 'dotted', cursor: 'pointer',
+              }}
+            >
+              💬 {isLeaveRequest ? 'Chờ duyệt: ' : 'Lý do: '}{leaveParsed.employeeReason}{leaveParsed.adminNote ? ' 📝' : ''}
+            </div>
+          </Tooltip>
+        )}
 
         {hasApprovedOT && (
           <div style={{ marginTop: 2 }}>
@@ -1531,13 +1614,12 @@ const WorkSchedulePage = () => {
                   <div style={{ fontSize: '13px', color: '#595959', marginTop: 4 }}>💬 Lý do: <em>{reason}</em></div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button type="primary" size="small" style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }} onClick={async () => {
-                    try {
-                      await updateWorkSchedule({ ...item, status: 'LEAVE_APPROVED', managerApproved: true });
-                      message.success(`🟢 Đã duyệt cho nhân viên ${empName} nghỉ làm ca này!`);
-                      loadData();
-                    } catch (e) { message.error('Lỗi khi duyệt nghỉ!'); }
-                  }}>
+                  <Button
+                    type="primary"
+                    size="small"
+                    style={{ background: '#722ed1', borderColor: '#722ed1', fontWeight: 'bold' }}
+                    onClick={() => handleOpenApproveLeaveModal(item, reason, empName)}
+                  >
                     Duyệt nghỉ
                   </Button>
                   <Button danger size="small" onClick={async () => {
@@ -2573,6 +2655,68 @@ const WorkSchedulePage = () => {
             <Input.TextArea rows={3} placeholder="VD: nhân viên xin nghỉ đột xuất, sắp xếp lại nhân sự..." />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Approve Leave Request Modal — quản lý thêm ghi chú riêng khi duyệt nghỉ */}
+      <Modal
+        title="Duyệt đơn xin nghỉ"
+        open={isApproveLeaveModalOpen}
+        onCancel={() => { setIsApproveLeaveModalOpen(false); setApproveLeaveTarget(null); }}
+        onOk={handleApproveLeaveSubmit}
+        okText="Xác nhận duyệt nghỉ"
+        cancelText="Đóng"
+        okButtonProps={{ style: { background: '#722ed1', borderColor: '#722ed1' }, loading: approveLeaveSubmitting }}
+        destroyOnClose
+      >
+        {approveLeaveTarget && (
+          <div style={{ marginBottom: 12, padding: 12, background: '#f9f0ff', borderRadius: 8 }}>
+            <div><strong>Nhân viên:</strong> {approveLeaveTarget.empName}</div>
+            <div><strong>Lý do xin nghỉ:</strong> {approveLeaveTarget.employeeReason}</div>
+          </div>
+        )}
+        <Form form={approveLeaveForm} layout="vertical">
+          <Form.Item name="adminNote" label="Ghi chú của quản lý (tuỳ chọn)">
+            <Input.TextArea rows={3} placeholder="VD: đã sắp xếp người thay ca, nhớ báo lại khi đi làm lại..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Leave Request Detail Modal — bấm vào note trên Lịch tuần để xem chi tiết */}
+      <Modal
+        title="Chi tiết đơn xin nghỉ"
+        open={isLeaveDetailModalOpen}
+        onCancel={() => { setIsLeaveDetailModalOpen(false); setLeaveDetailTarget(null); }}
+        footer={null}
+      >
+        {leaveDetailTarget && (() => {
+          const { item, parsed } = leaveDetailTarget;
+          const shiftInfo = getShiftDetails(item.shiftId);
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div><strong>Nhân viên:</strong> {getAccountName(item.accountId)}</div>
+              <div><strong>Ca:</strong> {shiftInfo.name} ({shiftInfo.time})</div>
+              <div><strong>Ngày:</strong> {dayjs(item.workDate).format('DD/MM/YYYY')}</div>
+              <div>
+                <strong>Trạng thái:</strong>{' '}
+                {parsed.isPending ? (
+                  <Tag color="magenta">Đang chờ duyệt</Tag>
+                ) : (
+                  <Tag color="purple">Đã duyệt nghỉ</Tag>
+                )}
+              </div>
+              <div>
+                <strong>Lý do của nhân viên:</strong>
+                <div style={{ marginTop: 4, padding: 10, background: '#fafafa', borderRadius: 6 }}>{parsed.employeeReason}</div>
+              </div>
+              {parsed.adminNote && (
+                <div>
+                  <strong>Ghi chú của quản lý:</strong>
+                  <div style={{ marginTop: 4, padding: 10, background: '#f9f0ff', borderRadius: 6 }}>{parsed.adminNote}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

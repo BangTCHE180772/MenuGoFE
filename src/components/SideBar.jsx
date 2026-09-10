@@ -158,6 +158,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
@@ -165,6 +166,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CHEF]: [
     { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
@@ -176,6 +178,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.WAITER]: [
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
