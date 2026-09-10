@@ -10,6 +10,11 @@ export const getBInventories = async (branchId, search = '', docType = '', mode 
   return response.data;
 };
 
+export const getBInventoryDetail = async (id) => {
+  const response = await axiosInstance.get(`/api/BInventory/detail/${id}`);
+  return response.data;
+};
+
 export const getBInventoryLedger = async (binventoryId, page = 1, pageSize = 20) => {
   const response = await axiosInstance.get(
     `/api/BInventory/${binventoryId}/ledger?page=${page}&pageSize=${pageSize}`

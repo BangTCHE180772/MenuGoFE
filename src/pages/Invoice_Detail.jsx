@@ -15,7 +15,7 @@ import {
   CreditCardOutlined
 } from '@ant-design/icons';
 import { message } from 'antd';
-import { getSaleById } from '../api/documentApi';
+import { getDocumentById, getSaleById } from '../api/documentApi';
 import { getOrderById } from '../api/orderApi';
 
 const Invoice_Detail = () => {
@@ -29,14 +29,37 @@ const Invoice_Detail = () => {
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
+    const cleanId = String(id).replace(/^HD0*/i, '');
     try {
       setLoading(true);
-      let res = await getSaleById(id).catch(() => null);
-      if (!res) {
-        res = await getOrderById(id).catch(() => null);
+      let data = null;
+
+      // 1. Thử lấy từ Order API trước
+      try {
+        const orderRes = await getOrderById(cleanId);
+        data = orderRes?.data || orderRes;
+      } catch (err1) {
+        // Tiếp tục thử nguồn tài liệu
       }
-      if (res) {
-        setInvoice(res);
+
+      // 2. Thử lấy từ SaleDocument API
+      if (!data) {
+        try {
+          const saleRes = await getSaleById(cleanId);
+          data = saleRes?.data || saleRes;
+        } catch (err2) {}
+      }
+
+      // 3. Thử lấy từ Document API
+      if (!data) {
+        try {
+          const docRes = await getDocumentById(cleanId);
+          data = docRes?.data || docRes;
+        } catch (err3) {}
+      }
+
+      if (data) {
+        setInvoice(data);
       }
     } catch (err) {
       console.error('Lỗi khi tải chi tiết hóa đơn:', err);
@@ -53,14 +76,25 @@ const Invoice_Detail = () => {
   const itemsList = useMemo(() => {
     if (!invoice) return [];
     const list = invoice.orderDetails || invoice.details || invoice.documentDetails || [];
-    return list.map((it, idx) => {
-      const code = it.productCode || it.snapshotProductCode || it.code || `M${idx + 1}`;
+    if (!Array.isArray(list)) return [];
+
+    const validItems = list.filter((it) => {
+      if (it.status === 'Cancelled' || it.status === 'Rejected' || it.cookingStatus === 'Cancelled') {
+        return false;
+      }
+      return true;
+    });
+
+    return validItems.map((it, idx) => {
+      const code = it.productCode || it.snapshotProductCode || it.code || (it.productId ? `SP${it.productId}` : `M${idx + 1}`);
       const name = it.productName || it.snapshotProductName || it.name || 'Món ăn';
       const unit = it.unitName || it.snapshotUnitName || 'Phần';
-      const qty = Number(it.quantity || 1);
-      const price = Number(it.unitPrice || it.price || 0);
-      const total = Number(it.totalPrice || (qty * price) || 0);
-      const note = it.note || '';
+      const rawQty = Number(it.quantity || 1);
+      const retQty = Number(it.returnedQuantity || 0);
+      const qty = Math.max(1, rawQty - retQty);
+      const price = Number(it.unitPrice ?? it.price ?? 0);
+      const total = Number(it.totalPrice ?? (qty * price) ?? 0);
+      const note = it.note || (it.notes && it.notes.join(', ')) || '';
 
       return {
         ...it,
@@ -79,7 +113,13 @@ const Invoice_Detail = () => {
   const discountAmount = Number(invoice?.discountAmount || 0);
   const pointsUsed = Number(invoice?.pointsUsed || 0);
   const pointsDiscount = pointsUsed * 1000;
-  const totalAmount = Number(invoice?.totalAmount ?? invoice?.total ?? Math.max(0, subtotal - discountAmount - pointsDiscount));
+  const taxableAmount = Math.max(0, subtotal - discountAmount - pointsDiscount);
+  const vatAmount = invoice?.vatAmount != null
+    ? Number(invoice.vatAmount)
+    : (invoice?.totalAmount ? Math.max(0, Math.round(Number(invoice.totalAmount) - taxableAmount)) : 0);
+  const totalAmount = Number(invoice?.totalAmount ?? invoice?.total ?? (taxableAmount + vatAmount));
+
+  const invoiceCode = invoice?.orderCode || invoice?.code || (invoice?.id ? `HD${invoice.id}` : (id ? (String(id).startsWith('HD') ? id : `HD${id}`) : ''));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
@@ -102,7 +142,7 @@ const Invoice_Detail = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-                {invoice?.code || `HD${invoice?.id || ''}`}
+                {invoiceCode}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 12, fontWeight: 700 }}>
                 <CheckCircleOutlined /> Đã thanh toán
@@ -142,13 +182,16 @@ const Invoice_Detail = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Bàn / Khu vực:</span>
-                <strong style={{ color: '#ea580c' }}>{invoice?.tableName || invoice?.table?.name || 'Bàn mang về'}</strong>
+                <strong style={{ color: '#ea580c' }}>
+                  {invoice?.tableName || invoice?.table?.name || 'Bàn mang về'}
+                  {(invoice?.areaName || invoice?.table?.area?.name) ? ` (${invoice?.areaName || invoice?.table?.area?.name})` : ''}
+                </strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Thời gian lập:</span>
                 <span style={{ color: '#334155', fontWeight: 600 }}>
                   <CalendarOutlined style={{ marginRight: 4, color: '#94a3b8' }} />
-                  {invoice?.orderDate || invoice?.createdAt ? dayjs(invoice.orderDate || invoice.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
+                  {invoice?.orderDate || invoice?.createdAt || invoice?.date ? dayjs(invoice.orderDate || invoice.createdAt || invoice.date).format('DD/MM/YYYY HH:mm') : '---'}
                 </span>
               </div>
             </div>
@@ -162,17 +205,20 @@ const Invoice_Detail = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Thu ngân:</span>
-                <strong style={{ color: '#0f172a' }}>{invoice?.cashierName || invoice?.creatorName || 'Thu ngân'}</strong>
+                <strong style={{ color: '#0f172a' }}>{invoice?.createdByName || invoice?.cashierName || invoice?.creatorName || 'Thu ngân'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Khách hàng:</span>
-                <span style={{ color: '#334155', fontWeight: 600 }}>{invoice?.customerName || invoice?.partnerName || 'Khách lẻ'}</span>
+                <span style={{ color: '#334155', fontWeight: 600 }}>
+                  {invoice?.customerName || invoice?.customer?.name || invoice?.partnerName || 'Khách lẻ'}
+                  {(invoice?.customerPhone || invoice?.customer?.phone) ? ` (${invoice?.customerPhone || invoice?.customer?.phone})` : ''}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Phương thức:</span>
                 <span style={{ color: '#059669', fontWeight: 700 }}>
                   <CreditCardOutlined style={{ marginRight: 4 }} />
-                  {invoice?.paymentMethod === 'Transfer' || invoice?.paymentMethod === 2 ? 'Chuyển khoản' : 'Tiền mặt'}
+                  {invoice?.paymentMethod === 'Transfer' || invoice?.paymentMethod === 2 || invoice?.paymentMethod === 'Chuyển khoản' ? 'Chuyển khoản' : 'Tiền mặt'}
                 </span>
               </div>
             </div>
@@ -190,8 +236,22 @@ const Invoice_Detail = () => {
               </div>
               {discountAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748b' }}>Giảm giá:</span>
+                  <span style={{ color: '#64748b' }}>
+                    Giảm giá {invoice?.voucherCode ? `(${invoice.voucherCode})` : ''}:
+                  </span>
                   <span style={{ color: '#059669', fontWeight: 600 }}>-{Math.round(discountAmount).toLocaleString('vi-VN')} đ</span>
+                </div>
+              )}
+              {pointsUsed > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Trừ điểm tích lũy ({pointsUsed} đ):</span>
+                  <span style={{ color: '#d97706', fontWeight: 600 }}>-{Math.round(pointsDiscount).toLocaleString('vi-VN')} đ</span>
+                </div>
+              )}
+              {vatAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Thuế VAT (8%):</span>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>+{Math.round(vatAmount).toLocaleString('vi-VN')} đ</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: 6 }}>

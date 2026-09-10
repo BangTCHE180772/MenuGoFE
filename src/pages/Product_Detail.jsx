@@ -6,16 +6,93 @@ import {
   ReloadOutlined,
   PrinterOutlined,
   AppstoreOutlined,
-  TagOutlined,
-  DollarCircleOutlined,
   HistoryOutlined,
   BarcodeOutlined,
-  ShopOutlined,
-  InfoCircleOutlined
+  CheckCircleOutlined,
+  WarningOutlined,
+  CompassOutlined
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getProductById } from '../api/productApi';
-import { getBInventoryLedger } from '../api/binventoryApi';
+import { getBInventoryDetail, getBInventoryLedger, getBInventories } from '../api/binventoryApi';
+import { getBatchesByBInventoryId } from '../api/batchApi';
+import BatchTraceabilityDrawer from '../components/inventory/tabs/Product/BatchTraceabilityDrawer';
+import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../components/inventory/utils/batchHelper';
+
+const renderMethodBadge = (ldg) => {
+  let method = ldg.methodName || ldg.method || ldg.type || '';
+  const docType = ldg.documentType || '';
+  const docCode = ldg.documentCode || ldg.code || '';
+
+  if (docType === 'Export' || docType === 'ExportDelete' || method.toLowerCase().includes('hủy') || docCode.startsWith('XH')) {
+    method = 'Xuất Hủy';
+  } else if (docType === 'Sale' || method.toLowerCase().includes('bán') || docCode.startsWith('PXBH') || docCode.startsWith('HD')) {
+    method = 'Bán hàng';
+  } else if (docType === 'Return' || (method.toLowerCase().includes('trả') && !method.toLowerCase().includes('khách')) || docCode.startsWith('THN') || docCode.startsWith('TH')) {
+    method = 'Trả Hàng';
+  } else if (docType === 'Transfer' || method.toLowerCase().includes('chuyển') || docCode.startsWith('CK')) {
+    method = 'Chuyển Hàng';
+  } else if (docType === 'CustomerReturn' || method.toLowerCase().includes('khách')) {
+    method = 'Khách trả hàng';
+  } else if (docType === 'Import' || method.toLowerCase().includes('nhập') || docCode.startsWith('NH')) {
+    method = 'Nhập hàng';
+  } else if (docType === 'Check' || method.toLowerCase().includes('kiểm')) {
+    method = 'Kiểm kho';
+  } else if (docType === 'Production' || method.toLowerCase().includes('sản xuất')) {
+    method = 'Sản xuất';
+  }
+
+  if (!method) {
+    method = docType || 'Biến động kho';
+  }
+
+  let bg = '#f1f5f9';
+  let color = '#334155';
+  let border = '#e2e8f0';
+
+  if (method === 'Bán hàng') {
+    bg = '#eff6ff';
+    color = '#1d4ed8';
+    border = '#bfdbfe';
+  } else if (method === 'Xuất Hủy') {
+    bg = '#fef2f2';
+    color = '#dc2626';
+    border = '#fecaca';
+  } else if (method === 'Trả Hàng') {
+    bg = '#fff7ed';
+    color = '#c2410c';
+    border = '#ffedd5';
+  } else if (method === 'Chuyển Hàng') {
+    bg = '#f5f3ff';
+    color = '#6d28d9';
+    border = '#ddd6fe';
+  } else if (method === 'Nhập hàng') {
+    bg = '#ecfdf5';
+    color = '#047857';
+    border = '#a7f3d0';
+  } else if (method === 'Khách trả hàng') {
+    bg = '#f0fdf4';
+    color = '#15803d';
+    border = '#bbf7d0';
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2.5px 8px',
+        borderRadius: 4,
+        fontSize: 10.5,
+        fontWeight: 700,
+        background: bg,
+        color: color,
+        border: `1px solid ${border}`
+      }}
+    >
+      {method}
+    </span>
+  );
+};
 
 const Product_Detail = () => {
   const { id } = useParams();
@@ -25,28 +102,73 @@ const Product_Detail = () => {
   const initialProduct = location.state?.product || location.state?.item || location.state?.document || null;
   const [product, setProduct] = useState(initialProduct);
   const [ledger, setLedger] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [activeTab, setActiveTab] = useState('ledger'); // 'ledger' | 'batches'
   const [loading, setLoading] = useState(!initialProduct);
-  const [activeTab, setActiveTab] = useState('info'); // 'info' | 'ledger'
+
+  const [selectedTraceBatchId, setSelectedTraceBatchId] = useState(null);
+  const [traceDrawerOpen, setTraceDrawerOpen] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [prodRes, ledgRes] = await Promise.all([
-        getProductById(id).catch(() => null),
-        getBInventoryLedger(id, 1, 30).catch(() => null)
-      ]);
+      let prodData = null;
 
-      if (prodRes) {
-        setProduct((prev) => ({ ...prev, ...prodRes }));
+      // 1. Lấy từ BInventory detail API
+      try {
+        const binvRes = await getBInventoryDetail(id);
+        if (binvRes) {
+          prodData = binvRes;
+        }
+      } catch (e) {}
+
+      // 2. Tìm trong danh sách BInventories của chi nhánh nếu chưa có
+      if (!prodData) {
+        try {
+          const branchId = localStorage.getItem('branchId') || 1;
+          const list = await getBInventories(branchId);
+          if (Array.isArray(list)) {
+            const found = list.find(
+              (it) => it.id === Number(id) || it.bInventoryId === Number(id) || it.productId === Number(id)
+            );
+            if (found) {
+              prodData = found;
+            }
+          }
+        } catch (e) {}
       }
-      if (ledgRes) {
-        const items = Array.isArray(ledgRes.items) ? ledgRes.items : (Array.isArray(ledgRes) ? ledgRes : []);
+
+      // 3. Fallback getProductById
+      if (!prodData) {
+        try {
+          const pRes = await getProductById(id);
+          if (pRes) {
+            prodData = pRes?.data || pRes;
+          }
+        } catch (e) {}
+      }
+
+      if (prodData) {
+        setProduct(prodData);
+      }
+
+      // 4. Lấy lịch sử biến động thẻ kho
+      try {
+        const ledgRes = await getBInventoryLedger(id, 1, 50);
+        const items = Array.isArray(ledgRes?.items) ? ledgRes.items : (Array.isArray(ledgRes) ? ledgRes : []);
         setLedger(items);
-      }
+      } catch (e) {}
+
+      // 5. Lấy danh sách Lô hàng & HSD
+      try {
+        const batchRes = await getBatchesByBInventoryId(id);
+        const bList = Array.isArray(batchRes) ? batchRes : (batchRes?.items || []);
+        setBatches(bList);
+      } catch (e) {}
     } catch (err) {
       console.error('Lỗi khi tải chi tiết sản phẩm:', err);
-      message.error('Không thể tải thông tin chi tiết sản phẩm.');
+      message.error('Không thể tải thông tin chi tiết mặt hàng.');
     } finally {
       setLoading(false);
     }
@@ -56,14 +178,69 @@ const Product_Detail = () => {
     fetchDetail();
   }, [fetchDetail]);
 
-  const pCode = product?.code || product?.productCode || product?.barcode || `SP${id}`;
-  const pName = product?.name || product?.productName || 'Sản phẩm';
+  const pCode = product?.code || product?.productCode || product?.barcode || product?.product?.code || `SP${id}`;
+  const pName = product?.name || product?.productName || product?.product?.name || 'Mặt hàng';
   const uName = product?.unitName || product?.unit?.name || 'Đơn vị';
   const stockQty = Number(product?.quantity ?? product?.stockQuantity ?? product?.currentStock ?? 0);
-  const avgCost = Number(product?.avgCost ?? product?.costPrice ?? product?.price ?? 0);
+  const avgCost = Number(product?.purchasePrice ?? product?.avg ?? product?.avgCost ?? product?.costPrice ?? 0);
   const stockValue = stockQty * avgCost;
-  const minStock = Number(product?.minQuantity ?? product?.minimumStockQuantity ?? 0);
-  const maxStock = Number(product?.maxQuantity ?? product?.maximumStockQuantity ?? 0);
+  const minStock = Number(product?.minStorage ?? product?.minQuantity ?? 0);
+  const maxStock = Number(product?.maxStorage ?? product?.maxQuantity ?? 0);
+  const groupName = product?.groupName || product?.categoryName || 'Mặc định';
+  const description = product?.description || '';
+
+  const imgSrc =
+    product?.imageUrl ||
+    product?.imageLink ||
+    product?.avatar ||
+    product?.avatarImage ||
+    product?.product?.imageUrl ||
+    product?.product?.imageLink ||
+    (typeof product?.image === 'string' ? product?.image : product?.image?.imageLink);
+
+  const getProductTypeBadge = (typeVal) => {
+    const rawType = String(typeVal || product?.type || product?.productType || '').toLowerCase();
+    if (rawType === 'ingredient' || rawType === '0') {
+      return (
+        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: 11, fontWeight: 600 }}>
+          Nguyên liệu
+        </span>
+      );
+    }
+    if (rawType === 'manufactured' || rawType === '1') {
+      return (
+        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 11, fontWeight: 600 }}>
+          Bán thành phẩm
+        </span>
+      );
+    }
+    if (rawType === 'processed' || rawType === '2') {
+      return (
+        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff', fontSize: 11, fontWeight: 600 }}>
+          Món chế biến
+        </span>
+      );
+    }
+    if (rawType === 'regular' || rawType === '3') {
+      return (
+        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', fontSize: 11, fontWeight: 600 }}>
+          Hàng hóa thường
+        </span>
+      );
+    }
+    if (rawType === 'tool' || rawType === '4') {
+      return (
+        <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', fontSize: 11, fontWeight: 600 }}>
+          Dụng cụ
+        </span>
+      );
+    }
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontSize: 11, fontWeight: 600 }}>
+        {product?.type || 'Hàng hóa'}
+      </span>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
@@ -116,140 +293,353 @@ const Product_Detail = () => {
 
       {/* BODY */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* CARDS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          {/* THẺ 1: TỒN KHO */}
-          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AppstoreOutlined style={{ color: '#059669' }} /> Tình trạng tồn kho
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Tồn kho hiện tại:</span>
-                <strong style={{ fontSize: 15, color: stockQty <= minStock ? '#dc2626' : '#059669' }}>
-                  {stockQty.toLocaleString('vi-VN')} {uName}
-                </strong>
+        {/* CARD TỔNG QUAN THÔNG TIN: ẢNH BÊN TRÁI - THÔNG TIN BÊN PHẢI */}
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 8,
+            border: '1px solid #cbd5e1',
+            padding: '20px 24px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+            display: 'flex',
+            gap: 24,
+            alignItems: 'stretch'
+          }}
+        >
+          {/* KHỐI ẢNH NGUYÊN LIỆU (BÊN TRÁI) */}
+          <div
+            style={{
+              width: 170,
+              minWidth: 170,
+              height: 170,
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            {imgSrc ? (
+              <img
+                src={imgSrc}
+                alt={pName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+                <AppstoreOutlined style={{ fontSize: 44, color: '#cbd5e1', marginBottom: 6 }} />
+                <div style={{ fontSize: 11, fontWeight: 500 }}>Chưa có hình ảnh</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Định mức an toàn:</span>
-                <span style={{ color: '#334155', fontWeight: 600 }}>
-                  Min: {minStock} {uName} | Max: {maxStock > 0 ? `${maxStock} ${uName}` : '---'}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* THẺ 2: GIÁ VỐN & GIÁ TRỊ */}
-          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <DollarCircleOutlined style={{ color: '#2563eb' }} /> Giá vốn & Giá trị tồn
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Giá vốn bình quân:</span>
-                <strong style={{ color: '#0f172a' }}>{Math.round(avgCost).toLocaleString('vi-VN')} đ / {uName}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Tổng giá trị tồn kho:</span>
-                <strong style={{ fontSize: 15, color: '#2563eb' }}>{Math.round(stockValue).toLocaleString('vi-VN')} đ</strong>
-              </div>
-            </div>
-          </div>
+          {/* KHỐI THÔNG TIN CHI TIẾT (BÊN PHẢI) */}
+          <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              {/* TIÊU ĐỀ & HUY HIỆU */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                    {pName}
+                  </span>
+                  <span style={{ padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontSize: 11, fontWeight: 700 }}>
+                    {pCode}
+                  </span>
+                  {getProductTypeBadge()}
+                </div>
 
-          {/* THẺ 3: THÔNG TIN MẶT HÀNG */}
-          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TagOutlined style={{ color: '#ea580c' }} /> Đặc tính mặt hàng
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Mã sản phẩm:</span>
-                <strong style={{ color: '#2563eb' }}>{pCode}</strong>
+                <div>
+                  {stockQty > 0 ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 11, fontWeight: 700 }}>
+                      <CheckCircleOutlined /> Còn hàng
+                    </span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontSize: 11, fontWeight: 700 }}>
+                      <WarningOutlined /> Hết hàng
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Đơn vị tính chính:</span>
-                <strong style={{ color: '#334155' }}>{uName}</strong>
+
+              {/* LƯỚI THÔNG TIN CHI TIẾT */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '10px 20px',
+                  fontSize: 12,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  padding: '14px 18px'
+                }}
+              >
+                <div>
+                  <span style={{ color: '#64748b' }}>Nhóm hàng:</span>{' '}
+                  <strong style={{ color: '#0f172a' }}>{groupName}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Tồn kho hiện tại:</span>{' '}
+                  <strong style={{ color: stockQty <= 0 ? '#dc2626' : (stockQty <= minStock ? '#ea580c' : '#059669'), fontSize: 13 }}>
+                    {stockQty.toLocaleString('vi-VN')} {uName}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Giá vốn bình quân:</span>{' '}
+                  <strong style={{ color: '#0f172a' }}>
+                    {Math.round(avgCost).toLocaleString('vi-VN')} đ / {uName}
+                  </strong>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b' }}>Đơn vị tính chính:</span>{' '}
+                  <strong style={{ color: '#0f172a' }}>{uName}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Định mức an toàn:</span>{' '}
+                  <span style={{ color: '#334155', fontWeight: 600 }}>
+                    Tối thiểu: {minStock} {uName} | Tối đa: {maxStock > 0 ? `${maxStock} ${uName}` : '---'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Tổng giá trị tồn kho:</span>{' '}
+                  <strong style={{ color: '#2563eb', fontSize: 13 }}>
+                    {Math.round(stockValue).toLocaleString('vi-VN')} đ
+                  </strong>
+                </div>
+
+                {product?.sellPrice > 0 && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Giá bán:</span>{' '}
+                    <strong style={{ color: '#059669' }}>
+                      {Math.round(product.sellPrice).toLocaleString('vi-VN')} đ
+                    </strong>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* MÔ TẢ NGUYÊN LIỆU NẾU CÓ */}
+            {description && (
+              <div style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>
+                <strong style={{ color: '#334155' }}>Mô tả:</strong> {description}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* BẢNG THẺ KHO */}
+        {/* TABS: THẺ KHO & LÔ HÀNG & HSD */}
         <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 16px' }}>
+          {/* TAB HEADERS */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 16px', gap: 8 }}>
             <button
               type="button"
-              onClick={() => setActiveTab('info')}
+              onClick={() => setActiveTab('ledger')}
               style={{
-                padding: '12px 16px',
-                fontSize: 12.5,
+                padding: '12px 18px',
+                fontSize: 13,
                 fontWeight: 700,
-                color: activeTab === 'info' ? '#e8442a' : '#64748b',
-                borderBottom: activeTab === 'info' ? '2px solid #e8442a' : '2px solid transparent',
+                color: activeTab === 'ledger' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'ledger' ? '2px solid #e8442a' : '2px solid transparent',
                 background: 'transparent',
-                border: 'none',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6
               }}
             >
-              <HistoryOutlined /> Thẻ kho - Lịch sử biến động xuất nhập ({ledger.length})
+              <HistoryOutlined /> Thẻ kho ({ledger.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('batches')}
+              style={{
+                padding: '12px 18px',
+                fontSize: 13,
+                fontWeight: 700,
+                color: activeTab === 'batches' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'batches' ? '2px solid #e8442a' : '2px solid transparent',
+                background: 'transparent',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <BarcodeOutlined /> Lô hàng & HSD ({batches.length})
             </button>
           </div>
 
-          <div style={{ overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
-                  <th style={{ padding: '10px 12px' }}>Thời gian ghi sổ</th>
-                  <th style={{ padding: '10px 12px' }}>Mã chứng từ</th>
-                  <th style={{ padding: '10px 12px' }}>Loại giao dịch</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>SL thay đổi</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Tồn sau GD</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Giá vốn ghi nhận (đ)</th>
-                  <th style={{ padding: '10px 12px' }}>Người thực hiện</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledger.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
-                      Chưa có lịch sử giao dịch thẻ kho cho mặt hàng này
-                    </td>
+          {/* TAB 1: THẺ KHO */}
+          {activeTab === 'ledger' && (
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
+                    <th style={{ padding: '10px 12px' }}>Mã chứng từ</th>
+                    <th style={{ padding: '10px 12px' }}>Nghiệp vụ</th>
+                    <th style={{ padding: '10px 12px' }}>Thời gian</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Giá vốn BQ</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Thay đổi tồn</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Tồn tích lũy</th>
                   </tr>
-                ) : (
-                  ledger.map((lg, idx) => (
-                    <tr key={lg.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
-                      <td style={{ padding: '10px 12px', color: '#475569' }}>
-                        {lg.businessDate || lg.postedAt || lg.createdAt ? dayjs(lg.businessDate || lg.postedAt || lg.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
-                        {lg.documentCode || lg.code || '---'}
-                      </td>
-                      <td style={{ padding: '10px 12px', color: '#334155' }}>
-                        {lg.documentType || lg.type || 'Giao dịch kho'}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: Number(lg.quantityDelta || lg.delta || 0) > 0 ? '#059669' : '#dc2626' }}>
-                        {Number(lg.quantityDelta || lg.delta || 0) > 0 ? `+${Number(lg.quantityDelta || lg.delta || 0)}` : Number(lg.quantityDelta || lg.delta || 0)}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        {Number(lg.runningQuantity || lg.balance || 0).toLocaleString('vi-VN')}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>
-                        {Math.round(Number(lg.runningAverageCost || lg.unitCost || 0)).toLocaleString('vi-VN')} đ
-                      </td>
-                      <td style={{ padding: '10px 12px', color: '#334155' }}>
-                        {lg.snapshotPostedByName || lg.creator || 'Hệ thống'}
+                </thead>
+                <tbody>
+                  {ledger.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                        Chưa có lịch sử giao dịch thẻ kho cho mặt hàng này
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    ledger.map((lg, idx) => {
+                      const qDelta = Number(lg.quantityDelta || lg.delta || 0);
+                      const qBalance = Number(lg.runningQuantity || lg.balance || 0);
+                      const unitCost = Number(lg.runningAverageCost || lg.unitCost || 0);
+                      const timeStr = lg.businessDate || lg.postedAt || lg.createdAt;
+
+                      return (
+                        <tr key={lg.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
+                            {lg.documentCode || lg.code || '---'}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {renderMethodBadge(lg)}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#475569' }}>
+                            {timeStr ? dayjs(timeStr).format('DD/MM/YYYY HH:mm') : '---'}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0f172a', fontWeight: 600 }}>
+                            {Math.round(unitCost).toLocaleString('vi-VN')} đ
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: qDelta > 0 ? '#059669' : (qDelta < 0 ? '#dc2626' : '#64748b') }}>
+                            {qDelta > 0 ? `+${qDelta.toLocaleString('vi-VN')}` : qDelta.toLocaleString('vi-VN')}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                            {qBalance.toLocaleString('vi-VN')}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* TAB 2: LÔ HÀNG & HSD */}
+          {activeTab === 'batches' && (
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
+                    <th style={{ padding: '10px 12px' }}>Mã Lô</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>SL ban đầu</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Tồn hiện tại</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Giá vốn riêng Lô</th>
+                    <th style={{ padding: '10px 12px' }}>Ngày sản xuất</th>
+                    <th style={{ padding: '10px 12px' }}>Hạn sử dụng</th>
+                    <th style={{ padding: '10px 12px' }}>Ngày nhập</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Trạng thái Lô</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Hạn Dùng</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                        Chưa có dữ liệu Lô hàng & HSD cho mặt hàng này
+                      </td>
+                    </tr>
+                  ) : (
+                    batches.map((b, idx) => {
+                      const qOrig = Number(b.quantityOriginal ?? 0);
+                      const qRem = Number(b.quantityRemaining ?? 0);
+                      const uCost = Number(b.unitCost ?? 0);
+
+                      return (
+                        <tr key={b.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 1 ? '#fafafa' : '#ffffff' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#2563eb' }}>
+                            {b.batchCode || '---'}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
+                            {qOrig.toLocaleString('vi-VN')} {uName}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: qRem > 0 ? '#059669' : '#dc2626' }}>
+                            {qRem.toLocaleString('vi-VN')} {uName}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>
+                            {Math.round(uCost).toLocaleString('vi-VN')} đ
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#475569' }}>
+                            {b.manufactureDate ? dayjs(b.manufactureDate).format('DD/MM/YYYY') : '---'}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#475569' }}>
+                            {b.expiryDate ? dayjs(b.expiryDate).format('DD/MM/YYYY') : 'Không có'}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#475569' }}>
+                            {b.receivedDate ? dayjs(b.receivedDate).format('DD/MM/YYYY') : '---'}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            {renderBatchStatusBadge(b.status)}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry, b.quantityRemaining, b.status)}
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTraceBatchId(b.id);
+                                setTraceDrawerOpen(true);
+                              }}
+                              style={{
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: 4,
+                                padding: '3px 8px',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4
+                              }}
+                            >
+                              <CompassOutlined /> Truy vết
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* DRAWER TRUY VẾT LÔ HÀNG */}
+      <BatchTraceabilityDrawer
+        batchId={selectedTraceBatchId}
+        open={traceDrawerOpen}
+        onClose={() => {
+          setTraceDrawerOpen(false);
+          setSelectedTraceBatchId(null);
+        }}
+      />
     </div>
   );
 };
