@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   SearchOutlined,
@@ -7,7 +8,8 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   DeleteOutlined,
-  EnvironmentOutlined
+  EnvironmentOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getProductionById } from '../../../../api/documentApi';
 
@@ -23,6 +25,7 @@ const ProductionTable = ({
   handleDeleteDocument,
   onRefresh
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [loadedDoc, setLoadedDoc] = useState(null);
@@ -203,16 +206,17 @@ const ProductionTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu sản xuất nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu sản xuất nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -275,12 +279,33 @@ const ProductionTable = ({
                           </button>
                         </div>
                       </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/production-detail/${doc.id}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL PANEL (SINGLE TAB: THÔNG TIN CHI TIẾT) */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={9} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -293,7 +318,7 @@ const ProductionTable = ({
                             }}
                           >
                             {/* SINGLE TAB HEADER */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div
                                 style={{
                                   padding: '10px 16px',
@@ -308,6 +333,26 @@ const ProductionTable = ({
                               >
                                 <InfoCircleOutlined /> Thông tin chi tiết phiếu sản xuất
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/production-detail/${doc.id}`)}
+                                style={{
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                              >
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết lệnh
+                              </button>
                             </div>
 
                             {loadingDocId === doc.id ? (

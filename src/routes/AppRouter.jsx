@@ -65,6 +65,17 @@ import ProductCatalogPage from '../pages/ProductCatalogPage';
 import InventoryManagementPage from '../pages/InventoryManagementPage';
 import CashFlowPage from '../pages/CashFlowPage';
 import NotificationPage from '../pages/NotificationPage';
+import Adjustment_Detail from '../pages/Adjustment_Detail';
+import Import_Detail from '../pages/Import_Detail';
+import ImportReturn_Detail from '../pages/ImportReturn_Detail';
+import ExportDelete_Detail from '../pages/ExportDelete_Detail';
+import Transfer_Detail from '../pages/Transfer_Detail';
+import Check_Detail from '../pages/Check_Detail';
+import Partner_Detail from '../pages/Partner_Detail';
+import Customer_Detail from '../pages/Customer_Detail';
+import Invoice_Detail from '../pages/Invoice_Detail';
+import Production_Detail from '../pages/Production_Detail';
+import Product_Detail from '../pages/Product_Detail';
 
 const AppRouter = () => {
   const { user, role } = useAuth();
@@ -165,6 +176,28 @@ const AppRouter = () => {
               <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
                 <Route path="/product-catalog" element={<ProductCatalogPage />} />
                 <Route path="/inventory-management" element={<InventoryManagementPage />} />
+                <Route path="/adjustment-detail/:id" element={<Adjustment_Detail />} />
+                <Route path="/inventory-management/adjustment-detail/:id" element={<Adjustment_Detail />} />
+                <Route path="/import-detail/:id" element={<Import_Detail />} />
+                <Route path="/inventory-management/import-detail/:id" element={<Import_Detail />} />
+                <Route path="/import-return-detail/:id" element={<ImportReturn_Detail />} />
+                <Route path="/inventory-management/import-return-detail/:id" element={<ImportReturn_Detail />} />
+                <Route path="/export-delete-detail/:id" element={<ExportDelete_Detail />} />
+                <Route path="/inventory-management/export-delete-detail/:id" element={<ExportDelete_Detail />} />
+                <Route path="/transfer-detail/:id" element={<Transfer_Detail />} />
+                <Route path="/inventory-management/transfer-detail/:id" element={<Transfer_Detail />} />
+                <Route path="/check-detail/:id" element={<Check_Detail />} />
+                <Route path="/inventory-management/check-detail/:id" element={<Check_Detail />} />
+                <Route path="/partner-detail/:id" element={<Partner_Detail />} />
+                <Route path="/inventory-management/partner-detail/:id" element={<Partner_Detail />} />
+                <Route path="/customer-detail/:id" element={<Customer_Detail />} />
+                <Route path="/inventory-management/customer-detail/:id" element={<Customer_Detail />} />
+                <Route path="/invoice-detail/:id" element={<Invoice_Detail />} />
+                <Route path="/inventory-management/invoice-detail/:id" element={<Invoice_Detail />} />
+                <Route path="/production-detail/:id" element={<Production_Detail />} />
+                <Route path="/inventory-management/production-detail/:id" element={<Production_Detail />} />
+                <Route path="/product-detail/:id" element={<Product_Detail />} />
+                <Route path="/inventory-management/product-detail/:id" element={<Product_Detail />} />
                 <Route path="/cashflow" element={<CashFlowPage />} />
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />

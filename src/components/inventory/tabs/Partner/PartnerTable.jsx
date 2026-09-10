@@ -12,7 +12,8 @@ import {
   DeleteOutlined,
   UserOutlined,
   DownOutlined,
-  RightOutlined
+  RightOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getPartnerFinancialSummary, getPartnerImportDocuments, getPartnerCashFlows, payPartnerImportDocument } from '../../../../api/partnerApi';
 import { getDebtDisplayInfo } from '../../../../utils/debtHelper';
@@ -220,6 +221,25 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
 
         {/* NÚT THAO TÁC HỒ SƠ ĐỐI TÁC */}
         <div style={{ display: 'flex', gap: 8, paddingRight: 4 }}>
+          <button
+            type="button"
+            onClick={() => navigate(`/partner-detail/${partner.id}`)}
+            style={{
+              background: '#ffffff',
+              color: '#0f172a',
+              border: '1px solid #cbd5e1',
+              borderRadius: 5,
+              padding: '4px 10px',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <EyeOutlined style={{ color: '#e8442a' }} /> Chi tiết đối tác
+          </button>
           <button
             type="button"
             onClick={() => onEdit && onEdit(partner)}
@@ -974,6 +994,7 @@ const PartnerTable = ({
   onDelete,
   onRefresh
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
   const pageSize = 20;
@@ -1110,12 +1131,13 @@ const PartnerTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>SỐ ĐIỆN THOẠI</th>
               <th style={{ padding: '8px 10px', textAlign: 'right' }}>CÔNG NỢ HỆ THỐNG</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {currentData.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Chưa có đối tác nào phù hợp</td>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Chưa có đối tác nào phù hợp</td>
               </tr>
             ) : (
               currentData.map((p) => {
@@ -1178,12 +1200,33 @@ const PartnerTable = ({
                           Xóa
                         </button>
                       </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/partner-detail/${p.id}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* VÙNG CHI TIẾT ĐỐI TÁC MỞ RỘNG (GỒM 3 TAB: THÔNG TIN, LỊCH SỬ GIAO DỊCH, PHIẾU NHẬP HÀNG) */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={5} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={6} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',

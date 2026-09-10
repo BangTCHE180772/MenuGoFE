@@ -11,7 +11,8 @@ import {
   SearchOutlined,
   AppstoreOutlined,
   CompassOutlined,
-  InboxOutlined
+  InboxOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getBInventories, getBInventoryLedger } from '../../../../api/binventoryApi';
@@ -621,6 +622,7 @@ const ProductTable = ({
               <th style={{ padding: '10px 8px', textAlign: 'right' }}>Đơn giá</th>
               <th style={{ padding: '10px 8px', textAlign: 'right' }}>Giá trị tồn cuối</th>
               <th style={{ padding: '10px 8px', textAlign: 'center' }}>Trạng thái</th>
+              <th style={{ padding: '10px 8px', textAlign: 'center' }}>Chi tiết</th>
             </tr>
           </thead>
           <tbody>
@@ -637,17 +639,18 @@ const ProductTable = ({
                 {totalStockValue.toLocaleString('vi-VN')}đ
               </td>
               <td style={{ padding: '10px 8px' }}></td>
+              <td style={{ padding: '10px 8px' }}></td>
             </tr>
 
             {loading ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
                   Đang tải danh sách tồn kho từ API...
                 </td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                   Không tìm thấy dữ liệu nguyên liệu / mặt hàng nào
                 </td>
               </tr>
@@ -751,12 +754,33 @@ const ProductTable = ({
                           </span>
                         )}
                       </td>
+                      <td style={{ padding: '10px 8px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/product-detail/${itemId}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* ─── EXPANDED DETAILED DRAWER CONTAINER ─────────────────── */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={10} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={11} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -768,61 +792,19 @@ const ProductTable = ({
                             }}
                           >
                             {/* SUB-TABS NAVIGATION HEADER */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px' }}>
-                              {/* TAB 1: THÔNG TIN (MANDATORY) */}
-                              <button
-                                type="button"
-                                onClick={() => handleTabSwitch(itemId, 'info')}
-                                style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'info' ? 700 : 500,
-                                  color: activeTab === 'info' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'info' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5
-                                }}
-                              >
-                                <InfoCircleOutlined /> Thông tin
-                              </button>
-
-                              {/* TAB 2: THẺ KHO (MANDATORY, LAZY LOADED ON CLICK) */}
-                              <button
-                                type="button"
-                                onClick={() => handleTabSwitch(itemId, 'ledger')}
-                                style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'ledger' ? 700 : 500,
-                                  color: activeTab === 'ledger' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'ledger' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5
-                                }}
-                              >
-                                <HistoryOutlined /> Thẻ kho
-                              </button>
-
-                              {/* TAB 3: ĐƠN VỊ QUY ĐỔI (CONDITIONAL) */}
-                              {hasUnitConversions && (
+                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex' }}>
+                                {/* TAB 1: THÔNG TIN (MANDATORY) */}
                                 <button
                                   type="button"
-                                  onClick={() => handleTabSwitch(itemId, 'unit')}
+                                  onClick={() => handleTabSwitch(itemId, 'info')}
                                   style={{
                                     padding: '9px 14px',
                                     border: 'none',
                                     background: 'transparent',
-                                    fontWeight: activeTab === 'unit' ? 700 : 500,
-                                    color: activeTab === 'unit' ? '#2563eb' : '#64748b',
-                                    borderBottom: activeTab === 'unit' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    fontWeight: activeTab === 'info' ? 700 : 500,
+                                    color: activeTab === 'info' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'info' ? '2.5px solid #2563eb' : '2.5px solid transparent',
                                     cursor: 'pointer',
                                     fontSize: 12,
                                     display: 'flex',
@@ -830,22 +812,20 @@ const ProductTable = ({
                                     gap: 5
                                   }}
                                 >
-                                  <SwapOutlined /> Đơn vị quy đổi
+                                  <InfoCircleOutlined /> Thông tin
                                 </button>
-                              )}
 
-                              {/* TAB 4: ĐỊNH LƯỢNG / THÀNH PHẦN (CONDITIONAL) */}
-                              {hasRecipe && (
+                                {/* TAB 2: THẺ KHO (MANDATORY, LAZY LOADED ON CLICK) */}
                                 <button
                                   type="button"
-                                  onClick={() => handleTabSwitch(itemId, 'recipe')}
+                                  onClick={() => handleTabSwitch(itemId, 'ledger')}
                                   style={{
                                     padding: '9px 14px',
                                     border: 'none',
                                     background: 'transparent',
-                                    fontWeight: activeTab === 'recipe' ? 700 : 500,
-                                    color: activeTab === 'recipe' ? '#2563eb' : '#64748b',
-                                    borderBottom: activeTab === 'recipe' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    fontWeight: activeTab === 'ledger' ? 700 : 500,
+                                    color: activeTab === 'ledger' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'ledger' ? '2.5px solid #2563eb' : '2.5px solid transparent',
                                     cursor: 'pointer',
                                     fontSize: 12,
                                     display: 'flex',
@@ -853,29 +833,96 @@ const ProductTable = ({
                                     gap: 5
                                   }}
                                 >
-                                  <ProfileOutlined /> Định lượng món
+                                  <HistoryOutlined /> Thẻ kho
                                 </button>
-                              )}
 
-                              {/* TAB 5: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                                {/* TAB 3: ĐƠN VỊ QUY ĐỔI (CONDITIONAL) */}
+                                {hasUnitConversions && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTabSwitch(itemId, 'unit')}
+                                    style={{
+                                      padding: '9px 14px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      fontWeight: activeTab === 'unit' ? 700 : 500,
+                                      color: activeTab === 'unit' ? '#2563eb' : '#64748b',
+                                      borderBottom: activeTab === 'unit' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 5
+                                    }}
+                                  >
+                                    <SwapOutlined /> Đơn vị quy đổi
+                                  </button>
+                                )}
+
+                                {/* TAB 4: ĐỊNH LƯỢNG / THÀNH PHẦN (CONDITIONAL) */}
+                                {hasRecipe && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTabSwitch(itemId, 'recipe')}
+                                    style={{
+                                      padding: '9px 14px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      fontWeight: activeTab === 'recipe' ? 700 : 500,
+                                      color: activeTab === 'recipe' ? '#2563eb' : '#64748b',
+                                      borderBottom: activeTab === 'recipe' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 5
+                                    }}
+                                  >
+                                    <ProfileOutlined /> Định lượng món
+                                  </button>
+                                )}
+
+                                {/* TAB 5: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleTabSwitch(itemId, 'batches')}
+                                  style={{
+                                    padding: '9px 14px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontWeight: activeTab === 'batches' ? 700 : 500,
+                                    color: activeTab === 'batches' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'batches' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5
+                                  }}
+                                >
+                                  <AppstoreOutlined /> Lô hàng & HSD
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
-                                onClick={() => handleTabSwitch(itemId, 'batches')}
+                                onClick={() => navigate(`/product-detail/${itemId}`)}
                                 style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'batches' ? 700 : 500,
-                                  color: activeTab === 'batches' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'batches' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
                                   cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
+                                  display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: 5
+                                  gap: 6,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                 }}
                               >
-                                <AppstoreOutlined /> Lô hàng & HSD
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết mặt hàng
                               </button>
                             </div>
 

@@ -9,7 +9,8 @@ import {
   HistoryOutlined,
   EditOutlined,
   DeleteOutlined,
-  ArrowRightOutlined
+  ArrowRightOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getCustomerPurchases, getCustomerPoints } from '../../../../api/customerManagementApi';
 import { useSignalR } from '../../../../context/SignalRContext';
@@ -165,6 +166,25 @@ const CustomerDetailSection = ({
 
         {/* NÚT TÁC VỤ NGỮ CẢNH THEO TỪNG SUB TAB */}
         <div style={{ display: 'flex', gap: 8, paddingRight: 4 }}>
+          <button
+            type="button"
+            onClick={() => navigate(`/customer-detail/${customer.id}`)}
+            style={{
+              background: '#ffffff',
+              color: '#0f172a',
+              border: '1px solid #cbd5e1',
+              borderRadius: 5,
+              padding: '4px 10px',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <EyeOutlined style={{ color: '#e8442a' }} /> Chi tiết khách hàng
+          </button>
           {/* KHI XEM THÔNG TIN KHÁCH HÀNG: HIỆN SỬA THÔNG TIN HOẶC XÓA KHÁCH HÀNG */}
           {activeSubTab === 'info' && (
             <>
@@ -519,6 +539,7 @@ const CustomerTable = ({
   onRefresh,
   loading = false
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
   const pageSize = 20;
@@ -606,7 +627,7 @@ const CustomerTable = ({
         </div>
       </div>
 
-      {/* DATA TABLE: ĐÃ BỎ CỘT THAO TÁC THEO YÊU CẦU */}
+      {/* DATA TABLE */}
       <div style={{ flex: 1, overflow: 'auto', border: '1px solid #cbd5e1', borderRadius: 6 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textWrap: 'nowrap' }}>
           <thead>
@@ -615,12 +636,13 @@ const CustomerTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>SỐ ĐIỆN THOẠI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>EMAIL</th>
               <th style={{ padding: '8px 10px', textAlign: 'right' }}>ĐIỂM TÍCH LŨY</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {currentData.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
                   {loading ? 'Đang tải danh sách...' : 'Chưa có khách hàng nào phù hợp'}
                 </td>
               </tr>
@@ -652,12 +674,33 @@ const CustomerTable = ({
                       <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 800, color: '#ea580c' }}>
                         {points.toLocaleString('vi-VN')} điểm
                       </td>
+                      <td style={{ padding: '9px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/customer-detail/${c.id}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL CONTAINER */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={4} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={5} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',

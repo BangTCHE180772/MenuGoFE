@@ -11,7 +11,8 @@ import {
   CreditCardOutlined,
   SearchOutlined,
   PlusOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { deleteImportPendingDocument, getImportById } from '../../../../api/documentApi';
 
@@ -247,16 +248,17 @@ const ImportTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -387,12 +389,35 @@ const ImportTable = ({
                           <span style={{ color: '#94a3b8' }}>---</span>
                         )}
                       </td>
+                      {/* CỘT CHI TIẾT BÊN PHẢI CỘT THAO TÁC */}
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/import-detail/${doc.id}`, { state: { document: doc } })}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <EyeOutlined style={{ fontSize: 11 }} /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL DRAWER CONTAINER */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={9} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -420,7 +445,7 @@ const ImportTable = ({
                                   fontSize: 12
                                 }}
                               >
-                                <InfoCircleOutlined /> Thông tin phiếu
+                                <InfoCircleOutlined /> Thông tin chi tiết
                               </button>
                               <button
                                 type="button"
@@ -439,29 +464,51 @@ const ImportTable = ({
                                 <CreditCardOutlined /> Lịch sử thanh toán
                               </button>
 
-                              {/* EXTRA TRẢ HÀNG BUTTON ON COMPLETED EXPANDED TAB */}
-                              {isCompleted && (
+                              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <button
                                   type="button"
-                                  onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
+                                  onClick={() => navigate(`/import-detail/${doc.id}`, { state: { document: loadedDoc } })}
                                   style={{
-                                    marginLeft: 'auto',
                                     padding: '4px 12px',
-                                    fontSize: 11,
+                                    fontSize: 11.5,
+                                    borderRadius: 5,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#0f172a',
                                     fontWeight: 600,
-                                    borderRadius: 4,
-                                    border: '1px solid #fed7aa',
-                                    background: '#fff7ed',
-                                    color: '#ea580c',
                                     cursor: 'pointer',
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: 4
+                                    gap: 5,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                   }}
                                 >
-                                  <RollbackOutlined /> Trả hàng
+                                  <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
                                 </button>
-                              )}
+
+                                {/* EXTRA TRẢ HÀNG BUTTON ON COMPLETED EXPANDED TAB */}
+                                {isCompleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      borderRadius: 4,
+                                      border: '1px solid #fed7aa',
+                                      background: '#fff7ed',
+                                      color: '#ea580c',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 4
+                                    }}
+                                  >
+                                    <RollbackOutlined /> Trả hàng
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {loadingDocId === doc.id ? (
