@@ -223,7 +223,7 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
         <div style={{ display: 'flex', gap: 8, paddingRight: 4 }}>
           <button
             type="button"
-            onClick={() => navigate(`/partner-detail/${partner.id}`)}
+            onClick={() => navigate(`/partner-detail/${partner.id}`, { state: { partner } })}
             style={{
               background: '#ffffff',
               color: '#0f172a',
@@ -1203,7 +1203,7 @@ const PartnerTable = ({
                       <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => navigate(`/partner-detail/${p.id}`)}
+                          onClick={() => navigate(`/partner-detail/${p.id}`, { state: { partner: p } })}
                           style={{
                             padding: '3px 10px',
                             fontSize: 11,
