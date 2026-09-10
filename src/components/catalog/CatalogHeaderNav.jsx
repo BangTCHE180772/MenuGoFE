@@ -15,8 +15,8 @@ const CatalogHeaderNav = ({
   totalProducts = 0,
 }) => {
   const tabs = [
-    { key: 'ProductCatalog', label: 'Sản phẩm', icon: <AppstoreOutlined /> },
-    { key: 'PricePromo', label: 'Giá bán & Khuyến mãi', icon: <DollarOutlined /> },
+    { key: 'ProductCatalog', label: 'Danh mục & Sản phẩm', icon: <AppstoreOutlined /> },
+    { key: 'PricePromo', label: 'Bảng giá & Khuyến mãi', icon: <DollarOutlined /> },
   ];
 
   return (
