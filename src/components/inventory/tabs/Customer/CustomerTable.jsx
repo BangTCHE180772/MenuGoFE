@@ -168,7 +168,7 @@ const CustomerDetailSection = ({
         <div style={{ display: 'flex', gap: 8, paddingRight: 4 }}>
           <button
             type="button"
-            onClick={() => navigate(`/customer-detail/${customer.id}`)}
+            onClick={() => navigate(`/customer-detail/${customer.id}`, { state: { customer } })}
             style={{
               background: '#ffffff',
               color: '#0f172a',
@@ -346,10 +346,10 @@ const CustomerDetailSection = ({
                             {p.totalAmount.toLocaleString('vi-VN')} đ
                           </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>
-                            +{p.pointsEarned}
+                            +{Number(p.pointsEarned ?? 0).toLocaleString('vi-VN')}
                           </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>
-                            {p.pointsUsed > 0 ? `-${p.pointsUsed}` : '0'}
+                            {(p.pointsUsed ?? 0) > 0 ? `-${Number(p.pointsUsed).toLocaleString('vi-VN')}` : '0'}
                           </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                             {p.finalAmount.toLocaleString('vi-VN')} đ
