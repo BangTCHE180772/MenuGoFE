@@ -15,6 +15,7 @@ import {
   Tooltip,
   Popconfirm,
   Modal,
+  Table,
 } from 'antd';
 import {
   FireOutlined,
@@ -27,7 +28,7 @@ import {
   BellOutlined,
 } from '@ant-design/icons';
 import { getKitchenItems, updateCookingStatus, batchUpdateCookingStatus, cancelOrderDetail, reuseLeftoverForOrderDetail } from '../api/kitchenApi';
-import { getReusableLeftovers } from '../api/leftoverApi';
+import { getReusableLeftovers, getLeftoverRecordsByBranch } from '../api/leftoverApi';
 import { useSignalR } from '../context/SignalRContext';
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
@@ -72,6 +73,10 @@ const KDSPage = () => {
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
   const [cancelledAlerts, setCancelledAlerts] = useState([]);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
+  // Món khách trả (nhân viên ghi nhận ở trang Trả món) — bếp chỉ xem để biết, không
+  // thao tác gì trên danh sách này (khác với gợi ý "dùng lại món thừa" ở trên).
+  const [returnedItems, setReturnedItems] = useState([]);
+  const [showReturnedItemsModal, setShowReturnedItemsModal] = useState(false);
   const signalRConnection = useSignalR();
 
   // Join branch-specific SignalR group
@@ -153,6 +158,23 @@ const KDSPage = () => {
     return () => clearInterval(interval);
   }, [fetchReusableLeftovers]);
 
+  // Danh sách món khách trả trong ngày — chỉ để bếp xem, không thao tác.
+  const fetchReturnedItems = useCallback(async () => {
+    if (!currentBranchId) return;
+    try {
+      const res = await getLeftoverRecordsByBranch(currentBranchId, { type: 'Return' });
+      setReturnedItems(res.data || []);
+    } catch {
+      // Chỉ để xem — im lặng bỏ qua, không chặn luồng bếp
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchReturnedItems();
+    const interval = setInterval(fetchReturnedItems, 30000);
+    return () => clearInterval(interval);
+  }, [fetchReturnedItems]);
+
   // SignalR real-time event listener
   useEffect(() => {
     if (!signalRConnection) return;
@@ -180,6 +202,11 @@ const KDSPage = () => {
         fetchItems(false);
       } else if (notif.type === 'cooking-status-changed') {
         fetchItems(false);
+      } else if (notif.type === 'leftover-return') {
+        playAlertSound('new');
+        message.warning(notif.message || `Bàn ${notif.tableName || '?'} vừa trả món!`);
+        fetchReturnedItems();
+        fetchReusableLeftovers();
       }
     };
 
@@ -188,7 +215,7 @@ const KDSPage = () => {
     return () => {
       signalRConnection.off('ReceiveNotification', handleNotification);
     };
-  }, [signalRConnection, fetchItems, playAlertSound, currentBranchId]);
+  }, [signalRConnection, fetchItems, playAlertSound, currentBranchId, fetchReturnedItems, fetchReusableLeftovers]);
 
   // Single Item Status Change Handler
   const handleStatusChange = async (detailIdOrIds, nextStatus, quantity = null) => {
@@ -755,6 +782,16 @@ const KDSPage = () => {
           >
             Hoàn thành ({readyItems.length})
           </Button>
+
+          <Badge count={returnedItems.length} overflowCount={99}>
+            <Button
+              icon={<ExclamationCircleOutlined />}
+              onClick={() => setShowReturnedItemsModal(true)}
+              style={{ backgroundColor: '#fff1f0', borderColor: '#ff4d4f', color: '#cf1322', borderRadius: 16 }}
+            >
+              Món khách trả
+            </Button>
+          </Badge>
         </Space>
       </div>
 
@@ -981,6 +1018,44 @@ const KDSPage = () => {
         <div style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
           {renderGroupedColumn(readyItems, 'Chưa có món hoàn thành')}
         </div>
+      </Modal>
+
+      {/* ── Modal: Món khách trả (chỉ xem, bếp không thao tác gì ở đây) ─────── */}
+      <Modal
+        title={`📋 Món khách trả (${returnedItems.length}) — chỉ xem`}
+        open={showReturnedItemsModal}
+        onCancel={() => setShowReturnedItemsModal(false)}
+        footer={null}
+        width={800}
+      >
+        <Table
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 8 }}
+          dataSource={returnedItems}
+          locale={{ emptyText: 'Chưa có món nào bị khách trả.' }}
+          columns={[
+            { title: 'Bàn', dataIndex: 'tableName', key: 'tableName', render: (v) => v || '—' },
+            { title: 'Món', dataIndex: 'productName', key: 'productName' },
+            { title: 'SL', dataIndex: 'quantity', key: 'quantity', width: 60 },
+            { title: 'Lý do', dataIndex: 'reason', key: 'reason' },
+            {
+              title: 'Cách xử lý',
+              dataIndex: 'handlingAction',
+              key: 'handlingAction',
+              render: (v) => {
+                const labels = { Discard: 'Huỷ', StaffUse: 'Nhân viên dùng', Reuse: 'Tái sử dụng' };
+                return v ? <Tag>{labels[v] || v}</Tag> : '—';
+              },
+            },
+            {
+              title: 'Thời gian',
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              render: (v) => new Date(v).toLocaleString('vi-VN'),
+            },
+          ]}
+        />
       </Modal>
     </div>
   );

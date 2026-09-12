@@ -112,12 +112,19 @@ const LeftoverPage = () => {
     try {
       const res = await getAllOrders(branchId);
       const orders = res.data || [];
+      const now = dayjs();
       const options = orders
         .slice()
         .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
         .flatMap((order) =>
           (order.orderDetails || [])
             .filter((d) => d.status !== 'Cancelled')
+            // Chỉ hiện món đặt trong ngày và còn trong 1 tiếng gần nhất — tránh liệt kê
+            // toàn bộ lịch sử đơn hàng cũ không còn liên quan đến việc trả món.
+            .filter((d) => {
+              const orderedAt = dayjs(d.createdAt);
+              return orderedAt.isSame(now, 'day') && now.diff(orderedAt, 'minute') <= 60;
+            })
             .map((d) => ({
               value: d.id,
               label: `HD${order.id} · Bàn ${order.tableName || '?'} · ${d.productName} x${d.quantity}`,
@@ -133,6 +140,9 @@ const LeftoverPage = () => {
 
   useEffect(() => {
     fetchOrderDetailOptions();
+    // Poll để món tự rớt khỏi danh sách khi quá 1 tiếng, không cần tải lại trang.
+    const interval = setInterval(fetchOrderDetailOptions, 60000);
+    return () => clearInterval(interval);
   }, [fetchOrderDetailOptions]);
 
   const handleSubmit = async (values) => {
