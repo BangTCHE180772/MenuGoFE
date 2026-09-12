@@ -27,6 +27,9 @@ export const requestLeave = (data) =>
 export const requestShiftSwap = (data) =>
   axiosInstance.post('/api/WorkSchedule/shift-swap', data);
 
+export const rejectShiftSwap = (id, senderAccountId, note) =>
+  axiosInstance.put(`/api/WorkSchedule/${id}/reject-transfer`, { senderAccountId, note });
+
 export const approveOT = (data) =>
   axiosInstance.post('/api/WorkSchedule/approve-ot', data);
 

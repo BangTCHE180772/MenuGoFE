@@ -62,9 +62,10 @@ import {
   approveOT,
   verifyPOSActivity,
   autoAssignWorkSchedules,
+  rejectShiftSwap,
 } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
-import { getRoleRange } from '../api/accountApi';
+import { getRoleRange, getAllAccounts } from '../api/accountApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getShiftChangeRequestsByBranch, approveShiftChangeRequest, rejectShiftChangeRequest } from '../api/shiftChangeRequestApi';
 import { getContracts } from '../api/contractApi';
@@ -136,6 +137,10 @@ const WorkSchedulePage = () => {
   const [schedules, setSchedules] = useState([]);
   const [branches, setBranches] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  // Danh sách tên đầy đủ (không giới hạn theo role) — chỉ dùng để hiển thị tên
+  // nhân viên (VD: người gửi/nhận trong yêu cầu đổi ca), vì "accounts" ở trên
+  // bị giới hạn chỉ còn tài khoản Quản lý khi người xem là Admin/Owner.
+  const [allAccountNames, setAllAccountNames] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -306,6 +311,13 @@ const WorkSchedulePage = () => {
   const [isLeaveDetailModalOpen, setIsLeaveDetailModalOpen] = useState(false);
   const [leaveDetailTarget, setLeaveDetailTarget] = useState(null);
 
+  // Reject/Cancel Shift-Change Request Modal state — bắt buộc nhập lý do trước khi
+  // từ chối/hủy yêu cầu đổi ca (dùng chung cho cả "Đổi ca làm" và "Đổi giờ ca").
+  const [isRejectShiftChangeModalOpen, setIsRejectShiftChangeModalOpen] = useState(false);
+  const [rejectShiftChangeTarget, setRejectShiftChangeTarget] = useState(null);
+  const [rejectShiftChangeSubmitting, setRejectShiftChangeSubmitting] = useState(false);
+  const [rejectShiftChangeForm] = Form.useForm();
+
   const handleOpenOTModal = async (record) => {
     setSelectedOTRecord(record);
     setIsOTModalOpen(true);
@@ -388,16 +400,18 @@ const WorkSchedulePage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schedulesRes, branchesRes, accountsRes, shiftsRes, contractsRes] = await Promise.all([
+      const [schedulesRes, branchesRes, accountsRes, allAccountsRes, shiftsRes, contractsRes] = await Promise.all([
         getAllWorkSchedules(),
         getAllBranches(),
         getRoleRange(),
+        getAllAccounts().catch(() => ({ data: [] })),
         getAllShifts(),
         getContracts().catch(() => ({ data: [] })),
       ]);
       setSchedules(schedulesRes.data || []);
       setBranches(branchesRes.data || []);
       setAccounts(accountsRes.data || []);
+      setAllAccountNames(allAccountsRes.data || []);
       setContracts(contractsRes.data || []);
       const rawShifts = shiftsRes.data || [];
       const sortedShifts = [...rawShifts].sort((a, b) => (a.id ?? 0) - (b.id ?? 0) || (a.startTime || '').localeCompare(b.startTime || ''));
@@ -438,13 +452,26 @@ const WorkSchedulePage = () => {
 
   // Helper mappings
   const getAccountName = (id) => {
-    const acc = accounts.find((a) => a.id === id);
+    const acc = accounts.find((a) => a.id === id) || allAccountNames.find((a) => a.id === id);
     return acc ? acc.name : `Nhân viên #${id}`;
   };
 
   const getBranchName = (id) => {
     const br = branches.find((b) => b.id === id);
     return br ? br.name : `Chi nhánh #${id}`;
+  };
+
+  // Tìm tên Quản lý phụ trách 1 chi nhánh — dựa vào hợp đồng còn hiệu lực + role Quản lý (roleId 3).
+  const getBranchManagerName = (branchId) => {
+    const nameSource = allAccountNames.length > 0 ? allAccountNames : accounts;
+    const managerContract = contracts.find((c) => {
+      if (c.branchId !== branchId) return false;
+      if (!(c.status === 'Active' || c.status === 1 || c.status === 'Hiệu lực')) return false;
+      const acc = nameSource.find((a) => a.id === c.accountId);
+      const primaryRoleId = acc?.roleIds && acc.roleIds.length > 0 ? acc.roleIds[0] : acc?.roleId;
+      return primaryRoleId === 3;
+    });
+    return managerContract ? getAccountName(managerContract.accountId) : null;
   };
 
   const getShiftDetails = (id) => {
@@ -796,6 +823,41 @@ const WorkSchedulePage = () => {
       message.error('Lỗi khi duyệt nghỉ!');
     } finally {
       setApproveLeaveSubmitting(false);
+    }
+  };
+
+  const handleOpenRejectShiftChangeModal = (target) => {
+    setRejectShiftChangeTarget(target);
+    rejectShiftChangeForm.resetFields();
+    setIsRejectShiftChangeModalOpen(true);
+  };
+
+  const handleRejectShiftChangeSubmit = async () => {
+    try {
+      const values = await rejectShiftChangeForm.validateFields();
+      if (!rejectShiftChangeTarget) return;
+      setRejectShiftChangeSubmitting(true);
+      const note = values.note.trim();
+
+      if (rejectShiftChangeTarget.type === 'transfer') {
+        const { item, senderId } = rejectShiftChangeTarget;
+        await rejectShiftSwap(item.id, senderId, note);
+      } else {
+        const { item } = rejectShiftChangeTarget;
+        await rejectShiftChangeRequest(item.id, note);
+      }
+
+      message.info('❌ Đã từ chối/hủy yêu cầu đổi ca.');
+      setIsRejectShiftChangeModalOpen(false);
+      setRejectShiftChangeTarget(null);
+      loadData();
+      loadShiftChangeRequests();
+    } catch (err) {
+      if (err?.errorFields) return; // validation error — antd đã tự hiển thị
+      console.error(err);
+      message.error(err?.response?.data?.message || 'Lỗi khi từ chối/hủy yêu cầu đổi ca!');
+    } finally {
+      setRejectShiftChangeSubmitting(false);
     }
   };
 
@@ -1684,13 +1746,11 @@ const WorkSchedulePage = () => {
                     }}>
                     Duyệt đổi ca
                   </Button>
-                  <Button danger size="small" onClick={async () => {
-                    try {
-                      await updateWorkSchedule({ ...item, accountId: senderId, status: 'APPROVED', managerApproved: true });
-                      message.info('❌ Đã hủy/từ chối yêu cầu đổi ca.');
-                      loadData();
-                    } catch (e) { message.error('Lỗi từ chối!'); }
-                  }}>
+                  <Button
+                    danger
+                    size="small"
+                    onClick={() => handleOpenRejectShiftChangeModal({ type: 'transfer', item, senderId, senderName, receiverName })}
+                  >
                     {isPendingEmp ? 'Hủy yêu cầu' : 'Từ chối'}
                   </Button>
                 </div>
@@ -1724,14 +1784,11 @@ const WorkSchedulePage = () => {
                 }}>
                   Duyệt
                 </Button>
-                <Button danger size="small" onClick={async () => {
-                  try {
-                    await rejectShiftChangeRequest(item.id);
-                    message.info(`❌ Đã từ chối yêu cầu đổi ca của ${item.accountName}.`);
-                    loadData();
-                    loadShiftChangeRequests();
-                  } catch (e) { message.error(e.response?.data?.message || 'Lỗi từ chối!'); }
-                }}>
+                <Button
+                  danger
+                  size="small"
+                  onClick={() => handleOpenRejectShiftChangeModal({ type: 'change', item, empName: item.accountName })}
+                >
                   Từ chối
                 </Button>
               </div>
@@ -2717,6 +2774,60 @@ const WorkSchedulePage = () => {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Reject/Cancel Shift-Change Request Modal — bắt buộc nhập lý do trước khi hủy */}
+      <Modal
+        title="Từ chối / Hủy yêu cầu đổi ca"
+        open={isRejectShiftChangeModalOpen}
+        onCancel={() => { setIsRejectShiftChangeModalOpen(false); setRejectShiftChangeTarget(null); }}
+        onOk={handleRejectShiftChangeSubmit}
+        okText="Xác nhận từ chối/hủy"
+        cancelText="Đóng"
+        okButtonProps={{ danger: true, loading: rejectShiftChangeSubmitting }}
+        width={640}
+        destroyOnClose
+      >
+        {rejectShiftChangeTarget && (() => {
+          const { type, item } = rejectShiftChangeTarget;
+          const branchName = getBranchName(item.branchId);
+          const managerName = getBranchManagerName(item.branchId);
+
+          if (type === 'transfer') {
+            const shiftInfo = getShiftDetails(item.shiftId);
+            const employeeNote = (item.status || '').split(':').slice(2).join(':').trim() || 'Đổi ca';
+            return (
+              <div style={{ marginBottom: 16, padding: 14, background: '#fff7e6', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div><strong>Yêu cầu đổi ca:</strong> {rejectShiftChangeTarget.senderName} ➔ {rejectShiftChangeTarget.receiverName}</div>
+                <div><strong>Chi nhánh:</strong> {branchName}</div>
+                <div><strong>Ca:</strong> {shiftInfo.name} ({shiftInfo.time})</div>
+                <div><strong>Ngày:</strong> {dayjs(item.workDate).format('DD/MM/YYYY')}</div>
+                {managerName && <div><strong>Quản lý chi nhánh:</strong> {managerName}</div>}
+                <div><strong>Lý do đổi ca (nhân viên):</strong> {employeeNote}</div>
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ marginBottom: 16, padding: 14, background: '#fff7e6', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div><strong>Nhân viên:</strong> {rejectShiftChangeTarget.empName}</div>
+              <div><strong>Chi nhánh:</strong> {branchName}</div>
+              <div><strong>Đổi ca:</strong> {item.oldShiftName} ({item.oldStartTime?.slice(0, 5)}-{item.oldEndTime?.slice(0, 5)}) ➔ {item.newShiftName} ({item.newStartTime?.slice(0, 5)}-{item.newEndTime?.slice(0, 5)})</div>
+              <div><strong>Ngày:</strong> {dayjs(item.workDate).format('DD/MM/YYYY')}</div>
+              {managerName && <div><strong>Quản lý chi nhánh:</strong> {managerName}</div>}
+              <div><strong>Lý do đổi ca (nhân viên):</strong> {item.reason || 'Không có lý do'}</div>
+            </div>
+          );
+        })()}
+        <Form form={rejectShiftChangeForm} layout="vertical">
+          <Form.Item
+            name="note"
+            label="Lý do từ chối/hủy (của quản lý)"
+            rules={[{ required: true, whitespace: true, message: 'Phải nhập lý do từ chối/hủy yêu cầu đổi ca.' }]}
+          >
+            <Input.TextArea rows={3} placeholder="VD: không đủ nhân sự thay thế, ca không phù hợp..." />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
