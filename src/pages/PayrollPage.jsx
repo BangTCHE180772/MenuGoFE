@@ -22,6 +22,7 @@ import {
   Divider,
   Alert,
   Segmented,
+  Badge,
 } from 'antd';
 import {
   PlusOutlined,
@@ -47,6 +48,7 @@ import {
   BellOutlined,
   ExclamationCircleOutlined,
   CalendarOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -61,11 +63,13 @@ import {
   lockPayroll,
   unlockPayroll,
   approvePayroll,
+  getPayrollSuggestions,
 } from '../api/payrollApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+import PayrollSuggestionManagerModal from '../PopUp/PayrollSuggestionManagerModal';
 
 // Payroll status definitions
 const PAYROLL_STATUS = {
@@ -259,6 +263,9 @@ const PayrollPage = () => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusTargetRecord, setStatusTargetRecord] = useState(null);
 
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
+
   const [form] = Form.useForm();
   const [generateForm] = Form.useForm();
   const [batchForm] = Form.useForm();
@@ -318,6 +325,12 @@ const PayrollPage = () => {
         }),
         getAllBranches(),
         getRoleRange(),
+        getPayrollSuggestions({
+          branchId: selectedBranch || undefined,
+          status: 'Pending',
+          month: month || undefined,
+          year: year || undefined,
+        }).catch(() => ({ data: [] })),
       ];
 
       if (!isCurrentMonthSelected) {
@@ -334,14 +347,17 @@ const PayrollPage = () => {
       const payrollsRes = results[0];
       const branchesRes = results[1];
       const accountsRes = results[2];
-      const currentMonthPayrollsRes = !isCurrentMonthSelected ? results[3] : payrollsRes;
+      const suggestionsRes = results[3];
+      const currentMonthPayrollsRes = !isCurrentMonthSelected ? results[4] : payrollsRes;
 
       const fetchedPayrolls = payrollsRes.data || [];
       const currentMonthPayrolls = currentMonthPayrollsRes?.data || fetchedPayrolls;
+      const pendingSuggestions = suggestionsRes?.data || [];
 
       setPayrolls(fetchedPayrolls);
       setBranches(branchesRes.data || []);
       setAccounts(accountsRes.data || []);
+      setPendingSuggestionCount(pendingSuggestions.length);
 
       const count = currentMonthPayrolls.filter((p) => {
         const statusVal = p.status;
@@ -1096,6 +1112,23 @@ const PayrollPage = () => {
 
           {(!isOwnerOrAdmin || isManagerTab) && (
             <Space size="middle" wrap>
+              <Badge count={pendingSuggestionCount} overflowCount={99}>
+                <Button
+                  type="primary"
+                  icon={<SolutionOutlined />}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #722ed1, #9254de)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(114, 46, 209, 0.25)',
+                    fontWeight: 600,
+                  }}
+                  onClick={() => setIsSuggestionModalOpen(true)}
+                >
+                  Duyệt kiến nghị
+                </Button>
+              </Badge>
               <Button
                 type="default"
                 icon={<CalculatorOutlined style={{ color: '#e8442a' }} />}
@@ -2271,6 +2304,15 @@ const PayrollPage = () => {
           </Row>
         </Form>
       </Modal>
+
+      {/* 5. Modal Process Employee Payroll Suggestions */}
+      <PayrollSuggestionManagerModal
+        open={isSuggestionModalOpen}
+        onClose={() => setIsSuggestionModalOpen(false)}
+        branchId={selectedBranch ? Number(selectedBranch) : undefined}
+        branches={branches}
+        onProcessSuccess={loadData}
+      />
     </div>
   );
 };

@@ -39,6 +39,7 @@ import {
   updatePayrollSuggestion,
   deletePayrollSuggestion,
 } from '../api/payrollApi';
+import { getMyContracts } from '../api/contractApi';
 
 const { Text, Title } = Typography;
 
@@ -74,18 +75,83 @@ const PayrollSuggestionModal = ({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [contractInfo, setContractInfo] = useState(null);
   const [form] = Form.useForm();
 
-  // Helper calculation states
-  const [calcMissingHours, setCalcMissingHours] = useState(0);
-  const [calcHourlyRate, setCalcHourlyRate] = useState(0);
+  // Fetch active employee contract when modal opens
+  useEffect(() => {
+    if (open) {
+      getMyContracts()
+        .then((res) => {
+          if (res.data && res.data.length > 0) {
+            const active = res.data.find((c) => c.status === 'Active') || res.data[0];
+            setContractInfo(active);
+          }
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [open]);
+
+  // Determine salary type & rates directly from contract / payroll
+  const isHourlySalary = React.useMemo(() => {
+    if (contractInfo) {
+      return contractInfo.salaryType === 'Hourly' || contractInfo.salaryType === 2;
+    }
+    if (selectedPayroll) {
+      return selectedPayroll.salaryType === 'Hourly' || selectedPayroll.salaryType === 2;
+    }
+    return false;
+  }, [contractInfo, selectedPayroll]);
+
+  const contractHourlyRate = React.useMemo(() => {
+    if (contractInfo && (contractInfo.salaryType === 'Hourly' || contractInfo.salaryType === 2)) {
+      return contractInfo.baseSalary || 25000;
+    }
+    if (selectedPayroll && (selectedPayroll.salaryType === 'Hourly' || selectedPayroll.salaryType === 2)) {
+      return selectedPayroll.baseSalary || 25000;
+    }
+    // Salaried fallback
+    const base = contractInfo?.baseSalary || selectedPayroll?.baseSalary || 5000000;
+    const stdDays = contractInfo?.standardWorkDays || selectedPayroll?.standardWorkDays || 26;
+    return Math.round(base / stdDays / 8);
+  }, [contractInfo, selectedPayroll]);
+
+  const contractMonthlyRate = React.useMemo(() => {
+    return contractInfo?.baseSalary || selectedPayroll?.baseSalary || 5000000;
+  }, [contractInfo, selectedPayroll]);
+
+  const standardWorkDays = React.useMemo(() => {
+    return contractInfo?.standardWorkDays || selectedPayroll?.standardWorkDays || 26;
+  }, [contractInfo, selectedPayroll]);
+
+  // Auto-Calculator inputs & conversion formula
+  const [calcQuantity, setCalcQuantity] = useState(null);
+
+  const calculatedTotal = React.useMemo(() => {
+    if (!calcQuantity || calcQuantity <= 0) return 0;
+    if (isHourlySalary) {
+      return Math.round(calcQuantity * contractHourlyRate);
+    } else {
+      return Math.round((calcQuantity * contractMonthlyRate) / standardWorkDays);
+    }
+  }, [calcQuantity, isHourlySalary, contractHourlyRate, contractMonthlyRate, standardWorkDays]);
+
+  const handleApplyCalculatedAmount = () => {
+    if (calculatedTotal <= 0) {
+      message.warning('Vui lòng nhập số lượng giờ/ngày công làm thiếu hợp lệ!');
+      return;
+    }
+    form.setFieldsValue({ amount: calculatedTotal });
+    message.success(`⚡ Đã quy đổi ${calcQuantity} ${isHourlySalary ? 'giờ' : 'ngày công'} = ${calculatedTotal.toLocaleString()} đ và điền vào ô Số tiền đề xuất!`);
+  };
 
   const [filterMonth, setFilterMonth] = useState(month || dayjs().month() + 1);
   const [filterYear, setFilterYear] = useState(year || dayjs().year());
 
   useEffect(() => {
     if (open) {
-      setActiveTab(defaultTab || 'history');
+      const targetTab = defaultTab === 'create' || defaultTab === 'new' ? 'create' : 'history';
+      setActiveTab(targetTab);
       setEditingId(null);
       if (month) setFilterMonth(month);
       if (year) setFilterYear(year);
@@ -126,7 +192,7 @@ const PayrollSuggestionModal = ({
       applyOption: record.applyOption || 'NextMonth',
       isResigned: !!record.isResigned,
     });
-    setActiveTab('new');
+    setActiveTab('create');
   };
 
   const handleDelete = async (id) => {
@@ -365,7 +431,7 @@ const PayrollSuggestionModal = ({
             ),
           },
           {
-            key: 'new',
+            key: 'create',
             label: (
               <span>
                 <PlusCircleOutlined /> {editingId ? 'Chỉnh sửa kiến nghị' : 'Tạo kiến nghị mới'}
@@ -438,13 +504,84 @@ const PayrollSuggestionModal = ({
                     </Col>
                   </Row>
 
-                  <Form.Item name="isResigned" valuePropName="checked">
-                    <Checkbox>
-                      <strong style={{ color: '#d97706' }}>
-                        Tôi là nhân sự sắp / đã nghỉ việc (Yêu cầu quyết toán bổ sung ngay kỳ lương này)
-                      </strong>
-                    </Checkbox>
-                  </Form.Item>
+
+                  {/* Auto-Calculator Card (Placed BEFORE Reason) */}
+                  <Card
+                    size="small"
+                    style={{
+                      background: 'linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%)',
+                      borderRadius: '8px',
+                      border: '1px solid #b7eb8f',
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }} size="small">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#276749' }}>
+                          ⚡ Tự động quy đổi ngày công ra tiền (Lấy từ hợp đồng)
+                        </span>
+                        <Tag color={isHourlySalary ? 'blue' : 'green'} style={{ fontWeight: 600 }}>
+                          {isHourlySalary
+                            ? `Lương hợp đồng: ${contractHourlyRate.toLocaleString()} đ/giờ`
+                            : `Lương hợp đồng: ${contractMonthlyRate.toLocaleString()} đ/tháng (${standardWorkDays} ngày công)`}
+                        </Tag>
+                      </div>
+
+                      <Row gutter={12} align="middle">
+                        <Col span={14}>
+                          <div style={{ fontSize: 11, color: '#595959', marginBottom: 2 }}>
+                            {isHourlySalary
+                              ? 'Nhập số giờ làm bị thiếu (h):'
+                              : `Nhập số ngày công làm thiếu (ví dụ: 1 công, 0.5 ca):`}
+                          </div>
+                          <InputNumber
+                            placeholder={isHourlySalary ? 'Ví dụ: 4.5 giờ' : 'Ví dụ: 1 ngày công'}
+                            style={{ width: '100%' }}
+                            value={calcQuantity}
+                            onChange={setCalcQuantity}
+                            min={0.1}
+                            step={isHourlySalary ? 0.5 : 0.5}
+                          />
+                        </Col>
+                        <Col span={10} style={{ textAlign: 'right' }}>
+                          <Button
+                            type="primary"
+                            style={{ background: '#52c41a', borderColor: '#52c41a', width: '100%', marginTop: 16 }}
+                            onClick={handleApplyCalculatedAmount}
+                          >
+                            ⚡ Quy đổi & Điền tiền
+                          </Button>
+                        </Col>
+                      </Row>
+
+                      {calculatedTotal > 0 && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: '#276749',
+                            fontWeight: 600,
+                            background: '#ffffff',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: '1px dashed #b7eb8f',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span>
+                            💡 Quy đổi: {calcQuantity} {isHourlySalary ? 'giờ' : 'ngày công'}{' '}
+                            {isHourlySalary
+                              ? `× ${contractHourlyRate.toLocaleString()} đ`
+                              : `× (${contractMonthlyRate.toLocaleString()} đ ÷ ${standardWorkDays} công)`}
+                          </span>
+                          <span style={{ fontSize: 13, color: '#389e0d', fontWeight: 700 }}>
+                            = <strong>{calculatedTotal.toLocaleString()} đ</strong>
+                          </span>
+                        </div>
+                      )}
+                    </Space>
+                  </Card>
 
                   <Form.Item
                     name="reason"
@@ -456,52 +593,6 @@ const PayrollSuggestionModal = ({
                       placeholder="Mô tả rõ lý do, ngày giờ xảy ra sai sót, số giờ làm thiếu để Quản lý dễ kiểm tra..."
                     />
                   </Form.Item>
-
-                  <Divider style={{ margin: '12px 0' }} />
-
-                  {/* Calculator helper */}
-                  <Card size="small" style={{ background: '#f9f9f9', marginBottom: 16 }}>
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>
-                        <CalculatorOutlined /> Công cụ hỗ trợ tính tiền thiếu giờ:
-                      </span>
-                      <Row gutter={12}>
-                        <Col span={10}>
-                          <InputNumber
-                            placeholder="Số giờ thiếu (h)"
-                            style={{ width: '100%' }}
-                            value={calcMissingHours}
-                            onChange={setCalcMissingHours}
-                          />
-                        </Col>
-                        <Col span={10}>
-                          <InputNumber
-                            placeholder="Lương theo giờ (đ/h)"
-                            style={{ width: '100%' }}
-                            value={calcHourlyRate}
-                            onChange={setCalcHourlyRate}
-                            formatter={(val) => (val ? `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')}
-                            parser={(val) => (val ? val.replace(/\$\s?|(,*)/g, '') : '')}
-                          />
-                        </Col>
-                        <Col span={4}>
-                          <Button
-                            type="dashed"
-                            onClick={() => {
-                              if (calcMissingHours > 0 && calcHourlyRate > 0) {
-                                form.setFieldsValue({ amount: calcMissingHours * calcHourlyRate });
-                                message.success('Đã áp dụng số tiền tự động tính vào ô Số tiền đề xuất!');
-                              } else {
-                                message.warning('Vui lòng nhập số giờ thiếu và lương theo giờ');
-                              }
-                            }}
-                          >
-                            Áp dụng
-                          </Button>
-                        </Col>
-                      </Row>
-                    </Space>
-                  </Card>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     <Button onClick={() => setActiveTab('history')}>Hủy</Button>
