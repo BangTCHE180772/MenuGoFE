@@ -286,6 +286,8 @@ const PayrollPage = () => {
   const lockWarningStartDay = payrollPayday >= 4 ? payrollPayday - 3 : 1;
   const todayDay = dayjs().date();
 
+  const [currentMonthUnlockedCount, setCurrentMonthUnlockedCount] = useState(0);
+
   const unlockedStaffCount = useMemo(() => {
     return payrolls.filter((p) => {
       const statusVal = p.status;
@@ -303,7 +305,11 @@ const PayrollPage = () => {
       const month = selectedMonthYear ? selectedMonthYear.month() + 1 : null;
       const year = selectedMonthYear ? selectedMonthYear.year() : null;
 
-      const [payrollsRes, branchesRes, accountsRes] = await Promise.all([
+      const currentM = dayjs().month() + 1;
+      const currentY = dayjs().year();
+      const isCurrentMonthSelected = month === currentM && year === currentY;
+
+      const promises = [
         getPayrolls({
           branchId: selectedBranch || undefined,
           month: month || undefined,
@@ -312,11 +318,36 @@ const PayrollPage = () => {
         }),
         getAllBranches(),
         getRoleRange(),
-      ]);
+      ];
 
-      setPayrolls(payrollsRes.data || []);
+      if (!isCurrentMonthSelected) {
+        promises.push(
+          getPayrolls({
+            branchId: selectedBranch || undefined,
+            month: currentM,
+            year: currentY,
+          })
+        );
+      }
+
+      const results = await Promise.all(promises);
+      const payrollsRes = results[0];
+      const branchesRes = results[1];
+      const accountsRes = results[2];
+      const currentMonthPayrollsRes = !isCurrentMonthSelected ? results[3] : payrollsRes;
+
+      const fetchedPayrolls = payrollsRes.data || [];
+      const currentMonthPayrolls = currentMonthPayrollsRes?.data || fetchedPayrolls;
+
+      setPayrolls(fetchedPayrolls);
       setBranches(branchesRes.data || []);
       setAccounts(accountsRes.data || []);
+
+      const count = currentMonthPayrolls.filter((p) => {
+        const statusVal = p.status;
+        return statusVal === 'Draft' || statusVal === 'Pending' || statusVal === 1 || statusVal === 2;
+      }).length;
+      setCurrentMonthUnlockedCount(count);
     } catch (err) {
       console.error(err);
       message.error('Không thể tải dữ liệu bảng lương!');
@@ -1171,11 +1202,11 @@ const PayrollPage = () => {
 
           <Col xs={24} sm={12} md={6}>
             <Space align="center">
-              <DollarCircleOutlined style={{ fontSize: 22, color: unlockedStaffCount > 0 ? '#dc2626' : '#16a34a', background: unlockedStaffCount > 0 ? '#fef2f2' : '#f0fdf4', padding: 10, borderRadius: '50%' }} />
+              <DollarCircleOutlined style={{ fontSize: 22, color: currentMonthUnlockedCount > 0 ? '#dc2626' : '#16a34a', background: currentMonthUnlockedCount > 0 ? '#fef2f2' : '#f0fdf4', padding: 10, borderRadius: '50%' }} />
               <div>
-                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Trạng Thái Tiến Độ</div>
-                <strong style={{ fontSize: 15, color: unlockedStaffCount > 0 ? '#dc2626' : '#16a34a' }}>
-                  {unlockedStaffCount > 0 ? `${unlockedStaffCount} nhân sự chưa chốt` : '✅ Đã chốt hoàn tất'}
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Trạng Thái Tiến Độ Tháng Này ({dayjs().month() + 1}/{dayjs().year()})</div>
+                <strong style={{ fontSize: 15, color: currentMonthUnlockedCount > 0 ? '#dc2626' : '#16a34a' }}>
+                  {currentMonthUnlockedCount > 0 ? `${currentMonthUnlockedCount} nhân sự chưa chốt` : '✅ Đã chốt hoàn tất'}
                 </strong>
               </div>
             </Space>
@@ -1183,32 +1214,32 @@ const PayrollPage = () => {
         </Row>
       </Card>
 
-      {/* 1. Manager Warning Alert (Shown when near/at lock deadline & unlocked count > 0) */}
-      {(!isOwnerOrAdmin || !isManagerTab) && unlockedStaffCount > 0 && isNearOrPastLockDeadline && (
+      {/* 1. Manager Warning Alert (Always warns for CURRENT MONTH regardless of table filter) */}
+      {(!isOwnerOrAdmin || !isManagerTab) && currentMonthUnlockedCount > 0 && todayDay >= lockWarningStartDay && (
         <Alert
           message={
             <Space>
               <WarningOutlined style={{ color: '#d97706', fontSize: 16 }} />
-              <strong style={{ color: '#b45309' }}>⚠️ CẢNH BÁO HẠN CHỐT LƯƠNG DÀNH CHO QUẢN LÝ</strong>
+              <strong style={{ color: '#b45309' }}>⚠️ CẢNH BÁO HẠN CHỐT LƯƠNG DÀNH CHO QUẢN LÝ (THÁNG {dayjs().month() + 1}/{dayjs().year()})</strong>
             </Space>
           }
-          description={`Chi nhánh ${activeBranch?.name || ''} quy định trả lương vào ngày ${payrollPayday} hàng tháng. Quản lý phải hoàn tất chốt bảng lương trước ngày ${lockDeadlineDay}! Hiện đang có ${unlockedStaffCount} nhân sự chưa được chốt lương. Vui lòng rà soát và bấm "Chốt lương" gửi Chủ cửa hàng phê duyệt.`}
+          description={`Chi nhánh ${activeBranch?.name || ''} quy định trả lương vào ngày ${payrollPayday} hàng tháng. Quản lý phải hoàn tất chốt bảng lương kỳ Tháng ${dayjs().month() + 1}/${dayjs().year()} trước ngày ${lockDeadlineDay}! Hiện đang có ${currentMonthUnlockedCount} nhân sự chưa được chốt lương. Vui lòng rà soát và bấm "Chốt lương" gửi Chủ cửa hàng phê duyệt.`}
           type="warning"
           showIcon={false}
           style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb' }}
         />
       )}
 
-      {/* 2. Owner Escalation Alert (Shown to Owner when past/at lock deadline & unlocked count > 0) */}
-      {isOwnerOrAdmin && unlockedStaffCount > 0 && todayDay >= lockDeadlineDay && (
+      {/* 2. Owner Escalation Alert (Always warns for CURRENT MONTH regardless of table filter) */}
+      {isOwnerOrAdmin && currentMonthUnlockedCount > 0 && todayDay >= lockDeadlineDay && (
         <Alert
           message={
             <Space>
               <ExclamationCircleOutlined style={{ color: '#dc2626', fontSize: 16 }} />
-              <strong style={{ color: '#dc2626' }}>🚨 THÔNG BÁO CHO CHỦ CỬA HÀNG: QUẢN LÝ CHƯA CHỐT LƯƠNG ĐÚNG HẠN</strong>
+              <strong style={{ color: '#dc2626' }}>🚨 THÔNG BÁO CHO CHỦ CỬA HÀNG: QUẢN LÝ CHƯA CHỐT LƯƠNG ĐÚNG HẠN (THÁNG {dayjs().month() + 1}/{dayjs().year()})</strong>
             </Space>
           }
-          description={`Chi nhánh ${activeBranch?.name || ''} có ${unlockedStaffCount} nhân sự chưa được Quản lý chốt lương đúng hạn! (Hạn chốt quy định: Ngày ${lockDeadlineDay}, Ngày trả lương: Ngày ${payrollPayday}). Vui lòng nhắc nhở Quản lý chi nhánh hoặc trực tiếp kiểm tra và chốt/duyệt bảng lương.`}
+          description={`Chi nhánh ${activeBranch?.name || ''} có ${currentMonthUnlockedCount} nhân sự chưa được Quản lý chốt lương kỳ Tháng ${dayjs().month() + 1}/${dayjs().year()} đúng hạn! (Hạn chốt quy định: Ngày ${lockDeadlineDay}, Ngày trả lương: Ngày ${payrollPayday}). Vui lòng nhắc nhở Quản lý chi nhánh hoặc trực tiếp kiểm tra và chốt/duyệt bảng lương.`}
           type="error"
           showIcon={false}
           style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #fca5a5', background: '#fef2f2' }}
@@ -1968,85 +1999,85 @@ const PayrollPage = () => {
                       size="small"
                       bordered
                       columns={[
-                      {
-                        title: 'Ngày làm',
-                        dataIndex: 'workDate',
-                        key: 'workDate',
-                        width: 105,
-                        render: (d) => dayjs(d).format('DD/MM/YYYY'),
-                      },
-                      {
-                        title: 'Số giờ làm',
-                        key: 'hours',
-                        align: 'center',
-                        width: 90,
-                        render: (_, r) => (
-                          <span>{r.actualHours ?? r.regularHours ?? 0}h{r.standardHours ? `/${r.standardHours}h` : ''}</span>
-                        ),
-                      },
-                      {
-                        title: 'Hệ số ngày',
-                        dataIndex: 'dateCoefficient',
-                        key: 'dateCoefficient',
-                        align: 'center',
-                        width: 90,
-                        render: (coeff, r) => {
-                          const val = coeff ?? r.dateMultiplier ?? 1.0;
-                          return <Tag color={val > 1.0 ? 'volcano' : 'default'}>{val}x</Tag>;
+                        {
+                          title: 'Ngày làm',
+                          dataIndex: 'workDate',
+                          key: 'workDate',
+                          width: 105,
+                          render: (d) => dayjs(d).format('DD/MM/YYYY'),
                         },
-                      },
-                      {
-                        title: 'Loại ca',
-                        dataIndex: 'isNightShift',
-                        key: 'isNightShift',
-                        align: 'center',
-                        width: 85,
-                        render: (isNight) => isNight ? <Tag color="purple">Ca đêm</Tag> : <Tag color="default">Ca ngày</Tag>,
-                      },
-                      {
-                        title: 'OT duyệt',
-                        dataIndex: 'approvedOTHours',
-                        key: 'approvedOTHours',
-                        align: 'center',
-                        width: 85,
-                        render: (ot) => (ot > 0 ? <Tag color="orange">+{ot}h OT</Tag> : '0h'),
-                      },
-                      {
-                        title: 'Tiền ca gốc',
-                        dataIndex: 'baseShiftPay',
-                        key: 'baseShiftPay',
-                        align: 'right',
-                        render: (amt, r) => formatVND(amt ?? r.shiftTotal ?? 0),
-                      },
-                      {
-                        title: 'Thưởng Ca đêm / OT',
-                        key: 'bonusPay',
-                        align: 'right',
-                        render: (_, r) => {
-                          const night = r.nightShiftPay || 0;
-                          const ot = r.oTPay || 0;
-                          if (night === 0 && ot === 0) return '0 đ';
-                          return (
-                            <div style={{ fontSize: 11 }}>
-                              {night > 0 && <span style={{ color: '#722ed1', display: 'block' }}>Đêm: +{formatVND(night)}</span>}
-                              {ot > 0 && <span style={{ color: '#fa8c16', display: 'block' }}>OT: +{formatVND(ot)}</span>}
-                            </div>
-                          );
+                        {
+                          title: 'Số giờ làm',
+                          key: 'hours',
+                          align: 'center',
+                          width: 90,
+                          render: (_, r) => (
+                            <span>{r.actualHours ?? r.regularHours ?? 0}h{r.standardHours ? `/${r.standardHours}h` : ''}</span>
+                          ),
                         },
-                      },
-                      {
-                        title: 'Tổng tiền ca',
-                        dataIndex: 'totalShiftPay',
-                        key: 'totalShiftPay',
-                        align: 'right',
-                        render: (amt, r) => <strong style={{ color: '#e8442a' }}>{formatVND(amt ?? r.shiftTotal ?? 0)}</strong>,
-                      },
-                    ]}
-                  />
-                )}
-              </>
-            );
-          })()}
+                        {
+                          title: 'Hệ số ngày',
+                          dataIndex: 'dateCoefficient',
+                          key: 'dateCoefficient',
+                          align: 'center',
+                          width: 90,
+                          render: (coeff, r) => {
+                            const val = coeff ?? r.dateMultiplier ?? 1.0;
+                            return <Tag color={val > 1.0 ? 'volcano' : 'default'}>{val}x</Tag>;
+                          },
+                        },
+                        {
+                          title: 'Loại ca',
+                          dataIndex: 'isNightShift',
+                          key: 'isNightShift',
+                          align: 'center',
+                          width: 85,
+                          render: (isNight) => isNight ? <Tag color="purple">Ca đêm</Tag> : <Tag color="default">Ca ngày</Tag>,
+                        },
+                        {
+                          title: 'OT duyệt',
+                          dataIndex: 'approvedOTHours',
+                          key: 'approvedOTHours',
+                          align: 'center',
+                          width: 85,
+                          render: (ot) => (ot > 0 ? <Tag color="orange">+{ot}h OT</Tag> : '0h'),
+                        },
+                        {
+                          title: 'Tiền ca gốc',
+                          dataIndex: 'baseShiftPay',
+                          key: 'baseShiftPay',
+                          align: 'right',
+                          render: (amt, r) => formatVND(amt ?? r.shiftTotal ?? 0),
+                        },
+                        {
+                          title: 'Thưởng Ca đêm / OT',
+                          key: 'bonusPay',
+                          align: 'right',
+                          render: (_, r) => {
+                            const night = r.nightShiftPay || 0;
+                            const ot = r.oTPay || 0;
+                            if (night === 0 && ot === 0) return '0 đ';
+                            return (
+                              <div style={{ fontSize: 11 }}>
+                                {night > 0 && <span style={{ color: '#722ed1', display: 'block' }}>Đêm: +{formatVND(night)}</span>}
+                                {ot > 0 && <span style={{ color: '#fa8c16', display: 'block' }}>OT: +{formatVND(ot)}</span>}
+                              </div>
+                            );
+                          },
+                        },
+                        {
+                          title: 'Tổng tiền ca',
+                          dataIndex: 'totalShiftPay',
+                          key: 'totalShiftPay',
+                          align: 'right',
+                          render: (amt, r) => <strong style={{ color: '#e8442a' }}>{formatVND(amt ?? r.shiftTotal ?? 0)}</strong>,
+                        },
+                      ]}
+                    />
+                  )}
+                </>
+              );
+            })()}
 
             <Divider style={{ margin: '16px 0 8px 0' }}>Chi tiết Phụ cấp & Khoản trừ</Divider>
 
