@@ -36,11 +36,14 @@ import {
   UpOutlined,
   BellOutlined,
   ExclamationCircleOutlined,
+  QuestionCircleOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { getMyPayrolls } from '../api/payrollApi';
 import { useAuth } from '../context/AuthContext';
+import PayrollSuggestionModal from '../PopUp/PayrollSuggestionModal';
 
 const { Title, Text } = Typography;
 
@@ -82,6 +85,8 @@ const MyPayrollPage = () => {
   const [payrolls, setPayrolls] = useState([]);
   const [selectedPayrollId, setSelectedPayrollId] = useState(null);
   const [showShiftTable, setShowShiftTable] = useState(false);
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+  const [suggestionModalTab, setSuggestionModalTab] = useState('history');
 
   const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
   const [filterYear, setFilterYear] = useState(dayjs().year());
@@ -219,6 +224,30 @@ const MyPayrollPage = () => {
               />
             </Space>
           )}
+
+          <Space style={{ marginLeft: payrolls.length <= 1 ? 'auto' : 0 }}>
+            <Button
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setSuggestionModalTab('history');
+                setIsSuggestionModalOpen(true);
+              }}
+            >
+              Lịch sử kiến nghị
+            </Button>
+
+            <Button
+              type="primary"
+              ghost
+              icon={<QuestionCircleOutlined />}
+              onClick={() => {
+                setSuggestionModalTab('create');
+                setIsSuggestionModalOpen(true);
+              }}
+            >
+              Gửi kiến nghị / khiếu nại
+            </Button>
+          </Space>
         </div>
       </Card>
 
@@ -593,6 +622,18 @@ const MyPayrollPage = () => {
           </div>
         )}
       </Spin>
+
+      <PayrollSuggestionModal
+        open={isSuggestionModalOpen}
+        onClose={() => setIsSuggestionModalOpen(false)}
+        branchId={selectedPayroll?.branchId || user?.branchId}
+        accountId={user?.id}
+        month={filterMonth}
+        year={filterYear}
+        selectedPayroll={selectedPayroll}
+        defaultTab={suggestionModalTab}
+        onSuccess={fetchMyPayrolls}
+      />
     </div>
   );
 };

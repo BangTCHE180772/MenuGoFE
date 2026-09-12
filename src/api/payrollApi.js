@@ -37,3 +37,24 @@ export const unlockPayroll = (id) =>
 
 export const approvePayroll = (id) =>
   axiosInstance.post(`/api/Payroll/${id}/approve`);
+
+// Payroll Suggestions API
+export const getPayrollSuggestions = (params) =>
+  axiosInstance.get('/api/Payroll/suggestions', { params });
+
+export const getPayrollSuggestionById = (id) =>
+  axiosInstance.get(`/api/Payroll/suggestions/${id}`);
+
+export const createPayrollSuggestion = (data) =>
+  axiosInstance.post('/api/Payroll/suggestions', data);
+
+export const processPayrollSuggestion = (id, data) =>
+  axiosInstance.put(`/api/Payroll/suggestions/${id}/process`, data);
+
+export const updatePayrollSuggestion = (id, data) =>
+  axiosInstance.put(`/api/Payroll/suggestions/${id}`, data);
+
+export const deletePayrollSuggestion = (id) =>
+  axiosInstance.delete(`/api/Payroll/suggestions/${id}`);
+
+
