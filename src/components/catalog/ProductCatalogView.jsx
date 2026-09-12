@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Collapse } from 'antd';
 import CatalogHeaderNav from './CatalogHeaderNav';
 import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
 import ProductPagination from './ProductPagination';
 import PriceManagementTab from './PriceManagementTab';
+import PromotionManagementTab from './PromotionManagementTab';
 
 // Modals
 import ProductTypeSelectModal from './modals/ProductTypeSelectModal';
@@ -26,6 +28,20 @@ import {
 import { getAllGroups, createGroup } from '../../api/groupApi';
 import { getAllMenus, createMenu } from '../../api/menuApi';
 import { getAllUnits, createUnit } from '../../api/unitApi';
+import configApi from '../../api/configApi';
+import PriorityOrderModal from './modals/PriorityOrderModal';
+
+const sortItemsByPriority = (items, orderList) => {
+  if (!Array.isArray(orderList) || orderList.length === 0) return items;
+  return [...items].sort((a, b) => {
+    const idxA = orderList.indexOf(a.id);
+    const idxB = orderList.indexOf(b.id);
+    const posA = idxA === -1 ? 9999 : idxA;
+    const posB = idxB === -1 ? 9999 : idxB;
+    if (posA !== posB) return posA - posB;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+};
 
 const ProductCatalogView = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,6 +61,7 @@ const ProductCatalogView = () => {
   const [groups, setGroups] = useState([]);
   const [units, setUnits] = useState([]);
   const [menus, setMenus] = useState([]);
+  const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Custom Toast Notification State
@@ -56,9 +73,17 @@ const ProductCatalogView = () => {
   };
 
   // Filter States
-  const [searchText, setSearchText] = useState('');
+  const searchFromUrl = searchParams.get('search') || '';
+  const [searchText, setSearchText] = useState(searchFromUrl);
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
   const [selectedTypes, setSelectedTypes] = useState([]);
+
+  useEffect(() => {
+    const s = searchParams.get('search') || '';
+    if (s !== searchText) {
+      setSearchText(s);
+    }
+  }, [searchParams]);
   const [selectedMenuIds, setSelectedMenuIds] = useState([]);
   const [selectedSellableFilter, setSelectedSellableFilter] = useState('all');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -72,6 +97,7 @@ const ProductCatalogView = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedProductType, setSelectedProductType] = useState('Regular');
+  
 
   // Secondary Sub-Modals
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
@@ -79,25 +105,96 @@ const ProductCatalogView = () => {
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [quickLoading, setQuickLoading] = useState(false);
 
+  // Priority Ordering States
+  const [catalogPriority, setCatalogPriority] = useState(() => {
+    const saved = localStorage.getItem('catalog_priority');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return { groupOrder: [], menuOrder: [], groupNames: [], menuNames: [] };
+  });
+  const [isGroupPriorityModalOpen, setIsGroupPriorityModalOpen] = useState(false);
+  const [isMenuPriorityModalOpen, setIsMenuPriorityModalOpen] = useState(false);
+  const [prioritySaving, setPrioritySaving] = useState(false);
+
   // Fetch Master Data
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, groupRes, unitRes, menuRes] = await Promise.all([
+      const { getAllPromotions } = await import('../../api/promotionApi');
+      const [prodRes, groupRes, unitRes, menuRes, priorityRes, promoRes] = await Promise.all([
         getAllProducts(),
         getAllGroups(),
         getAllUnits(),
         getAllMenus(),
+        configApi.getCatalogPriority().catch(() => null),
+        getAllPromotions().catch(() => []),
       ]);
+
+      const priorityData = priorityRes?.groupOrder ? priorityRes : catalogPriority;
+      if (priorityRes) {
+        setCatalogPriority(priorityRes);
+        localStorage.setItem('catalog_priority', JSON.stringify(priorityRes));
+      }
+
       setProducts(prodRes.data || []);
-      setGroups(groupRes.data || []);
+      setGroups(sortItemsByPriority(groupRes.data || [], priorityData.groupOrder));
       setUnits(unitRes.data || []);
-      setMenus(menuRes.data || []);
+      setMenus(sortItemsByPriority(menuRes.data || [], priorityData.menuOrder));
+      setPromotions(promoRes || []);
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu catalog:', err);
       showToast('error', 'Không thể tải dữ liệu danh mục sản phẩm.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveGroupPriority = async (newOrderedGroups) => {
+    setPrioritySaving(true);
+    try {
+      const newGroupOrder = newOrderedGroups.map((g) => g.id);
+      const newGroupNames = newOrderedGroups.map((g) => g.name);
+      const updatedPriority = {
+        ...catalogPriority,
+        groupOrder: newGroupOrder,
+        groupNames: newGroupNames,
+      };
+      await configApi.saveCatalogPriority(updatedPriority);
+      localStorage.setItem('catalog_priority', JSON.stringify(updatedPriority));
+      setCatalogPriority(updatedPriority);
+      setGroups(newOrderedGroups);
+      setIsGroupPriorityModalOpen(false);
+      showToast('success', 'Đã lưu thứ tự ưu tiên nhóm hàng thành công.');
+    } catch (err) {
+      console.error('Lỗi khi lưu thứ tự ưu tiên nhóm hàng:', err);
+      showToast('error', 'Không thể lưu thứ tự ưu tiên nhóm hàng.');
+    } finally {
+      setPrioritySaving(false);
+    }
+  };
+
+  const handleSaveMenuPriority = async (newOrderedMenus) => {
+    setPrioritySaving(true);
+    try {
+      const newMenuOrder = newOrderedMenus.map((m) => m.id);
+      const newMenuNames = newOrderedMenus.map((m) => m.name);
+      const updatedPriority = {
+        ...catalogPriority,
+        menuOrder: newMenuOrder,
+        menuNames: newMenuNames,
+      };
+      await configApi.saveCatalogPriority(updatedPriority);
+      localStorage.setItem('catalog_priority', JSON.stringify(updatedPriority));
+      setCatalogPriority(updatedPriority);
+      setMenus(newOrderedMenus);
+      setIsMenuPriorityModalOpen(false);
+      showToast('success', 'Đã lưu thứ tự ưu tiên thực đơn thành công.');
+    } catch (err) {
+      console.error('Lỗi khi lưu thứ tự ưu tiên thực đơn:', err);
+      showToast('error', 'Không thể lưu thứ tự ưu tiên thực đơn.');
+    } finally {
+      setPrioritySaving(false);
     }
   };
 
@@ -149,7 +246,7 @@ const ProductCatalogView = () => {
       // 1. Text Search (Code, Name)
       if (searchText.trim()) {
         const query = searchText.toLowerCase();
-        const codeMatch = p.skuCode && p.skuCode.toLowerCase().includes(query);
+        const codeMatch = (p.skuCode && p.skuCode.toLowerCase().includes(query)) || (p.code && p.code.toLowerCase().includes(query));
         const nameMatch = p.name && p.name.toLowerCase().includes(query);
         if (!codeMatch && !nameMatch) return false;
       }
@@ -325,6 +422,8 @@ const ProductCatalogView = () => {
               onResetFilters={handleResetFilters}
               onOpenAddGroupModal={() => setIsAddGroupOpen(true)}
               onOpenAddMenuModal={() => setIsAddMenuOpen(true)}
+              onOpenGroupPriorityModal={() => setIsGroupPriorityModalOpen(true)}
+              onOpenMenuPriorityModal={() => setIsMenuPriorityModalOpen(true)}
             />
 
             {/* RIGHT CONTENT BODY: PRODUCT TABLE + PAGINATION */}
@@ -333,6 +432,7 @@ const ProductCatalogView = () => {
                 products={paginatedProducts}
                 groups={groups}
                 units={units}
+                promotions={promotions}
                 loading={loading}
                 selectedRowKeys={selectedRowKeys}
                 setSelectedRowKeys={setSelectedRowKeys}
@@ -353,14 +453,23 @@ const ProductCatalogView = () => {
           </>
         )}
 
-        {activeTab === 'Price' && (
-          <PriceManagementTab
-            products={products}
-            groups={groups}
-            onRefreshData={fetchData}
-            notifySuccess={(msg) => showToast('success', msg)}
-            notifyError={(msg) => showToast('error', msg)}
-          />
+        {activeTab === 'PricePromo' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <Collapse defaultActiveKey={['1', '2']} style={{ background: '#fff' }}>
+              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Quản lý giá sản phẩm</span>} key="1">
+                <PriceManagementTab
+                  products={products}
+                  groups={groups}
+                  onRefreshData={fetchData}
+                  notifySuccess={(msg) => showToast('success', msg)}
+                  notifyError={(msg) => showToast('error', msg)}
+                />
+              </Collapse.Panel>
+              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Chương trình khuyến mãi</span>} key="2">
+                <PromotionManagementTab />
+              </Collapse.Panel>
+            </Collapse>
+          </div>
         )}
       </div>
 
@@ -460,6 +569,27 @@ const ProductCatalogView = () => {
         onCancel={() => setIsAddUnitOpen(false)}
         onSave={handleSaveQuickUnit}
         loading={quickLoading}
+      />
+
+      {/* PRIORITY ORDER MODALS */}
+      <PriorityOrderModal
+        open={isGroupPriorityModalOpen}
+        onClose={() => setIsGroupPriorityModalOpen(false)}
+        type="group"
+        items={groups}
+        currentOrder={catalogPriority.groupOrder}
+        onSave={handleSaveGroupPriority}
+        loading={prioritySaving}
+      />
+
+      <PriorityOrderModal
+        open={isMenuPriorityModalOpen}
+        onClose={() => setIsMenuPriorityModalOpen(false)}
+        type="menu"
+        items={menus}
+        currentOrder={catalogPriority.menuOrder}
+        onSave={handleSaveMenuPriority}
+        loading={prioritySaving}
       />
     </div>
   );

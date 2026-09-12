@@ -20,7 +20,8 @@ const VoucherPage = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState(null);
 
-
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterBranch, setFilterBranch] = useState('All');
 
   const fetchVouchers = async () => {
     setLoading(true);
@@ -66,11 +67,40 @@ const VoucherPage = () => {
           message.success('Xóa thành công');
           fetchVouchers();
         } catch (error) {
-          message.error('Xóa thất bại');
+          message.error(error?.response?.data?.message || 'Xóa thất bại');
         }
       }
     });
   };
+
+  const processedVouchers = React.useMemo(() => {
+    let list = vouchers.map(v => {
+      const now = dayjs();
+      let status = 'Active';
+      if (dayjs(v.endDate).isBefore(now)) status = 'Expired';
+      else if (!v.isActive) status = 'Disabled';
+      else if (dayjs(v.startDate).isAfter(now)) status = 'Upcoming';
+      return { ...v, status };
+    });
+
+    if (filterBranch !== 'All') {
+      list = list.filter(v => !v.branchId || v.branchId === Number(filterBranch));
+    }
+
+    if (filterStatus !== 'All') {
+      list = list.filter(v => v.status === filterStatus);
+    }
+
+    const statusPriority = { 'Active': 1, 'Upcoming': 2, 'Disabled': 3, 'Expired': 4 };
+    list.sort((a, b) => {
+      const pA = statusPriority[a.status] || 99;
+      const pB = statusPriority[b.status] || 99;
+      if (pA !== pB) return pA - pB;
+      return dayjs(b.startDate).valueOf() - dayjs(a.startDate).valueOf();
+    });
+
+    return list;
+  }, [vouchers, filterStatus, filterBranch]);
 
   const columns = [
     {
@@ -116,39 +146,80 @@ const VoucherPage = () => {
     {
       title: 'SL',
       key: 'quantity',
-      render: (_, record) => `${record.usedCount} / ${record.quantity}`
+      render: (_, record) => (
+        <div>
+          <div>{record.usedCount} / {record.quantity}</div>
+          <div style={{ fontSize: 11, color: '#64748b' }}>
+            {record.maxUsagePerCustomer ? `(Tối đa ${record.maxUsagePerCustomer}/khách)` : '(Không giới hạn/khách)'}
+          </div>
+        </div>
+      )
     },
     {
-      title: 'Trạng thái',
-      dataIndex: 'isActive',
-      render: (isActive) => (
-        <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Hoạt động' : 'Đã khóa'}</Tag>
-      )
+      title: 'Tình trạng',
+      key: 'status',
+      render: (_, record) => {
+        const colors = {
+          'Active': 'green',
+          'Upcoming': 'gold',
+          'Disabled': 'default',
+          'Expired': 'error'
+        };
+        const labels = {
+          'Active': 'Đang diễn ra',
+          'Upcoming': 'Sắp tới',
+          'Disabled': 'Đã khóa',
+          'Expired': 'Đã kết thúc'
+        };
+        return <Tag color={colors[record.status]}>{labels[record.status]}</Tag>;
+      }
     },
     {
       title: 'Thao tác',
       key: 'action',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button icon={<EditOutlined />} onClick={() => showModal(record)} />
-          <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)} />
-        </Space>
-      )
+      render: (_, record) => {
+        if (record.status === 'Expired') return <span style={{ fontSize: 12, color: '#94a3b8' }}>-</span>;
+        return (
+          <Space size="middle">
+            <Button icon={<EditOutlined />} onClick={() => showModal(record)} />
+            <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)} />
+          </Space>
+        );
+      }
     }
   ];
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2>Quản lý Khuyến mãi & Voucher</h2>
+        <h2>Quản lý Voucher</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
-          Tạo Khuyến mãi mới
+          Tạo Voucher mới
         </Button>
       </div>
 
+      <Space style={{ marginBottom: 16 }}>
+        <span>Tình trạng:</span>
+        <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 150 }}>
+          <Option value="All">Tất cả</Option>
+          <Option value="Active">Đang diễn ra</Option>
+          <Option value="Upcoming">Sắp tới</Option>
+          <Option value="Disabled">Đã khóa (Tắt)</Option>
+          <Option value="Expired">Đã kết thúc</Option>
+        </Select>
+
+        <span>Chi nhánh:</span>
+        <Select value={filterBranch} onChange={setFilterBranch} style={{ width: 200 }}>
+          <Option value="All">Tất cả chi nhánh</Option>
+          {branches.map(b => (
+            <Option key={b.id} value={b.id}>{b.name}</Option>
+          ))}
+        </Select>
+      </Space>
+
       <Table 
         columns={columns} 
-        dataSource={vouchers} 
+        dataSource={processedVouchers} 
         rowKey="id" 
         loading={loading}
         pagination={{ pageSize: 10 }}

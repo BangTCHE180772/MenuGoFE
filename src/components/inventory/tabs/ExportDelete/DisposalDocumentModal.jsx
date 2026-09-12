@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 
 import { getProductsByDate, getPreviousLedgerSnapshots } from '../../../../api/binventoryApi';
+import { getBatches } from '../../../../api/batchApi';
 import {
   createExportDeletePending,
   createExportDeleteCompleted,
@@ -23,6 +24,7 @@ import {
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 import { extractErrorMessage } from '../../utils/errorHelper';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 
 const showToast = (text, type = 'success') => {
   const toast = document.createElement('div');
@@ -31,7 +33,7 @@ const showToast = (text, type = 'success') => {
     position: fixed;
     top: 24px;
     right: 24px;
-    background: ${type === 'error' ? '#ef4444' : '#10b981'};
+    background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : type === 'info' ? '#3b82f6' : '#10b981'};
     color: #ffffff;
     padding: 10px 20px;
     border-radius: 6px;
@@ -50,13 +52,15 @@ const DisposalDocumentModal = ({
   onSuccess,
   branchId,
   products = [],
-  editDocumentId = null
+  editDocumentId = null,
+  initialData = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
   const creatorName = user?.name || user?.email || 'Mno';
 
   const [loading, setLoading] = useState(false);
+  const [loadingExpiredInModal, setLoadingExpiredInModal] = useState(false);
   const [selectedDateTime, setSelectedDateTime] = useState(dayjs());
   const [openTimeFormatted, setOpenTimeFormatted] = useState('');
   const [openTimeISO, setOpenTimeISO] = useState('');
@@ -65,6 +69,8 @@ const DisposalDocumentModal = ({
   const [bInventoryList, setBInventoryList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const searchContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     docCode: '',
@@ -78,13 +84,48 @@ const DisposalDocumentModal = ({
     getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        setBInventoryList(data);
+        if (data.length > 0 || !query) {
+          setBInventoryList((prev) => {
+            if (!query) return data;
+            const prevMap = new Map(prev.map((item) => [item.id ?? item.bInventoryId, item]));
+            data.forEach((item) => {
+              prevMap.set(item.id ?? item.bInventoryId, item);
+            });
+            return Array.from(prevMap.values());
+          });
+        }
       })
       .catch((err) => {
         console.error('Failed to load BInventories by date:', err);
-        setBInventoryList([]);
       });
   }, []);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Keyboard shortcut F1 to focus search, ESC to close dropdown
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!open) return;
+      if (e.key === 'F1') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setShowDropdown(true);
+      } else if (e.key === 'Escape') {
+        setShowDropdown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -160,16 +201,16 @@ const DisposalDocumentModal = ({
 
         setFormData({
           docCode: '',
-          note: ''
+          note: initialData?.note || ''
         });
-        setItems([]);
+        setItems(initialData?.items || []);
 
         if (branchId) {
           fetchBInventories(branchId, now.toISOString(), '');
         }
       }
     }
-  }, [open, editDocumentId, branchId, fetchBInventories]);
+  }, [open, editDocumentId, branchId, fetchBInventories, initialData]);
 
   // Trigger search on user typing
   useEffect(() => {
@@ -193,6 +234,97 @@ const DisposalDocumentModal = ({
     }
   };
 
+  // Tự động tìm và chọn các nguyên liệu đã hết hạn ngay trong modal
+  const handleSelectAllExpiredInModal = async () => {
+    if (!branchId) return;
+    setLoadingExpiredInModal(true);
+    try {
+      const batchesRes = await getBatches({
+        branchId: branchId,
+        expiryStatus: 'expired',
+        pageSize: 1000
+      });
+
+      const batches = Array.isArray(batchesRes?.items) ? batchesRes.items : [];
+      const expiredBatches = batches.filter(
+        (b) => Number(b.quantityRemaining) > 0 && b.status !== 2 && b.status !== 'Depleted'
+      );
+
+      if (expiredBatches.length === 0) {
+        showToast('Không tìm thấy nguyên liệu nào đã hết hạn còn tồn kho trong chi nhánh.', 'info');
+        return;
+      }
+
+      const existingIds = new Set(items.map((i) => Number(i.bInventoryId)));
+      const rawList = bInventoryList.length > 0 ? bInventoryList : products;
+
+      const groupedByInv = {};
+      expiredBatches.forEach((batch) => {
+        const invId = Number(batch.bInventoryId);
+        if (!groupedByInv[invId]) groupedByInv[invId] = [];
+        groupedByInv[invId].push(batch);
+      });
+
+      const newItemsToAdd = [];
+      Object.entries(groupedByInv).forEach(([invIdStr, bList]) => {
+        const invId = Number(invIdStr);
+        if (existingIds.has(invId)) return;
+
+        const matchP = (rawList || []).find((b) => Number(b.id ?? b.bInventoryId) === invId);
+        const totalExpiredQty = bList.reduce((sum, b) => sum + Number(b.quantityRemaining || 0), 0);
+        const baseStockVal = Number(matchP?.runningQuantity ?? matchP?.quantity ?? matchP?.stockQuantity ?? 0);
+
+        // Nếu tồn kho sản phẩm đã hết (<= 0) hoặc lượng hết hạn <= 0 thì đã xuất hủy hết
+        if (baseStockVal <= 0 || totalExpiredQty <= 0) return;
+
+        const conversions = matchP?.unitConversions || matchP?.product?.unitConversions || [];
+        const defaultUc = conversions.length > 0 ? conversions[0] : null;
+        const conversionPoint = defaultUc?.conversionPoint > 0 ? defaultUc.conversionPoint : 1;
+        const avgVal = matchP?.runningAverageCost > 0 ? matchP.runningAverageCost : (matchP?.avg > 0 ? matchP.avg : (bList[0].unitCost || 0));
+
+        const batchDesc = bList.map((b) => {
+          const exp = b.expiryDate ? dayjs(b.expiryDate).format('DD/MM/YYYY') : '---';
+          return `${b.batchCode} (${b.quantityRemaining} ${b.unitName}, HSD: ${exp})`;
+        }).join('; ');
+
+        newItemsToAdd.push({
+          rowId: `expired-${invId}-${Date.now()}-${Math.random()}`,
+          bInventoryId: invId,
+          code: matchP?.code || bList[0].productCode || `SP${invId}`,
+          name: matchP?.name || bList[0].productName || 'Nguyên liệu',
+          baseStock: baseStockVal,
+          stock: baseStockVal,
+          baseAvgCost: avgVal,
+          costPrice: avgVal,
+          unitConversionId: defaultUc ? defaultUc.id : null,
+          unitName: defaultUc ? (defaultUc.unitName || defaultUc.name) : (matchP?.unitName || bList[0].unitName || 'Đơn vị'),
+          unitConversions: conversions,
+          conversionPoint: conversionPoint,
+          quantity: Math.min(totalExpiredQty, baseStockVal),
+          note: `Lô hết hạn: ${batchDesc}`,
+          isExpiredAutoSelected: true,
+          editingNote: false
+        });
+      });
+
+      if (newItemsToAdd.length === 0) {
+        showToast('Tất cả các nguyên liệu hết hạn đã có trong danh sách xuất hủy.', 'warning');
+        return;
+      }
+
+      setItems((prev) => [...prev, ...newItemsToAdd]);
+      if (!formData.note) {
+        setFormData((prev) => ({ ...prev, note: `Xuất hủy nguyên liệu hết hạn sử dụng (${expiredBatches.length} lô hết hạn)` }));
+      }
+      showToast(`Đã thêm ${newItemsToAdd.length} mặt hàng hết hạn vào danh sách xuất hủy.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Có lỗi xảy ra khi lấy hàng hết hạn.', 'error');
+    } finally {
+      setLoadingExpiredInModal(false);
+    }
+  };
+
   const searchOptions = useMemo(() => {
     const rawList = bInventoryList.length > 0 ? bInventoryList : products;
     return rawList
@@ -204,14 +336,14 @@ const DisposalDocumentModal = ({
         return true;
       })
       .map((b) => {
-        const conversions = b.unitConversions || b.product?.unitConversions || [];
+        const conversions = b.unitConversions || b.conversions || b.product?.unitConversions || [];
         const baseUnitName = b.baseUnit?.unitName || b.unitName || conversions[0]?.unitName || 'Đơn vị';
-        const stockVal = b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? 0;
+        const stockVal = b.runningQuantity ?? b.quantity ?? b.stockQuantity ?? b.stock ?? 0;
         const avgVal = (b.runningAverageCost > 0 ? b.runningAverageCost : (b.avg > 0 ? b.avg : (b.purchasePrice > 0 ? b.purchasePrice : (b.sellPrice || 0))));
         return {
           id: b.id ?? b.bInventoryId ?? b.productId,
-          code: b.code || b.skuCode || `SP${b.id ?? b.productId}`,
-          name: b.name || 'Sản phẩm',
+          code: b.code || b.skuCode || b.productCode || `SP${b.id ?? b.productId}`,
+          name: b.name || b.productName || 'Sản phẩm',
           baseStock: stockVal,
           baseAvgCost: avgVal,
           stock: stockVal,
@@ -229,10 +361,18 @@ const DisposalDocumentModal = ({
     const unselected = searchOptions.filter((opt) => !existingIds.has(Number(opt.id)));
 
     if (!searchQuery.trim()) return unselected;
-    const q = searchQuery.toLowerCase();
-    return unselected.filter(
-      (opt) => opt.code.toLowerCase().includes(q) || opt.name.toLowerCase().includes(q)
-    );
+    const qRaw = searchQuery.toLowerCase().trim();
+    const qNorm = removeVietnameseTones(searchQuery).trim();
+    return unselected.filter((opt) => {
+      const nameRaw = (opt.name || '').toLowerCase();
+      const nameNorm = removeVietnameseTones(opt.name);
+      const codeRaw = (opt.code || '').toLowerCase();
+      return (
+        nameRaw.includes(qRaw) ||
+        nameNorm.includes(qNorm) ||
+        codeRaw.includes(qRaw)
+      );
+    });
   }, [searchOptions, searchQuery, items]);
 
   const handleSelectProduct = (opt) => {
@@ -425,103 +565,22 @@ const DisposalDocumentModal = ({
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
             {editDocumentId ? `Chỉnh sửa phiếu xuất hủy (${formData.docCode || ''})` : 'Tạo phiếu xuất hủy'}
           </span>
-
-          {/* SEARCH PRODUCT DROPDOWN CONTAINER - FOLLOWS TYPING & NO DUPLICATES */}
-          <div style={{ position: 'relative', width: 420 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: 16,
-                padding: '3px 12px',
-                border: '1px solid rgba(255,255,255,0.4)'
-              }}
-            >
-              <SearchOutlined style={{ color: '#e8442a', marginRight: 6 }} />
-              <input
-                type="text"
-                placeholder="Tìm theo mã hoặc tên..."
-                value={searchQuery}
-                onFocus={() => setShowDropdown(true)}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowDropdown(true);
-                }}
-                style={{
-                  width: '100%',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: 11,
-                  background: 'transparent',
-                  color: '#0f172a'
-                }}
-              />
-            </div>
-
-            {showDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 32,
-                  left: 0,
-                  right: 0,
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  maxHeight: 240,
-                  overflowY: 'auto',
-                  zIndex: 1001
-                }}
-              >
-                {filteredOptions.length === 0 ? (
-                  <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
-                    {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
-                  </div>
-                ) : (
-                  filteredOptions.map((opt) => (
-                    <div
-                      key={opt.id}
-                      onClick={() => handleSelectProduct(opt)}
-                      style={{
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
-                        <div style={{ fontSize: 10, color: '#64748b' }}>
-                          {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Giá vốn: {Number(opt.costPrice ?? opt.baseAvgCost ?? 0).toLocaleString('vi-VN')} đ
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <button
             type="button"
             title="Toàn màn hình"
             style={{
-              background: 'transparent',
+              background: 'rgba(255, 255, 255, 0.18)',
               border: 'none',
-              color: 'rgba(255, 255, 255, 0.85)',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
               cursor: 'pointer',
-              fontSize: 16
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
             <FullscreenOutlined />
@@ -530,11 +589,15 @@ const DisposalDocumentModal = ({
             type="button"
             title="In phiếu"
             style={{
-              background: 'transparent',
+              background: 'rgba(255, 255, 255, 0.18)',
               border: 'none',
-              color: 'rgba(255, 255, 255, 0.85)',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
               cursor: 'pointer',
-              fontSize: 16
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
             <PrinterOutlined />
@@ -562,8 +625,151 @@ const DisposalDocumentModal = ({
 
       {/* BODY CONTENT - HTML TABLE WITHOUT ANTD COMPONENTS */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT: TABLE AREA */}
+        {/* LEFT: TABLE AREA & SEARCH */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* SEARCH BAR & EXPIRED BUTTON ROW */}
+          <div style={{ marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div ref={searchContainerRef} style={{ flex: 1, position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <SearchOutlined style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 14 }} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Tìm sản phẩm theo mã hoặc tên (F1)..."
+                  value={searchQuery}
+                  onFocus={() => setShowDropdown(true)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: 36,
+                    paddingLeft: 34,
+                    paddingRight: searchQuery ? 30 : 12,
+                    fontSize: 12,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    background: '#ffffff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                />
+                {searchQuery && (
+                  <CloseOutlined
+                    onClick={() => {
+                      setSearchQuery('');
+                      searchInputRef.current?.focus();
+                    }}
+                    title="Xóa tìm kiếm"
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#94a3b8',
+                      fontSize: 11,
+                      cursor: 'pointer'
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* LIVE SEARCH DROPDOWN */}
+              {showDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 6,
+                    background: '#ffffff',
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    marginTop: 4,
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                    zIndex: 100
+                  }}
+                >
+                  {filteredOptions.length === 0 ? (
+                    <div style={{ padding: 12, color: '#94a3b8', textAlign: 'center', fontSize: 12 }}>
+                      {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
+                    </div>
+                  ) : (
+                    filteredOptions.map((opt) => (
+                      <div
+                        key={opt.id}
+                        onClick={() => handleSelectProduct(opt)}
+                        style={{
+                          padding: '9px 14px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>
+                            {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>
+                            Tồn: {Number(opt.stock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')} {opt.unitName}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#e8442a', fontWeight: 600 }}>
+                            Giá vốn: {Number(opt.costPrice ?? opt.baseAvgCost ?? 0).toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* NÚT CHỌN HÀNG HẾT HẠN */}
+            <button
+              type="button"
+              onClick={handleSelectAllExpiredInModal}
+              disabled={loadingExpiredInModal}
+              title="Tự động tìm và chọn các nguyên liệu đã hết hạn"
+              style={{
+                height: 36,
+                background: '#fff1f2',
+                color: '#e11d48',
+                border: '1px solid #fecdd3',
+                borderRadius: 6,
+                padding: '0 14px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: loadingExpiredInModal ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 2px rgba(225, 29, 72, 0.08)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!loadingExpiredInModal) e.currentTarget.style.background = '#ffe4e6';
+              }}
+              onMouseLeave={(e) => {
+                if (!loadingExpiredInModal) e.currentTarget.style.background = '#fff1f2';
+              }}
+            >
+              <WarningOutlined />
+              <span>{loadingExpiredInModal ? 'Đang tìm...' : 'Chọn hàng hết hạn'}</span>
+            </button>
+          </div>
+
           <div
             style={{
               flex: 1,
@@ -624,6 +830,22 @@ const DisposalDocumentModal = ({
                         <td style={{ padding: '6px 8px' }}>
                           <div>
                             <span style={{ fontWeight: 600, color: '#0f172a' }}>{record.name}</span>
+                            {(record.isExpiredAutoSelected || record.note?.includes('Lô hết hạn')) && (
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 9.5,
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fca5a5',
+                                  padding: '1px 5px',
+                                  borderRadius: 4,
+                                  fontWeight: 700
+                                }}
+                              >
+                                Hết hạn
+                              </span>
+                            )}
                           </div>
                           <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <EditOutlined style={{ fontSize: 11, color: '#94a3b8' }} />

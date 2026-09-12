@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -21,6 +21,7 @@ import {
   getTransferById
 } from '../../../../api/documentApi';
 import { extractErrorMessage } from '../../utils/errorHelper';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 
@@ -68,6 +69,8 @@ const TransferDocumentModal = ({
   const [bInventoryList, setBInventoryList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const searchContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     docCode: '',
@@ -75,16 +78,47 @@ const TransferDocumentModal = ({
   });
   const [items, setItems] = useState([]);
 
-  // Fetch branches excluding current branch
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Keyboard shortcut F1/F3 to focus search, ESC to close dropdown
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!open) return;
+      if (e.key === 'F1' || e.key === 'F3') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setShowDropdown(true);
+      } else if (e.key === 'Escape') {
+        setShowDropdown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+
+  // Fetch branches excluding current branch and inactive branches
   useEffect(() => {
     if (open) {
       getAllBranches()
         .then((res) => {
           const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
           setBranches(list);
-          const otherBranches = list.filter((b) => Number(b.id) !== Number(branchId));
-          if (otherBranches.length > 0) {
-            setTargetBranchId(otherBranches[0].id);
+          const validOtherBranches = list.filter(
+            (b) => Number(b.id) !== Number(branchId) && !b.isDeleted && b.status !== 'Ngừng kinh doanh'
+          );
+          if (validOtherBranches.length > 0) {
+            setTargetBranchId(validOtherBranches[0].id);
+          } else {
+            setTargetBranchId('');
           }
         })
         .catch((err) => {
@@ -100,11 +134,19 @@ const TransferDocumentModal = ({
     getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        setBInventoryList(data);
+        if (data.length > 0 || !query) {
+          setBInventoryList((prev) => {
+            if (!query) return data;
+            const prevMap = new Map(prev.map((item) => [item.id ?? item.bInventoryId, item]));
+            data.forEach((item) => {
+              prevMap.set(item.id ?? item.bInventoryId, item);
+            });
+            return Array.from(prevMap.values());
+          });
+        }
       })
       .catch((err) => {
         console.error('Failed to load BInventories:', err);
-        setBInventoryList([]);
       });
   }, []);
 
@@ -248,16 +290,24 @@ const TransferDocumentModal = ({
     const unselected = searchOptions.filter((opt) => !existingIds.has(Number(opt.id)));
 
     if (!searchQuery.trim()) return unselected;
-    const q = searchQuery.toLowerCase();
-    return unselected.filter(
-      (opt) => opt.code.toLowerCase().includes(q) || opt.name.toLowerCase().includes(q)
-    );
+    const qRaw = searchQuery.toLowerCase().trim();
+    const qNorm = removeVietnameseTones(searchQuery).trim();
+    return unselected.filter((opt) => {
+      const nameRaw = (opt.name || '').toLowerCase();
+      const nameNorm = removeVietnameseTones(opt.name);
+      const codeRaw = (opt.code || '').toLowerCase();
+      return (
+        nameRaw.includes(qRaw) ||
+        nameNorm.includes(qNorm) ||
+        codeRaw.includes(qRaw)
+      );
+    });
   }, [searchOptions, searchQuery, items]);
 
   const handleSelectProduct = (opt) => {
     const existingIndex = items.findIndex((i) => Number(i.bInventoryId) === Number(opt.id));
     if (existingIndex >= 0) {
-      message.warning(`${opt.name} đã có trong danh sách chuyển hàng.`);
+      showToast(`${opt.name} đã có trong danh sách chuyển hàng.`, 'warning');
       setShowDropdown(false);
       setSearchQuery('');
       return;
@@ -321,16 +371,33 @@ const TransferDocumentModal = ({
   }, [items]);
 
   const otherBranches = useMemo(() => {
-    return branches.filter((b) => Number(b.id) !== Number(branchId));
+    return branches.filter(
+      (b) => Number(b.id) !== Number(branchId) && !b.isDeleted && b.status !== 'Ngừng kinh doanh'
+    );
   }, [branches, branchId]);
 
+  const currentBranch = useMemo(() => {
+    return branches.find((b) => Number(b.id) === Number(branchId));
+  }, [branches, branchId]);
+
+  const isSenderInactive = currentBranch ? (currentBranch.isDeleted || currentBranch.status === 'Ngừng kinh doanh') : false;
+
   const handleSubmit = async (isDraft = false) => {
+    if (isSenderInactive) {
+      showToast('Chi nhánh gửi hiện tại đã ngừng kinh doanh, không thể tạo hoặc chuyển hàng.', 'error');
+      return;
+    }
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 sản phẩm để chuyển hàng.', 'error');
       return;
     }
     if (!targetBranchId) {
-      showToast('Vui lòng chọn chi nhánh nhận.', 'error');
+      showToast('Vui lòng chọn chi nhánh nhận hợp lệ.', 'error');
+      return;
+    }
+    const targetBranch = branches.find((b) => Number(b.id) === Number(targetBranchId));
+    if (!targetBranch || targetBranch.isDeleted || targetBranch.status === 'Ngừng kinh doanh') {
+      showToast('Chi nhánh nhận đã ngừng kinh doanh. Không thể chuyển hàng tới chi nhánh này.', 'error');
       return;
     }
 
@@ -459,105 +526,24 @@ const TransferDocumentModal = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
-            Chuyển hàng
+            {editDocumentId ? `Chỉnh sửa phiếu chuyển hàng (${formData.docCode || ''})` : 'Tạo phiếu chuyển hàng'}
           </span>
-
-          {/* SEARCH INPUT DROPDOWN */}
-          <div style={{ position: 'relative', width: 420 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: 16,
-                padding: '3px 12px',
-                border: '1px solid rgba(255,255,255,0.4)'
-              }}
-            >
-              <SearchOutlined style={{ color: '#e8442a', marginRight: 6 }} />
-              <input
-                type="text"
-                placeholder="Tìm hàng hóa theo mã hoặc theo tên (F3)..."
-                value={searchQuery}
-                onFocus={() => setShowDropdown(true)}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowDropdown(true);
-                }}
-                style={{
-                  width: '100%',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: 11,
-                  background: 'transparent',
-                  color: '#0f172a'
-                }}
-              />
-            </div>
-
-            {showDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 32,
-                  left: 0,
-                  right: 0,
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  maxHeight: 240,
-                  overflowY: 'auto',
-                  zIndex: 1001
-                }}
-              >
-                {filteredOptions.length === 0 ? (
-                  <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
-                    {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
-                  </div>
-                ) : (
-                  filteredOptions.map((opt) => (
-                    <div
-                      key={opt.id}
-                      onClick={() => handleSelectProduct(opt)}
-                      style={{
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
-                        <div style={{ fontSize: 10, color: '#64748b' }}>
-                          {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Tồn: {Number(opt.stock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <button
             type="button"
             title="Toàn màn hình"
             style={{
-              background: 'transparent',
+              background: 'rgba(255, 255, 255, 0.18)',
               border: 'none',
-              color: 'rgba(255, 255, 255, 0.85)',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
               cursor: 'pointer',
-              fontSize: 16
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
             <FullscreenOutlined />
@@ -566,11 +552,15 @@ const TransferDocumentModal = ({
             type="button"
             title="In phiếu"
             style={{
-              background: 'transparent',
+              background: 'rgba(255, 255, 255, 0.18)',
               border: 'none',
-              color: 'rgba(255, 255, 255, 0.85)',
+              borderRadius: 6,
+              padding: '5px 8px',
+              color: '#ffffff',
               cursor: 'pointer',
-              fontSize: 16
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
             <PrinterOutlined />
@@ -598,8 +588,115 @@ const TransferDocumentModal = ({
 
       {/* BODY CONTENT */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* LEFT AREA: TABLE OR EXCEL DRAG & DROP BOX */}
+        {/* LEFT AREA: SEARCH & ITEMS TABLE */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* SEARCH INPUT WITH DROPDOWN */}
+          <div ref={searchContainerRef} style={{ marginBottom: 10, position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <SearchOutlined style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 14 }} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onFocus={() => setShowDropdown(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowDropdown(true);
+                }}
+                placeholder="Tìm sản phẩm theo mã hoặc tên (F1)..."
+                style={{
+                  width: '100%',
+                  height: 36,
+                  paddingLeft: 34,
+                  paddingRight: searchQuery ? 30 : 12,
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  background: '#ffffff',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              />
+              {searchQuery && (
+                <CloseOutlined
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title="Xóa tìm kiếm"
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8',
+                    fontSize: 11,
+                    cursor: 'pointer'
+                  }}
+                />
+              )}
+            </div>
+
+            {/* LIVE SEARCH DROPDOWN */}
+            {showDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  background: '#ffffff',
+                  maxHeight: 240,
+                  overflowY: 'auto',
+                  marginTop: 4,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                  zIndex: 100
+                }}
+              >
+                {filteredOptions.length === 0 ? (
+                  <div style={{ padding: 12, color: '#94a3b8', textAlign: 'center', fontSize: 12 }}>
+                    {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
+                  </div>
+                ) : (
+                  filteredOptions.map((opt) => (
+                    <div
+                      key={opt.id}
+                      onClick={() => handleSelectProduct(opt)}
+                      style={{
+                        padding: '9px 14px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                          {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>
+                          Tồn: {Number(opt.stock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')} {opt.unitName}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#e8442a', fontWeight: 600 }}>
+                          Giá vốn: {Number(opt.costPrice ?? opt.baseAvgCost ?? 0).toLocaleString('vi-VN')} đ
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div
             style={{
               flex: 1,
@@ -883,10 +980,23 @@ const TransferDocumentModal = ({
               </span>
             </div>
 
+            {isSenderInactive && (
+              <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 6, color: '#b91c1c', fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Chi nhánh hiện tại đã ngừng kinh doanh. Không thể tạo hoặc chuyển hàng.
+              </div>
+            )}
+
+            {!isSenderInactive && otherBranches.length === 0 && (
+              <div style={{ padding: '8px 10px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 6, color: '#b45309', fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                Hiện không có chi nhánh nào khác đang hoạt động để nhận hàng.
+              </div>
+            )}
+
             <div>
               <div style={{ marginBottom: 4, color: '#64748b', fontSize: 11 }}>Tới chi nhánh</div>
               <select
                 value={targetBranchId}
+                disabled={isSenderInactive || otherBranches.length === 0}
                 onChange={(e) => setTargetBranchId(e.target.value)}
                 style={{
                   width: '100%',
@@ -895,12 +1005,13 @@ const TransferDocumentModal = ({
                   border: '1px solid #cbd5e1',
                   outline: 'none',
                   fontSize: 11,
-                  background: '#ffffff',
-                  color: '#0f172a'
+                  background: isSenderInactive || otherBranches.length === 0 ? '#f1f5f9' : '#ffffff',
+                  color: isSenderInactive || otherBranches.length === 0 ? '#94a3b8' : '#0f172a',
+                  cursor: isSenderInactive || otherBranches.length === 0 ? 'not-allowed' : 'pointer'
                 }}
               >
                 {otherBranches.length === 0 ? (
-                  <option value="">Không có chi nhánh khác</option>
+                  <option value="">-- Không có chi nhánh đang hoạt động --</option>
                 ) : (
                   otherBranches.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -934,7 +1045,7 @@ const TransferDocumentModal = ({
           <div style={{ display: 'flex', gap: 10, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId}
               onClick={() => handleSubmit(true)}
               style={{
                 flex: 1,
@@ -944,14 +1055,15 @@ const TransferDocumentModal = ({
                 fontWeight: 600,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 0.5 : 1
               }}
             >
               Lưu tạm
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId}
               onClick={() => handleSubmit(false)}
               style={{
                 flex: 1,
@@ -961,7 +1073,8 @@ const TransferDocumentModal = ({
                 fontWeight: 700,
                 borderRadius: 6,
                 padding: '8px 0',
-                cursor: 'pointer'
+                cursor: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isSenderInactive || otherBranches.length === 0 || !targetBranchId) ? 0.5 : 1
               }}
             >
               Hoàn thành

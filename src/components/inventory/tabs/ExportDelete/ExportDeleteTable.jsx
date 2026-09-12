@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   SearchOutlined,
@@ -7,7 +8,10 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   DeleteOutlined,
-  EnvironmentOutlined
+  EnvironmentOutlined,
+  WarningOutlined,
+  CloseOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getExportDeleteById } from '../../../../api/documentApi';
 
@@ -21,15 +25,18 @@ const ExportDeleteTable = ({
   setModalExportOpen,
   onEditDocument,
   handleDeleteDocument,
-  onRefresh
+  onRefresh,
+  expiredCount = 0,
+  onOpenExpiredModal,
+  loadingExpired = false
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [loadedDoc, setLoadedDoc] = useState(null);
   const [loadingDocId, setLoadingDocId] = useState(null);
 
-  const pageSize = 20;
-
+  const pageSize = 15;
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -45,12 +52,22 @@ const ExportDeleteTable = ({
       const res = await getExportDeleteById(docId);
       setLoadedDoc(res || {});
     } catch (err) {
-      console.error('Failed to load export delete document details:', err);
+      console.error('Failed to load export delete details:', err);
       setLoadedDoc(null);
     } finally {
       setLoadingDocId(null);
     }
   };
+
+  // Auto-expand matching document from searchText
+  React.useEffect(() => {
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleRowExpand(matched.id);
+    }
+  }, [documents, searchText]);
 
   const getStatusBadge = (status) => {
     if (status === 0 || status === 'Pending') {
@@ -75,34 +92,34 @@ const ExportDeleteTable = ({
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
-      {/* TOP ACTION TOOLBAR */}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden', width: '100%' }}>
+      {/* ACTION TOOLBAR */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {/* SEARCH INPUT */}
-          <div style={{ position: 'relative', width: 280 }}>
-            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
-            <input
-              type="text"
-              placeholder="Theo mã phiếu xuất hủy, người tạo..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{
-                width: '100%',
-                height: 32,
-                padding: '4px 10px 4px 30px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: '#1e293b',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                outline: 'none',
-                transition: 'border 0.2s ease'
-              }}
-            />
-          </div>
+          {setSearchText && (
+            <div style={{ position: 'relative', width: 280 }}>
+              <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+              <input
+                type="text"
+                placeholder="Theo mã phiếu, người tạo, ghi chú..."
+                value={searchText || ''}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: 32,
+                  padding: '4px 10px 4px 30px',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: '#1e293b',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  transition: 'border 0.2s ease'
+                }}
+              />
+            </div>
+          )}
 
-          {/* STATUS FILTER PILLS */}
           {setStatusFilter && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
               {[
@@ -138,8 +155,49 @@ const ExportDeleteTable = ({
           )}
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* NÚT XUẤT HỎNG */}
+          <button
+            type="button"
+            onClick={onOpenExpiredModal}
+            disabled={loadingExpired}
+            style={{
+              background: '#fff1f2',
+              color: '#e11d48',
+              border: '1px solid #fecdd3',
+              borderRadius: 6,
+              padding: '0 14px',
+              height: 32,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: loadingExpired ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 2px rgba(225, 29, 72, 0.1)'
+            }}
+          >
+            <WarningOutlined style={{ color: '#e11d48', fontSize: 13 }} />
+            <span>{loadingExpired ? 'Đang tìm...' : 'Xuất hỏng'}</span>
+            {expiredCount > 0 && (
+              <span
+                style={{
+                  background: '#e11d48',
+                  color: '#ffffff',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 10,
+                  padding: '1px 6px',
+                  lineHeight: '14px',
+                  marginLeft: 2
+                }}
+              >
+                {expiredCount}
+              </span>
+            )}
+          </button>
+
+          {/* NÚT XUẤT HỦY */}
           <button
             type="button"
             onClick={() => {
@@ -203,16 +261,17 @@ const ExportDeleteTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu xuất hủy nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu xuất hủy nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -278,12 +337,34 @@ const ExportDeleteTable = ({
                           </button>
                         </div>
                       </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/export-delete-detail/${doc.id}`, { state: { document: doc } })}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <EyeOutlined style={{ fontSize: 11 }} /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL PANEL (SINGLE TAB: THÔNG TIN CHI TIẾT) */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={9} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -296,7 +377,7 @@ const ExportDeleteTable = ({
                             }}
                           >
                             {/* SINGLE TAB HEADER */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
                               <div
                                 style={{
                                   padding: '10px 16px',
@@ -311,6 +392,26 @@ const ExportDeleteTable = ({
                               >
                                 <InfoCircleOutlined /> Thông tin chi tiết phiếu xuất hủy
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/export-delete-detail/${doc.id}`, { state: { document: activeDoc } })}
+                                style={{
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                              >
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
+                              </button>
                             </div>
 
                             {loadingDocId === doc.id ? (

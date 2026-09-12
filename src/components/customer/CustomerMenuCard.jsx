@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Tag, Button, Modal } from "antd";
-import { EyeOutlined, CoffeeOutlined, CustomerServiceOutlined, MessageOutlined } from "@ant-design/icons";
+import { CoffeeOutlined, CustomerServiceOutlined, MessageOutlined, EyeOutlined } from "@ant-design/icons";
 
 const formatPrice = (price) => {
   if (price === undefined || price === null) return "0 đ";
@@ -31,7 +31,11 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
 
   return (
     <>
-      <div className="customer-menu-card">
+      <div 
+        className="customer-menu-card"
+        onClick={() => onViewDetail && onViewDetail(product)}
+        style={{ cursor: "pointer" }}
+      >
         <div className="card-image-wrapper">
           <img 
             src={image} 
@@ -44,20 +48,14 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
               e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'; 
             }}
           />
-          <div className="card-overlay" style={{ gap: 8 }}>
-            <Button
-              type="primary"
-              shape="round"
-              icon={<EyeOutlined />}
-              onClick={() => onViewDetail(product)}
-              className="btn-quick-view"
-            >
-              Xem chi tiết
-            </Button>
+          <div className="card-overlay">
             <Button
               shape="round"
               icon={<MessageOutlined />}
-              onClick={() => setConsultModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setConsultModalOpen(true);
+              }}
               style={{
                 background: '#ea580c',
                 borderColor: '#ea580c',
@@ -74,6 +72,22 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
               Mới
             </span>
           )}
+          {product.originalPrice && product.originalPrice > price && (
+            <span className="card-discount-badge" style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              background: '#ea580c',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              padding: '4px 8px',
+              borderBottomLeftRadius: '8px',
+              zIndex: 10
+            }}>
+              -{Math.round(((product.originalPrice - price) / product.originalPrice) * 100)}%
+            </span>
+          )}
         </div>
 
         <div className="card-info">
@@ -86,7 +100,16 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
             {name}
           </h3>
           <div className="card-footer-row">
-            <div className="card-price">{formatPrice(price)}</div>
+            <div className="card-price" style={{ display: 'flex', flexDirection: 'column' }}>
+              {product.originalPrice && product.originalPrice > price && (
+                <span style={{ fontSize: 12, textDecoration: 'line-through', color: '#94a3b8', marginBottom: '-2px' }}>
+                  {formatPrice(product.originalPrice)}
+                </span>
+              )}
+              <span style={{ fontSize: 15, fontWeight: 800, color: product.originalPrice && product.originalPrice > price ? '#ea580c' : '#1e293b' }}>
+                {formatPrice(price)}
+              </span>
+            </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <Button
                 type="text"

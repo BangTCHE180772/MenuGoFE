@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ReloadOutlined,
   LeftOutlined,
@@ -11,7 +11,8 @@ import {
   SearchOutlined,
   AppstoreOutlined,
   CompassOutlined,
-  InboxOutlined
+  InboxOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getBInventories, getBInventoryLedger } from '../../../../api/binventoryApi';
@@ -101,27 +102,104 @@ const getProductTypeBadge = (item) => {
 };
 
 const mapMethodToTab = (methodName, docCode) => {
-  if (methodName === "Bán hàng" || (docCode && docCode.startsWith("PXBH"))) {
+  if (methodName === "Bán hàng" || (docCode && (docCode.startsWith("PXBH") || docCode.startsWith("HD")))) {
     return "Invoice";
   }
   switch (methodName) {
     case "Nhập hàng":
       return "Import";
     case "Trả hàng nhập":
+    case "Trả Hàng":
+    case "Trả hàng":
       return "ImportReturn";
     case "Kiểm kho":
       return "Check";
     case "Xuất hủy":
+    case "Xuất Hủy":
       return "ExportDelete";
     case "Xuất chuyển kho":
+    case "Chuyển Hàng":
+    case "Chuyển hàng":
       return "Transfer";
     case "Sản xuất":
       return "Production";
     case "Điều chỉnh":
+    case "Điều chỉnh giá vốn":
       return "Adjustment";
     default:
       return null;
   }
+};
+
+const renderMethodBadge = (ldg) => {
+  let method = ldg.methodName || ldg.method || ldg.type || '';
+  const docType = ldg.documentType || '';
+  const docCode = ldg.documentCode || ldg.docCode || '';
+
+  if (docType === 'Export' || docType === 'ExportDelete' || method.toLowerCase().includes('hủy') || docCode.startsWith('XH')) {
+    method = 'Xuất Hủy';
+  } else if (docType === 'Sale' || method.toLowerCase().includes('bán') || docCode.startsWith('PXBH') || docCode.startsWith('HD')) {
+    method = 'Bán hàng';
+  } else if (docType === 'Return' || (method.toLowerCase().includes('trả') && !method.toLowerCase().includes('khách')) || docCode.startsWith('THN') || docCode.startsWith('TH')) {
+    method = 'Trả Hàng';
+  } else if (docType === 'Transfer' || method.toLowerCase().includes('chuyển') || docCode.startsWith('CK')) {
+    method = 'Chuyển Hàng';
+  } else if (docType === 'CustomerReturn' || method.toLowerCase().includes('khách')) {
+    method = 'Khách trả hàng';
+  } else if (docType === 'Import' || method.toLowerCase().includes('nhập') || docCode.startsWith('NH')) {
+    method = 'Nhập hàng';
+  } else if (docType === 'Check' || method.toLowerCase().includes('kiểm')) {
+    method = 'Kiểm kho';
+  } else if (docType === 'Production' || method.toLowerCase().includes('sản xuất')) {
+    method = 'Sản xuất';
+  }
+
+  let bg = '#f1f5f9';
+  let color = '#334155';
+  let border = '#e2e8f0';
+
+  if (method === 'Bán hàng') {
+    bg = '#eff6ff';
+    color = '#1d4ed8';
+    border = '#bfdbfe';
+  } else if (method === 'Xuất Hủy') {
+    bg = '#fef2f2';
+    color = '#dc2626';
+    border = '#fecaca';
+  } else if (method === 'Trả Hàng') {
+    bg = '#fff7ed';
+    color = '#c2410c';
+    border = '#ffedd5';
+  } else if (method === 'Chuyển Hàng') {
+    bg = '#f5f3ff';
+    color = '#6d28d9';
+    border = '#ddd6fe';
+  } else if (method === 'Nhập hàng') {
+    bg = '#ecfdf5';
+    color = '#047857';
+    border = '#a7f3d0';
+  } else if (method === 'Khách trả hàng') {
+    bg = '#f0fdf4';
+    color = '#15803d';
+    border = '#bbf7d0';
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2.5px 8px',
+        borderRadius: 4,
+        fontSize: 10.5,
+        fontWeight: 700,
+        background: bg,
+        color: color,
+        border: `1px solid ${border}`
+      }}
+    >
+      {method}
+    </span>
+  );
 };
 
 const ProductTable = ({
@@ -134,6 +212,7 @@ const ProductTable = ({
   statusFilter = 'ALL',
   setStatusFilter
 }) => {
+  const navigate = useNavigate();
   const [bInventories, setBInventories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -164,7 +243,53 @@ const ProductTable = ({
     try {
       // mode = 4 for 'monan' (only Processed), mode = 2 for 'nguyenlieu' (all non-Processed)
       const modeParam = subTab === 'monan' ? 4 : 2;
-      const data = await getBInventories(selectedBranchId, '', '', modeParam);
+      let data = await getBInventories(selectedBranchId, '', '', modeParam);
+
+      // Nếu có tìm kiếm từ URL hoặc tham số sản phẩm mà không tìm thấy trong subTab hiện tại, kiểm tra toàn bộ kho
+      const searchParam = searchParams.get('search') || searchText;
+      const prodIdParam = searchParams.get('productId');
+      const invIdParam = searchParams.get('inventoryId');
+      if (searchParam || prodIdParam || invIdParam) {
+        const lowerSearch = (searchParam || '').toLowerCase().trim();
+        const found = (data || []).some((i) => {
+          if (invIdParam && (i.id === Number(invIdParam) || i.bInventoryId === Number(invIdParam))) return true;
+          if (prodIdParam && (i.productId === Number(prodIdParam) || i.product?.id === Number(prodIdParam))) return true;
+          if (lowerSearch) {
+            const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+            const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+            return pName === lowerSearch || pCode === lowerSearch || pCode.includes(lowerSearch) || pName.includes(lowerSearch);
+          }
+          return false;
+        });
+
+        if (!found) {
+          try {
+            const allData = await getBInventories(selectedBranchId, '', '', 0);
+            const matchedItem = (allData || []).find((i) => {
+              if (invIdParam && (i.id === Number(invIdParam) || i.bInventoryId === Number(invIdParam))) return true;
+              if (prodIdParam && (i.productId === Number(prodIdParam) || i.product?.id === Number(prodIdParam))) return true;
+              if (lowerSearch) {
+                const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
+                const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
+                return pName === lowerSearch || pCode === lowerSearch || pCode.includes(lowerSearch) || pName.includes(lowerSearch);
+              }
+              return false;
+            });
+
+            if (matchedItem) {
+              const isProcessed = checkIsProcessed(matchedItem);
+              const neededSubTab = isProcessed ? 'monan' : 'nguyenlieu';
+              if (subTab !== neededSubTab && setSubTab) {
+                setSubTab(neededSubTab);
+                return;
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
       if (Array.isArray(data)) {
         setBInventories(data);
       } else {
@@ -236,9 +361,9 @@ const ProductTable = ({
 
   const [searchParams] = useSearchParams();
 
-  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho
+  // Tự động mở chi tiết nguyên liệu khi điều hướng từ thông báo cảnh báo kho hoặc tìm kiếm
   useEffect(() => {
-    const listToSearch = filteredData.length > 0 ? filteredData : rawList;
+    const listToSearch = (rawList && rawList.length > 0) ? rawList : filteredData;
     if (!listToSearch || listToSearch.length === 0) return;
 
     const invIdParam = searchParams.get('inventoryId') ? Number(searchParams.get('inventoryId')) : null;
@@ -258,7 +383,7 @@ const ProductTable = ({
       matched = listToSearch.find((i) => {
         const pName = String(i.name || i.productName || i.product?.name || '').toLowerCase();
         const pCode = String(i.code || i.productCode || i.product?.code || '').toLowerCase();
-        return pName === lower || pCode === lower || pName.includes(lower);
+        return pName === lower || pCode === lower || pCode.includes(lower) || pName.includes(lower);
       });
     }
 
@@ -321,8 +446,8 @@ const ProductTable = ({
       const rawLedgerItems = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
       // Sort by latest date descending
       const sortedItems = [...rawLedgerItems].sort((a, b) => {
-        const tA = new Date(a.createdDate || a.time || a.date || 0).getTime();
-        const tB = new Date(b.createdDate || b.time || b.date || 0).getTime();
+        const tA = new Date(a.businessDate || a.createdAt || a.createdDate || a.time || a.date || 0).getTime();
+        const tB = new Date(b.businessDate || b.createdAt || b.createdDate || b.time || b.date || 0).getTime();
         return tB - tA;
       });
 
@@ -543,6 +668,7 @@ const ProductTable = ({
               <th style={{ padding: '10px 8px', textAlign: 'right' }}>Đơn giá</th>
               <th style={{ padding: '10px 8px', textAlign: 'right' }}>Giá trị tồn cuối</th>
               <th style={{ padding: '10px 8px', textAlign: 'center' }}>Trạng thái</th>
+              <th style={{ padding: '10px 8px', textAlign: 'center' }}>Chi tiết</th>
             </tr>
           </thead>
           <tbody>
@@ -559,17 +685,18 @@ const ProductTable = ({
                 {totalStockValue.toLocaleString('vi-VN')}đ
               </td>
               <td style={{ padding: '10px 8px' }}></td>
+              <td style={{ padding: '10px 8px' }}></td>
             </tr>
 
             {loading ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
                   Đang tải danh sách tồn kho từ API...
                 </td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                   Không tìm thấy dữ liệu nguyên liệu / mặt hàng nào
                 </td>
               </tr>
@@ -673,12 +800,33 @@ const ProductTable = ({
                           </span>
                         )}
                       </td>
+                      <td style={{ padding: '10px 8px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/product-detail/${itemId}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* ─── EXPANDED DETAILED DRAWER CONTAINER ─────────────────── */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={10} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={11} style={{ padding: '4px 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -690,61 +838,19 @@ const ProductTable = ({
                             }}
                           >
                             {/* SUB-TABS NAVIGATION HEADER */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px' }}>
-                              {/* TAB 1: THÔNG TIN (MANDATORY) */}
-                              <button
-                                type="button"
-                                onClick={() => handleTabSwitch(itemId, 'info')}
-                                style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'info' ? 700 : 500,
-                                  color: activeTab === 'info' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'info' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5
-                                }}
-                              >
-                                <InfoCircleOutlined /> Thông tin
-                              </button>
-
-                              {/* TAB 2: THẺ KHO (MANDATORY, LAZY LOADED ON CLICK) */}
-                              <button
-                                type="button"
-                                onClick={() => handleTabSwitch(itemId, 'ledger')}
-                                style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'ledger' ? 700 : 500,
-                                  color: activeTab === 'ledger' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'ledger' ? '2.5px solid #2563eb' : '2.5px solid transparent',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 5
-                                }}
-                              >
-                                <HistoryOutlined /> Thẻ kho
-                              </button>
-
-                              {/* TAB 3: ĐƠN VỊ QUY ĐỔI (CONDITIONAL) */}
-                              {hasUnitConversions && (
+                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex' }}>
+                                {/* TAB 1: THÔNG TIN (MANDATORY) */}
                                 <button
                                   type="button"
-                                  onClick={() => handleTabSwitch(itemId, 'unit')}
+                                  onClick={() => handleTabSwitch(itemId, 'info')}
                                   style={{
                                     padding: '9px 14px',
                                     border: 'none',
                                     background: 'transparent',
-                                    fontWeight: activeTab === 'unit' ? 700 : 500,
-                                    color: activeTab === 'unit' ? '#2563eb' : '#64748b',
-                                    borderBottom: activeTab === 'unit' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    fontWeight: activeTab === 'info' ? 700 : 500,
+                                    color: activeTab === 'info' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'info' ? '2.5px solid #2563eb' : '2.5px solid transparent',
                                     cursor: 'pointer',
                                     fontSize: 12,
                                     display: 'flex',
@@ -752,22 +858,20 @@ const ProductTable = ({
                                     gap: 5
                                   }}
                                 >
-                                  <SwapOutlined /> Đơn vị quy đổi
+                                  <InfoCircleOutlined /> Thông tin
                                 </button>
-                              )}
 
-                              {/* TAB 4: ĐỊNH LƯỢNG / THÀNH PHẦN (CONDITIONAL) */}
-                              {hasRecipe && (
+                                {/* TAB 2: THẺ KHO (MANDATORY, LAZY LOADED ON CLICK) */}
                                 <button
                                   type="button"
-                                  onClick={() => handleTabSwitch(itemId, 'recipe')}
+                                  onClick={() => handleTabSwitch(itemId, 'ledger')}
                                   style={{
                                     padding: '9px 14px',
                                     border: 'none',
                                     background: 'transparent',
-                                    fontWeight: activeTab === 'recipe' ? 700 : 500,
-                                    color: activeTab === 'recipe' ? '#2563eb' : '#64748b',
-                                    borderBottom: activeTab === 'recipe' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    fontWeight: activeTab === 'ledger' ? 700 : 500,
+                                    color: activeTab === 'ledger' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'ledger' ? '2.5px solid #2563eb' : '2.5px solid transparent',
                                     cursor: 'pointer',
                                     fontSize: 12,
                                     display: 'flex',
@@ -775,29 +879,96 @@ const ProductTable = ({
                                     gap: 5
                                   }}
                                 >
-                                  <ProfileOutlined /> Định lượng món
+                                  <HistoryOutlined /> Thẻ kho
                                 </button>
-                              )}
 
-                              {/* TAB 5: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                                {/* TAB 3: ĐƠN VỊ QUY ĐỔI (CONDITIONAL) */}
+                                {hasUnitConversions && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTabSwitch(itemId, 'unit')}
+                                    style={{
+                                      padding: '9px 14px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      fontWeight: activeTab === 'unit' ? 700 : 500,
+                                      color: activeTab === 'unit' ? '#2563eb' : '#64748b',
+                                      borderBottom: activeTab === 'unit' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 5
+                                    }}
+                                  >
+                                    <SwapOutlined /> Đơn vị quy đổi
+                                  </button>
+                                )}
+
+                                {/* TAB 4: ĐỊNH LƯỢNG / THÀNH PHẦN (CONDITIONAL) */}
+                                {hasRecipe && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTabSwitch(itemId, 'recipe')}
+                                    style={{
+                                      padding: '9px 14px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      fontWeight: activeTab === 'recipe' ? 700 : 500,
+                                      color: activeTab === 'recipe' ? '#2563eb' : '#64748b',
+                                      borderBottom: activeTab === 'recipe' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 5
+                                    }}
+                                  >
+                                    <ProfileOutlined /> Định lượng món
+                                  </button>
+                                )}
+
+                                {/* TAB 5: DANH SÁCH LÔ HÀNG & HSD (MANDATORY) */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleTabSwitch(itemId, 'batches')}
+                                  style={{
+                                    padding: '9px 14px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontWeight: activeTab === 'batches' ? 700 : 500,
+                                    color: activeTab === 'batches' ? '#2563eb' : '#64748b',
+                                    borderBottom: activeTab === 'batches' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5
+                                  }}
+                                >
+                                  <AppstoreOutlined /> Lô hàng & HSD
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
-                                onClick={() => handleTabSwitch(itemId, 'batches')}
+                                onClick={() => navigate(`/product-detail/${itemId}`)}
                                 style={{
-                                  padding: '9px 14px',
-                                  border: 'none',
-                                  background: 'transparent',
-                                  fontWeight: activeTab === 'batches' ? 700 : 500,
-                                  color: activeTab === 'batches' ? '#2563eb' : '#64748b',
-                                  borderBottom: activeTab === 'batches' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
                                   cursor: 'pointer',
-                                  fontSize: 12,
-                                  display: 'flex',
+                                  display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: 5
+                                  gap: 6,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                 }}
                               >
-                                <AppstoreOutlined /> Lô hàng & HSD
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết mặt hàng
                               </button>
                             </div>
 
@@ -898,7 +1069,7 @@ const ProductTable = ({
                                           <thead>
                                             <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mã chứng từ</th>
-                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Phương thức</th>
+                                              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Nghiệp vụ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'left' }}>Thời gian</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn BQ</th>
                                               <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thay đổi tồn</th>
@@ -942,7 +1113,7 @@ const ProductTable = ({
                                                           textDecoration: 'underline'
                                                         }}
                                                         onClick={() => {
-                                                          const tab = mapMethodToTab(method, docCode);
+                                                          const tab = mapMethodToTab(ldg.methodName || method, docCode);
                                                           if (tab) {
                                                             window.location.href = `/inventory-management?tab=${tab}&search=${docCode}`;
                                                           }
@@ -951,8 +1122,8 @@ const ProductTable = ({
                                                         {renderTruncatedText(docCode, 18)}
                                                       </button>
                                                     </td>
-                                                    <td style={{ padding: '8px 10px', color: '#334155' }}>
-                                                      {renderTruncatedText(method, 22)}
+                                                    <td style={{ padding: '8px 10px' }}>
+                                                      {renderMethodBadge(ldg)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', color: '#475569' }}>
                                                       {timeStr}
@@ -1146,8 +1317,25 @@ const ProductTable = ({
 
                                                 return (
                                                   <tr key={b.id || bIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
-                                                      {b.batchCode}
+                                                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>
+                                                      {b.batchCode ? (
+                                                        <span
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate(`/inventory-management?tab=BatchExpiry&search=${encodeURIComponent(b.batchCode)}`);
+                                                          }}
+                                                          style={{
+                                                            color: '#2563eb',
+                                                            cursor: 'pointer',
+                                                            textDecoration: 'underline'
+                                                          }}
+                                                          title="Nhấp để tìm Lô trong tab Quản lý HSD / Lô"
+                                                        >
+                                                          {b.batchCode}
+                                                        </span>
+                                                      ) : (
+                                                        <span style={{ color: '#94a3b8' }}>---</span>
+                                                      )}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                                                       {qOrig.toLocaleString('vi-VN')} {item.unitName || 'đv'}
@@ -1178,7 +1366,7 @@ const ProductTable = ({
                                                       {renderBatchStatusBadge(b.status)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry)}
+                                                      {renderExpiryStatusBadge(b.expiryDate, b.daysUntilExpiry, b.quantityRemaining, b.status)}
                                                     </td>
                                                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                                                       <button

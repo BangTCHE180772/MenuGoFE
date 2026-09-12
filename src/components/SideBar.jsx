@@ -41,16 +41,16 @@ import { useBranch } from "../context/BranchContext";
 
 // ─── Tùy chọn con của Quản Lý Kho ──────────────────────────────────────────
 const INVENTORY_SUB_MENU = [
+  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Nhập hàng", path: "/inventory-management?tab=Import", tabKey: "Import" },
   { label: "Trả hàng nhập", path: "/inventory-management?tab=ImportReturn", tabKey: "ImportReturn" },
-  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
   { label: "Xuất hủy", path: "/inventory-management?tab=ExportDelete", tabKey: "ExportDelete" },
-  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
   { label: "Chuyển hàng", path: "/inventory-management?tab=Transfer", tabKey: "Transfer" },
   { label: "Kiểm kho", path: "/inventory-management?tab=Check", tabKey: "Check" },
-  { label: "Điều chỉnh giá vốn", path: "/inventory-management?tab=Adjustment", tabKey: "Adjustment" },
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
   { label: "Khách hàng", path: "/inventory-management?tab=Customer", tabKey: "Customer" },
+  { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
+  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
   { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];
@@ -134,6 +134,8 @@ const ROLE_MENUS = {
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
+    { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
     { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
     { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
@@ -155,12 +157,16 @@ const ROLE_MENUS = {
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CASHIER]: [
+    { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.CHEF]: [
+    { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     {
       label: "Lịch làm việc",
       path: "/work-schedule",
@@ -172,6 +178,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.WAITER]: [
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
+    { label: "Trả món", path: "/leftover", icon: <DeleteOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
@@ -209,7 +216,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
 
   const menuItems = ROLE_MENUS[role] ?? [];
   const searchParams = new URLSearchParams(location.search);
-  const activeTabParam = searchParams.get("tab") || "Import";
+  const activeTabParam = searchParams.get("tab") || "Adjustment";
 
   const handleLogout = async () => {
     await logout();

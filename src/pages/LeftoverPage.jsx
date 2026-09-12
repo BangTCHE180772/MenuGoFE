@@ -34,9 +34,15 @@ const HANDLING_ACTION_LABELS = {
 };
 
 const LeftoverPage = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { currentBranchId } = useBranch();
   const branchId = currentBranchId || user?.branchId;
+
+  // Nhân viên (Cashier/Waiter/Chef...) mới cần điền form ghi nhận món thừa —
+  // Quản lý/Chủ sở hữu/Admin chỉ xem lịch sử để theo dõi, không tạo bản ghi.
+  const isManager =
+    ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
+    [1, 2, 3].includes(user?.roleId);
 
   const [form] = Form.useForm();
   const type = Form.useWatch('type', form);
@@ -89,6 +95,7 @@ const LeftoverPage = () => {
   }, [fetchRecords]);
 
   useEffect(() => {
+    if (isManager) return;
     (async () => {
       try {
         const [prodRes, shiftRes] = await Promise.all([getAllProducts(), getAllShifts()]);
@@ -98,19 +105,26 @@ const LeftoverPage = () => {
         message.error('Không thể tải danh mục sản phẩm/ca làm việc.');
       }
     })();
-  }, []);
+  }, [isManager]);
 
   const fetchOrderDetailOptions = useCallback(async () => {
-    if (!branchId) return;
+    if (!branchId || isManager) return;
     try {
       const res = await getAllOrders(branchId);
       const orders = res.data || [];
+      const now = dayjs();
       const options = orders
         .slice()
         .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
         .flatMap((order) =>
           (order.orderDetails || [])
             .filter((d) => d.status !== 'Cancelled')
+            // Chỉ hiện món đặt trong ngày và còn trong 1 tiếng gần nhất — tránh liệt kê
+            // toàn bộ lịch sử đơn hàng cũ không còn liên quan đến việc trả món.
+            .filter((d) => {
+              const orderedAt = dayjs(d.createdAt);
+              return orderedAt.isSame(now, 'day') && now.diff(orderedAt, 'minute') <= 60;
+            })
             .map((d) => ({
               value: d.id,
               label: `HD${order.id} · Bàn ${order.tableName || '?'} · ${d.productName} x${d.quantity}`,
@@ -122,10 +136,13 @@ const LeftoverPage = () => {
     } catch {
       message.error('Không thể tải danh sách chi tiết đơn hàng.');
     }
-  }, [branchId]);
+  }, [branchId, isManager]);
 
   useEffect(() => {
     fetchOrderDetailOptions();
+    // Poll để món tự rớt khỏi danh sách khi quá 1 tiếng, không cần tải lại trang.
+    const interval = setInterval(fetchOrderDetailOptions, 60000);
+    return () => clearInterval(interval);
   }, [fetchOrderDetailOptions]);
 
   const handleSubmit = async (values) => {
@@ -240,93 +257,95 @@ const LeftoverPage = () => {
 
   const leftoverTab = (
     <>
-      <Card title="Ghi nhận món thừa" style={{ marginBottom: 20, borderRadius: 12 }}>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          initialValues={{ type: 'Return', recordDate: dayjs() }}
-        >
-          <Form.Item name="type" label="Loại" rules={[{ required: true }]}>
-            <Radio.Group>
-              <Radio.Button value="Return">Khách trả món (Return)</Radio.Button>
-              <Radio.Button value="Extra">Bếp làm dư (Extra)</Radio.Button>
-            </Radio.Group>
-          </Form.Item>
+      {!isManager && (
+        <Card title="Ghi nhận món thừa" style={{ marginBottom: 20, borderRadius: 12 }}>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            initialValues={{ type: 'Return', recordDate: dayjs() }}
+          >
+            <Form.Item name="type" label="Loại" rules={[{ required: true }]}>
+              <Radio.Group>
+                <Radio.Button value="Return">Khách trả món (Return)</Radio.Button>
+                <Radio.Button value="Extra">Bếp làm dư (Extra)</Radio.Button>
+              </Radio.Group>
+            </Form.Item>
 
-          <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-            <Form.Item name="productId" label="Món" rules={[{ required: true, message: 'Chọn món' }]} style={{ width: 260 }}>
-              <Select
-                showSearch
-                placeholder="Chọn món"
-                optionFilterProp="label"
-                options={products.map((p) => ({ value: p.id, label: p.name }))}
+            <Space style={{ display: 'flex' }} size="large" align="start" wrap>
+              <Form.Item name="productId" label="Món" rules={[{ required: true, message: 'Chọn món' }]} style={{ width: 260 }}>
+                <Select
+                  showSearch
+                  placeholder="Chọn món"
+                  optionFilterProp="label"
+                  options={products.map((p) => ({ value: p.id, label: p.name }))}
+                />
+              </Form.Item>
+
+              <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]} style={{ width: 120 }}>
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+
+              {type === 'Return' && (
+                <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 340 }}>
+                  <Select
+                    showSearch
+                    placeholder="Tìm theo bàn hoặc tên món..."
+                    optionFilterProp="label"
+                    options={orderDetailOptions}
+                    onChange={(value, option) => {
+                      if (option) {
+                        form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
+                      }
+                    }}
+                  />
+                </Form.Item>
+              )}
+
+              {type === 'Extra' && (
+                <Form.Item name="shiftId" label="Ca làm việc" style={{ width: 200 }}>
+                  <Select allowClear placeholder="Chọn ca" options={shifts.map((s) => ({ value: s.id, label: s.name }))} />
+                </Form.Item>
+              )}
+
+              <Form.Item name="recordDate" label="Ngày" style={{ width: 160 }}>
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+              </Form.Item>
+            </Space>
+
+            {type === 'Return' && (
+              <Space style={{ display: 'flex' }} size="large" align="start" wrap>
+                <Form.Item name="handlingAction" label="Cách xử lý" rules={[{ required: true, message: 'Chọn cách xử lý' }]} style={{ width: 220 }}>
+                  <Select
+                    placeholder="Chọn cách xử lý"
+                    options={[
+                      { value: 'Discard', label: 'Huỷ' },
+                      { value: 'StaffUse', label: 'Nhân viên dùng' },
+                      { value: 'Reuse', label: 'Tái sử dụng (nếu cho phép)' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item name="discountAmount" label="Số tiền giảm giá (nếu có)" style={{ width: 200 }}>
+                  <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                </Form.Item>
+              </Space>
+            )}
+
+            <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }]}>
+              <Input.TextArea
+                rows={2}
+                placeholder={type === 'Extra' ? 'VD: làm dư, ước tính sai...' : 'VD: món bị nguội, khách gọi nhầm...'}
               />
             </Form.Item>
 
-            <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]} style={{ width: 120 }}>
-              <InputNumber min={1} style={{ width: '100%' }} />
+            <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+              <Button type="primary" icon={<PlusOutlined />} htmlType="submit" loading={saving}>
+                Ghi nhận
+              </Button>
             </Form.Item>
-
-            {type === 'Return' && (
-              <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 340 }}>
-                <Select
-                  showSearch
-                  placeholder="Tìm theo bàn hoặc tên món..."
-                  optionFilterProp="label"
-                  options={orderDetailOptions}
-                  onChange={(value, option) => {
-                    if (option) {
-                      form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
-                    }
-                  }}
-                />
-              </Form.Item>
-            )}
-
-            {type === 'Extra' && (
-              <Form.Item name="shiftId" label="Ca làm việc" style={{ width: 200 }}>
-                <Select allowClear placeholder="Chọn ca" options={shifts.map((s) => ({ value: s.id, label: s.name }))} />
-              </Form.Item>
-            )}
-
-            <Form.Item name="recordDate" label="Ngày" style={{ width: 160 }}>
-              <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-            </Form.Item>
-          </Space>
-
-          {type === 'Return' && (
-            <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-              <Form.Item name="handlingAction" label="Cách xử lý" rules={[{ required: true, message: 'Chọn cách xử lý' }]} style={{ width: 220 }}>
-                <Select
-                  placeholder="Chọn cách xử lý"
-                  options={[
-                    { value: 'Discard', label: 'Huỷ' },
-                    { value: 'StaffUse', label: 'Nhân viên dùng' },
-                    { value: 'Reuse', label: 'Tái sử dụng (nếu cho phép)' },
-                  ]}
-                />
-              </Form.Item>
-              <Form.Item name="discountAmount" label="Số tiền giảm giá (nếu có)" style={{ width: 200 }}>
-                <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
-              </Form.Item>
-            </Space>
-          )}
-
-          <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }]}>
-            <Input.TextArea
-              rows={2}
-              placeholder={type === 'Extra' ? 'VD: làm dư, ước tính sai...' : 'VD: món bị nguội, khách gọi nhầm...'}
-            />
-          </Form.Item>
-
-          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Button type="primary" icon={<PlusOutlined />} htmlType="submit" loading={saving}>
-              Ghi nhận
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+          </Form>
+        </Card>
+      )}
 
       <Card
         title="Lịch sử món thừa"

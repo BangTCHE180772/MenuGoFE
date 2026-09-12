@@ -33,6 +33,11 @@ export const deletePartner = async (id) => {
   return response.data;
 };
 
+export const getPartnerById = async (partnerId) => {
+  const response = await axiosInstance.get(`/api/Partner/${partnerId}`);
+  return response.data;
+};
+
 export const getPartnerFinancialSummary = async (partnerId) => {
   const response = await axiosInstance.get(`/api/Partner/${partnerId}/financial-summary`);
   return response.data;
@@ -55,6 +60,11 @@ export const getCustomerPurchases = async (customerId) => {
 
 export const getCustomerPoints = async (customerId) => {
   const response = await axiosInstance.get(`/api/Partner/customer/${customerId}/points`);
+  return response.data;
+};
+
+export const payPartnerImportDocument = async (partnerId, documentId, paymentData) => {
+  const response = await axiosInstance.post(`/api/Partner/${partnerId}/import-documents/${documentId}/pay`, paymentData);
   return response.data;
 };
 

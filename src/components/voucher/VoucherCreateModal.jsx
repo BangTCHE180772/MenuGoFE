@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, message } from 'antd';
 import { createVoucher } from '../../api/voucherApi';
+import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -111,19 +112,30 @@ const VoucherCreateModal = ({ visible, onClose, onSuccess, branches }) => {
 
         <Form.Item name="branchId" label="Chi nhánh áp dụng (Để trống = Toàn hệ thống)">
           <Select allowClear placeholder="Chọn chi nhánh">
-            {branches.map(b => (
-              <Option key={b.id} value={b.id}>{b.name}</Option>
+            {branches
+              .filter((b) => !b.isDeleted && b.status !== 'Ngừng kinh doanh')
+              .map((b) => (
+                <Option key={b.id} value={b.id}>{b.name}</Option>
             ))}
           </Select>
         </Form.Item>
 
         <Form.Item name="dateRange" label="Thời gian áp dụng" rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}>
-          <RangePicker style={{ width: '100%' }} showTime format="DD/MM/YYYY HH:mm" />
+          <RangePicker 
+            style={{ width: '100%' }} 
+            showTime 
+            format="DD/MM/YYYY HH:mm" 
+            disabledDate={(current) => current && current < dayjs().startOf('day')}
+          />
         </Form.Item>
 
         <div style={{ display: 'flex', gap: 16 }}>
-          <Form.Item name="quantity" label="Số lượng phát hành" rules={[{ required: true }]}>
+          <Form.Item name="quantity" label="Số lượng phát hành" rules={[{ required: true }]} style={{ flex: 1 }}>
             <InputNumber style={{ width: '100%' }} min={1} />
+          </Form.Item>
+
+          <Form.Item name="maxUsagePerCustomer" label="Giới hạn dùng/khách" style={{ flex: 1 }}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="Không giới hạn" />
           </Form.Item>
 
           <Form.Item name="isActive" label="Trạng thái" valuePropName="checked">

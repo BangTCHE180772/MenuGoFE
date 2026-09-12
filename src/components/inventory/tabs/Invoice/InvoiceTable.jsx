@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { SearchOutlined, PlusOutlined, ReloadOutlined, InfoCircleOutlined, UserOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { SearchOutlined, PlusOutlined, ReloadOutlined, InfoCircleOutlined, UserOutlined, ShoppingCartOutlined, EyeOutlined } from '@ant-design/icons';
 import { getOrderById } from '../../../../api/orderApi';
 import { getDocumentById, getSaleById } from '../../../../api/documentApi';
 
 const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchFromUrl = searchParams.get('search') || '';
   const [searchText, setSearchText] = useState(searchFromUrl);
@@ -34,9 +35,18 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
     // Tự động mở rộng chi tiết hóa đơn nếu tìm kiếm khớp mã hóa đơn
     if (currentSearch && invoices.length > 0) {
       const lower = currentSearch.toLowerCase().trim();
-      const matched = invoices.find(
-        (i) => i.code?.toLowerCase() === lower || String(i.id) === lower || `hd${i.id}` === lower
-      );
+      const numMatch = lower.match(/^hd0*(\d+)$/) || lower.match(/^0*(\d+)$/);
+      const searchNum = numMatch ? numMatch[1] : null;
+
+      const matched = invoices.find((i) => {
+        const invLower = i.code?.toLowerCase() || '';
+        return (
+          invLower === lower ||
+          String(i.id) === lower ||
+          `hd${i.id}` === lower ||
+          (searchNum && (String(i.id) === searchNum || invLower === `hd${searchNum}`))
+        );
+      });
       if (matched && expandedInvoiceId !== matched.id) {
         toggleExpand(matched.id);
       }
@@ -157,8 +167,15 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
           return inv.id.toString() === searchOrderId || inv.code?.toLowerCase().includes(searchOrderId);
         }
       }
+      const numMatch = lower.match(/^hd0*(\d+)$/) || lower.match(/^0*(\d+)$/);
+      const searchNum = numMatch ? numMatch[1] : null;
+      const codeLower = inv.code?.toLowerCase() || '';
+      const isCodeMatch =
+        codeLower.includes(lower) ||
+        (searchNum && (String(inv.id) === searchNum || codeLower.includes(`hd${searchNum}`)));
+
       return (
-        inv.code?.toLowerCase().includes(lower) ||
+        isCodeMatch ||
         inv.customer?.toLowerCase().includes(lower) ||
         inv.tableName?.toLowerCase().includes(lower) ||
         inv.createdByName?.toLowerCase().includes(lower)
@@ -235,16 +252,17 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>THU NGÂN</th>
               <th style={{ padding: '8px 10px', textAlign: 'right' }}>TỔNG TIỀN (VNĐ)</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#64748b' }}>Đang tải danh sách hóa đơn...</td>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#64748b' }}>Đang tải danh sách hóa đơn...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy hóa đơn nào</td>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy hóa đơn nào</td>
               </tr>
             ) : (
               currentData.map((inv) => {
@@ -287,12 +305,33 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
                           Đã thanh toán
                         </span>
                       </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/invoice-detail/${inv.id}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL CONTAINER */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={7} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -315,9 +354,31 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
                                   {loadedDoc.tableName || 'Mang về'} {loadedDoc.areaName ? `(${loadedDoc.areaName})` : ''}
                                 </span>
                               </div>
-                              <div style={{ color: '#64748b', fontSize: 11 }}>
-                                Thu ngân / Người lập: <strong style={{ color: '#0f172a' }}>{loadedDoc.createdByName || 'Thu ngân'}</strong> &nbsp;|&nbsp; 
-                                Thời gian: <strong style={{ color: '#334155' }}>{dayjs(loadedDoc.date || loadedDoc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ color: '#64748b', fontSize: 11 }}>
+                                  Thu ngân / Người lập: <strong style={{ color: '#0f172a' }}>{loadedDoc.createdByName || 'Thu ngân'}</strong> &nbsp;|&nbsp; 
+                                  Thời gian: <strong style={{ color: '#334155' }}>{dayjs(loadedDoc.date || loadedDoc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/invoice-detail/${inv.id}`)}
+                                  style={{
+                                    padding: '4px 12px',
+                                    fontSize: 11.5,
+                                    borderRadius: 5,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#0f172a',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                  }}
+                                >
+                                  <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết hóa đơn
+                                </button>
                               </div>
                             </div>
 

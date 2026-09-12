@@ -774,10 +774,12 @@ const ContractPage = () => {
                   rules={[{ required: true, message: 'Vui lòng chọn chi nhánh!' }]}
                 >
                   <Select placeholder="Chọn chi nhánh...">
-                    {branches.map((b) => (
-                      <Select.Option key={b.id} value={b.id}>
-                        {b.name}
-                      </Select.Option>
+                    {branches
+                      .filter((b) => !b.isDeleted && b.status !== 'Ngừng kinh doanh')
+                      .map((b) => (
+                        <Select.Option key={b.id} value={b.id}>
+                          {b.name}
+                        </Select.Option>
                     ))}
                   </Select>
                 </Form.Item>

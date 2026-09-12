@@ -33,25 +33,26 @@ export const BranchProvider = ({ children }) => {
       return;
     }
 
-    if (role === 'Manager') {
-      if (user?.branchIds?.length > 0) {
-        setCurrentBranchId(user.branchIds[0]);
-      } else {
-        setCurrentBranchId(null);
-      }
-    } else {
-      // Owner / Admin
+    if (role === 'Owner' || role === 'Admin') {
       const saved = localStorage.getItem('currentBranchId');
       if (saved) {
         setCurrentBranchId(parseInt(saved, 10));
       } else {
         setCurrentBranchId(null); // 'Tất cả chi nhánh'
       }
+    } else {
+      // Manager / Cashier / Waiter / Chef — chi nhánh cố định theo hợp đồng,
+      // không có quyền tự chọn chi nhánh khác.
+      if (user?.branchIds?.length > 0) {
+        setCurrentBranchId(user.branchIds[0]);
+      } else {
+        setCurrentBranchId(null);
+      }
     }
   }, [user, role, isAuthenticated]);
 
   const selectBranch = (branchId) => {
-    if (role === 'Manager') return; // Manager is locked
+    if (role !== 'Owner' && role !== 'Admin') return; // Chỉ Owner/Admin được tự chọn chi nhánh
 
     setCurrentBranchId(branchId);
     if (branchId) {

@@ -136,6 +136,7 @@ const TransferTab = ({
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         loading={loading || parentLoading}
+        branches={branches}
         setModalTransferOpen={setModalTransferOpen}
         onEditDocument={handleOpenEdit}
         handleReceiveTransfer={handleOpenReceiveModal}

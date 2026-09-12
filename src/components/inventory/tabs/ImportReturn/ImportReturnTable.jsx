@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   EnvironmentOutlined,
@@ -9,7 +10,8 @@ import {
   RollbackOutlined,
   LoadingOutlined,
   InfoCircleOutlined,
-  CreditCardOutlined
+  CreditCardOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getReturnDocumentById, getDocumentById } from '../../../../api/documentApi';
 
@@ -23,60 +25,49 @@ const ImportReturnTable = ({
   onOpenReturnModal,
   onRefresh
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [activeTabMap, setActiveTabMap] = useState({});
-  const [loadedDocMap, setLoadedDocMap] = useState({});   // cache full doc
+  const [loadedDocMap, setLoadedDocMap] = useState({});
   const [loadingDocId, setLoadingDocId] = useState(null);
 
   const pageSize = 20;
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // Expand / collapse + fetch full detail from API
   const toggleExpand = async (docId) => {
     if (expandedDocId === docId) {
       setExpandedDocId(null);
-      return;
-    }
-    setExpandedDocId(docId);
-    if (!activeTabMap[docId]) {
-      setActiveTabMap((prev) => ({ ...prev, [docId]: 'info' }));
-    }
+    } else {
+      setExpandedDocId(docId);
+      if (!activeTabMap[docId]) {
+        setActiveTabMap((prev) => ({ ...prev, [docId]: 'info' }));
+      }
 
-    if (!loadedDocMap[docId]) {
-      setLoadingDocId(docId);
-      try {
-        let fullDoc = await getReturnDocumentById(docId);
-        if (!fullDoc) {
-          fullDoc = await getDocumentById(docId);
-        }
-        if (fullDoc) {
-          setLoadedDocMap((prev) => ({ ...prev, [docId]: fullDoc }));
-        }
-      } catch (err) {
-        console.error('Lỗi khi tải chi tiết phiếu trả:', err);
+      if (!loadedDocMap[docId]) {
+        setLoadingDocId(docId);
         try {
-          const fallbackDoc = await getDocumentById(docId);
-          if (fallbackDoc) {
-            setLoadedDocMap((prev) => ({ ...prev, [docId]: fallbackDoc }));
+          const fullDoc = await getReturnDocumentById(docId);
+          if (fullDoc) {
+            setLoadedDocMap((prev) => ({ ...prev, [docId]: fullDoc }));
           }
-        } catch (e2) {
-          console.error('Lỗi fallback khi tải phiếu:', e2);
+        } catch (err) {
+          console.error(`Failed to load details for return document #${docId}`, err);
+        } finally {
+          setLoadingDocId(null);
         }
-      } finally {
-        setLoadingDocId(null);
       }
     }
   };
 
-  // Auto-expand single result matching searchText
+  // Auto-expand matching document from searchText
   React.useEffect(() => {
-    if (documents.length === 1 && searchText && documents[0].code?.toLowerCase() === searchText.toLowerCase()) {
-      const singleDocId = documents[0].id;
-      if (expandedDocId !== singleDocId) {
-        toggleExpand(singleDocId);
-      }
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleExpand(matched.id);
     }
   }, [documents, searchText]);
 
@@ -90,25 +81,27 @@ const ImportReturnTable = ({
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden', width: '100%' }}>
       {/* HEADER ACTION TOOLBAR */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* SEARCH */}
-          <div style={{ position: 'relative', width: 280 }}>
-            <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
-            <input
-              type="text"
-              placeholder="Theo mã phiếu trả, NCC, người tạo..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{
-                width: '100%', height: 32, padding: '4px 10px 4px 30px',
-                fontSize: 12, fontWeight: 500, color: '#1e293b',
-                borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none'
-              }}
-            />
-          </div>
+          {setSearchText && (
+            <div style={{ position: 'relative', width: 280 }}>
+              <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+              <input
+                type="text"
+                placeholder="Theo mã phiếu trả, mã phiếu nhập, NCC..."
+                value={searchText || ''}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{
+                  width: '100%', height: 32, padding: '4px 10px 4px 30px',
+                  fontSize: 12, fontWeight: 500, color: '#1e293b',
+                  borderRadius: 6, border: '1px solid #cbd5e1', outline: 'none'
+                }}
+              />
+            </div>
+          )}
 
           {/* STATUS FILTER */}
           {setStatusFilter && (
@@ -169,15 +162,16 @@ const ImportReturnTable = ({
               <th style={{ padding: '9px 10px', textAlign: 'right' }}>NCC ĐÃ THANH TOÁN (₫)</th>
               <th style={{ padding: '9px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '9px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
+              <th style={{ padding: '9px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#64748b' }}>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#64748b' }}>
                 <LoadingOutlined style={{ marginRight: 6 }} />Đang tải dữ liệu...
               </td></tr>
             ) : currentData.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 36, color: '#94a3b8' }}>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 36, color: '#94a3b8' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <RollbackOutlined style={{ fontSize: 28, color: '#cbd5e1' }} />
                   <span>Chưa có phiếu trả hàng nhập nào</span>
@@ -187,7 +181,6 @@ const ImportReturnTable = ({
               currentData.map((doc) => {
                 const isExpanded = expandedDocId === doc.id;
                 const currentTab = activeTabMap[doc.id] || 'info';
-                // Use full loaded doc if available, otherwise summary row data
                 const loadedDoc = loadedDocMap[doc.id] || null;
                 const partnerName = loadedDoc?.partnerName || doc.partnerName || doc.snapshotPartnerName || 'Nhà cung cấp';
                 const totalAmt = Math.round(Number(loadedDoc?.totalAmount ?? doc.totalAmount ?? 0));
@@ -230,43 +223,82 @@ const ImportReturnTable = ({
                       <td style={{ padding: '9px 10px', color: '#64748b' }}>
                         {doc.snapshotCreatedByName || doc.creator || 'Hệ thống'}
                       </td>
+                      {/* CỘT CHI TIẾT */}
+                      <td style={{ padding: '9px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/import-return-detail/${doc.id}`, { state: { document: loadedDoc || doc } })}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <EyeOutlined style={{ fontSize: 11 }} /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL ROW */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={8} style={{ padding: 0, background: '#fafafa', borderBottom: '2px solid #e2e8f0' }}>
+                        <td colSpan={9} style={{ padding: 0, background: '#fafafa', borderBottom: '2px solid #e2e8f0' }}>
                           <div style={{ background: '#ffffff', borderTop: '1px dashed #cbd5e1' }}>
 
                             {/* TABS BAR */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 16px', alignItems: 'center' }}>
-                              <button onClick={() => handleTabChange(doc.id, 'info')}
-                                style={{
-                                  padding: '10px 16px', border: 'none', background: 'transparent',
-                                  fontWeight: currentTab === 'info' ? 700 : 500,
-                                  color: currentTab === 'info' ? '#e8442a' : '#64748b',
-                                  borderBottom: currentTab === 'info' ? '2px solid #e8442a' : '2px solid transparent',
-                                  cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5
-                                }}>
-                                <InfoCircleOutlined /> Thông tin phiếu
-                              </button>
-                              <button onClick={() => handleTabChange(doc.id, 'payment')}
-                                style={{
-                                  padding: '10px 16px', border: 'none', background: 'transparent',
-                                  fontWeight: currentTab === 'payment' ? 700 : 500,
-                                  color: currentTab === 'payment' ? '#e8442a' : '#64748b',
-                                  borderBottom: currentTab === 'payment' ? '2px solid #e8442a' : '2px solid transparent',
-                                  cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5
-                                }}>
-                                <CreditCardOutlined /> Lịch sử thanh toán
-                              </button>
-
-                              <div style={{ marginLeft: 'auto' }}>
-                                <button type="button" onClick={(e) => handlePrint(doc.code, e)}
-                                  style={{ height: 28, padding: '0 12px', fontSize: 11, fontWeight: 600, borderRadius: 4, border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <PrinterOutlined /> In phiếu
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 16px', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <button onClick={() => handleTabChange(doc.id, 'info')}
+                                  style={{
+                                    padding: '10px 16px', border: 'none', background: 'transparent',
+                                    fontWeight: currentTab === 'info' ? 700 : 500,
+                                    color: currentTab === 'info' ? '#e8442a' : '#64748b',
+                                    borderBottom: currentTab === 'info' ? '2px solid #e8442a' : '2px solid transparent',
+                                    cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5
+                                  }}>
+                                  <InfoCircleOutlined /> Thông tin phiếu
+                                </button>
+                                <button onClick={() => handleTabChange(doc.id, 'payment')}
+                                  style={{
+                                    padding: '10px 16px', border: 'none', background: 'transparent',
+                                    fontWeight: currentTab === 'payment' ? 700 : 500,
+                                    color: currentTab === 'payment' ? '#e8442a' : '#64748b',
+                                    borderBottom: currentTab === 'payment' ? '2px solid #e8442a' : '2px solid transparent',
+                                    cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5
+                                  }}>
+                                  <CreditCardOutlined /> Lịch sử thanh toán
                                 </button>
                               </div>
+
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/import-return-detail/${doc.id}`, { state: { document: loadedDoc || doc } })}
+                                style={{
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                              >
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
+                              </button>
                             </div>
 
                             {/* LOADING STATE */}

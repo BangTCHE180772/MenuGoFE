@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message } from 'antd';
+import { Modal, Form, Input, InputNumber, DatePicker, Select, Button, Space, Typography, Table, Spin, message, Alert } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createReservation, searchCustomersOData, getAvailableTablesForReservation } from '../../api/reservationApi';
@@ -408,14 +408,23 @@ const ReservationFormModal = ({ visible, onCancel, onSuccess }) => {
           </div>
 
           {preOrderItems.length > 0 ? (
-            <Table
-              dataSource={preOrderItems}
-              columns={productColumns}
-              rowKey="productId"
-              pagination={false}
-              size="small"
-              bordered
-            />
+            <>
+              <Alert 
+                message="Lưu ý về giá" 
+                description="Giá hiển thị hiện tại là giá tham khảo. Giá và các chương trình khuyến mãi thực tế sẽ được áp dụng tự động tại thời điểm khách đến nhận bàn." 
+                type="info" 
+                showIcon 
+                style={{ marginBottom: 12 }} 
+              />
+              <Table
+                dataSource={preOrderItems}
+                columns={productColumns}
+                rowKey="productId"
+                pagination={false}
+                size="small"
+                bordered
+              />
+            </>
           ) : (
             <div style={{ padding: '20px', textAlign: 'center', background: '#fafafa', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
               <Text type="secondary">Chưa có món nào được đặt trước</Text>

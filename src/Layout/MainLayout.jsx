@@ -19,6 +19,7 @@ const MainLayout = () => {
   const isFluid =
     location.pathname.startsWith('/product-catalog') ||
     location.pathname.startsWith('/inventory-management') ||
+    location.pathname.includes('-detail') ||
     location.pathname.startsWith('/chat');
 
   // Sidebar collapse state initialized from localStorage

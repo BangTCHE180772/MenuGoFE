@@ -46,6 +46,80 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
   const sourceBatch = traceData?.sourceBatch;
   const allocations = traceData?.allocations || [];
 
+  const renderAllocationTypeBadge = (a) => {
+    let label = a.allocationTypeName || '';
+    const docCode = a.documentCode || '';
+    const orderId = a.orderId;
+
+    // Xử lý loại bỏ nhãn cũ "Xuất bán món / hàng hóa" và phân định rõ ràng Bán hàng vs Xuất hàng
+    if (label === 'Xuất bán món / hàng hóa' || label.includes('Xuất bán') || a.allocationType === 'Sale' || a.allocationType === 1) {
+      if ((orderId && orderId > 0) || docCode.startsWith('PXBH') || docCode.startsWith('HD')) {
+        label = 'Bán hàng';
+      } else {
+        label = 'Xuất hàng';
+      }
+    }
+
+    let bg = '#f1f5f9';
+    let color = '#334155';
+    let border = '#e2e8f0';
+
+    if (label === 'Bán hàng') {
+      bg = '#eff6ff';
+      color = '#1d4ed8';
+      border = '#bfdbfe';
+    } else if (label === 'Xuất hàng') {
+      bg = '#fef3c7';
+      color = '#b45309';
+      border = '#fde68a';
+    } else if (label.toLowerCase().includes('hủy') || label.toLowerCase().includes('hao hụt')) {
+      label = 'Xuất Hủy';
+      bg = '#fef2f2';
+      color = '#dc2626';
+      border = '#fecaca';
+    } else if (label.toLowerCase().includes('chuyển')) {
+      label = 'Chuyển Hàng';
+      bg = '#f5f3ff';
+      color = '#6d28d9';
+      border = '#ddd6fe';
+    } else if (label.toLowerCase().includes('sản xuất')) {
+      bg = '#ecfdf5';
+      color = '#047857';
+      border = '#a7f3d0';
+    } else if (label.toLowerCase().includes('trả') && !label.toLowerCase().includes('khách')) {
+      label = 'Trả Hàng';
+      bg = '#fff7ed';
+      color = '#c2410c';
+      border = '#ffedd5';
+    } else if (label.toLowerCase().includes('khách')) {
+      label = 'Khách trả hàng';
+      bg = '#f0fdf4';
+      color = '#15803d';
+      border = '#bbf7d0';
+    } else if (label.toLowerCase().includes('kiểm')) {
+      bg = '#f8fafc';
+      color = '#475569';
+      border = '#cbd5e1';
+    }
+
+    return (
+      <span
+        style={{
+          display: 'inline-block',
+          padding: '2.5px 8px',
+          borderRadius: 4,
+          fontSize: 10.5,
+          fontWeight: 700,
+          background: bg,
+          color: color,
+          border: `1px solid ${border}`
+        }}
+      >
+        {label}
+      </span>
+    );
+  };
+
   return (
     <div
       style={{
@@ -178,7 +252,7 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                     {renderBatchStatusBadge(currentBatch.status)}
                   </div>
                   <div>
-                    {renderExpiryStatusBadge(currentBatch.expiryDate, currentBatch.daysUntilExpiry)}
+                    {renderExpiryStatusBadge(currentBatch.expiryDate, currentBatch.daysUntilExpiry, currentBatch.quantityRemaining, currentBatch.status)}
                   </div>
                 </div>
 
@@ -306,20 +380,7 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                                 {dayjs(a.documentPostedAt || a.createdAt).format('DD/MM/YYYY HH:mm')}
                               </td>
                               <td style={{ padding: '8px 10px' }}>
-                                <span
-                                  style={{
-                                    display: 'inline-block',
-                                    padding: '2px 8px',
-                                    borderRadius: 4,
-                                    fontSize: 10.5,
-                                    fontWeight: 600,
-                                    background: '#f1f5f9',
-                                    color: '#334155',
-                                    border: '1px solid #e2e8f0'
-                                  }}
-                                >
-                                  {a.allocationTypeName}
-                                </span>
+                                {renderAllocationTypeBadge(a)}
                               </td>
                               <td style={{ padding: '8px 10px', fontWeight: 600, color: '#2563eb' }}>
                                 {a.documentCode || '---'}

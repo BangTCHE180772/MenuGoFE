@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   EnvironmentOutlined,
@@ -10,7 +11,8 @@ import {
   CreditCardOutlined,
   SearchOutlined,
   PlusOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { deleteImportPendingDocument, getImportById } from '../../../../api/documentApi';
 
@@ -29,6 +31,7 @@ const ImportTable = ({
   onOpenReturnModal,
   onEditDocument
 }) => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' }
@@ -67,13 +70,13 @@ const ImportTable = ({
     }
   };
 
-  // Auto-expand single result matching searchText
+  // Auto-expand matching document from searchText
   React.useEffect(() => {
-    if (documents.length === 1 && searchText && documents[0].code?.toLowerCase() === searchText.toLowerCase()) {
-      const singleDocId = documents[0].id;
-      if (expandedDocId !== singleDocId) {
-        toggleExpand(singleDocId);
-      }
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleExpand(matched.id);
     }
   }, [documents, searchText]);
 
@@ -245,16 +248,17 @@ const ImportTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu nhập nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -271,12 +275,14 @@ const ImportTable = ({
                 const supplierName = loadedDoc.partnerName || supplierPartner?.partnerName || loadedDoc.partner?.name || '---';
 
                 const totalInvoiceAmount = Number(loadedDoc.totalAmount || 0);
+                const matchDebt = (loadedDoc.note || '').match(/Trừ tiền NCC nợ:\s*([0-9.,]+)/);
+                const deductedDebt = matchDebt ? Number(matchDebt[1].replace(/\./g, '').replace(',', '.')) : 0;
                 const roundingCF = cashFlowsList.find((cf) => cf.type === 5 || cf.type === 'Rounding');
                 const roundingAmount = Number(roundingCF?.totalAmount || 0);
-                const effectivePayableAmount = totalInvoiceAmount - roundingAmount;
+                const effectivePayableAmount = Math.max(0, totalInvoiceAmount - roundingAmount - deductedDebt);
                 const paymentCashFlows = cashFlowsList.filter((cf) => cf.type !== 5 && cf.type !== 'Rounding');
                 const supplierAmountPaid = Math.round(Number(loadedDoc.amountPaid ?? supplierPartner?.amountPaid ?? paymentCashFlows.reduce((sum, cf) => sum + Number(cf.totalAmount || 0), 0)));
-                const remainingDebt = Math.max(0, Number(loadedDoc.amountDue ?? (effectivePayableAmount - supplierAmountPaid)));
+                const remainingDebt = Math.max(0, effectivePayableAmount - supplierAmountPaid);
 
                 return (
                   <React.Fragment key={doc.id}>
@@ -383,12 +389,35 @@ const ImportTable = ({
                           <span style={{ color: '#94a3b8' }}>---</span>
                         )}
                       </td>
+                      {/* CỘT CHI TIẾT BÊN PHẢI CỘT THAO TÁC */}
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/import-detail/${doc.id}`, { state: { document: doc } })}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <EyeOutlined style={{ fontSize: 11 }} /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL DRAWER CONTAINER */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={9} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -416,7 +445,7 @@ const ImportTable = ({
                                   fontSize: 12
                                 }}
                               >
-                                <InfoCircleOutlined /> Thông tin phiếu
+                                <InfoCircleOutlined /> Thông tin chi tiết
                               </button>
                               <button
                                 type="button"
@@ -435,29 +464,51 @@ const ImportTable = ({
                                 <CreditCardOutlined /> Lịch sử thanh toán
                               </button>
 
-                              {/* EXTRA TRẢ HÀNG BUTTON ON COMPLETED EXPANDED TAB */}
-                              {isCompleted && (
+                              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <button
                                   type="button"
-                                  onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
+                                  onClick={() => navigate(`/import-detail/${doc.id}`, { state: { document: loadedDoc } })}
                                   style={{
-                                    marginLeft: 'auto',
                                     padding: '4px 12px',
-                                    fontSize: 11,
+                                    fontSize: 11.5,
+                                    borderRadius: 5,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#0f172a',
                                     fontWeight: 600,
-                                    borderRadius: 4,
-                                    border: '1px solid #fed7aa',
-                                    background: '#fff7ed',
-                                    color: '#ea580c',
                                     cursor: 'pointer',
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: 4
+                                    gap: 5,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                   }}
                                 >
-                                  <RollbackOutlined /> Trả hàng
+                                  <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
                                 </button>
-                              )}
+
+                                {/* EXTRA TRẢ HÀNG BUTTON ON COMPLETED EXPANDED TAB */}
+                                {isCompleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenReturnModal && onOpenReturnModal(loadedDoc)}
+                                    style={{
+                                      padding: '4px 12px',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      borderRadius: 4,
+                                      border: '1px solid #fed7aa',
+                                      background: '#fff7ed',
+                                      color: '#ea580c',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 4
+                                    }}
+                                  >
+                                    <RollbackOutlined /> Trả hàng
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {loadingDocId === doc.id ? (
@@ -498,9 +549,12 @@ const ImportTable = ({
                                         {roundingAmount !== 0 && (
                                           <div>ĐC Làm tròn (Rounding): <strong style={{ color: '#d97706' }}>{roundingAmount > 0 ? `-${roundingAmount.toLocaleString('vi-VN')}` : `+${Math.abs(roundingAmount).toLocaleString('vi-VN')}`} đ</strong></div>
                                         )}
+                                        {deductedDebt > 0 && (
+                                          <div>Trừ tiền NCC nợ: <strong style={{ color: '#16a34a' }}>-{deductedDebt.toLocaleString('vi-VN')} đ</strong></div>
+                                        )}
                                         <div>Cần trả NCC: <strong style={{ color: '#0f172a' }}>{effectivePayableAmount.toLocaleString('vi-VN')} đ</strong></div>
                                         <div>Đã trả NCC: <strong style={{ color: '#059669' }}>{supplierAmountPaid.toLocaleString('vi-VN')} đ</strong></div>
-                                        <div>Còn nợ NCC: <strong style={{ color: '#ef4444' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
+                                        <div>Còn nợ NCC: <strong style={{ color: remainingDebt > 0 ? '#ef4444' : '#64748b' }}>{remainingDebt.toLocaleString('vi-VN')} đ</strong></div>
                                       </div>
                                     </div>
 
@@ -539,11 +593,46 @@ const ImportTable = ({
 
                                               return (
                                                 <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>{pCode}</td>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700 }}>
+                                                    {pCode && pCode !== '---' ? (
+                                                      <span
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          navigate(`/inventory-management?tab=Product&search=${encodeURIComponent(pCode)}&subTab=nguyenlieu`);
+                                                        }}
+                                                        style={{
+                                                          color: '#2563eb',
+                                                          cursor: 'pointer',
+                                                          textDecoration: 'underline'
+                                                        }}
+                                                        title="Nhấp để tìm nguyên liệu trong tab Sản phẩm / Kho hàng"
+                                                      >
+                                                        {pCode}
+                                                      </span>
+                                                    ) : (
+                                                      <span style={{ color: '#94a3b8' }}>---</span>
+                                                    )}
+                                                  </td>
                                                   <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
                                                   <td style={{ padding: '8px 10px', color: '#0f172a', fontWeight: 600 }}>
                                                     {bCode !== '---' ? (
-                                                      <span style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: 4, border: '1px solid #bfdbfe', fontSize: 10.5 }}>
+                                                      <span
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          navigate(`/inventory-management?tab=BatchExpiry&search=${encodeURIComponent(bCode)}`);
+                                                        }}
+                                                        style={{
+                                                          background: '#eff6ff',
+                                                          color: '#2563eb',
+                                                          padding: '2px 6px',
+                                                          borderRadius: 4,
+                                                          border: '1px solid #bfdbfe',
+                                                          fontSize: 10.5,
+                                                          cursor: 'pointer',
+                                                          textDecoration: 'underline'
+                                                        }}
+                                                        title="Nhấp để tìm Lô trong tab Quản lý HSD / Lô"
+                                                      >
                                                         {bCode}
                                                       </span>
                                                     ) : (
@@ -586,14 +675,32 @@ const ImportTable = ({
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {cashFlowsList.length === 0 ? (
+                                          {cashFlowsList.length === 0 && deductedDebt === 0 ? (
                                             <tr>
                                               <td colSpan={5} style={{ textAlign: 'center', padding: 16, color: '#94a3b8' }}>
                                                 Chưa có lịch sử giao dịch thanh toán
                                               </td>
                                             </tr>
                                           ) : (
-                                            cashFlowsList.map((cf, idx) => {
+                                            <>
+                                              {deductedDebt > 0 && (
+                                                <tr style={{ borderBottom: '1px solid #f1f5f9', background: '#f0fdf4' }}>
+                                                  <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>{`DED-${loadedDoc.code}`}</td>
+                                                  <td style={{ padding: '8px 10px', color: '#475569' }}>
+                                                    {loadedDoc.orderDate ? dayjs(loadedDoc.orderDate).format('DD/MM/YYYY HH:mm') : dayjs(loadedDoc.createdAt).format('DD/MM/YYYY HH:mm')}
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', color: '#16a34a', fontWeight: 600 }}>Cấn trừ nợ NCC</td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                                                    {deductedDebt.toLocaleString('vi-VN')} đ
+                                                  </td>
+                                                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                    <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d', fontSize: 10, fontWeight: 600 }}>
+                                                      Đã trừ nợ
+                                                    </span>
+                                                  </td>
+                                                </tr>
+                                              )}
+                                              {cashFlowsList.map((cf, idx) => {
                                               const isRounding = cf.type === 5 || cf.type === 'Rounding';
                                               return (
                                                 <tr key={cf.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: isRounding ? '#fffbeb' : 'transparent' }}>
@@ -614,7 +721,8 @@ const ImportTable = ({
                                                   </td>
                                                 </tr>
                                               );
-                                            })
+                                            })}
+                                            </>
                                           )}
                                         </tbody>
                                       </table>

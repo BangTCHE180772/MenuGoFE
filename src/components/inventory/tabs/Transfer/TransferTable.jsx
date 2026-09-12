@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   SearchOutlined,
@@ -7,7 +8,8 @@ import {
   InfoCircleOutlined,
   EditOutlined,
   DeleteOutlined,
-  EnvironmentOutlined
+  EnvironmentOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { getTransferById } from '../../../../api/documentApi';
 
@@ -19,12 +21,17 @@ const TransferTable = ({
   statusFilter = 'ALL',
   setStatusFilter,
   loading,
+  branches = [],
   setModalTransferOpen,
   onEditDocument,
   handleReceiveTransfer,
   handleDeleteDocument,
   onRefresh
 }) => {
+  const navigate = useNavigate();
+  const currentBranch = (branches || []).find((b) => Number(b.id) === Number(selectedBranchId));
+  const isBranchInactive = currentBranch ? (currentBranch.isDeleted || currentBranch.status === 'Ngừng kinh doanh') : false;
+
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [loadedDoc, setLoadedDoc] = useState(null);
@@ -53,6 +60,16 @@ const TransferTable = ({
       setLoadingDocId(null);
     }
   };
+
+  // Auto-expand matching document from searchText
+  React.useEffect(() => {
+    if (!searchText || !documents || documents.length === 0) return;
+    const cleanSearch = searchText.trim().toLowerCase();
+    const matched = documents.find((d) => d.code?.toLowerCase() === cleanSearch);
+    if (matched && expandedDocId !== matched.id) {
+      toggleRowExpand(matched.id);
+    }
+  }, [documents, searchText]);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', background: '#ffffff', overflow: 'hidden' }}>
@@ -120,14 +137,22 @@ const TransferTable = ({
 
         {/* ACTION BUTTONS */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isBranchInactive && (
+            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecdd3', fontSize: 11, fontWeight: 600 }}>
+              Ngừng kinh doanh
+            </span>
+          )}
           <button
             type="button"
+            disabled={isBranchInactive}
+            title={isBranchInactive ? 'Chi nhánh này đã ngừng kinh doanh, không thể tạo phiếu chuyển hàng' : 'Tạo phiếu chuyển hàng'}
             onClick={() => {
+              if (isBranchInactive) return;
               if (onEditDocument) onEditDocument(null);
               else if (setModalTransferOpen) setModalTransferOpen(true);
             }}
             style={{
-              background: 'linear-gradient(135deg, #e8442a, #f97316)',
+              background: isBranchInactive ? '#cbd5e1' : 'linear-gradient(135deg, #e8442a, #f97316)',
               color: '#ffffff',
               border: 'none',
               borderRadius: 6,
@@ -135,11 +160,12 @@ const TransferTable = ({
               height: 32,
               fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isBranchInactive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
+              boxShadow: isBranchInactive ? 'none' : '0 2px 4px rgba(232, 68, 42, 0.25)',
+              opacity: isBranchInactive ? 0.65 : 1
             }}
           >
             <PlusOutlined /> Chuyển hàng
@@ -183,16 +209,17 @@ const TransferTable = ({
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>TRẠNG THÁI</th>
               <th style={{ padding: '8px 10px', textAlign: 'left' }}>NGƯỜI TẠO</th>
               <th style={{ padding: '8px 10px', textAlign: 'center' }}>THAO TÁC</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center' }}>CHI TIẾT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu chuyển hàng nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu chuyển hàng nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -248,10 +275,6 @@ const TransferTable = ({
                           <span style={{ padding: '2px 6px', borderRadius: 4, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 10, fontWeight: 600 }}>
                             Đã nhận đủ
                           </span>
-                        ) : isPartial ? (
-                          <span style={{ padding: '2px 6px', borderRadius: 4, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontSize: 10, fontWeight: 600 }}>
-                            Nhận 1 phần
-                          </span>
                         ) : isRejected ? (
                           <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontSize: 10, fontWeight: 600 }}>
                             Bị từ chối
@@ -296,12 +319,33 @@ const TransferTable = ({
                           </button>
                         </div>
                       </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/transfer-detail/${doc.id}`)}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            borderRadius: 4,
+                            border: '1px solid #bfdbfe',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <EyeOutlined /> Chi tiết
+                        </button>
+                      </td>
                     </tr>
 
                     {/* EXPANDED DETAIL PANEL (SINGLE TAB: THÔNG TIN CHI TIẾT) */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc' }}>
-                        <td colSpan={8} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={9} style={{ padding: '0 12px 14px 12px', borderBottom: '2px solid #cbd5e1' }}>
                           <div
                             style={{
                               background: '#ffffff',
@@ -314,7 +358,7 @@ const TransferTable = ({
                             }}
                           >
                             {/* SINGLE TAB HEADER */}
-                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div
                                 style={{
                                   padding: '10px 16px',
@@ -329,6 +373,26 @@ const TransferTable = ({
                               >
                                 <InfoCircleOutlined /> Thông tin chi tiết phiếu chuyển kho
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/transfer-detail/${doc.id}`)}
+                                style={{
+                                  padding: '4px 12px',
+                                  fontSize: 11.5,
+                                  borderRadius: 5,
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                              >
+                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
+                              </button>
                             </div>
 
                             {loadingDocId === doc.id ? (
