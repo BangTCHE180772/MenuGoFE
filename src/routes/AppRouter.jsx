@@ -52,6 +52,7 @@ import CustomerReservationPage from '../pages/customer/CustomerReservationPage';
 import CustomerChatPage from '../pages/customer/CustomerChatPage';
 import CustomerPrivateRoute from './CustomerPrivateRoute';
 import VoucherPage from '../pages/VoucherPage';
+import PromotionVoucherPage from '../pages/PromotionVoucherPage';
 import TableManagementPage from '../pages/TableManagementPage';
 import { SignalRProvider } from '../context/SignalRContext';
 import GlobalReservationListener from '../components/reservation/GlobalReservationListener';
@@ -208,7 +209,7 @@ const AppRouter = () => {
                 <Route path="/menu-management" element={<MenuManagementPage />} />
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
-                <Route path="/vouchers" element={<VoucherPage />} />
+                <Route path="/promotions" element={<PromotionVoucherPage />} />
                 <Route path="/device-management" element={<DeviceManagementPage />} />
                 <Route path="/device-setup" element={<DeviceSetupPage />} />
                 <Route path="/contracts" element={<ContractPage />} />
