@@ -112,38 +112,35 @@ const VoucherPage = () => {
       title: 'Mã Voucher',
       dataIndex: 'code',
       key: 'code',
-      render: (text) => <strong>{text}</strong>
+      render: (text) => <strong style={{ fontSize: 14 }}>{text}</strong>
     },
     {
       title: 'Tên CTKM',
       dataIndex: 'name',
       key: 'name',
+      render: (text) => <span style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{text}</span>
     },
     {
       title: 'Giá trị giảm',
       key: 'discount',
-      render: (_, record) => {
-        if (record.discountType === 'Fixed') {
-          return `${record.discountValue.toLocaleString()} đ`;
-        }
-        return `${record.discountValue}% (Tối đa ${record.maxDiscount.toLocaleString()} đ)`;
-      }
+      render: (_, record) => (
+        <span style={{ fontSize: 14, color: '#475569' }}>
+          {record.discountType === 'Fixed'
+            ? `${record.discountValue.toLocaleString()} đ`
+            : `${record.discountValue}% (Tối đa ${record.maxDiscount.toLocaleString()} đ)`}
+        </span>
+      )
     },
     {
       title: 'Đơn tối thiểu',
       dataIndex: 'minOrderValue',
-      render: (val) => `${val.toLocaleString()} đ`
-    },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchName',
-      render: (val) => val || 'Toàn hệ thống'
+      render: (val) => <span style={{ fontSize: 14, color: '#475569' }}>{val.toLocaleString()} đ</span>
     },
     {
       title: 'Thời gian',
       key: 'time',
       render: (_, record) => (
-        <span style={{ fontSize: 12 }}>
+        <span style={{ fontSize: 13, color: '#64748b' }}>
           {dayjs(record.startDate).format('DD/MM/YYYY')} - {dayjs(record.endDate).format('DD/MM/YYYY')}
         </span>
       )
@@ -153,8 +150,8 @@ const VoucherPage = () => {
       key: 'usage',
       render: (_, record) => (
         <div>
-          <div>{record.usedCount} / {record.quantity}</div>
-          <div style={{ fontSize: 11, color: '#64748b' }}>
+          <div style={{ fontSize: 14, color: '#475569' }}>{record.usedCount} / {record.quantity}</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>
             {record.maxUsagePerCustomer ? `(Tối đa ${record.maxUsagePerCustomer}/khách)` : '(Không giới hạn/khách)'}
           </div>
         </div>
@@ -165,9 +162,9 @@ const VoucherPage = () => {
       key: 'branch',
       render: (_, record) => (
         record.branchId ? (
-          <Tag color="blue">{record.branchName}</Tag>
+          <Tag color="blue" style={{ fontSize: 13 }}>{record.branchName}</Tag>
         ) : (
-          <span style={{ color: '#2563eb', fontWeight: 500 }}>Toàn hệ thống</span>
+          <Tag color="blue" style={{ fontSize: 13 }}>Toàn hệ thống</Tag>
         )
       )
     },
@@ -187,7 +184,7 @@ const VoucherPage = () => {
           'Disabled': 'Đã khóa',
           'Expired': 'Đã kết thúc'
         };
-        return <Tag color={colors[record.status]}>{labels[record.status]}</Tag>;
+        return <Tag color={colors[record.status]} style={{ fontSize: 13 }}>{labels[record.status]}</Tag>;
       }
     },
     {

@@ -856,18 +856,19 @@ const CustomerDashboardPage = () => {
                     <Input prefix={<MailOutlined style={{ color: '#94a3b8' }} />} placeholder="Địa chỉ email (dùng để nhận OTP và thông báo)" />
                   </Form.Item>
 
-                  <Form.Item
-                    name="receivePromoEmails"
-                    valuePropName="checked"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5' }}>
+                    <Form.Item
+                      name="receivePromoEmails"
+                      valuePropName="checked"
+                      style={{ margin: 0 }}
+                    >
                       <Switch />
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#9a3412', fontSize: '14px' }}>Nhận thông báo ưu đãi</div>
-                        <div style={{ fontSize: '12px', color: '#c2410c' }}>Đồng ý nhận email thông báo khi có Voucher hoặc Khuyến mãi mới</div>
-                      </div>
+                    </Form.Item>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#9a3412', fontSize: '14px' }}>Nhận thông báo ưu đãi</div>
+                      <div style={{ fontSize: '12px', color: '#c2410c' }}>Đồng ý nhận email thông báo khi có Voucher hoặc Khuyến mãi mới</div>
                     </div>
-                  </Form.Item>
+                  </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
                     <Button onClick={() => setEditProfileOpen(false)}>Hủy</Button>
