@@ -242,7 +242,8 @@ const KDSPage = () => {
       fetchItems(false);
     } catch (err) {
       console.error(err);
-      message.error('Lỗi khi cập nhật trạng thái món.');
+      const errorMsg = err.response?.data?.message || err.response?.data?.detail || 'Lỗi khi cập nhật trạng thái món.';
+      message.error(errorMsg);
     }
   };
 
@@ -253,7 +254,8 @@ const KDSPage = () => {
       fetchItems(false);
     } catch (err) {
       console.error(err);
-      message.error('Lỗi khi cập nhật trạng thái mẻ.');
+      const errorMsg = err.response?.data?.message || err.response?.data?.detail || 'Lỗi khi cập nhật trạng thái mẻ.';
+      message.error(errorMsg);
     }
   };
 
