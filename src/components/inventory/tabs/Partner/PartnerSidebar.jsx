@@ -21,9 +21,9 @@ const PartnerSidebar = ({ partnerType, setPartnerType }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
             { key: 'ALL', label: 'Tất cả đối tác' },
-            { key: 'Nhà cung cấp', label: 'Nhà cung cấp' },
-            { key: 'Vận chuyển', label: 'Vận chuyển' },
-            { key: 'Đối tác dịch vụ', label: 'Đối tác dịch vụ' }
+            { key: 'NCC', label: 'Nhà cung cấp' },
+            { key: 'VC', label: 'Vận chuyển' },
+            { key: 'OTHER', label: 'Đối tác dịch vụ' }
           ].map((item) => (
             <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 10.5 }}>
               <input

@@ -224,7 +224,6 @@ const PartnerModal = ({
                   }}
                 >
                   <option value="Nhà cung cấp">Nhà cung cấp</option>
-                  <option value="Khách hàng">Khách hàng</option>
                   <option value="Vận chuyển">Vận chuyển</option>
                   <option value="Khác">Khác</option>
                 </select>
