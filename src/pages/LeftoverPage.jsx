@@ -160,7 +160,7 @@ const LeftoverPage = () => {
         reason: values.reason,
         orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
         handlingAction: values.type === 'Return' ? values.handlingAction : null,
-        discountAmount: values.type === 'Return' ? values.discountAmount ?? null : null,
+        compensationPoints: values.type === 'Return' ? values.compensationPoints ?? null : null,
         shiftId: values.shiftId ?? null,
         recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
       });
@@ -203,8 +203,8 @@ const LeftoverPage = () => {
           <Space direction="vertical" size={0}>
             {r.tableName && <span>Bàn: {r.tableName}</span>}
             {r.handlingAction && <Tag>{HANDLING_ACTION_LABELS[r.handlingAction] || r.handlingAction}</Tag>}
-            {r.discountAmount ? (
-              <span style={{ color: '#cf1322', fontSize: 12 }}>Giảm: {r.discountAmount.toLocaleString('vi-VN')}đ</span>
+            {r.compensationPoints ? (
+              <span style={{ color: '#d48806', fontSize: 12 }}>Bù: {r.compensationPoints.toLocaleString('vi-VN')} điểm</span>
             ) : null}
             {r.usedAt && <Tag color="blue">Đã dùng lại</Tag>}
           </Space>
@@ -325,8 +325,8 @@ const LeftoverPage = () => {
                     ]}
                   />
                 </Form.Item>
-                <Form.Item name="discountAmount" label="Số tiền giảm giá (nếu có)" style={{ width: 200 }}>
-                  <InputNumber min={0} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                <Form.Item name="compensationPoints" label="Điểm tích lũy bù cho khách (nếu có)" style={{ width: 220 }}>
+                  <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="điểm" />
                 </Form.Item>
               </Space>
             )}
