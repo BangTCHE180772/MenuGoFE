@@ -2,11 +2,13 @@ import React from 'react';
 import { Modal, Form, Input, Select, InputNumber, DatePicker, Switch, message } from 'antd';
 import dayjs from 'dayjs';
 import { updateVoucher } from '../../api/voucherApi';
+import { useAuth, ROLES } from '../../context/AuthContext';
 
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 const VoucherEditModal = ({ visible, onClose, onSuccess, branches, editingVoucher }) => {
+  const { hasRole } = useAuth();
+  const isOwnerOrAdmin = hasRole(ROLES.OWNER, ROLES.ADMIN);
   const [form] = Form.useForm();
   const [loading, setLoading] = React.useState(false);
 
@@ -14,7 +16,8 @@ const VoucherEditModal = ({ visible, onClose, onSuccess, branches, editingVouche
     if (visible && editingVoucher) {
       form.setFieldsValue({
         ...editingVoucher,
-        dateRange: [dayjs(editingVoucher.startDate), dayjs(editingVoucher.endDate)]
+        startDate: dayjs(editingVoucher.startDate),
+        endDate: dayjs(editingVoucher.endDate)
       });
     } else {
       form.resetFields();
@@ -45,11 +48,10 @@ const VoucherEditModal = ({ visible, onClose, onSuccess, branches, editingVouche
       try {
         const payload = {
           ...values,
-          startDate: values.dateRange[0].toISOString(),
-          endDate: values.dateRange[1].toISOString(),
+          startDate: values.startDate.toISOString(),
+          endDate: values.endDate.toISOString(),
           id: editingVoucher.id
         };
-        delete payload.dateRange;
 
         await updateVoucher(payload);
         message.success('Cập nhật khuyến mãi thành công');
@@ -118,19 +120,37 @@ const VoucherEditModal = ({ visible, onClose, onSuccess, branches, editingVouche
           <InputNumber style={{ width: '100%' }} min={0} disabled={hasBeenUsed} />
         </Form.Item>
 
-        <Form.Item name="branchId" label="Chi nhánh áp dụng (Để trống = Toàn hệ thống)">
-          <Select allowClear placeholder="Chọn chi nhánh" disabled={hasBeenUsed}>
-            {branches
-              .filter((b) => !b.isDeleted && b.status !== 'Ngừng kinh doanh')
-              .map((b) => (
-                <Option key={b.id} value={b.id}>{b.name}</Option>
-            ))}
-          </Select>
-        </Form.Item>
+        {isOwnerOrAdmin && (
+          <Form.Item name="branchId" label="Chi nhánh áp dụng (Để trống = Toàn hệ thống)">
+            <Select allowClear placeholder="Chọn chi nhánh" disabled={hasBeenUsed}>
+              {branches
+                .filter((b) => !b.isDeleted && b.status !== 'Ngừng kinh doanh')
+                .map((b) => (
+                  <Option key={b.id} value={b.id}>{b.name}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+        )}
 
-        <Form.Item name="dateRange" label="Thời gian áp dụng" rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}>
-          <RangePicker style={{ width: '100%' }} showTime format="DD/MM/YYYY HH:mm" />
-        </Form.Item>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <Form.Item name="startDate" label="Từ ngày" rules={[{ required: true, message: 'Chọn ngày bắt đầu' }]} style={{ flex: 1 }}>
+            <DatePicker 
+              style={{ width: '100%' }} 
+              showTime 
+              format="DD/MM/YYYY HH:mm" 
+              disabled={hasBeenUsed}
+            />
+          </Form.Item>
+
+          <Form.Item name="endDate" label="Đến ngày" rules={[{ required: true, message: 'Chọn ngày kết thúc' }]} style={{ flex: 1 }}>
+            <DatePicker 
+              style={{ width: '100%' }} 
+              showTime 
+              format="DD/MM/YYYY HH:mm" 
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
+          </Form.Item>
+        </div>
 
         <div style={{ display: 'flex', gap: 16 }}>
           <Form.Item name="quantity" label="Số lượng phát hành" rules={[{ required: true }]} style={{ flex: 1 }}>

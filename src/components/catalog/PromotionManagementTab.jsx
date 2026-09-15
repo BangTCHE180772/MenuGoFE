@@ -5,7 +5,7 @@ import { getAllPromotions, createPromotion, updatePromotion, deletePromotion } f
 import { getAllProducts } from '../../api/productApi';
 import { getAllBranches } from '../../api/branchApi';
 import { useAuth, ROLES } from '../../context/AuthContext';
-import { Spin, Switch } from 'antd';
+import { Spin, Switch, Select, Table, Space, Button, Tag } from 'antd';
 
 const PromotionManagementTab = () => {
   const { hasRole } = useAuth();
@@ -43,11 +43,18 @@ const PromotionManagementTab = () => {
   }, []);
 
   const processedPromotions = React.useMemo(() => {
-    let list = [...promotions];
+    let list = promotions.map(p => {
+      const now = dayjs();
+      let status = 'Active';
+      if (dayjs(p.endDate).isBefore(now)) status = 'Expired';
+      else if (!p.isActive) status = 'Disabled';
+      else if (dayjs(p.startDate).isAfter(now)) status = 'Upcoming';
+      return { ...p, status };
+    });
 
     // Filter Branch
     if (filterBranch !== 'All') {
-      list = list.filter(p => p.scope === 0 || p.branches?.some(b => b.branchId === Number(filterBranch)));
+      list = list.filter(p => p.scope === 0 || p.scope === 'AllBranches' || p.branches?.some(b => b.branchId === Number(filterBranch)));
     }
 
     // Filter Status
@@ -93,6 +100,10 @@ const PromotionManagementTab = () => {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const handleCreate = () => {
     setFormValues({
       name: '',
@@ -120,7 +131,7 @@ const PromotionManagementTab = () => {
       maxDiscount: promo.maxDiscount || 0,
       startDate: dayjs(promo.startDate).format('YYYY-MM-DDTHH:mm'),
       endDate: dayjs(promo.endDate).format('YYYY-MM-DDTHH:mm'),
-      scope: promo.scope,
+      scope: promo.scope === 'AllBranches' ? 0 : (promo.scope === 'SpecificBranches' ? 1 : promo.scope),
       branchIds: promo.branches?.map(b => b.branchId) || [],
       productIds: promo.products?.map(p => p.productId) || [],
       isActive: promo.isActive !== false,
@@ -154,6 +165,15 @@ const PromotionManagementTab = () => {
 
     setSaving(true);
     try {
+      let finalScope = isOwnerOrAdmin ? formValues.scope : 1;
+      let finalBranchIds = isOwnerOrAdmin && formValues.scope === 1 ? formValues.branchIds : [];
+
+      // Auto coerce Specific Branches -> All Branches if they manually selected every single branch
+      if (isOwnerOrAdmin && finalScope === 1 && finalBranchIds.length === branches.length && branches.length > 0) {
+        finalScope = 0;
+        finalBranchIds = [];
+      }
+
       const payload = {
         name: formValues.name,
         discountType: formValues.discountType,
@@ -162,9 +182,9 @@ const PromotionManagementTab = () => {
         startDate: new Date(formValues.startDate).toISOString(),
         endDate: new Date(formValues.endDate).toISOString(),
         isActive: formValues.isActive,
-        scope: isOwnerOrAdmin ? formValues.scope : 1,
+        scope: finalScope,
         productIds: formValues.productIds,
-        branchIds: isOwnerOrAdmin && formValues.scope === 1 ? formValues.branchIds : []
+        branchIds: finalBranchIds
       };
 
       if (editingId) {
@@ -243,69 +263,67 @@ const PromotionManagementTab = () => {
       <div style={{ background: '#ffffff', borderRadius: 8, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>{editingId ? 'Cập nhật chương trình khuyến mãi' : 'Tạo chương trình khuyến mãi'}</h3>
-          <button onClick={() => { setIsCreating(false); setEditingId(null); }} style={{ padding: '6px 12px', background: '#f1f5f9', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Quay lại</button>
+          <button onClick={() => { setIsCreating(false); setEditingId(null); }} style={{ padding: '6px 12px', background: '#f1f5f9', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Quay lại</button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* CỘT TRÁI: Thông tin KM */}
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 16 }}>
             {formValues.hasBeenUsed && (
-              <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '10px 14px', borderRadius: 6, fontSize: 13, marginBottom: 16, border: '1px solid #f87171' }}>
+              <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '10px 14px', borderRadius: 6, fontSize: 14, marginBottom: 16, border: '1px solid #f87171' }}>
                 <strong>Lưu ý:</strong> Chương trình này đã được khách hàng sử dụng trong giao dịch. Bạn chỉ có thể thay đổi Tên, Ngày kết thúc và Trạng thái.
               </div>
             )}
 
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Tên chương trình *</label>
-              <input type="text" value={formValues.name} onChange={e => setFormValues({ ...formValues, name: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }} placeholder="VD: Giảm giá hè 2024" />
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Tên chương trình *</label>
+              <input type="text" value={formValues.name} onChange={e => setFormValues({ ...formValues, name: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }} placeholder="VD: Giảm giá hè 2024" />
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Loại giảm giá</label>
-                <select value={formValues.discountType} disabled={formValues.hasBeenUsed} onChange={e => setFormValues({ ...formValues, discountType: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }}>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Loại giảm giá</label>
+                <select value={formValues.discountType} disabled={formValues.hasBeenUsed} onChange={e => setFormValues({ ...formValues, discountType: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }}>
                   <option value="Percentage">Phần trăm (%)</option>
                   <option value="Fixed">Số tiền (VNĐ)</option>
                 </select>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Mức giảm *</label>
-                <input type="number" min="0" disabled={formValues.hasBeenUsed} value={formValues.discountValue} onChange={e => setFormValues({ ...formValues, discountValue: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} />
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Mức giảm *</label>
+                <input type="number" min="0" disabled={formValues.hasBeenUsed} value={formValues.discountValue} onChange={e => setFormValues({ ...formValues, discountValue: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} />
               </div>
             </div>
 
             {formValues.discountType === 'Percentage' && (
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Giảm tối đa (VNĐ)</label>
-                <input type="number" min="0" disabled={formValues.hasBeenUsed} value={formValues.maxDiscount} onChange={e => setFormValues({ ...formValues, maxDiscount: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} placeholder="0 = Không giới hạn" />
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Giảm tối đa (VNĐ)</label>
+                <input type="number" min="0" disabled={formValues.hasBeenUsed} value={formValues.maxDiscount} onChange={e => setFormValues({ ...formValues, maxDiscount: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} placeholder="0 = Không giới hạn" />
               </div>
             )}
 
             {/* Thời gian: cùng 1 hàng */}
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Từ ngày *</label>
-                <input type="datetime-local" disabled={formValues.hasBeenUsed} value={formValues.startDate} onChange={e => setFormValues({ ...formValues, startDate: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} />
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Từ ngày *</label>
+                <input type="datetime-local" disabled={formValues.hasBeenUsed} min={!editingId ? dayjs().format('YYYY-MM-DDTHH:mm') : undefined} value={formValues.startDate} onChange={e => setFormValues({ ...formValues, startDate: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, boxSizing: 'border-box', background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Đến ngày *</label>
-                <input type="datetime-local" value={formValues.endDate} onChange={e => setFormValues({ ...formValues, endDate: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Đến ngày *</label>
+                <input type="datetime-local" min={!editingId ? dayjs().format('YYYY-MM-DDTHH:mm') : undefined} value={formValues.endDate} onChange={e => setFormValues({ ...formValues, endDate: e.target.value })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
             </div>
 
-            {editingId && (
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
-                  <Switch checkedChildren="Hoạt động" unCheckedChildren="Khóa" checked={formValues.isActive} onChange={checked => setFormValues({ ...formValues, isActive: checked })} />
-                  Đang hoạt động (Hiển thị cho khách hàng)
-                </label>
-              </div>
-            )}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                <Switch checkedChildren="Hoạt động" unCheckedChildren="Khóa" checked={formValues.isActive} onChange={checked => setFormValues({ ...formValues, isActive: checked })} />
+                Đang hoạt động (Hiển thị cho khách hàng)
+              </label>
+            </div>
 
             {isOwnerOrAdmin && (
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Phạm vi áp dụng</label>
-                <select value={formValues.scope} disabled={formValues.hasBeenUsed} onChange={e => setFormValues({ ...formValues, scope: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, marginBottom: 8, background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }}>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#475569' }}>Phạm vi áp dụng</label>
+                <select value={formValues.scope} disabled={formValues.hasBeenUsed} onChange={e => setFormValues({ ...formValues, scope: Number(e.target.value) })} style={{ width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 14, marginBottom: 8, background: formValues.hasBeenUsed ? '#f1f5f9' : '#fff' }}>
                   <option value={0}>Tất cả chi nhánh</option>
                   <option value={1}>Chi nhánh cụ thể</option>
                 </select>
@@ -313,7 +331,7 @@ const PromotionManagementTab = () => {
                 {formValues.scope === 1 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 8, background: '#f8fafc', borderRadius: 4, border: '1px solid #e2e8f0', opacity: formValues.hasBeenUsed ? 0.6 : 1 }}>
                     {branches.map(b => (
-                      <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: formValues.hasBeenUsed ? 'not-allowed' : 'pointer' }}>
+                      <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: formValues.hasBeenUsed ? 'not-allowed' : 'pointer' }}>
                         <input type="checkbox" disabled={formValues.hasBeenUsed} checked={formValues.branchIds.includes(b.id)} onChange={e => {
                           const checked = e.target.checked;
                           setFormValues(prev => ({
@@ -329,7 +347,7 @@ const PromotionManagementTab = () => {
             )}
 
             <div style={{ textAlign: 'right', marginTop: 16 }}>
-              <button onClick={handleSave} disabled={saving} style={{ background: '#ea580c', color: 'white', padding: '8px 20px', borderRadius: 6, border: 'none', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+              <button onClick={handleSave} disabled={saving} style={{ background: '#ea580c', color: 'white', padding: '8px 20px', borderRadius: 6, border: 'none', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14 }}>
                 {saving ? 'Đang lưu...' : (editingId ? 'Cập nhật' : 'Lưu chương trình')}
               </button>
             </div>
@@ -338,7 +356,7 @@ const PromotionManagementTab = () => {
           {/* CỘT PHẢI: Chọn sản phẩm */}
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', maxHeight: 500 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Sản phẩm áp dụng ({formValues.productIds.length} đã chọn)</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>Sản phẩm áp dụng ({formValues.productIds.length} đã chọn)</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={selectAllFiltered} style={{ background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '3px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
                   <CheckSquareOutlined /> Chọn hết
@@ -356,13 +374,13 @@ const PromotionManagementTab = () => {
                 placeholder="Tìm kiếm món ăn..."
                 value={productSearch}
                 onChange={e => setProductSearch(e.target.value)}
-                style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: 13 }}
+                style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: 14 }}
               />
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
               {filteredProducts.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Không tìm thấy sản phẩm</div>
+                <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Không tìm thấy sản phẩm</div>
               ) : (
                 filteredProducts.map(p => (
                   <label key={p.id} style={{
@@ -373,7 +391,7 @@ const PromotionManagementTab = () => {
                   }}>
                     <input type="checkbox" checked={formValues.productIds.includes(p.id)} disabled={formValues.hasBeenUsed} onChange={() => toggleProductSelection(p.id)} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
                       <div style={{ fontSize: 11, color: '#64748b' }}>{Number(p.sellPrice || 0).toLocaleString('vi-VN')}đ</div>
                     </div>
                   </label>
@@ -387,6 +405,13 @@ const PromotionManagementTab = () => {
   }
 
   /* ── Danh sách KM ─────────────────────────────────────────────────────── */
+  const canEditDelete = (p) => {
+    if (isOwnerOrAdmin) return true;
+    if (p.scope === 0 || p.scope === 'AllBranches') return false;
+    if (p.branches && p.branches.length > 1) return false;
+    return true;
+  };
+
   return (
     <div style={{ background: '#ffffff', borderRadius: 8, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -399,90 +424,113 @@ const PromotionManagementTab = () => {
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b' }}>Tình trạng:</span>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, outline: 'none' }}>
-            <option value="All">Tất cả</option>
-            <option value="Active">Đang diễn ra</option>
-            <option value="Upcoming">Sắp tới</option>
-            <option value="Disabled">Đã khóa (Tắt)</option>
-            <option value="Expired">Đã kết thúc</option>
-          </select>
+          <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 150 }}>
+            <Select.Option value="All">Tất cả</Select.Option>
+            <Select.Option value="Active">Đang diễn ra</Select.Option>
+            <Select.Option value="Upcoming">Sắp tới</Select.Option>
+            <Select.Option value="Disabled">Đã khóa (Tắt)</Select.Option>
+            <Select.Option value="Expired">Đã kết thúc</Select.Option>
+          </Select>
         </div>
 
         {isOwnerOrAdmin && branches.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b' }}>Chi nhánh:</span>
-            <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)} style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, outline: 'none' }}>
-              <option value="All">Tất cả chi nhánh</option>
+            <Select value={filterBranch} onChange={setFilterBranch} style={{ width: 200 }}>
+              <Select.Option value="All">Tất cả chi nhánh</Select.Option>
               {branches.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
+                <Select.Option key={b.id} value={b.id}>{b.name}</Select.Option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569' }}>Tên chương trình</th>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569' }}>Mức giảm</th>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569' }}>Thời gian</th>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569' }}>Tình trạng</th>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569' }}>Số món</th>
-              <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#475569', textAlign: 'center' }}>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {processedPromotions.length === 0 ? (
-              <tr><td colSpan="6" style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Chưa có chương trình khuyến mãi nào</td></tr>
-            ) : (
-              processedPromotions.map(p => (
-                <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: '#0f172a' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <GiftOutlined style={{ color: '#ea580c', fontSize: 12 }} />
-                      {p.name}
-                    </div>
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>
-                    {p.discountType === 'Percentage' ? `${p.discountValue}%` : `${Number(p.discountValue).toLocaleString('vi-VN')}đ`}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748b' }}>
-                    {dayjs(p.startDate).format('DD/MM/YY HH:mm')} → {dayjs(p.endDate).format('DD/MM/YY HH:mm')}
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                      background: p.status === 'Active' ? '#dcfce7' : p.status === 'Upcoming' ? '#fef9c3' : '#f1f5f9',
-                      color: p.status === 'Active' ? '#166534' : p.status === 'Upcoming' ? '#854d0e' : '#475569'
-                    }}>
-                      {p.status === 'Active' ? 'Đang diễn ra' : p.status === 'Upcoming' ? 'Sắp tới' : p.status === 'Disabled' ? 'Đã tắt' : 'Đã kết thúc'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 14px', fontSize: 13, color: '#475569' }}>
-                    {p.products?.length || 0} món
-                  </td>
-                  <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                    {p.status !== 'Expired' ? (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                        <button onClick={() => handleEdit(p)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: 14 }}>
-                          <EditOutlined />
-                        </button>
-                        <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>
-                          <DeleteOutlined />
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 12, color: '#94a3b8' }}>-</span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table 
+        columns={[
+          {
+            title: 'Tên chương trình',
+            dataIndex: 'name',
+            key: 'name',
+            render: (text) => <span style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{text}</span>
+          },
+          {
+            title: 'Mức giảm',
+            key: 'discount',
+            render: (_, p) => (
+              <span style={{ fontSize: 14, color: '#475569' }}>
+                {p.discountType === 'Percentage' ? `${p.discountValue}%` : `${Number(p.discountValue).toLocaleString('vi-VN')} đ`}
+              </span>
+            )
+          },
+          {
+            title: 'Thời gian',
+            key: 'time',
+            render: (_, p) => (
+              <span style={{ fontSize: 13, color: '#64748b' }}>
+                {dayjs(p.startDate).format('DD/MM/YYYY')} - {dayjs(p.endDate).format('DD/MM/YYYY')}
+              </span>
+            )
+          },
+          {
+            title: 'Tình trạng',
+            key: 'status',
+            render: (_, p) => {
+              const colors = {
+                'Active': 'green',
+                'Upcoming': 'gold',
+                'Disabled': 'default',
+                'Expired': 'error'
+              };
+              const labels = {
+                'Active': 'Đang diễn ra',
+                'Upcoming': 'Sắp tới',
+                'Disabled': 'Đã tắt',
+                'Expired': 'Đã kết thúc'
+              };
+              return <Tag color={colors[p.status]} style={{ fontSize: 13 }}>{labels[p.status]}</Tag>;
+            }
+          },
+          {
+            title: 'Số món',
+            key: 'products',
+            render: (_, p) => <span style={{ fontSize: 14, color: '#475569' }}>{p.products?.length || 0} món</span>
+          },
+          {
+            title: 'Áp dụng tại',
+            key: 'branches',
+            render: (_, p) => (
+              p.scope === 0 || p.scope === 'AllBranches' ? (
+                <Tag color="blue" style={{ fontSize: 13 }}>Toàn hệ thống</Tag>
+              ) : (
+                <Space wrap size={[0, 4]}>
+                  {p.branches?.map(b => (
+                    <Tag key={b.branchId} style={{ fontSize: 13 }}>
+                      {b.branchName || b.branch?.name || `CN ${b.branchId}`}
+                    </Tag>
+                  ))}
+                </Space>
+              )
+            )
+          },
+          {
+            title: 'Thao tác',
+            key: 'action',
+            render: (_, p) => {
+              if (p.status === 'Expired' || !canEditDelete(p)) return <span style={{ fontSize: 13, color: '#94a3b8' }}>-</span>;
+              return (
+                <Space size="middle">
+                  <Button icon={<EditOutlined />} onClick={() => handleEdit(p)} />
+                  <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(p.id)} />
+                </Space>
+              );
+            }
+          }
+        ]}
+        dataSource={processedPromotions}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+      />
     </div>
   );
 };

@@ -83,8 +83,8 @@ const ROLE_MENUS = {
     { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
@@ -106,8 +106,8 @@ const ROLE_MENUS = {
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
@@ -136,8 +136,8 @@ const ROLE_MENUS = {
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
     { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
     { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -327,14 +327,14 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
           const hasChildren = item.children && item.children.length > 0;
           const isParentActive = hasChildren
             ? item.children.some((child) => {
-                const childBasePath = child.path.split("?")[0];
-                if (child.tabKey) {
-                  return location.pathname === childBasePath && activeTabParam === child.tabKey;
-                }
-                return location.pathname === childBasePath;
-              })
+              const childBasePath = child.path.split("?")[0];
+              if (child.tabKey) {
+                return location.pathname === childBasePath && activeTabParam === child.tabKey;
+              }
+              return location.pathname === childBasePath;
+            })
             : location.pathname === item.path ||
-              (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
+            (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
 
           const isSubOpen = openSubMenus[item.label] ?? true;
 
@@ -451,7 +451,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
             </div>
           </Dropdown>
         )}
-        
+
         <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: '4px' }}>
           {!collapsed && (
             <Tooltip title="Đăng xuất" placement="top">
@@ -466,7 +466,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
             </Tooltip>
           )}
         </div>
-        
+
         {/* If collapsed, still show avatar that can click to dropdown */}
         {collapsed && (
           <div style={{ marginTop: '12px' }}>
