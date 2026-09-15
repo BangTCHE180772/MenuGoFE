@@ -373,7 +373,7 @@ const CustomerOrderPage = () => {
 
         {activeTab === 'menu' ? (
           <div className="co-menu-wrap">
-            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} branchId={summary?.branchId} />
+            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} branchId={summary?.branchId} showReuseSuggestions={false} />
           </div>
         ) : (
           <div className="co-ordered-list">

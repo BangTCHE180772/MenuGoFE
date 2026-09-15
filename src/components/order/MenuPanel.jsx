@@ -15,7 +15,7 @@ const formatPrice = (price) =>
 
 const REUSE_POLL_MS = 20000;
 
-const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
+const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
   const [loading, setLoading] = useState(true);
@@ -27,9 +27,11 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
 
   const searchTimeout = useRef(null);
 
-  /* ── Gợi ý dùng lại món thừa (Return, Processed, còn trong 30p) ─────────── */
+  /* ── Gợi ý dùng lại món thừa (Return, Processed, còn trong 30p) ───────────
+     Chỉ dành cho nhân viên gọi món (OrderPage) — đây là gợi ý vận hành nội bộ
+     bếp/phục vụ, KHÔNG được lộ ra màn hình khách tự gọi món (CustomerOrderPage). */
   useEffect(() => {
-    if (!branchId) return undefined;
+    if (!branchId || !showReuseSuggestions) return undefined;
     let cancelled = false;
     const fetchReusable = () => {
       getReusableLeftovers(branchId)
@@ -39,7 +41,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
     fetchReusable();
     const poll = setInterval(fetchReusable, REUSE_POLL_MS);
     return () => { cancelled = true; clearInterval(poll); };
-  }, [branchId]);
+  }, [branchId, showReuseSuggestions]);
 
   // Đếm ngược phút còn lại của từng gợi ý
   useEffect(() => {
@@ -228,8 +230,9 @@ const MenuPanel = ({ onAddItem, canOrder, branchId }) => {
         <span className="pos-menu-count">{products.length} món</span>
       </div>
 
-      {/* Gợi ý dùng lại món thừa — món đã nấu xong bị trả trong 30p gần nhất */}
-      {reusableLeftovers.length > 0 && (
+      {/* Gợi ý dùng lại món thừa — món đã nấu xong bị trả trong 30p gần nhất.
+          Chỉ dành cho nhân viên, không hiện ở màn hình khách tự gọi món. */}
+      {showReuseSuggestions && reusableLeftovers.length > 0 && (
         <div style={{
           background: '#fffbeb',
           border: '1px solid #fde68a',

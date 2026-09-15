@@ -68,6 +68,7 @@ const KDSPage = () => {
 
   const [items, setItems] = useState([]);
   const [reusableLeftovers, setReusableLeftovers] = useState([]);
+  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [viewMode, setViewMode] = useState('COLUMN'); // 'COLUMN' (Chia dọc) or 'GRID' (Grid/Tab)
@@ -157,6 +158,12 @@ const KDSPage = () => {
     const interval = setInterval(fetchReusableLeftovers, 20000);
     return () => clearInterval(interval);
   }, [fetchReusableLeftovers]);
+
+  useEffect(() => {
+    if (reusableLeftovers.length === 0) return undefined;
+    const tick = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(tick);
+  }, [reusableLeftovers.length]);
 
   // Danh sách món khách trả trong ngày — chỉ để bếp xem, không thao tác.
   const fetchReturnedItems = useCallback(async () => {
@@ -601,11 +608,25 @@ const KDSPage = () => {
             >
               <Button
                 block
-                size="large"
                 icon={<ThunderboltOutlined />}
-                style={{ backgroundColor: '#fffbeb', borderColor: '#f59e0b', color: '#b45309', fontWeight: 700, marginBottom: 8 }}
+                style={{
+                  backgroundColor: '#fffbeb',
+                  borderColor: '#f59e0b',
+                  color: '#b45309',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  marginBottom: 8,
+                  height: 'auto',
+                  minHeight: 40,
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.4,
+                  padding: '8px 12px',
+                }}
               >
-                ♻️ Dùng món thừa vừa trả — Dừng chế biến
+                ♻️ Dùng món thừa vừa trả
+                <br />
+                Dừng chế biến
               </Button>
             </Popconfirm>
           )}
@@ -818,6 +839,47 @@ const KDSPage = () => {
               }}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Gợi ý dùng lại món thừa (tổng quan, kể cả khi chưa khớp món đang chờ nấu) ── */}
+      {reusableLeftovers.length > 0 && (
+        <div
+          style={{
+            marginBottom: 20,
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            borderRadius: KDS_STYLE.radius,
+            padding: '14px 20px',
+            boxShadow: KDS_STYLE.shadow,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#b45309', marginBottom: 10 }}>
+            💡 Gợi ý dùng lại món thừa (còn trong 30 phút) — {reusableLeftovers.length} món
+          </div>
+          <Space size={10} wrap>
+            {reusableLeftovers.map((item) => {
+              const minutesLeft = Math.max(0, Math.round((new Date(item.expiresAt).getTime() - now) / 60000));
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #f59e0b',
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13, color: KDS_STYLE.textPrimary }}>
+                    {item.productName} x{item.quantity}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#92400e' }}>
+                    {item.tableName ? `Từ ${item.tableName} · ` : ''}còn {minutesLeft}p
+                  </div>
+                </div>
+              );
+            })}
+          </Space>
         </div>
       )}
 
