@@ -1,7 +1,7 @@
 import axiosInstance from './axiosInstance';
 
-export const createPaymentLink = async (orderId) => {
-    const response = await axiosInstance.post(`/api/Payment/create-payment-link/${orderId}`);
+export const createPaymentLink = async (orderId, payload = null) => {
+    const response = await axiosInstance.post(`/api/Payment/create-payment-link/${orderId}`, payload);
     return response.data;
 };
 

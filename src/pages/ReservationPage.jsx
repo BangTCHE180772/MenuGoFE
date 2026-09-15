@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Space, message, Tabs, Modal, Typography, DatePicker, Radio, Calendar, Badge, Row, Col, Empty, Tooltip } from 'antd';
-import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, AppstoreOutlined, CalendarOutlined, EditOutlined } from '@ant-design/icons';
+import { Card, Button, Tag, Space, message, Tabs, Modal, Typography, DatePicker, Row, Col, Empty, Tooltip } from 'antd';
+import { PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { getReservations, checkInReservation, cancelReservation } from '../api/reservationApi';
 import ReservationFormModal from '../components/reservation/ReservationFormModal';
 import ReservationEditModal from '../components/reservation/ReservationEditModal';
@@ -21,7 +21,7 @@ const ReservationPage = ({ isPosHub }) => {
   const [editingReservation, setEditingReservation] = useState(null);
   const [assigningReservation, setAssigningReservation] = useState(null);
 
-  const [viewMode, setViewMode] = useState('cards');
+
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [activeTab, setActiveTab] = useState('All');
 
@@ -116,22 +116,7 @@ const ReservationPage = ({ isPosHub }) => {
     });
   };
 
-  const dateCellRender = (value) => {
-    const dailyData = reservations.filter(r => dayjs(r.reservationTime).isSame(value, 'day'));
-    if (dailyData.length === 0) return null;
 
-    const pendingCount = dailyData.filter(r => r.status === 'Pending').length;
-    const completedCount = dailyData.filter(r => r.status === 'Completed').length;
-    const totalGuests = dailyData.reduce((sum, r) => sum + r.numberOfGuests, 0);
-
-    return (
-      <div className="calendar-cell-events">
-        <div className="calendar-cell-total">{dailyData.length} Đơn ({totalGuests} khách)</div>
-        {pendingCount > 0 && <div><Badge status="warning" text={`${pendingCount} Chờ`} /></div>}
-        {completedCount > 0 && <div><Badge status="success" text={`${completedCount} Đã đến`} /></div>}
-      </div>
-    );
-  };
 
   const filteredReservations = reservations.filter(r => {
     const isSameDate = dayjs(r.reservationTime).isSame(selectedDate, 'day');
@@ -286,22 +271,15 @@ const ReservationPage = ({ isPosHub }) => {
         <Space size="large">
           {!isPosHub && <Title level={3} style={{ margin: 0 }}>Quản Lý Đặt Bàn</Title>}
 
-          <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)} buttonStyle="solid">
-            <Radio.Button value="cards"><AppstoreOutlined /> Theo Ngày</Radio.Button>
-            <Radio.Button value="calendar"><CalendarOutlined /> Lịch Tháng</Radio.Button>
-          </Radio.Group>
-
-          {viewMode === 'cards' && (
-            <Space>
-              <Text strong>Ngày xem:</Text>
-              <DatePicker
-                value={selectedDate}
-                onChange={(date) => setSelectedDate(date || dayjs())}
-                format="DD/MM/YYYY"
-                allowClear={false}
-              />
-            </Space>
-          )}
+          <Space>
+            <Text strong>Ngày xem:</Text>
+            <DatePicker
+              value={selectedDate}
+              onChange={(date) => setSelectedDate(date || dayjs())}
+              format="DD/MM/YYYY"
+              allowClear={false}
+            />
+          </Space>
         </Space>
 
         <Button
@@ -316,34 +294,18 @@ const ReservationPage = ({ isPosHub }) => {
 
       {/* Main Content Area */}
       <div className="reservation-content-area">
-        {viewMode === 'calendar' ? (
-          <Card bodyStyle={{ padding: 0 }}>
-            <Calendar
-              value={selectedDate}
-              onSelect={(date) => {
-                setSelectedDate(date);
-                setViewMode('cards');
-              }}
-              cellRender={(date, info) => {
-                if (info.type === 'date') return dateCellRender(date);
-                return info.originNode;
-              }}
-            />
-          </Card>
-        ) : (
-          <>
-            <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} style={{ marginBottom: 16 }} />
-            {filteredReservations.length === 0 ? (
-              <Card style={{ textAlign: 'center', padding: '40px 0' }}>
-                <Empty description={`Không có đặt bàn nào vào ngày ${selectedDate.format('DD/MM/YYYY')} (${activeTab})`} />
-              </Card>
-            ) : (
-              <Row gutter={[16, 16]}>
-                {filteredReservations.map(r => renderReservationCard(r))}
-              </Row>
-            )}
-          </>
-        )}
+        <>
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} style={{ marginBottom: 16 }} />
+          {filteredReservations.length === 0 ? (
+            <Card style={{ textAlign: 'center', padding: '40px 0' }}>
+              <Empty description={`Không có đặt bàn nào vào ngày ${selectedDate.format('DD/MM/YYYY')} (${activeTab})`} />
+            </Card>
+          ) : (
+            <Row gutter={[16, 16]}>
+              {filteredReservations.map(r => renderReservationCard(r))}
+            </Row>
+          )}
+        </>
       </div>
 
       <ReservationFormModal

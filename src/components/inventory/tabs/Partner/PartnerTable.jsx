@@ -1042,7 +1042,6 @@ const PartnerTable = ({
               {[
                 { key: 'ALL', label: 'Tất cả' },
                 { key: 'NCC', label: 'Nhà cung cấp' },
-                { key: 'KH', label: 'Khách hàng' },
                 { key: 'VC', label: 'Vận chuyển' },
                 { key: 'OTHER', label: 'Khác' }
               ].map((st) => {
