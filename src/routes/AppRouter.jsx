@@ -105,30 +105,26 @@ const AppRouter = () => {
           </Route>
 
           {/* ── Device Route: cần device_token ─────────── */}
-          <Route element={<DeviceRoute />}>
+          {/* <Route element={<DeviceRoute />}>
             <Route element={<DeviceLayout />}>
-              {/* POS */}
               <Route element={<DeviceRoute allowedTypes={['POS']} />}>
                 <Route path="/pos" element={<CashierPage />} />
               </Route>
-              {/* Waiter */}
               <Route element={<DeviceRoute allowedTypes={['Waiter']} />}>
                 <Route path="/station" element={<WaiterStationPage />} />
               </Route>
-              {/* Kitchen */}
               <Route element={<DeviceRoute allowedTypes={['Kitchen']} />}>
                 <Route path="/kitchen" element={<KDSPage />} />
               </Route>
-              {/* Attendance */}
               <Route element={<DeviceRoute allowedTypes={['Attendance']} />}>
                 <Route path="/attendance" element={<AttendancePage />} />
               </Route>
             </Route>
-          </Route>
+          </Route> */}
 
           {/* ── Private Route: cho nhân viên/quản lý (trên điện thoại/web) ─────────── */}
           <Route element={<PrivateRoute />}>
-            <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} />
+            {/* <Route path="/device-auth/:challengeId" element={<DeviceAuthPage />} /> */}
 
             <Route element={<MainLayout />}>
               <Route index element={<Navigate to="/home" replace />} />
@@ -210,8 +206,8 @@ const AppRouter = () => {
                 <Route path="/accounts" element={<AccountPage />} />
                 <Route path="/tables" element={<TableManagementPage />} />
                 <Route path="/promotions" element={<PromotionVoucherPage />} />
-                <Route path="/device-management" element={<DeviceManagementPage />} />
-                <Route path="/device-setup" element={<DeviceSetupPage />} />
+                {/* <Route path="/device-management" element={<DeviceManagementPage />} /> */}
+                {/* <Route path="/device-setup" element={<DeviceSetupPage />} /> */}
                 <Route path="/contracts" element={<ContractPage />} />
                 <Route path="/shifts" element={<ShiftPage />} />
                 <Route path="/holiday-config" element={<HolidayConfigPage />} />

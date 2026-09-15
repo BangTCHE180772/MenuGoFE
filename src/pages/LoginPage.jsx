@@ -150,7 +150,7 @@ const LoginPage = () => {
           </Form>
 
         {/*=============================================================================================== DEVICE AUTHORIZATION */}
-        {isDeviceMode && deviceInfo?.isActive && (
+        {/* {isDeviceMode && deviceInfo?.isActive && (
           <>
             <Divider className="login-divider">hoặc</Divider>
             <Button
@@ -174,7 +174,7 @@ const LoginPage = () => {
               Thiết bị này đã được xác lập: {deviceInfo.name}
             </p>
           </>
-        )}
+        )} */}
       </div>
       <ForgotPasswordModal 
         visible={forgotModalVisible} 
