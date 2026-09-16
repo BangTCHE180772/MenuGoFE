@@ -95,8 +95,9 @@ const OrderedItem = ({
   const isPending = item.status === 'CustomerPending';
   const returnableQty = item.quantity - (item.returnedQuantity || 0);
   
-  const getStatusColor = (status) => {
-    switch (status) {
+  const getStatusColor = (item) => {
+    if (item.returnedQuantity === item.quantity && item.quantity > 0) return '#ef4444'; // red for fully returned
+    switch (item.cookingStatus || 'Waiting') {
       case 'Waiting': return '#f59e0b'; // amber
       case 'Cooking': return '#3b82f6'; // blue
       case 'Ready': return '#10b981'; // green
@@ -106,14 +107,15 @@ const OrderedItem = ({
     }
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
+  const getStatusText = (item) => {
+    if (item.returnedQuantity === item.quantity && item.quantity > 0) return 'Đã trả toàn bộ';
+    switch (item.cookingStatus || 'Waiting') {
       case 'Waiting': return 'Chờ nấu';
       case 'Cooking': return 'Đang nấu';
       case 'Ready': return 'Bếp đã xong';
       case 'Served': return 'Đã phục vụ';
       case 'Cancelled': return 'Đã huỷ';
-      default: return status;
+      default: return (item.cookingStatus || 'Waiting');
     }
   };
 
@@ -133,10 +135,10 @@ const OrderedItem = ({
               <span style={{fontWeight: 'bold'}}> x{item.quantity}</span>
             )}
           </div>
-          <div className="pos-cart-item-status-badge" style={{ backgroundColor: isPending ? '#8b5cf620' : getStatusColor(item.cookingStatus) + '20', color: isPending ? '#8b5cf6' : getStatusColor(item.cookingStatus) }}>
-            <span style={{ backgroundColor: isPending ? '#8b5cf6' : getStatusColor(item.cookingStatus) }} className="pos-order-status-dot" />
-            {isPending ? 'Chờ xác nhận' : getStatusText(item.cookingStatus)}
-            {item.returnedQuantity > 0 && <span style={{ marginLeft: 4, color: '#f59e0b' }}>(Đã trả {item.returnedQuantity})</span>}
+          <div className="pos-cart-item-status-badge" style={{ backgroundColor: isPending ? '#8b5cf620' : getStatusColor(item) + '20', color: isPending ? '#8b5cf6' : getStatusColor(item) }}>
+            <span style={{ backgroundColor: isPending ? '#8b5cf6' : getStatusColor(item) }} className="pos-order-status-dot" />
+            {isPending ? 'Chờ xác nhận' : getStatusText(item)}
+            {item.returnedQuantity > 0 && item.returnedQuantity < item.quantity && <span style={{ marginLeft: 4, color: '#f59e0b' }}>(Đã trả {item.returnedQuantity})</span>}
           </div>
         </div>
         <div className="pos-cart-item-total" style={{alignSelf: 'flex-start'}}>{formatPrice(item.price * item.quantity)}</div>
