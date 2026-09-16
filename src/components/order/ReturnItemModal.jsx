@@ -1,20 +1,23 @@
 import React, { useState, useRef } from 'react';
-import { Modal, InputNumber, Input, Form, message, Checkbox, Select } from 'antd';
+import { Modal, InputNumber, Input, Form, message, Select, Switch } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 
 const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const actionRef = useRef(false);
-  const isIntact = Form.useWatch('isIntact', form);
+  
+  // handlingAction now represents the Switch (true = Reuse, false = Discard)
+  const isHandlingReuse = Form.useWatch('handlingAction', form);
+  const returnReason = Form.useWatch('returnReason', form);
 
   if (!item) return null;
 
   const maxReturnable = item.quantity - (item.returnedQuantity || 0);
 
   const getReasonOptions = () => {
-    // Nếu là đồ thường (Regular) và nguyên vẹn: được phép chọn lý do mở rộng
-    if (item.productType === 'Regular' && isIntact) {
+    // Nếu là đồ thường/đóng gói và chọn Tái sử dụng: được phép chọn lý do mở rộng
+    if ((item.productType === 'Regular' || item.productType === 'Manufactured') && isHandlingReuse) {
       return [
         { value: 'Khách gọi dư', label: 'Khách gọi dư' },
         { value: 'Nhân viên bấm nhầm', label: 'Nhân viên bấm nhầm' },
@@ -22,7 +25,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
         { value: 'Lý do khác', label: 'Lý do khác' }
       ];
     }
-    // Các trường hợp còn lại (Processed hoặc Không nguyên vẹn): Chỉ các lỗi do nhà hàng
+    // Các trường hợp còn lại (Processed hoặc Huỷ): Chỉ các lỗi do nhà hàng
     return [
       { value: 'Ra món chậm', label: 'Ra món chậm' },
       { value: 'Thức ăn nguội/kém chất lượng', label: 'Thức ăn nguội/kém chất lượng' },
@@ -34,8 +37,11 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
     ];
   };
 
-  const handleIntactChange = () => {
-    form.setFieldsValue({ returnReason: undefined });
+  const handleHandlingChange = (checked) => {
+    form.setFieldsValue({
+      handlingAction: checked,
+      returnReason: undefined,
+    });
   };
 
   const handleOk = async () => {
@@ -45,11 +51,20 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
       const values = await form.validateFields();
       setLoading(true);
 
+      let finalReason = values.returnReason;
+      if (values.returnReason === 'Lý do khác') {
+        finalReason = values.otherReason;
+      }
+
+      const isReuse = values.handlingAction === true;
+
       const payload = {
         orderDetailId: item.orderDetailId,
         returnQuantity: values.returnQuantity,
-        returnReason: values.returnReason,
-        isIntact: values.isIntact || false,
+        returnReason: finalReason,
+        isIntact: isReuse, // Derived implicitly: Reuse means it was intact
+        handlingAction: isReuse ? 'Reuse' : 'Discard',
+        compensationPoints: values.compensationPoints,
       };
 
       if (isCustomerMode) {
@@ -88,7 +103,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
         <p><strong>Số lượng có thể trả:</strong> {maxReturnable}</p>
       </div>
 
-      <Form form={form} layout="vertical" initialValues={{ returnQuantity: 1, isIntact: true }}>
+      <Form form={form} layout="vertical" initialValues={{ returnQuantity: 1, handlingAction: true }}>
         <Form.Item
           name="returnQuantity"
           label="Số lượng trả"
@@ -104,6 +119,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           name="returnReason"
           label="Lý do trả"
           rules={[{ required: true, message: 'Vui lòng chọn lý do trả món!' }]}
+          style={{ marginBottom: returnReason === 'Lý do khác' ? 8 : 24 }}
         >
           <Select
             placeholder="Chọn lý do trả món..."
@@ -111,10 +127,29 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           />
         </Form.Item>
 
-        <Form.Item name="isIntact" valuePropName="checked">
-          <Checkbox onChange={handleIntactChange}>
-            Hàng còn nguyên vẹn (Sẽ được nhập lại vào kho nếu là mặt hàng Thường)
-          </Checkbox>
+        {returnReason === 'Lý do khác' && (
+          <Form.Item
+            name="otherReason"
+            rules={[{ required: true, message: 'Vui lòng nhập chi tiết lý do!' }]}
+            style={{ marginBottom: 24 }}
+          >
+            <Input.TextArea rows={2} placeholder="Vui lòng nhập chi tiết lý do..." />
+          </Form.Item>
+        )}
+
+        <Form.Item name="handlingAction" valuePropName="checked" label="Hướng xử lý">
+          <Switch
+            checkedChildren="Tái sử dụng"
+            unCheckedChildren="Huỷ bỏ"
+            onChange={handleHandlingChange}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+            Hàng tái sử dụng sẽ được cộng lại vào kho nếu là mặt hàng Thường.
+          </div>
+        </Form.Item>
+
+        <Form.Item name="compensationPoints" label="Điểm tích lũy bù cho khách (nếu có)">
+          <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="điểm" />
         </Form.Item>
       </Form>
     </Modal>

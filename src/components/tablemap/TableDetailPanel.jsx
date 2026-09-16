@@ -79,16 +79,17 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
 
   const qrUrl = `${window.location.origin}/customer-order/${table.id}`;
 
-  const renderStatusTag = (status, cookingStatus) => {
-    if (status === 'Cancelled') return <Tag color="red">Đã huỷ</Tag>;
-    if (status === 'CustomerPending') return <Tag color="default">Chờ xác nhận</Tag>;
+  const renderStatusTag = (item) => {
+    if (item.returnedQuantity === item.quantity && item.quantity > 0) return <Tag color="red">Đã trả toàn bộ</Tag>;
+    if (item.status === 'Cancelled') return <Tag color="red">Đã huỷ</Tag>;
+    if (item.status === 'CustomerPending') return <Tag color="default">Chờ xác nhận</Tag>;
 
-    switch (cookingStatus) {
+    switch (item.cookingStatus) {
       case 'Waiting': return <Tag color="orange">Chờ bếp</Tag>;
       case 'Cooking': return <Tag color="blue">Đang nấu</Tag>;
       case 'Ready': return <Tag color="green">Sẵn sàng</Tag>;
       case 'Served': return <Tag color="purple">Đã phục vụ</Tag>;
-      default: return <Tag color="default">{cookingStatus}</Tag>;
+      default: return <Tag color="default">{item.cookingStatus}</Tag>;
     }
   };
 
@@ -200,7 +201,7 @@ const TableDetailPanel = ({ branchId, table, summary, loading, onConfirm, onReje
                   </div>
                   {item.note && <div className="tablemap-item-note">Ghi chú: {item.note}</div>}
                   <div className="tablemap-item-status">
-                    {renderStatusTag(item.status, item.cookingStatus)}
+                    {renderStatusTag(item)}
                   </div>
                 </div>
 
