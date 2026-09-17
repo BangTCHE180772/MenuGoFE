@@ -22,6 +22,7 @@ import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord 
 import { getCancelledHistory, getAllOrders } from '../api/orderApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
+import { getAllAccounts } from '../api/accountApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 
@@ -32,6 +33,9 @@ const HANDLING_ACTION_LABELS = {
   StaffUse: 'Nhân viên dùng',
   Reuse: 'Tái sử dụng',
 };
+
+// RoleId 5 = Bếp (Chef) — theo ROLES_MAP dùng chung trong WorkSchedulePage.jsx.
+const CHEF_ROLE_ID = 5;
 
 const LeftoverPage = () => {
   const { user, role } = useAuth();
@@ -49,6 +53,7 @@ const LeftoverPage = () => {
 
   const [products, setProducts] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [chefAccounts, setChefAccounts] = useState([]);
   const [orderDetailOptions, setOrderDetailOptions] = useState([]);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -98,14 +103,15 @@ const LeftoverPage = () => {
     if (isManager) return;
     (async () => {
       try {
-        const [prodRes, shiftRes] = await Promise.all([getAllProducts(), getAllShifts()]);
+        const [prodRes, shiftRes, accountRes] = await Promise.all([getAllProducts(), getAllShifts(), getAllAccounts(branchId)]);
         setProducts(prodRes.data || []);
         setShifts(shiftRes.data || []);
+        setChefAccounts((accountRes.data || []).filter((a) => a.roleIds?.includes(CHEF_ROLE_ID)));
       } catch {
         message.error('Không thể tải danh mục sản phẩm/ca làm việc.');
       }
     })();
-  }, [isManager]);
+  }, [isManager, branchId]);
 
   const fetchOrderDetailOptions = useCallback(async () => {
     if (!branchId || isManager) return;
@@ -161,6 +167,7 @@ const LeftoverPage = () => {
         orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
         handlingAction: values.type === 'Return' ? values.handlingAction : null,
         compensationPoints: values.type === 'Return' ? values.compensationPoints ?? null : null,
+        atFaultAccountId: values.type === 'Return' ? values.atFaultAccountId ?? null : null,
         shiftId: values.shiftId ?? null,
         recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
       });
@@ -206,6 +213,9 @@ const LeftoverPage = () => {
             {r.compensationPoints ? (
               <span style={{ color: '#d48806', fontSize: 12 }}>Bù: {r.compensationPoints.toLocaleString('vi-VN')} điểm</span>
             ) : null}
+            {r.atFaultAccountName && (
+              <span style={{ color: '#cf1322', fontSize: 12 }}>Bếp làm sai: {r.atFaultAccountName}</span>
+            )}
             {r.usedAt && <Tag color="blue">Đã dùng lại</Tag>}
           </Space>
         ) : (
@@ -327,6 +337,15 @@ const LeftoverPage = () => {
                 </Form.Item>
                 <Form.Item name="compensationPoints" label="Điểm tích lũy bù cho khách (nếu có)" style={{ width: 220 }}>
                   <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="điểm" />
+                </Form.Item>
+                <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)" style={{ width: 220 }}>
+                  <Select
+                    allowClear
+                    showSearch
+                    placeholder="Chọn tài khoản bếp"
+                    optionFilterProp="label"
+                    options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
+                  />
                 </Form.Item>
               </Space>
             )}
