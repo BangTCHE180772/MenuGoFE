@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
+import { Dropdown, Avatar, message, Select, Tooltip, Button, Badge } from "antd";
 import NotificationBell from './NotificationBell';
+import { useSignalR } from "../context/SignalRContext";
+import axiosInstance from "../api/axiosInstance";
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -204,6 +206,63 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
     "Quản lý kho": true,
     "Báo cáo chuyên sâu": true,
   });
+
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const connection = useSignalR();
+
+  const fetchChatUnreadCount = useCallback(async () => {
+    if (!currentBranchId) {
+      setChatUnreadCount(0);
+      return;
+    }
+    try {
+      const res = await axiosInstance.get('/api/BranchChat/conversations', {
+        params: { branchId: currentBranchId },
+      });
+      if (Array.isArray(res.data)) {
+        const total = res.data.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch (err) {
+      console.warn('Không thể tải số tin nhắn chưa đọc:', err);
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchChatUnreadCount();
+  }, [currentBranchId, fetchChatUnreadCount]);
+
+  useEffect(() => {
+    const handleCustomUpdate = (e) => {
+      if (typeof e.detail === "number") {
+        setChatUnreadCount(e.detail);
+      } else {
+        fetchChatUnreadCount();
+      }
+    };
+    window.addEventListener("chat-unread-updated", handleCustomUpdate);
+    return () => {
+      window.removeEventListener("chat-unread-updated", handleCustomUpdate);
+    };
+  }, [fetchChatUnreadCount]);
+
+  useEffect(() => {
+    if (connection && currentBranchId) {
+      connection.invoke("JoinBranchGroup", currentBranchId).catch(() => {});
+
+      const handleSignalRUpdate = () => {
+        fetchChatUnreadCount();
+      };
+
+      connection.on("ReceiveNewMessage", handleSignalRUpdate);
+      connection.on("ReceiveNewConversation", handleSignalRUpdate);
+
+      return () => {
+        connection.off("ReceiveNewMessage", handleSignalRUpdate);
+        connection.off("ReceiveNewConversation", handleSignalRUpdate);
+      };
+    }
+  }, [connection, currentBranchId, fetchChatUnreadCount]);
 
   const toggleSubMenu = (label) => {
     setOpenSubMenus((prev) => ({
@@ -408,6 +467,9 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
           }
 
           // ── Standard Single Menu Item ──────────────────────────────────────
+          const isChatItem = item.path === "/chat";
+          const showBadge = isChatItem && chatUnreadCount > 0;
+
           const navLinkContent = (
             <Link
               key={idx}
@@ -415,14 +477,50 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
               state={{ from: location }}
               className={`sidebar-nav-item ${isParentActive ? "active" : ""}`}
             >
-              <span className="sidebar-nav-icon">{item.icon}</span>
-              {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
+              <span className="sidebar-nav-icon">
+                {showBadge && collapsed ? (
+                  <Badge count={chatUnreadCount} overflowCount={99} size="small" offset={[2, -2]}>
+                    {item.icon}
+                  </Badge>
+                ) : (
+                  item.icon
+                )}
+              </span>
+              {!collapsed && (
+                <span
+                  className="sidebar-nav-label"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </span>
+                  {showBadge && (
+                    <Badge
+                      count={chatUnreadCount}
+                      overflowCount={99}
+                      style={{
+                        backgroundColor: "#ef4444",
+                        boxShadow: "0 0 0 1px #fff",
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    />
+                  )}
+                </span>
+              )}
             </Link>
           );
 
           if (collapsed) {
+            const tooltipTitle = showBadge ? `${item.label} (${chatUnreadCount} tin chưa đọc)` : item.label;
             return (
-              <Tooltip key={idx} title={item.label} placement="right">
+              <Tooltip key={idx} title={tooltipTitle} placement="right">
                 {navLinkContent}
               </Tooltip>
             );

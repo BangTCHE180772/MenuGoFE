@@ -186,11 +186,13 @@ const BranchChatPage = () => {
         params: { branchId: currentBranchId },
       });
       const currentActive = selectId || activeConvId;
-      setConversations(
-        (res.data || []).map((c) =>
-          c.id === currentActive ? { ...c, unreadCount: 0 } : c
-        )
+      const mapped = (res.data || []).map((c) =>
+        c.id === currentActive ? { ...c, unreadCount: 0 } : c
       );
+      setConversations(mapped);
+      const total = mapped.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+      window.dispatchEvent(new CustomEvent("chat-unread-updated", { detail: total }));
+
       if (res.data.length > 0 && !activeConvId && !selectId) {
         handleSelectConversation(res.data[0].id);
       } else if (selectId) {
@@ -282,9 +284,12 @@ const BranchChatPage = () => {
 
   const handleSelectConversation = (id, targetMessageId = null) => {
     setActiveConvId(id);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-    );
+    setConversations((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c));
+      const total = updated.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+      window.dispatchEvent(new CustomEvent("chat-unread-updated", { detail: total }));
+      return updated;
+    });
     fetchMessages(id, targetMessageId);
   };
 
@@ -717,9 +722,12 @@ const BranchChatPage = () => {
                   ref={messagesContainerRef}
                   onClick={() => {
                     if (activeConvId) {
-                      setConversations((prev) =>
-                        prev.map((c) => (c.id === activeConvId ? { ...c, unreadCount: 0 } : c))
-                      );
+                      setConversations((prev) => {
+                        const updated = prev.map((c) => (c.id === activeConvId ? { ...c, unreadCount: 0 } : c));
+                        const total = updated.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+                        window.dispatchEvent(new CustomEvent("chat-unread-updated", { detail: total }));
+                        return updated;
+                      });
                     }
                   }}
                   style={{
