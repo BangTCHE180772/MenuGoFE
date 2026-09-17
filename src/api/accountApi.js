@@ -5,6 +5,11 @@ export const getAllAccounts = (branchId) =>
     params: branchId ? { branchId } : {},
   });
 
+export const getChefs = (branchId) =>
+  axiosInstance.get('/api/Account/chefs', {
+    params: branchId ? { branchId } : {},
+  });
+
 export const getAccountById = (id) =>
   axiosInstance.get(`/api/Account/${id}`);
 

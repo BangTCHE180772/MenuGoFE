@@ -1,15 +1,34 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Modal, InputNumber, Input, Form, message, Select, Switch } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
+import { useAuth } from '../../context/AuthContext';
+import { getChefs } from '../../api/accountApi';
 
 const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const actionRef = useRef(false);
+  const [chefAccounts, setChefAccounts] = useState([]);
+  
+  const { user, currentBranchId } = useAuth();
+  const branchId = currentBranchId || user?.branchId;
   
   // handlingAction now represents the Switch (true = Reuse, false = Discard)
   const isHandlingReuse = Form.useWatch('handlingAction', form);
   const returnReason = Form.useWatch('returnReason', form);
+
+  useEffect(() => {
+    const fetchChefs = async () => {
+      if (!branchId || !visible) return;
+      try {
+        const res = await getChefs(branchId);
+        setChefAccounts(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch chef accounts', err);
+      }
+    };
+    fetchChefs();
+  }, [branchId, visible]);
 
   if (!item) return null;
 
@@ -64,7 +83,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
         returnReason: finalReason,
         isIntact: isReuse, // Derived implicitly: Reuse means it was intact
         handlingAction: isReuse ? 'Reuse' : 'Discard',
-        compensationPoints: values.compensationPoints,
+        atFaultAccountId: values.atFaultAccountId,
       };
 
       if (isCustomerMode) {
@@ -148,9 +167,17 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           </div>
         </Form.Item>
 
-        <Form.Item name="compensationPoints" label="Điểm tích lũy bù cho khách (nếu có)">
-          <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="điểm" />
-        </Form.Item>
+        {!isHandlingReuse && (
+          <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)">
+            <Select
+              allowClear
+              showSearch
+              placeholder="Chọn bếp làm sai..."
+              optionFilterProp="label"
+              options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );

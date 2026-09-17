@@ -22,7 +22,7 @@ import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord 
 import { getCancelledHistory, getAllOrders } from '../api/orderApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
-import { getAllAccounts } from '../api/accountApi';
+import { getChefs } from '../api/accountApi';
 import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
@@ -36,8 +36,6 @@ const HANDLING_ACTION_LABELS = {
 };
 
 // RoleId 5 = Bếp (Chef) — theo ROLES_MAP dùng chung trong WorkSchedulePage.jsx.
-const CHEF_ROLE_ID = 5;
-
 const LeftoverPage = () => {
   const { user, role } = useAuth();
   const { currentBranchId } = useBranch();
@@ -114,11 +112,11 @@ const LeftoverPage = () => {
     if (!canCreate) return;
     (async () => {
       try {
-        const [prodRes, shiftRes, accountRes] = await Promise.all([getAllProducts(), getAllShifts(), getAllAccounts(branchId)]);
+        const [prodRes, shiftRes, chefRes] = await Promise.all([getAllProducts(), getAllShifts(), getChefs(branchId)]);
         setProducts(prodRes.data || []);
         setShifts(shiftRes.data || []);
-        setChefAccounts((accountRes.data || []).filter((a) => a.roleIds?.includes(CHEF_ROLE_ID)));
-      } catch {
+        setChefAccounts(chefRes.data || []);
+      } catch (err) {
         message.error('Không thể tải danh mục sản phẩm/ca làm việc.');
       }
     })();
