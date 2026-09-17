@@ -216,13 +216,17 @@ const AppRouter = () => {
                 <Route path="/work-schedule-summary" element={<WorkScheduleSummaryPage />} />
                 <Route path="/work-schedule-feedback" element={<ShiftFeedbackPage />} />
                 <Route path="/reservations" element={<ReservationPage />} />
-                <Route path="/chat" element={<BranchChatPage />} />
                 <Route path="/reports/revenue" element={<ReportRevenuePage />} />
                 <Route path="/reports/expense" element={<ReportExpensePage />} />
                 <Route path="/reports/profit" element={<ReportProfitPage />} />
                 <Route path="/reports/inventory" element={<ReportInventoryPage />} />
                 <Route path="/inventoryreport" element={<ReportInventoryPage />} />
                 <Route path="/kds" element={<KDSPage />} />
+              </Route>
+
+              {/* Cashier, Manager, Owner, Admin */}
+              <Route element={<RoleRoute allowedRoles={[ROLES.CASHIER, ROLES.MANAGER, ROLES.OWNER, ROLES.ADMIN]} />}>
+                <Route path="/chat" element={<BranchChatPage />} />
               </Route>
 
               {/* Owner, Admin */}

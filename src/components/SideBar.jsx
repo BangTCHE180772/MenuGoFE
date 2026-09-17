@@ -160,6 +160,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
+    { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },

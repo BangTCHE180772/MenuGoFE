@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Layout,
   Input,
@@ -17,6 +18,8 @@ import {
   message,
   Tooltip,
   InputNumber,
+  Result,
+  Alert,
 } from "antd";
 import {
   MessageOutlined,
@@ -35,6 +38,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useBranch } from "../context/BranchContext";
 import { useSignalR } from "../context/SignalRContext";
+import { useShiftSession } from "../hooks/useShiftSession";
 import axiosInstance from "../api/axiosInstance";
 import { getBranchRetentionSettings, updateBranchRetentionSettings } from "../api/guestChatApi";
 import ProductConsultationCard from "../components/chat/ProductConsultationCard";
@@ -114,6 +118,13 @@ const BranchChatPage = () => {
   const { user } = useAuth();
   const { currentBranchId } = useBranch();
   const connection = useSignalR();
+  const navigate = useNavigate();
+
+  const handleDisconnect = () => {
+    navigate('/home');
+  };
+
+  const { loading: shiftLoading, authorized: shiftAuthorized, shiftInfo, denyReason } = useShiftSession(handleDisconnect);
 
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -449,6 +460,37 @@ const BranchChatPage = () => {
     return `${timeStr} - ${dow} - ${dateStr}`;
   };
 
+  if (shiftLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Spin size="large" tip="Đang kiểm tra dữ liệu ca làm việc..." />
+      </div>
+    );
+  }
+
+  if (!shiftAuthorized) {
+    return (
+      <div style={{ padding: '40px', maxWidth: '600px', margin: '40px auto' }}>
+        <Result
+          status="403"
+          title="Chưa Thể Kết Nối Trò Chuyện Khách"
+          subTitle={denyReason || "Chức năng trò chuyện với khách chỉ khả dụng khi bạn đang trong ca làm việc tại nhà hàng."}
+          extra={[
+            <Button type="primary" key="schedule" onClick={() => navigate('/work-schedule')}>
+              Vào Lịch Làm Việc & Điểm Danh
+            </Button>,
+            <Button key="cashier" onClick={() => navigate('/cashier-session')}>
+              Vào Phiên Thu Ngân
+            </Button>,
+            <Button key="home" onClick={() => navigate('/home')}>
+              Trang Chủ
+            </Button>,
+          ]}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -462,6 +504,19 @@ const BranchChatPage = () => {
         boxSizing: "border-box",
       }}
     >
+      {shiftInfo && shiftInfo.time !== 'Không giới hạn' && (
+        <Alert
+          message={
+            <span>
+              <strong>Phiên Trò Chuyện Thu Ngân</strong> | Nhân viên: {user?.name || user?.fullName} | Ca: {shiftInfo.name} ({shiftInfo.time}) | Ngắt kết nối lúc: {shiftInfo.disconnectTime?.format ? shiftInfo.disconnectTime.format('HH:mm') : ''}
+            </span>
+          }
+          type="info"
+          showIcon
+          banner
+          style={{ marginBottom: 12, borderRadius: 8, flexShrink: 0 }}
+        />
+      )}
       <Card
         styles={{
           body: {
