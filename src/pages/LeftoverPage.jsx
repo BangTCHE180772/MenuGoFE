@@ -18,8 +18,8 @@ import {
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/leftoverApi';
-import { getCancelledHistory, getAllOrders } from '../api/orderApi';
+import { getCancelledHistory, getAllOrders, requestReturnItem } from '../api/orderApi';
+import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/inventoryApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getChefs } from '../api/accountApi';
@@ -175,19 +175,32 @@ const LeftoverPage = () => {
     }
     setSaving(true);
     try {
-      await createLeftoverRecord({
-        branchId,
-        type: values.type,
-        productId: values.productId,
-        quantity: values.quantity,
-        reason: values.reason,
-        orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
-        handlingAction: values.type === 'Return' ? values.handlingAction : null,
-        atFaultAccountId: values.type === 'Return' ? values.atFaultAccountId ?? null : null,
-        shiftId: values.shiftId ?? null,
-        recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
-      });
-      message.success('Đã ghi nhận món thừa');
+      if (values.type === 'Return') {
+        if (!values.orderDetailId) {
+          message.error('Vui lòng chọn chi tiết đơn hàng.');
+          setSaving(false);
+          return;
+        }
+        await requestReturnItem(values.orderDetailId, {
+          returnQuantity: values.quantity,
+          returnReason: values.reason,
+          handlingAction: values.handlingAction,
+          atFaultAccountId: values.atFaultAccountId ?? null,
+        });
+        message.success('Đã xử lý trả món và ghi nhận thành công');
+      } else {
+        await createLeftoverRecord({
+          branchId,
+          type: values.type,
+          productId: values.productId,
+          quantity: values.quantity,
+          reason: values.reason,
+          shiftId: values.shiftId ?? null,
+          recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
+        });
+        message.success('Đã ghi nhận món dư thừa');
+      }
+
       form.resetFields();
       form.setFieldsValue({ type: values.type, recordDate: dayjs() });
       fetchRecords();

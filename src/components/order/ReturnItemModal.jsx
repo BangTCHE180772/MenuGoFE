@@ -3,6 +3,7 @@ import { Modal, InputNumber, Input, Form, message, Select, Switch } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 import { useAuth } from '../../context/AuthContext';
 import { getChefs } from '../../api/accountApi';
+import { requestReturnItem } from '../../api/orderApi';
 
 const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = false }) => {
   const [form] = Form.useForm();
@@ -89,7 +90,7 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
       if (isCustomerMode) {
         await axiosInstance.post(`/api/Order/details/${item.orderDetailId}/customer-request-return`, payload);
       } else {
-        await axiosInstance.put(`/api/Order/details/${item.orderDetailId}/request-return`, payload);
+        await requestReturnItem(item.orderDetailId, payload);
       }
 
       message.success('Đã gửi yêu cầu trả món thành công!');
