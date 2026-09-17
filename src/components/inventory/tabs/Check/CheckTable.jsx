@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -32,6 +32,10 @@ const CheckTable = ({
   const [loadingDocId, setLoadingDocId] = useState(null);
 
   const pageSize = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText, statusFilter]);
 
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);

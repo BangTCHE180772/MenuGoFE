@@ -17,8 +17,9 @@ import {
   AppstoreOutlined
 } from '@ant-design/icons';
 import { message } from 'antd';
-import { getReturnDocumentById } from '../api/documentApi';
+import { getReturnDocumentById, getDocumentById } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const ImportReturn_Detail = () => {
   const { id } = useParams();
@@ -33,9 +34,19 @@ const ImportReturn_Detail = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const res = await getReturnDocumentById(id);
+      let res = null;
+      try {
+        res = await getReturnDocumentById(id);
+      } catch (e) {
+        console.warn('getReturnDocumentById failed, attempting getDocumentById fallback...', e);
+      }
+      if (!res) {
+        res = await getDocumentById(id);
+      }
       if (res) {
         setDoc(res);
+      } else {
+        throw new Error('Không tìm thấy dữ liệu phiếu');
       }
     } catch (err) {
       console.error('Lỗi khi tải chi tiết phiếu trả hàng nhập:', err);
@@ -78,8 +89,19 @@ const ImportReturn_Detail = () => {
   const amountPaid = Number(doc?.amountPaid || 0);
   const amountDue = Number(doc?.amountDue ?? (totalAmount - amountPaid));
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.orderDate || doc?.createdDate || doc?.createdAt).format('DDMMYYYY');
+    const partnerClean = (doc?.partnerName || doc?.snapshotPartnerName || 'NCC').replace(/[^a-zA-Z0-9À-ỹ]/g, '_');
+    document.title = `MenuGO_TraHang_${doc?.code || id}_${docDate}_${partnerClean}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER BAR */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -95,7 +117,7 @@ const ImportReturn_Detail = () => {
 
           <div>
             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-              Quản lý kho / Trả hàng nhập / Chi tiết phiếu trả
+              Quản lý kho / Trả hàng nhập / Chi tiết phiếu trả hàng
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
@@ -111,7 +133,7 @@ const ImportReturn_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -128,7 +150,7 @@ const ImportReturn_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: NHÀ CUNG CẤP & PHIẾU GỐC */}
@@ -221,9 +243,9 @@ const ImportReturn_Detail = () => {
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
             <AppstoreOutlined /> Danh sách mặt hàng hoàn trả ({detailsList.length})
           </div>
-          <div style={{ overflowX: 'auto', width: '100%' }}>
+          <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                   <th style={{ padding: '10px 12px' }}>Mã SP</th>
                   <th style={{ padding: '10px 12px' }}>Tên sản phẩm</th>
@@ -288,6 +310,70 @@ const ImportReturn_Detail = () => {
           </div>
         </div>
       </div>
+
+      {/* KHUNG IN PHIẾU TRẢ HÀNG NHẬP CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="PHIẾU TRẢ HÀNG NHẬP CHO NHÀ CUNG CẤP"
+        subTitle={`Mã phiếu: ${doc?.code || '---'} | Ngày trả: ${doc?.orderDate || doc?.createdDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: Hoàn thành`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Nhà cung cấp', value: doc?.partnerName || doc?.snapshotPartnerName },
+          { label: 'Phiếu nhập gốc', value: doc?.parentDocumentCode || 'Không có' },
+          { label: 'Chi nhánh xuất trả', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Người lập phiếu', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Tổng tiền hoàn trả', value: `${Math.round(totalAmount).toLocaleString('vi-VN')} đ` },
+          { label: 'Đã thu tiền hoàn', value: `${Math.round(amountPaid).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người lập phiếu', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Đại diện NCC / Nhận hàng', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.partnerName || doc?.snapshotPartnerName || '' },
+          { title: 'Thủ kho xuất trả', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Quản lý / Giám đốc duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">DANH SÁCH MẶT HÀNG TRẢ LẠI NCC TRUY VẾT ({detailsList.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '90px' }}>Mã nguyên liệu</th>
+              <th>Tên nguyên liệu</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '80px' }}>Số lượng</th>
+              <th style={{ width: '95px' }}>Giá hoàn (đ)</th>
+              <th style={{ width: '105px' }}>Thành tiền (đ)</th>
+              <th>Lý do trả lại</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detailsList.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="print-text-center">Chưa có chi tiết sản phẩm trả hàng</td>
+              </tr>
+            ) : (
+              detailsList.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="print-text-center">{idx + 1}</td>
+                  <td className="print-font-bold">{item.pCode}</td>
+                  <td>{item.pName}</td>
+                  <td className="print-text-center">{item.uName}</td>
+                  <td className="print-text-right print-font-bold">{item.qty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right">{Math.round(item.price).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{Math.round(item.total).toLocaleString('vi-VN')}</td>
+                  <td>{item.note || 'Trả lại NCC'}</td>
+                </tr>
+              ))
+            )}
+            <tr>
+              <td colSpan={6} className="print-text-right print-font-bold">TỔNG GIÁ TRỊ HOÀN TRẢ:</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalAmount).toLocaleString('vi-VN')} đ</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </InventoryPrintPortal>
     </div>
   );
 };

@@ -20,6 +20,7 @@ import {
 import { message } from 'antd';
 import { getCheckById } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Check_Detail = () => {
   const { id } = useParams();
@@ -94,8 +95,18 @@ const Check_Detail = () => {
 
   const isPending = doc?.status === 0 || doc?.status === 'Pending';
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.orderDate || doc?.createdDate || doc?.createdAt).format('DDMMYYYY');
+    document.title = `MenuGO_KiemKho_${doc?.code || id}_${docDate}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -133,7 +144,7 @@ const Check_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -150,7 +161,7 @@ const Check_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: THÔNG TIN PHIẾU KIỂM */}
@@ -252,9 +263,9 @@ const Check_Detail = () => {
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
             <AppstoreOutlined /> Chi tiết mặt hàng kiểm kê ({detailsList.length})
           </div>
-          <div style={{ overflowX: 'auto', width: '100%' }}>
+          <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                   <th style={{ padding: '10px 12px' }}>Mã SP</th>
                   <th style={{ padding: '10px 12px' }}>Tên sản phẩm</th>
@@ -319,6 +330,79 @@ const Check_Detail = () => {
           </div>
         </div>
       </div>
+
+      {/* KHUNG IN BIÊN BẢN KIỂM KÊ KHO CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="BIÊN BẢN KIỂM KÊ VÀ CÂN BẰNG TỒN KHO"
+        subTitle={`Mã phiếu: ${doc?.code || '---'} | Ngày kiểm: ${doc?.orderDate || doc?.createdDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${isPending ? 'Lưu tạm' : 'Đã cân bằng kho'}`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Mã phiếu kiểm', value: doc?.code },
+          { label: 'Chi nhánh kiểm kê', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Người tạo phiếu', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Người cân bằng kho', value: doc?.snapshotPostedByName || (isPending ? 'Chưa cân bằng' : 'Quản lý') },
+          { label: 'Trạng thái kiểm kê', value: isPending ? 'Phiếu lưu tạm' : 'Đã hoàn tất cân bằng' },
+          { label: 'Số mặt hàng khớp', value: `${matchedCount} mặt hàng` },
+          { label: 'Số mặt hàng lệch', value: `${diffCount} mặt hàng` },
+          { label: 'Tổng giá trị lệch kho', value: `${totalDiffValue > 0 ? '+' : ''}${Math.round(totalDiffValue).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú kiểm kho', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người kiểm kê', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Thủ kho phụ trách', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Người cân bằng kho', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.snapshotPostedByName || '' },
+          { title: 'Quản lý / Giám đốc duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">CHI TIẾT MẶT HÀNG KIỂM KÊ KHO TRUY VẾT ({detailsList.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '90px' }}>Mã nguyên liệu</th>
+              <th>Tên nguyên liệu</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '80px' }}>Tồn sổ sách</th>
+              <th style={{ width: '80px' }}>Tồn thực tế</th>
+              <th style={{ width: '80px' }}>SL lệch (+/-)</th>
+              <th style={{ width: '90px' }}>Giá vốn (đ)</th>
+              <th style={{ width: '100px' }}>Giá trị lệch (đ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detailsList.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="print-text-center">Chưa có chi tiết sản phẩm kiểm kho</td>
+              </tr>
+            ) : (
+              detailsList.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="print-text-center">{idx + 1}</td>
+                  <td className="print-font-bold">{item.pCode}</td>
+                  <td>{item.pName}</td>
+                  <td className="print-text-center">{item.uName}</td>
+                  <td className="print-text-right">{item.systemQty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{item.actualQty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold" style={{ color: item.diffQty > 0 ? '#15803d' : (item.diffQty < 0 ? '#b91c1c' : '#000') }}>
+                    {item.diffQty > 0 ? `+${item.diffQty}` : item.diffQty}
+                  </td>
+                  <td className="print-text-right">{Math.round(item.costPrice || 0).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold" style={{ color: item.diffValue > 0 ? '#15803d' : (item.diffValue < 0 ? '#b91c1c' : '#000') }}>
+                    {item.diffValue > 0 ? `+${Math.round(item.diffValue).toLocaleString('vi-VN')}` : Math.round(item.diffValue).toLocaleString('vi-VN')}
+                  </td>
+                </tr>
+              ))
+            )}
+            <tr>
+              <td colSpan={8} className="print-text-right print-font-bold">TỔNG GIÁ TRỊ CHÊNH LỆCH KHO:</td>
+              <td className="print-text-right print-font-bold" style={{ color: totalDiffValue > 0 ? '#15803d' : (totalDiffValue < 0 ? '#b91c1c' : '#000') }}>
+                {totalDiffValue > 0 ? `+${Math.round(totalDiffValue).toLocaleString('vi-VN')}` : Math.round(totalDiffValue).toLocaleString('vi-VN')} đ
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </InventoryPrintPortal>
     </div>
   );
 };

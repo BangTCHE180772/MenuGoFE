@@ -82,6 +82,8 @@ const ImportDocumentModal = ({
   const [supplierDebt, setSupplierDebt] = useState(null);
   const [loadingSupplierDebt, setLoadingSupplierDebt] = useState(false);
   const [deductDebt, setDeductDebt] = useState(false);
+  const [confirmEmptyExpiryOpen, setConfirmEmptyExpiryOpen] = useState(false);
+  const [emptyExpiryCount, setEmptyExpiryCount] = useState(0);
 
   // Fetch Suppliers & Product Search List when modal opens
   useEffect(() => {
@@ -89,6 +91,8 @@ const ImportDocumentModal = ({
 
     setSearchQuery('');
     setShowDropdown(false);
+    setConfirmEmptyExpiryOpen(false);
+    setEmptyExpiryCount(0);
 
     if (branchId) {
       getSuppliers(branchId)
@@ -364,10 +368,10 @@ const ImportDocumentModal = ({
   const payableAmount = Math.max(0, roundedGoodsAmount - effectiveCreditDeduction);
 
   useEffect(() => {
-    if (deductDebt && formData.paidAmount > payableAmount) {
+    if (Number(formData.paidAmount || 0) > payableAmount) {
       setFormData((prev) => ({ ...prev, paidAmount: payableAmount }));
     }
-  }, [payableAmount, deductDebt, formData.paidAmount]);
+  }, [payableAmount, formData.paidAmount]);
 
   // Build Payload (Matches ImportDocumentCreateDto and ImportDocumentUpdateDto schema)
   const buildPayload = () => {
@@ -453,6 +457,34 @@ const ImportDocumentModal = ({
   };
 
   // ACTION 2: HOÀN THÀNH (COMPLETE & POST)
+  const executeComplete = async () => {
+    const maxPayable = deductDebt ? payableAmount : roundedGoodsAmount;
+    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > maxPayable) {
+      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${maxPayable.toLocaleString('vi-VN')} đ.`);
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = buildPayload();
+      if (editingDocument && editingDocument.id) {
+        await updateImportPending(editingDocument.id, payload);
+        await completeImportDocument(editingDocument.id);
+      } else {
+        await createImportCompleted(payload);
+      }
+      showToast('Tạo thành công');
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      console.error('Lỗi khi hoàn thành phiếu nhập:', err);
+      const serverMsg = extractErrorMessage(err, 'Không thể hoàn thành phiếu nhập.');
+      alert(`Lỗi khi hoàn thành phiếu nhập:\n${serverMsg}`);
+    } finally {
+      setLoading(false);
+      setConfirmEmptyExpiryOpen(false);
+    }
+  };
+
   const handleComplete = async () => {
     if (items.length === 0) {
       alert('Vui lòng chọn ít nhất 1 sản phẩm để nhập kho');
@@ -484,30 +516,15 @@ const ImportDocumentModal = ({
       }
     }
 
-    const maxPayable = deductDebt ? payableAmount : roundedGoodsAmount;
-    if (Number(formData.paidAmount || 0) < 0 || Number(formData.paidAmount || 0) > maxPayable) {
-      alert(`Số tiền đã trả (${formData.paidAmount}) không hợp lệ. Phải nằm trong khoảng từ 0 đến ${maxPayable.toLocaleString('vi-VN')} đ.`);
+    // Kiểm tra các mặt hàng đang bỏ trống HẠN DÙNG
+    const emptyExpiryItems = items.filter((item) => !item.expiryDate || String(item.expiryDate).trim() === '');
+    if (emptyExpiryItems.length > 0) {
+      setEmptyExpiryCount(emptyExpiryItems.length);
+      setConfirmEmptyExpiryOpen(true);
       return;
     }
-    setLoading(true);
-    try {
-      const payload = buildPayload();
-      if (editingDocument && editingDocument.id) {
-        await updateImportPending(editingDocument.id, payload);
-        await completeImportDocument(editingDocument.id);
-      } else {
-        await createImportCompleted(payload);
-      }
-      showToast('Tạo thành công');
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (err) {
-      console.error('Lỗi khi hoàn thành phiếu nhập:', err);
-      const serverMsg = extractErrorMessage(err, 'Không thể hoàn thành phiếu nhập.');
-      alert(`Lỗi khi hoàn thành phiếu nhập:\n${serverMsg}`);
-    } finally {
-      setLoading(false);
-    }
+
+    await executeComplete();
   };
 
   if (!open) return null;
@@ -1070,13 +1087,33 @@ const ImportDocumentModal = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px dashed #cbd5e1' }}>
                 <span style={{ color: '#475569', fontSize: 11.5, fontWeight: 600 }}>Tiền trả NCC:</span>
                 <input
-                  type="number"
-                  min={0}
-                  max={payableAmount}
-                  value={formData.paidAmount}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, paidAmount: Math.max(0, Number(e.target.value)) }))}
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    formData.paidAmount === '' || formData.paidAmount == null
+                      ? ''
+                      : Number(formData.paidAmount).toLocaleString('vi-VN')
+                  }
+                  onChange={(e) => {
+                    const rawDigits = e.target.value.replace(/\D/g, '');
+                    if (!rawDigits) {
+                      setFormData((prev) => ({ ...prev, paidAmount: 0 }));
+                      return;
+                    }
+                    let val = Number(rawDigits);
+                    if (val > payableAmount) {
+                      val = payableAmount;
+                    }
+                    setFormData((prev) => ({ ...prev, paidAmount: val }));
+                  }}
+                  onFocus={(e) => {
+                    if (formData.paidAmount === 0) {
+                      e.target.select();
+                    }
+                  }}
+                  placeholder="0"
                   style={{
-                    width: 120,
+                    width: 130,
                     height: 28,
                     padding: '0 8px',
                     fontSize: 12,
@@ -1143,6 +1180,120 @@ const ImportDocumentModal = ({
         branchId={branchId}
         defaultType={createPartnerDefaultType}
       />
+
+      {/* MODAL XÁC NHẬN BỎ TRỐNG HẠN DÙNG */}
+      {confirmEmptyExpiryOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 100000,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              width: 440,
+              maxWidth: '92vw',
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: '22px 24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08)',
+              animation: 'fadeIn 0.2s ease'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: '50%',
+                  background: '#fef3c7',
+                  color: '#d97706',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  flexShrink: 0
+                }}
+              >
+                <InfoCircleOutlined />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                  Xác nhận hạn dùng
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>
+                  Thông tin hạn sử dụng hàng nhập kho
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fef3c7',
+                borderRadius: 8,
+                padding: '12px 14px',
+                marginBottom: 18,
+                fontSize: 13,
+                color: '#92400e',
+                lineHeight: 1.5
+              }}
+            >
+              Hiện đang có <strong style={{ color: '#b45309', fontSize: 14 }}>{emptyExpiryCount}</strong> mặt hàng chưa nhập <strong style={{ color: '#b45309' }}>HẠN DÙNG</strong>.
+              <div style={{ marginTop: 6, color: '#451a03' }}>
+                Bạn có muốn tiếp tục để HẠN DÙNG bỏ trống và hoàn thành phiếu nhập kho không?
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmEmptyExpiryOpen(false)}
+                disabled={loading}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Quay lại điền
+              </button>
+              <button
+                type="button"
+                onClick={executeComplete}
+                disabled={loading}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: '#059669',
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                {loading ? 'Đang hoàn thành...' : 'Đồng ý để trống'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

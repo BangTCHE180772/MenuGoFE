@@ -18,6 +18,7 @@ import {
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 import { extractErrorMessage } from '../../utils/errorHelper';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 
 const showToast = (text, type = 'success') => {
   const toast = document.createElement('div');
@@ -77,11 +78,12 @@ const ProductionDocumentModal = ({
     getProductsByDate(bId, date, query, 'Manufactured', 3)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        setManufacturedList(data);
+        if (data.length > 0 || !query) {
+          setManufacturedList(data);
+        }
       })
       .catch((err) => {
         console.error('Failed to load Manufactured products:', err);
-        setManufacturedList([]);
       });
   }, []);
 
@@ -194,10 +196,22 @@ const ProductionDocumentModal = ({
 
   const filteredOptions = useMemo(() => {
     if (!manufacturedQuery.trim()) return manufacturedOptions;
-    const q = manufacturedQuery.toLowerCase();
-    return manufacturedOptions.filter(
-      (opt) => opt.code.toLowerCase().includes(q) || opt.name.toLowerCase().includes(q)
-    );
+    const q = manufacturedQuery.toLowerCase().trim();
+    const qNorm = removeVietnameseTones(q);
+
+    return manufacturedOptions.filter((opt) => {
+      const name = (opt.name || '').toLowerCase();
+      const code = (opt.code || '').toLowerCase();
+      const nameNorm = removeVietnameseTones(opt.name || '');
+      const codeNorm = removeVietnameseTones(opt.code || '');
+
+      return (
+        name.includes(q) ||
+        code.includes(q) ||
+        nameNorm.includes(qNorm) ||
+        codeNorm.includes(qNorm)
+      );
+    });
   }, [manufacturedOptions, manufacturedQuery]);
 
   const handleSelectManufactured = (opt) => {

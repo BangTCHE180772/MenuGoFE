@@ -18,6 +18,7 @@ import {
 import { message } from 'antd';
 import { getProductionById } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Production_Detail = () => {
   const { id } = useParams();
@@ -86,8 +87,18 @@ const Production_Detail = () => {
 
   const isPending = doc?.status === 0 || doc?.status === 'Pending';
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.orderDate || doc?.createdAt).format('DDMMYYYY');
+    document.title = `MenuGO_SanXuat_${doc?.code || id}_${docDate}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -103,19 +114,19 @@ const Production_Detail = () => {
 
           <div>
             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-              Quản lý kho / Sản xuất & Chế biến / Chi tiết lệnh sản xuất
+              Quản lý kho / Sản xuất / Chi tiết lệnh sản xuất
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-              <span style={{ fontSize: 18, fontWeight: 800, color: '#9333ea' }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
                 {doc?.code || 'Lệnh sản xuất'}
               </span>
               {isPending ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa', fontSize: 12, fontWeight: 700 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff', fontSize: 12, fontWeight: 700 }}>
                   <ClockCircleOutlined /> Lưu tạm
                 </span>
               ) : (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontSize: 12, fontWeight: 700 }}>
-                  <CheckCircleOutlined /> Đã hoàn thành
+                  <CheckCircleOutlined /> Hoàn thành
                 </span>
               )}
             </div>
@@ -125,7 +136,7 @@ const Production_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -142,7 +153,7 @@ const Production_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: LỆNH SẢN XUẤT */}
@@ -216,9 +227,9 @@ const Production_Detail = () => {
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}>
             <ShoppingOutlined /> Danh sách thành phẩm nhập kho ({finishedProducts.length})
           </div>
-          <div style={{ overflowX: 'auto', width: '100%' }}>
+          <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                   <th style={{ padding: '10px 12px' }}>Mã thành phẩm</th>
                   <th style={{ padding: '10px 12px' }}>Tên thành phẩm</th>
@@ -267,9 +278,9 @@ const Production_Detail = () => {
             <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6 }}>
               <AppstoreOutlined /> Danh sách nguyên vật liệu tiêu hao ({ingredients.length})
             </div>
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '350px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã nguyên liệu</th>
                     <th style={{ padding: '10px 12px' }}>Tên nguyên liệu</th>
@@ -313,6 +324,103 @@ const Production_Detail = () => {
           </div>
         )}
       </div>
+
+      {/* KHUNG IN LỆNH SẢN XUẤT CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="LỆNH SẢN XUẤT VÀ TIÊU HAO NGUYÊN LIỆU"
+        subTitle={`Mã lệnh: ${doc?.code || '---'} | Ngày thực hiện: ${doc?.orderDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${isPending ? 'Lưu tạm' : 'Đã hoàn thành'}`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Mã lệnh sản xuất', value: doc?.code },
+          { label: 'Chi nhánh chế biến', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Người tạo lệnh', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Thời gian thực hiện', value: doc?.orderDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---' },
+          { label: 'Tổng giá trị thành phẩm', value: `${Math.round(totalFinishedValue).toLocaleString('vi-VN')} đ` },
+          { label: 'Chi phí nguyên liệu tiêu hao', value: `${Math.round(totalIngredientCost).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú lệnh', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người lập lệnh', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Thủ kho xuất nguyên liệu', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Bếp trưởng chế biến', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Quản lý duyệt nhập thành phẩm', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">I. DANH SÁCH THÀNH PHẨM THU ĐƯỢC ({finishedProducts.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '100px' }}>Mã thành phẩm</th>
+              <th>Tên thành phẩm</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '80px' }}>Số lượng</th>
+              <th style={{ width: '95px' }}>Giá vốn (đ)</th>
+              <th style={{ width: '105px' }}>Tổng giá trị (đ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {finishedProducts.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="print-text-center">Chưa có thành phẩm</td>
+              </tr>
+            ) : (
+              finishedProducts.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="print-text-center">{idx + 1}</td>
+                  <td className="print-font-bold">{item.pCode}</td>
+                  <td>{item.pName}</td>
+                  <td className="print-text-center">{item.uName}</td>
+                  <td className="print-text-right print-font-bold">{item.qty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right">{Math.round(item.price).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{Math.round(item.total).toLocaleString('vi-VN')}</td>
+                </tr>
+              ))
+            )}
+            <tr>
+              <td colSpan={6} className="print-text-right print-font-bold">TỔNG GIÁ TRỊ THÀNH PHẨM:</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalFinishedValue).toLocaleString('vi-VN')} đ</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {ingredients.length > 0 && (
+          <>
+            <div className="print-section-heading">II. DANH SÁCH NGUYÊN VẬT LIỆU TIÊU HAO (TRỪ KHO) ({ingredients.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th style={{ width: '100px' }}>Mã nguyên liệu</th>
+                  <th>Tên nguyên liệu</th>
+                  <th style={{ width: '55px' }}>ĐVT</th>
+                  <th style={{ width: '80px' }}>Số lượng xuất</th>
+                  <th style={{ width: '95px' }}>Đơn giá vốn (đ)</th>
+                  <th style={{ width: '105px' }}>Thành tiền tiêu hao (đ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingredients.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{item.pCode}</td>
+                    <td>{item.pName}</td>
+                    <td className="print-text-center">{item.uName}</td>
+                    <td className="print-text-right print-font-bold">{item.qty.toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right">{Math.round(item.price).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold">{Math.round(item.total).toLocaleString('vi-VN')}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={6} className="print-text-right print-font-bold">TỔNG CHI PHÍ NGUYÊN LIỆU:</td>
+                  <td className="print-text-right print-font-bold">{Math.round(totalIngredientCost).toLocaleString('vi-VN')} đ</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
     </div>
   );
 };

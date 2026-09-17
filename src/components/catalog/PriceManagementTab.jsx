@@ -66,10 +66,13 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
     return matchesType && matchesSearch && matchesGroup;
   });
 
-  const handlePriceChange = (productId, value) => {
+  const handlePriceChange = (productId, rawStr) => {
+    // Chỉ giữ lại chữ số
+    const cleanDigits = String(rawStr ?? '').replace(/\D/g, '');
+    const numValue = cleanDigits === '' ? 0 : Number(cleanDigits);
     setEditedPrices((prev) => ({
       ...prev,
-      [productId]: Number(value) >= 0 ? Number(value) : 0,
+      [productId]: numValue,
     }));
   };
 
@@ -334,10 +337,9 @@ const PriceManagementTab = ({ products = [], groups = [], onRefreshData, notifyS
                     {/* GIÁ BÁN INPUT */}
                     <td style={{ padding: '8px 14px', textAlign: 'right' }}>
                       <input
-                        type="number"
-                        min={0}
-                        step={500}
-                        value={currentPrice}
+                        type="text"
+                        inputMode="numeric"
+                        value={Number(currentPrice || 0).toLocaleString('vi-VN')}
                         onChange={(e) => handlePriceChange(p.id, e.target.value)}
                         style={{
                           width: 140,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductionTable from './ProductionTable';
 import ProductionDocumentModal from './ProductionDocumentModal';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 
 const ProductionTab = ({
   documents = [],
@@ -39,7 +40,7 @@ const ProductionTab = ({
 
   const productionDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      const isProd = doc.type === 6 || doc.type === 'Production';
+      const isProd = doc.type === 9 || doc.type === 6 || doc.type === 'Production' || String(doc.type ?? '').toLowerCase().includes('production');
       if (!isProd) return false;
 
       if (statusFilter !== 'ALL') {
@@ -50,10 +51,23 @@ const ProductionTab = ({
       }
 
       if (searchText) {
-        const lower = searchText.toLowerCase();
-        const matchCode = doc.code?.toLowerCase().includes(lower);
-        const matchCreator = (doc.createdByName || doc.snapshotCreatedByName || doc.currentCreatedByName || doc.creator || doc.creatorName)?.toLowerCase().includes(lower);
-        if (!matchCode && !matchCreator) return false;
+        const lower = searchText.toLowerCase().trim();
+        const norm = removeVietnameseTones(searchText).trim();
+
+        const codeRaw = (doc.code || '').toLowerCase();
+        const creatorRaw = (doc.createdByName || doc.snapshotCreatedByName || doc.currentCreatedByName || doc.creator || doc.creatorName || '').toLowerCase();
+        const creatorNorm = removeVietnameseTones(doc.createdByName || doc.snapshotCreatedByName || doc.currentCreatedByName || doc.creator || doc.creatorName || '');
+        const noteRaw = (doc.note || '').toLowerCase();
+        const noteNorm = removeVietnameseTones(doc.note || '');
+        const branchRaw = (doc.branchName || doc.snapshotBranchName || '').toLowerCase();
+        const branchNorm = removeVietnameseTones(doc.branchName || doc.snapshotBranchName || '');
+
+        const matchCode = codeRaw.includes(lower);
+        const matchCreator = creatorRaw.includes(lower) || creatorNorm.includes(norm);
+        const matchNote = noteRaw.includes(lower) || noteNorm.includes(norm);
+        const matchBranch = branchRaw.includes(lower) || branchNorm.includes(norm);
+
+        if (!matchCode && !matchCreator && !matchNote && !matchBranch) return false;
       }
       return true;
     });

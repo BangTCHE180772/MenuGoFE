@@ -26,6 +26,7 @@ import {
   deleteCostAdjustmentPendingDocument
 } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Adjustment_Detail = () => {
   const { id } = useParams();
@@ -211,12 +212,22 @@ const Adjustment_Detail = () => {
     );
   };
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.orderDate || doc?.createdDate || doc?.createdAt).format('DDMMYYYY');
+    document.title = `MenuGO_DieuChinhGiaVon_${doc?.code || id}_${docDate}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        height: '100vh',
         maxHeight: '100vh',
         background: '#f8fafc',
         overflow: 'hidden',
@@ -286,7 +297,7 @@ const Adjustment_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -378,6 +389,7 @@ const Adjustment_Detail = () => {
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
           padding: '20px 24px',
           display: 'flex',
@@ -639,9 +651,9 @@ const Adjustment_Detail = () => {
 
           {/* NỘI DUNG TAB: DANH SÁCH SẢN PHẨM */}
           {activeTab === 'products' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr
                     style={{
                       background: '#f1f5f9',
@@ -772,9 +784,9 @@ const Adjustment_Detail = () => {
 
           {/* NỘI DUNG TAB: LỊCH SỬ SỔ KHO */}
           {activeTab === 'ledger' && doc?.inventoryLedgers && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr
                     style={{
                       background: '#f1f5f9',
@@ -836,6 +848,115 @@ const Adjustment_Detail = () => {
           )}
         </div>
       </div>
+
+      {/* KHUNG IN PHIẾU ĐIỀU CHỈNH GIÁ VỐN CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="PHIẾU ĐIỀU CHỈNH GIÁ VỐN NGUYÊN VẬT LIỆU"
+        subTitle={`Mã phiếu: ${doc?.code || '---'} | Ngày lập: ${doc?.orderDate || doc?.createdDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${doc?.status === 1 ? 'Hoàn thành' : (isPending ? 'Lưu tạm' : 'Đã hủy')}`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Mã phiếu', value: doc?.code },
+          { label: 'Chứng từ tham chiếu', value: doc?.parentDocumentCode || 'Không có' },
+          { label: 'Chi nhánh áp dụng', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Người tạo phiếu', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Người duyệt áp dụng', value: doc?.snapshotPostedByName || (isCompleted ? 'Quản lý' : 'Chưa duyệt') },
+          { label: 'Thời gian áp dụng', value: doc?.postedDate || doc?.postedAt ? dayjs(doc.postedDate || doc.postedAt).format('DD/MM/YYYY HH:mm') : '---' },
+          { label: 'Tổng số mặt hàng', value: `${totalItemCount} mặt hàng` },
+          { label: 'Tổng giá trị điều chỉnh', value: `${grandTotalDelta > 0 ? '+' : ''}${Math.round(grandTotalDelta).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người lập phiếu', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Kế toán kho', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Thủ kho', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Quản lý / Giám đốc duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.snapshotPostedByName || '' }
+        ]}
+      >
+        <div className="print-section-heading">I. DANH SÁCH MẶT HÀNG ĐIỀU CHỈNH GIÁ VỐN TRUY VẾT ({totalItemCount})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '90px' }}>Mã nguyên liệu</th>
+              <th>Tên nguyên liệu</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '75px' }}>Tồn kho</th>
+              <th style={{ width: '90px' }}>Giá cũ (đ)</th>
+              <th style={{ width: '90px' }}>Giá mới (đ)</th>
+              <th style={{ width: '85px' }}>Lệch đ/vị</th>
+              <th style={{ width: '105px' }}>Lệch tổng (đ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detailsList.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="print-text-center">Chưa có thông tin sản phẩm trong phiếu điều chỉnh</td>
+              </tr>
+            ) : (
+              detailsList.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="print-text-center">{idx + 1}</td>
+                  <td className="print-font-bold">{item.pCode}</td>
+                  <td>{item.pName}</td>
+                  <td className="print-text-center">{item.uName}</td>
+                  <td className="print-text-right">{item.stockQty?.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right">{Math.round(item.oldPrice || 0).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{Math.round(item.newPrice || 0).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold" style={{ color: item.unitDelta > 0 ? '#15803d' : (item.unitDelta < 0 ? '#b91c1c' : '#000') }}>
+                    {item.unitDelta > 0 ? `+${Math.round(item.unitDelta).toLocaleString('vi-VN')}` : Math.round(item.unitDelta || 0).toLocaleString('vi-VN')}
+                  </td>
+                  <td className="print-text-right print-font-bold" style={{ color: item.totalDelta > 0 ? '#15803d' : (item.totalDelta < 0 ? '#b91c1c' : '#000') }}>
+                    {item.totalDelta > 0 ? `+${Math.round(item.totalDelta).toLocaleString('vi-VN')}` : Math.round(item.totalDelta || 0).toLocaleString('vi-VN')}
+                  </td>
+                </tr>
+              ))
+            )}
+            <tr>
+              <td colSpan={8} className="print-text-right print-font-bold">TỔNG GIÁ TRỊ ĐIỀU CHỈNH KHO:</td>
+              <td className="print-text-right print-font-bold" style={{ color: grandTotalDelta > 0 ? '#15803d' : (grandTotalDelta < 0 ? '#b91c1c' : '#000') }}>
+                {grandTotalDelta > 0 ? `+${Math.round(grandTotalDelta).toLocaleString('vi-VN')}` : Math.round(grandTotalDelta).toLocaleString('vi-VN')} đ
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {doc?.inventoryLedgers && doc.inventoryLedgers.length > 0 && (
+          <>
+            <div className="print-section-heading">II. LỊCH SỬ SỔ KHO / BIẾN ĐỘNG GIÁ VỐN ({doc.inventoryLedgers.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th>Tên nguyên liệu</th>
+                  <th style={{ width: '120px' }}>Thời điểm chốt</th>
+                  <th style={{ width: '100px' }}>Giá vốn cũ</th>
+                  <th style={{ width: '100px' }}>Giá vốn mới</th>
+                  <th style={{ width: '110px' }}>Biến động tồn (đ)</th>
+                  <th style={{ width: '90px' }}>Người ghi sổ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.inventoryLedgers.map((lg, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{lg.snapshotProductName}</td>
+                    <td className="print-text-center">{lg.postedAt ? dayjs(lg.postedAt).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                    <td className="print-text-right">{Math.round(Number(lg.oldCost || 0)).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold">{Math.round(Number(lg.newCost || 0)).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold" style={{ color: Number(lg.inventoryValueDelta) > 0 ? '#15803d' : '#b91c1c' }}>
+                      {Number(lg.inventoryValueDelta) > 0
+                        ? `+${Math.round(Number(lg.inventoryValueDelta)).toLocaleString('vi-VN')}`
+                        : Math.round(Number(lg.inventoryValueDelta)).toLocaleString('vi-VN')}
+                    </td>
+                    <td>{lg.snapshotPostedByName || 'Quản lý'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
     </div>
   );
 };

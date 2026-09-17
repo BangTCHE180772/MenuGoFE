@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -22,6 +22,7 @@ import {
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 import { extractErrorMessage } from '../../utils/errorHelper';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 
 const showToast = (text, type = 'success') => {
   const toast = document.createElement('div');
@@ -64,6 +65,18 @@ const CheckDocumentModal = ({
   const [bInventoryList, setBInventoryList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const searchContainerRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [formData, setFormData] = useState({
     docCode: '',
@@ -78,11 +91,12 @@ const CheckDocumentModal = ({
     getProductsByDate(bId, date, query, null, 2)
       .then((res) => {
         const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        setBInventoryList(data);
+        if (data.length > 0 || !query) {
+          setBInventoryList(data);
+        }
       })
       .catch((err) => {
         console.error('Failed to load BInventories by date:', err);
-        setBInventoryList([]);
       });
   }, []);
 
@@ -230,10 +244,22 @@ const CheckDocumentModal = ({
     const unselected = searchOptions.filter((opt) => !existingIds.has(Number(opt.id)));
 
     if (!searchQuery.trim()) return unselected;
-    const q = searchQuery.toLowerCase();
-    return unselected.filter(
-      (opt) => opt.code.toLowerCase().includes(q) || opt.name.toLowerCase().includes(q)
-    );
+    const q = searchQuery.toLowerCase().trim();
+    const qNorm = removeVietnameseTones(q);
+
+    return unselected.filter((opt) => {
+      const name = (opt.name || '').toLowerCase();
+      const code = (opt.code || '').toLowerCase();
+      const nameNorm = removeVietnameseTones(opt.name || '');
+      const codeNorm = removeVietnameseTones(opt.code || '');
+
+      return (
+        name.includes(q) ||
+        code.includes(q) ||
+        nameNorm.includes(qNorm) ||
+        codeNorm.includes(qNorm)
+      );
+    });
   }, [searchOptions, searchQuery, items]);
 
   const handleSelectProduct = (opt) => {
@@ -453,95 +479,10 @@ const CheckDocumentModal = ({
           flexShrink: 0
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: '#ffffff', letterSpacing: '0.3px' }}>
             {editDocumentId ? `Chỉnh sửa phiếu kiểm kho (${formData.docCode || ''})` : 'Tạo phiếu kiểm kho'}
           </span>
-
-          {/* SEARCH PRODUCT DROPDOWN CONTAINER */}
-          <div style={{ position: 'relative', width: 420 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: 16,
-                padding: '3px 12px',
-                border: '1px solid rgba(255,255,255,0.4)'
-              }}
-            >
-              <SearchOutlined style={{ color: '#e8442a', marginRight: 6 }} />
-              <input
-                type="text"
-                placeholder="Tìm theo mã hoặc tên hàng hóa..."
-                value={searchQuery}
-                onFocus={() => setShowDropdown(true)}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowDropdown(true);
-                }}
-                style={{
-                  width: '100%',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: 11,
-                  background: 'transparent',
-                  color: '#0f172a'
-                }}
-              />
-            </div>
-
-            {showDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 32,
-                  left: 0,
-                  right: 0,
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  maxHeight: 240,
-                  overflowY: 'auto',
-                  zIndex: 1001
-                }}
-              >
-                {filteredOptions.length === 0 ? (
-                  <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
-                    {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
-                  </div>
-                ) : (
-                  filteredOptions.map((opt) => (
-                    <div
-                      key={opt.id}
-                      onClick={() => handleSelectProduct(opt)}
-                      style={{
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
-                        <div style={{ fontSize: 10, color: '#64748b' }}>
-                          {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 10, color: '#e8442a', fontWeight: 600 }}>
-                        Tồn: {Number(opt.systemStock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -596,6 +537,87 @@ const CheckDocumentModal = ({
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* LEFT: TABLE AREA */}
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* SEARCH INPUT WITH DROPDOWN */}
+          <div ref={searchContainerRef} style={{ marginBottom: 10, position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <SearchOutlined style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 14 }} />
+              <input
+                type="text"
+                placeholder="Tìm sản phẩm theo mã hoặc tên (F1)..."
+                value={searchQuery}
+                onFocus={() => setShowDropdown(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowDropdown(true);
+                }}
+                style={{
+                  width: '100%',
+                  height: 36,
+                  paddingLeft: 34,
+                  paddingRight: 12,
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  background: '#ffffff',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              />
+            </div>
+
+            {/* LIVE SEARCH DROPDOWN */}
+            {showDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                  maxHeight: 240,
+                  overflowY: 'auto',
+                  marginTop: 4,
+                  zIndex: 1001
+                }}
+              >
+                {filteredOptions.length === 0 ? (
+                  <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
+                    {searchQuery.trim() ? 'Không tìm thấy hàng hóa' : 'Tất cả hàng hóa hợp lệ đã được thêm vào danh sách'}
+                  </div>
+                ) : (
+                  filteredOptions.map((opt) => (
+                    <div
+                      key={opt.id}
+                      onClick={() => handleSelectProduct(opt)}
+                      style={{
+                        padding: '9px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{opt.name}</div>
+                        <div style={{ fontSize: 10, color: '#64748b' }}>
+                          {opt.code} {opt.unitName ? `(${opt.unitName})` : ''}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#e8442a', fontWeight: 600 }}>
+                        Tồn: {Number(opt.systemStock ?? opt.baseStock ?? 0).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <div
             style={{
               flex: 1,
