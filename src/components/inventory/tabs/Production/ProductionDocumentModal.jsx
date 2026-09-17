@@ -220,21 +220,49 @@ const ProductionDocumentModal = ({
     setShowDropdown(false);
   };
 
-  // Preview ingredients list for Tab 2
+  // Preview ingredients list with branch inventory stock check
   const ingredientsList = useMemo(() => {
-    if (!selectedManufactured || !Array.isArray(selectedManufactured.ingredients)) return [];
-    return selectedManufactured.ingredients.map((ing) => ({
-      id: ing.id || ing.ingredientProductId,
-      code: ing.code || ing.ingredientProduct?.skuCode || `NL${ing.ingredientProductId || ing.id}`,
-      name: ing.name || ing.ingredientProduct?.name || 'Nguyên liệu',
-      quantity: (Number(ing.quantity || ing.normQty) || 0) * (Number(finishedQuantity) || 1),
-      unitName: ing.unitName || ''
-    }));
-  }, [selectedManufactured, finishedQuantity]);
+    if (!selectedManufactured) return [];
+    const rawIngredients = selectedManufactured.ingredients || selectedManufactured.recipeDetailes || [];
+    if (!Array.isArray(rawIngredients) || rawIngredients.length === 0) return [];
+
+    const qty = Number(finishedQuantity) || 1;
+    return rawIngredients.map((ing, idx) => {
+      const ingProdId = ing.ingredientProductId || ing.productId || ing.ingredientId || ing.id;
+      const matched = products.find((p) => Number(p.productId || p.id) === Number(ingProdId) || (p.code && p.code === ing.code));
+      const currentStock = Number(matched?.quantity ?? matched?.stockQuantity ?? 0);
+      const norm = Number(ing.quantity || ing.normQty || 0);
+      const required = norm * qty;
+      const unit = ing.unitName || matched?.baseUnit?.unitName || matched?.unitName || 'Đơn vị';
+      const isInsufficient = currentStock < required;
+
+      return {
+        key: ingProdId || idx,
+        id: ingProdId,
+        name: ing.name || ing.ingredientName || matched?.name || 'Nguyên liệu',
+        code: ing.code || ing.ingredientCode || matched?.code || `NL${ingProdId}`,
+        norm,
+        required,
+        currentStock,
+        unit,
+        isInsufficient,
+        diff: required - currentStock
+      };
+    });
+  }, [selectedManufactured, finishedQuantity, products]);
+
+  const hasInsufficient = useMemo(() => {
+    return ingredientsList.some((i) => i.isInsufficient);
+  }, [ingredientsList]);
 
   const handleSubmit = async (isDraft = false) => {
     if (!selectedManufactured) {
       showToast('Vui lòng chọn 1 mặt hàng sản xuất.', 'error');
+      return;
+    }
+
+    if (hasInsufficient) {
+      showToast('Kho không đủ nguyên liệu để sản xuất. Vui lòng kiểm tra lại tồn kho.', 'error');
       return;
     }
 
@@ -486,6 +514,78 @@ const ProductionDocumentModal = ({
                 </div>
               </div>
 
+              {/* DANH SÁCH NGUYÊN LIỆU THEO CÔNG THỨC */}
+              {selectedManufactured && (
+                <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 11, color: '#334155', textTransform: 'uppercase' }}>
+                      📋 Nguyên liệu tiêu hao theo công thức ({ingredientsList.length})
+                    </span>
+                    {hasInsufficient && (
+                      <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
+                        ⚠️ Có nguyên liệu không đủ tồn kho
+                      </span>
+                    )}
+                  </div>
+
+                  {ingredientsList.length === 0 ? (
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>
+                      Mặt hàng này chưa được cấu hình danh sách nguyên liệu công thức (Recipe).
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                        <thead>
+                          <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontWeight: 600 }}>
+                            <th style={{ padding: '6px 8px', textAlign: 'left' }}>Nguyên liệu</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', width: 90 }}>Định mức/sp</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', width: 90 }}>Cần dùng</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', width: 90 }}>Tồn kho</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'center', width: 100 }}>Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ingredientsList.map((ing, idx) => (
+                            <tr key={ing.key || idx} style={{ borderBottom: '1px solid #f1f5f9', background: ing.isInsufficient ? '#fef2f2' : 'transparent' }}>
+                              <td style={{ padding: '6px 8px' }}>
+                                <div style={{ fontWeight: 600, color: ing.isInsufficient ? '#dc2626' : '#0f172a' }}>{ing.name}</div>
+                                <div style={{ fontSize: 10, color: '#64748b' }}>{ing.code}</div>
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: '#475569' }}>
+                                {ing.norm.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} {ing.unit}
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                                {ing.required.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} {ing.unit}
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: ing.isInsufficient ? '#dc2626' : '#16a34a' }}>
+                                {ing.currentStock.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} {ing.unit}
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                {ing.isInsufficient ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '2px 6px', borderRadius: 4, border: '1px solid #fecaca' }}>
+                                    Thiếu {ing.diff.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', background: '#dcfce7', padding: '2px 6px', borderRadius: 4, border: '1px solid #bbf7d0' }}>
+                                    Đủ hàng
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {hasInsufficient && (
+                    <div style={{ marginTop: 8, padding: '6px 10px', background: '#fee2e2', borderRadius: 6, color: '#b91c1c', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      ⚠️ Không đủ nguyên liệu để sản xuất! Không thể hoàn thành hoặc lưu tạm khi kho thiếu nguyên liệu.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ROW 2: MÃ SẢN XUẤT */}
               <div>
                 <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã sản xuất</div>
@@ -575,16 +675,16 @@ const ProductionDocumentModal = ({
           )}
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || hasInsufficient}
             onClick={() => handleSubmit(true)}
             style={{
               background: '#ffffff',
               border: '1px solid #cbd5e1',
-              color: '#334155',
+              color: hasInsufficient ? '#94a3b8' : '#334155',
               fontWeight: 600,
               borderRadius: 20,
               padding: '8px 22px',
-              cursor: 'pointer',
+              cursor: hasInsufficient ? 'not-allowed' : 'pointer',
               fontSize: 12
             }}
           >
@@ -592,18 +692,18 @@ const ProductionDocumentModal = ({
           </button>
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || hasInsufficient}
             onClick={() => handleSubmit(false)}
             style={{
-              background: '#e8442a',
-              border: '1px solid #e8442a',
+              background: hasInsufficient ? '#cbd5e1' : '#e8442a',
+              border: `1px solid ${hasInsufficient ? '#cbd5e1' : '#e8442a'}`,
               color: '#ffffff',
               fontWeight: 700,
               borderRadius: 20,
               padding: '8px 24px',
-              cursor: 'pointer',
+              cursor: hasInsufficient ? 'not-allowed' : 'pointer',
               fontSize: 12,
-              boxShadow: '0 2px 6px rgba(232, 68, 42, 0.25)'
+              boxShadow: hasInsufficient ? 'none' : '0 2px 6px rgba(232, 68, 42, 0.25)'
             }}
           >
             Hoàn thành

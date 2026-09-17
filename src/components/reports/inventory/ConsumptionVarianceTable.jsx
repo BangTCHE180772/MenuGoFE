@@ -100,12 +100,6 @@ const ConsumptionVarianceTable = ({
       align: "right",
     },
     {
-      title: "Điều chỉnh",
-      field: (r) =>
-        `${(r.adjustment || 0) > 0 ? "+" : ""}${(r.adjustment || 0).toLocaleString()} ${r.unit}`,
-      align: "right",
-    },
-    {
       title: "Tồn cuối",
       field: (r) => `${(r.closingStock || 0).toLocaleString()} ${r.unit}`,
       align: "right",
@@ -264,26 +258,6 @@ const ConsumptionVarianceTable = ({
       ),
     },
     {
-      title: "Điều chỉnh",
-      dataIndex: "adjustment",
-      key: "adjustment",
-      align: "right",
-      render: (val, record) => {
-        const isPos = val > 0;
-        return (
-          <span
-            style={{
-              fontWeight: 500,
-              color: val === 0 ? "#475569" : isPos ? "#16a34a" : "#dc2626",
-            }}
-          >
-            {val === 0 ? "0" : isPos ? "+" : ""}
-            {(val || 0).toLocaleString()} {record.unit}
-          </span>
-        );
-      },
-    },
-    {
       title: "Tồn lý thuyết",
       dataIndex: "theoreticalStock",
       key: "theoreticalStock",
@@ -402,21 +376,37 @@ const ConsumptionVarianceTable = ({
           key="1"
         >
           <div style={{ fontSize: 13, lineHeight: "1.6", color: "#475569" }}>
+            {/* Mục đích báo cáo */}
+            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderLeft: "4px solid #0284c7", padding: "10px 14px", borderRadius: 6, marginBottom: 14 }}>
+              <strong style={{ color: "#0c4a6e" }}>🎯 Mục đích của báo cáo này là gì?</strong>
+              <div style={{ color: "#075985", marginTop: 6 }}>
+                Báo cáo giúp bạn <strong>theo dõi hiệu quả quản lý nguyên liệu trong từng kỳ</strong> — phản ánh trung thực mức độ khớp giữa lượng nguyên liệu tiêu hao theo định mức và tồn kho thực tế.
+                <ul style={{ paddingLeft: 20, margin: "8px 0 0" }}>
+                  <li style={{ marginBottom: 4 }}>
+                    <strong>Sai số thuộc về kỳ phát sinh:</strong> Mỗi kỳ báo cáo có Tồn đầu kỳ độc lập. Nếu trong kỳ xảy ra sai số, sai số đó <em>được ghi nhận và giữ nguyên tại kỳ đó</em> — không tự động chuyển sang kỳ tiếp theo.
+                  </li>
+                  <li style={{ marginBottom: 4 }}>
+                    <strong>Ví dụ:</strong> Bạn chọn kỳ xem là cả năm. Nếu tháng 3 có 1 tháng quản lý bất thường (sai số lớn), báo cáo của cả năm đó sẽ phản ánh sai số đó. Nhưng sang năm sau, nếu vận hành tốt, sai số sẽ không còn xuất hiện.
+                  </li>
+                  <li>
+                    <strong>Kỳ sau bắt đầu từ thực tế:</strong> Tồn đầu kỳ tiếp theo được tính từ Tồn cuối thực tế của kỳ này (hoặc kết quả Kiểm kho gần nhất), đảm bảo mỗi kỳ theo dõi độc lập và minh bạch.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <ol style={{ paddingLeft: 20, margin: 0 }}>
               <li>
                 Báo cáo chỉ hiển thị nguyên liệu có sai số vượt ngưỡng 5%.
               </li>
               <li>
-                Sai số được tính dựa trên chênh lệch giữa lượng hệ thống ghi
-                nhận tiêu thụ và lượng tiêu hao định mức.
+                Sai số được tính dựa trên chênh lệch giữa Tồn cuối thực tế và Tồn lý thuyết (tính từ tồn đầu kỳ, nhập, xuất và tiêu hao định mức theo các món bán ra).
               </li>
               <li>
-                Sai số dương (+) cho biết lượng hệ thống ghi nhận tiêu thụ cao
-                hơn định mức.
+                Sai số dương (+): Tồn cuối <em>cao hơn</em> lý thuyết — có thể có hàng nhận chưa lập phiếu hoặc bếp dùng ít hơn định mức.
               </li>
               <li>
-                Sai số âm (-) cho biết lượng hệ thống ghi nhận tiêu thụ thấp hơn
-                định mức.
+                Sai số âm (-): Tồn cuối <em>thấp hơn</em> lý thuyết — có thể có hao hụt, thất thoát hoặc bếp dùng nhiều hơn định mức.
               </li>
               <li>
                 Các nguyên liệu được sắp xếp theo mức độ bất thường từ cao xuống
@@ -425,6 +415,40 @@ const ConsumptionVarianceTable = ({
               <li>
                 Quản lý chi nhánh nên ưu tiên kiểm tra các nguyên liệu ở đầu
                 bảng trước.
+              </li>
+              <li>
+                <strong>Khi nào báo cáo sẽ hiển thị sai số?</strong>
+                <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderLeft: "3px solid #f59e0b", borderRadius: 6, padding: "8px 10px", fontSize: 12, marginTop: 6 }}>
+                  <div style={{ fontWeight: 600, color: "#92400e", marginBottom: 4 }}>💡 Nguyên tắc quan trọng cần hiểu trước:</div>
+                  <div style={{ color: "#78350f" }}>
+                    Khi mọi phiếu nghiệp vụ được lập đầy đủ, <strong>Tồn cuối và Tồn lý thuyết luôn bằng nhau</strong> vì cả hai đều tính từ cùng một tập giao dịch. Vì vậy, <strong>sai số chỉ xuất hiện khi có phiếu Kiểm kho</strong> với số đếm thực tế khác Tồn lý thuyết.
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                  <div style={{ background: "#fff5f5", border: "1px solid #fecaca", borderLeft: "3px solid #ef4444", borderRadius: 6, padding: "8px 10px", fontSize: 12 }}>
+                    <div style={{ fontWeight: 700, color: "#b91c1c", marginBottom: 4 }}>🔻 Kiểm kho ra sai số ÂM</div>
+                    <div style={{ color: "#7f1d1d", marginBottom: 4 }}>Số đếm thực tế <strong>thấp hơn</strong> Tồn lý thuyết. Điều này có nghĩa là trong kỳ đã xảy ra một hoặc nhiều tình huống:</div>
+                    <ul style={{ paddingLeft: 14, margin: 0, color: "#7f1d1d" }}>
+                      <li>Bếp dùng nhiều hơn định mức công thức (nêm nếm, rơi vãi)</li>
+                      <li>Nguyên liệu hỏng, ôi thiu đã bị bỏ đi nhưng <em>chưa lập phiếu Xuất hủy trước khi Kiểm kho</em></li>
+                      <li>Đã sản xuất mẻ bán sẵn nhưng <em>chưa lập phiếu Sản xuất trước khi Kiểm kho</em></li>
+                      <li>Thất thoát, mất mát không rõ nguyên nhân</li>
+                    </ul>
+                  </div>
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderLeft: "3px solid #22c55e", borderRadius: 6, padding: "8px 10px", fontSize: 12 }}>
+                    <div style={{ fontWeight: 700, color: "#15803d", marginBottom: 4 }}>🔺 Kiểm kho ra sai số DƯƠNG</div>
+                    <div style={{ color: "#14532d", marginBottom: 4 }}>Số đếm thực tế <strong>cao hơn</strong> Tồn lý thuyết. Điều này có nghĩa là trong kỳ đã xảy ra một hoặc nhiều tình huống:</div>
+                    <ul style={{ paddingLeft: 14, margin: 0, color: "#14532d" }}>
+                      <li>Đã nhận hàng nhưng <em>chưa lập phiếu Nhập kho trước khi Kiểm kho</em></li>
+                      <li>Đã nhận chuyển kho nhưng <em>chưa xác nhận phiếu trước khi Kiểm kho</em></li>
+                      <li>Bếp dùng ít hơn định mức công thức (tiết kiệm, đong thiếu)</li>
+                      <li>Kỳ trước Kiểm kho đếm thiếu, Tồn đầu kỳ này thấp hơn thực tế</li>
+                    </ul>
+                  </div>
+                </div>
+                <div style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, padding: "8px 10px", fontSize: 12, marginTop: 8, color: "#475569" }}>
+                  📌 <strong>Tóm lại:</strong> Báo cáo này có ý nghĩa nhất khi bạn thực hiện <strong>Kiểm kho định kỳ</strong>. Không có Kiểm kho → không có sai số → báo cáo trống không có nghĩa là quản lý tốt, mà là chưa đối chiếu thực tế.
+                </div>
               </li>
             </ol>
 
@@ -458,15 +482,10 @@ const ConsumptionVarianceTable = ({
                 hoặc hủy bỏ trong quá trình vận hành.
               </li>
               <li>
-                <strong>Điều chỉnh (+/-)</strong>: Lượng chênh lệch tăng/giảm do
-                kiểm kê kho thực tế.
-              </li>
-              <li>
                 <strong>Tồn lý thuyết</strong>: Tồn cuối lẽ ra phải còn trong
                 kho theo lý thuyết tính theo công thức:{" "}
                 <code>
-                  Tồn đầu + Nhập + Nhận - Gửi - Tiêu hao định mức - Xuất hủy +
-                  Điều chỉnh
+                  Tồn đầu + Nhập + Nhận - Gửi - Tiêu hao định mức - Xuất hủy - Sản xuất - Trả hàng
                 </code>
                 .
               </li>
@@ -475,9 +494,9 @@ const ConsumptionVarianceTable = ({
                 kết thúc kỳ báo cáo.
               </li>
               <li>
-                <strong>Chênh lệch</strong>: Lượng chênh lệch giữa Tồn lý thuyết
-                và Tồn cuối được tính theo công thức:{" "}
-                <code>Tồn lý thuyết - Tồn cuối</code>.
+                <strong>Chênh lệch</strong>: Lượng chênh lệch giữa Tồn cuối
+                và Tồn lý thuyết được tính theo công thức:{" "}
+                <code>Tồn cuối - Tồn lý thuyết</code>.
               </li>
               <li>
                 <strong>Sai số (%)</strong>: Tỷ lệ chênh lệch phần trăm tính
@@ -485,17 +504,6 @@ const ConsumptionVarianceTable = ({
                 <code>(Chênh lệch / Tiêu hao định mức) * 100</code>.
               </li>
             </ul>
-
-            <div style={{ marginTop: 8, fontWeight: 600, color: "#dc2626" }}>
-              * Lưu ý quan trọng:
-            </div>
-            <div style={{ paddingLeft: 8, fontStyle: "italic" }}>
-              - "Sai số vượt ngưỡng chỉ là dấu hiệu cần kiểm tra, không đồng
-              nghĩa với việc bếp làm thất thoát nguyên liệu."
-              <br />- "Hệ thống hiện ghi nhận mức tiêu thụ dựa trên dữ liệu tồn
-              kho và định mức công thức; báo cáo không trực tiếp đo lượng nguyên
-              liệu vật lý mà bếp đã sử dụng."
-            </div>
           </div>
         </Panel>
       </Collapse>

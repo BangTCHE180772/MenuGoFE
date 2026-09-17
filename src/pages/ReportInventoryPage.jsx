@@ -258,7 +258,6 @@ const ReportInventoryPage = () => {
     { title: "Gửi",                         field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
     { title: "Tiêu hao định mức",           field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
     { title: "Xuất hủy",                    field: (r) => `${(r.destruction || 0)} ${r.unit}`, align: "right" },
-    { title: "Điều chỉnh",                  field: (r) => `${(r.adjustment || 0) > 0 ? '+' : ''}${r.adjustment} ${r.unit}`, align: "right" },
     { title: "Tồn cuối",                    field: (r) => `${r.closingStock} ${r.unit}`, align: "right" },
     { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
     { title: "Tồn lý thuyết",               field: (r) => `${r.theoreticalStock} ${r.unit}`, align: "right" },
@@ -296,7 +295,7 @@ const ReportInventoryPage = () => {
           columnDefs={columnDefs}
           data={consumptionItems}
           summaryRow={[
-            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
           ]}
         />
       </div>

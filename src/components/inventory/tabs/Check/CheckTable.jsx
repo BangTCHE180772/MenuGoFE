@@ -276,7 +276,7 @@ const CheckTable = ({
                             type="button"
                             onClick={() => {
                               if (window.confirm(`Bạn có chắc chắn muốn ${isPending ? 'hủy phiếu nháp' : 'xóa chứng từ'} này?`)) {
-                                handleDeleteDocument(doc.id, doc.type || 10);
+                                handleDeleteDocument(doc.id, doc.type || 10, doc.status);
                               }
                             }}
                             style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
@@ -476,7 +476,7 @@ const CheckTable = ({
                                       type="button"
                                       onClick={() => {
                                         if (window.confirm('Bạn có chắc chắn muốn xóa phiếu kiểm kho nháp này?')) {
-                                          handleDeleteDocument(doc.id, doc.type || 10);
+                                          handleDeleteDocument(doc.id, doc.type || 10, doc.status);
                                         }
                                       }}
                                       style={{

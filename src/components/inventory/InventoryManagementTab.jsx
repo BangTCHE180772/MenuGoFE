@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import InventoryHeaderNav from './InventoryHeaderNav';
 import { useBranch } from '../../context/BranchContext';
-import { deleteDocument, deleteImportDocument, deleteReturnDocument, getDocuments } from '../../api/documentApi';
+import {
+  deleteDocument,
+  deleteImportDocument,
+  deleteReturnDocument,
+  deleteExportDeleteDocument,
+  deleteTransferDocument,
+  deleteCheckDocument,
+  deleteProductionDocument,
+  deleteCostAdjustmentDocument,
+  getDocuments
+} from '../../api/documentApi';
 
 // Tab Components
 import ImportTab from './tabs/Import/ImportTab';
@@ -91,18 +101,43 @@ const InventoryManagementTab = () => {
     }
   }, [currentBranchId]);
 
-  const handleDeleteDocument = async (id, type) => {
+  const handleDeleteDocument = async (id, type, status) => {
+    const isCompleted = status === 2 || status === 'Completed' || String(status).toLowerCase() === 'completed';
+    const isCancelled = status === 3 || status === 'Cancelled' || String(status).toLowerCase() === 'cancelled';
+
+    if (isCompleted) {
+      alert('Không thể xóa chứng từ đã hoàn thành. Theo nguyên tắc kế toán kho, số liệu đã được ghi sổ kho và tính giá vốn. Vui lòng lập phiếu kiểm kho hoặc điều chỉnh bù trừ nếu cần sửa đổi số liệu.');
+      return;
+    }
+
+    if (isCancelled) {
+      alert('Chứng từ này đã ở trạng thái hủy, không thể thao tác thêm.');
+      return;
+    }
+
     try {
       if (type === 1 || type === 'Import') {
         await deleteImportDocument(id);
-      } else if (type === 4 || type === 'Return') {
+      } else if (type === 2 || type === 4 || type === 'Return') {
         await deleteReturnDocument(id);
+      } else if (type === 5 || type === 'Transfer') {
+        await deleteTransferDocument(id);
+      } else if (type === 7 || type === 8 || type === 'Export' || type === 'ExportDelete') {
+        await deleteExportDeleteDocument(id);
+      } else if (type === 9 || type === 6 || type === 'Production') {
+        await deleteProductionDocument(id);
+      } else if (type === 10 || type === 'Check') {
+        await deleteCheckDocument(id);
+      } else if (type === 11 || type === 'CostAdjustment') {
+        await deleteCostAdjustmentDocument(id);
       } else {
-        await deleteDocument(id);
+        await deleteProductionDocument(id);
       }
       setDocuments((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
       console.error('Lỗi khi xóa chứng từ:', err);
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi xóa chứng từ.';
+      alert(`Thao tác không thành công: ${msg}`);
     }
   };
 
