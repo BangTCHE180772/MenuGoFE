@@ -1,4 +1,5 @@
 import { message } from "antd";
+import * as XLSX from "xlsx";
 
 const getExportFormattedDate = () => {
   const now = new Date();
@@ -9,10 +10,9 @@ const getExportFormattedDate = () => {
 };
 
 /**
- * Utility Xuất file Excel chuẩn Unicode UTF-16LE (.csv)
- * Mở trực tiếp bằng Microsoft Excel KHÔNG CÓ BẤT KỲ CẢNH BÁO AN TOÀN (File format and extension don't match)
- * Tiếng Việt hiển thị 100% sắc nét, tự động tách thành từng cột A, B, C, D...
- * Tên file tự động cấu trúc: MenuGo_[TenBaoCao]_[NgayXuat].csv
+ * Utility Xuất file Excel chuẩn .xlsx (SheetJS)
+ * Mở trực tiếp bằng Microsoft Excel, hiển thị chuẩn từng cột A, B, C, D...
+ * Tự động căn chỉnh độ rộng cột và định dạng dữ liệu
  */
 export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) => {
   try {
@@ -20,56 +20,47 @@ export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) 
     let cleanName = filename.replace(/^MenuGo_/i, "");
     const finalFilename = `MenuGo_${cleanName}_${dateStr}`;
 
-    const delimiter = "\t";
+    const headers = columnDefs.map((col) => col.title || "");
+    const aoa = [headers];
 
-    // 1. Dòng tiêu đề các cột
-    const headers = columnDefs.map((col) => col.title).join(delimiter);
-
-    // 2. Dòng tổng cộng (nếu có)
-    const summary = summaryRow
-      ? summaryRow.map((val) => String(val || "-").replace(/[\t\r\n]+/g, " ")).join(delimiter)
-      : null;
-
-    // 3. Các dòng dữ liệu
-    const rows = data.map((row) => {
-      return columnDefs
-        .map((col) => {
-          let val = typeof col.field === "function" ? col.field(row) : row[col.field];
-          if (val === null || val === undefined) val = "-";
-          return String(val).replace(/[\t\r\n]+/g, " ");
-        })
-        .join(delimiter);
-    });
-
-    const lines = [headers];
-    if (summary) lines.push(summary);
-    lines.push(...rows);
-
-    const textContent = lines.join("\r\n");
-
-    // Chuyển sang UTF-16LE ArrayBuffer chuẩn Microsoft Excel Unicode Text (BOM 0xFEFF)
-    const buffer = new ArrayBuffer(2 + textContent.length * 2);
-    const view = new DataView(buffer);
-
-    // Byte Order Mark (Little Endian 0xFEFF)
-    view.setUint16(0, 0xFEFF, true);
-
-    for (let i = 0; i < textContent.length; i++) {
-      view.setUint16(2 + i * 2, textContent.charCodeAt(i), true);
+    if (summaryRow && Array.isArray(summaryRow)) {
+      const summary = summaryRow.map((val) => (val === null || val === undefined ? "-" : val));
+      aoa.push(summary);
     }
 
-    const blob = new Blob([buffer], { type: "text/csv;charset=utf-16le;" });
-    const url = URL.createObjectURL(blob);
+    (data || []).forEach((row) => {
+      const rowData = columnDefs.map((col) => {
+        let val = typeof col.field === "function" ? col.field(row) : row[col.field];
+        if (val === null || val === undefined) return "-";
+        return val;
+      });
+      aoa.push(rowData);
+    });
 
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${finalFilename}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    message.success(`Đã xuất file Excel an toàn: ${finalFilename}.csv`);
+    // Tính toán độ rộng cột tự động
+    const colWidths = columnDefs.map((col, idx) => {
+      let maxLen = (col.title || "").toString().length;
+      if (summaryRow && summaryRow[idx]) {
+        maxLen = Math.max(maxLen, String(summaryRow[idx]).length);
+      }
+      for (let r = 0; r < Math.min((data || []).length, 100); r++) {
+        const row = data[r];
+        let val = typeof col.field === "function" ? col.field(row) : row[col.field];
+        if (val !== null && val !== undefined) {
+          maxLen = Math.max(maxLen, String(val).length);
+        }
+      }
+      return { wch: Math.min(Math.max(maxLen + 4, 12), 50) };
+    });
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Báo cáo");
+    XLSX.writeFile(wb, `${finalFilename}.xlsx`);
+
+    message.success(`Đã xuất file Excel: ${finalFilename}.xlsx`);
   } catch (err) {
     console.error("Lỗi xuất file Excel:", err);
     message.error("Không thể xuất file. Vui lòng thử lại!");
@@ -77,61 +68,88 @@ export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) 
 };
 
 /**
- * Utility Xuất nhiều bảng tổng hợp chung 1 file Excel (.csv UTF-16LE)
+ * Utility Xuất nhiều bảng tổng hợp chung 1 file Excel (.xlsx)
  */
 export const exportMultipleTablesToExcel = (filename, tablesArray) => {
   try {
     const dateStr = getExportFormattedDate();
     let cleanName = filename.replace(/^MenuGo_/i, "");
     const finalFilename = `MenuGo_${cleanName}_${dateStr}`;
-    const delimiter = "\t";
 
-    const allLines = [];
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tổng hợp tất cả các bảng
+    const combinedAoa = [];
+    let maxColsCount = 0;
 
     tablesArray.forEach((tbl) => {
       if (tbl.title) {
-        allLines.push(`=== ${tbl.title.toUpperCase()} ===`);
+        combinedAoa.push([`=== ${tbl.title.toUpperCase()} ===`]);
       }
-      const headers = tbl.columnDefs.map((col) => col.title).join(delimiter);
-      allLines.push(headers);
+      const headers = tbl.columnDefs.map((col) => col.title || "");
+      maxColsCount = Math.max(maxColsCount, headers.length);
+      combinedAoa.push(headers);
 
-      tbl.data.forEach((row) => {
-        const line = tbl.columnDefs
-          .map((col) => {
-            let val = typeof col.field === "function" ? col.field(row) : row[col.field];
-            if (val === null || val === undefined) val = "-";
-            return String(val).replace(/[\t\r\n]+/g, " ");
-          })
-          .join(delimiter);
-        allLines.push(line);
+      (tbl.data || []).forEach((row) => {
+        const rowData = tbl.columnDefs.map((col) => {
+          let val = typeof col.field === "function" ? col.field(row) : row[col.field];
+          if (val === null || val === undefined) return "-";
+          return val;
+        });
+        combinedAoa.push(rowData);
       });
 
-      allLines.push("");
-      allLines.push("");
+      combinedAoa.push([]);
     });
 
-    const textContent = allLines.join("\r\n");
+    const combinedWs = XLSX.utils.aoa_to_sheet(combinedAoa);
+    combinedWs["!cols"] = Array(maxColsCount).fill({ wch: 22 });
+    XLSX.utils.book_append_sheet(wb, combinedWs, "Tổng hợp");
 
-    const buffer = new ArrayBuffer(2 + textContent.length * 2);
-    const view = new DataView(buffer);
-    view.setUint16(0, 0xFEFF, true);
+    // Thêm từng Sheet riêng cho mỗi bảng để xem chi tiết
+    tablesArray.forEach((tbl, idx) => {
+      const headers = tbl.columnDefs.map((col) => col.title || "");
+      const sheetAoa = [headers];
 
-    for (let i = 0; i < textContent.length; i++) {
-      view.setUint16(2 + i * 2, textContent.charCodeAt(i), true);
-    }
+      (tbl.data || []).forEach((row) => {
+        const rowData = tbl.columnDefs.map((col) => {
+          let val = typeof col.field === "function" ? col.field(row) : row[col.field];
+          if (val === null || val === undefined) return "-";
+          return val;
+        });
+        sheetAoa.push(rowData);
+      });
 
-    const blob = new Blob([buffer], { type: "text/csv;charset=utf-16le;" });
-    const url = URL.createObjectURL(blob);
+      const ws = XLSX.utils.aoa_to_sheet(sheetAoa);
+      const colWidths = tbl.columnDefs.map((col) => {
+        let maxLen = (col.title || "").toString().length;
+        for (let r = 0; r < Math.min((tbl.data || []).length, 100); r++) {
+          const row = tbl.data[r];
+          let val = typeof col.field === "function" ? col.field(row) : row[col.field];
+          if (val !== null && val !== undefined) {
+            maxLen = Math.max(maxLen, String(val).length);
+          }
+        }
+        return { wch: Math.min(Math.max(maxLen + 4, 12), 45) };
+      });
+      ws["!cols"] = colWidths;
 
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${finalFilename}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      let sheetName = (tbl.title || `Bảng ${idx + 1}`)
+        .replace(/[:\\/?*\[\]]/g, "")
+        .trim()
+        .slice(0, 31);
+      if (!sheetName) sheetName = `Bảng ${idx + 1}`;
 
-    message.success(`Đã xuất file Excel tổng hợp: ${finalFilename}.csv`);
+      // Đảm bảo tên sheet không trùng lặp
+      if (wb.SheetNames.includes(sheetName)) {
+        sheetName = `${sheetName.slice(0, 28)}_${idx + 1}`;
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    XLSX.writeFile(wb, `${finalFilename}.xlsx`);
+    message.success(`Đã xuất file Excel: ${finalFilename}.xlsx`);
   } catch (err) {
     console.error("Lỗi xuất Excel tổng hợp:", err);
     message.error("Không thể xuất file. Vui lòng thử lại!");

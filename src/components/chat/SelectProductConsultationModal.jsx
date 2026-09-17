@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Input, Select, Checkbox, List, Button, Spin, Tag, Empty, Typography, message } from 'antd';
 import { SearchOutlined, CoffeeOutlined, SendOutlined } from '@ant-design/icons';
 import { getBInventories } from '../../api/binventoryApi';
+import { configApi } from '../../api/configApi';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -26,6 +27,31 @@ const SelectProductConsultationModal = ({
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [catalogPriority, setCatalogPriority] = useState(() => {
+    const saved = localStorage.getItem("catalog_priority");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return { groupOrder: [], menuOrder: [], groupNames: [], menuNames: [] };
+  });
+
+  // Tải cấu hình ưu tiên catalog nếu có
+  useEffect(() => {
+    if (open) {
+      configApi.getCatalogPriority()
+        .then((res) => {
+          if (res && (res.groupOrder?.length > 0 || res.groupNames?.length > 0)) {
+            setCatalogPriority(res);
+            localStorage.setItem("catalog_priority", JSON.stringify(res));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [open]);
 
   // Tải danh sách món ăn từ BInventory của chi nhánh
   useEffect(() => {
@@ -35,7 +61,7 @@ const SelectProductConsultationModal = ({
       setSearchText('');
       setSelectedCategory('all');
     }
-  }, [open, branchId]);
+  }, [open, branchId, catalogPriority]);
 
   const fetchBranchProducts = async (bid) => {
     setLoadingProducts(true);
@@ -47,11 +73,56 @@ const SelectProductConsultationModal = ({
         );
         const mapped = sellable.map((item) => ({
           id: item.productId,
+          groupId: item.groupId,
           name: item.name,
           price: item.sellPrice || 0,
           imageLink: item.imageLink || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80',
           groupName: item.groupName || 'Món ăn'
         }));
+
+        const getGroupPriority = (groupName, groupId) => {
+          const groupOrder = catalogPriority?.groupOrder || [];
+          const groupNames = catalogPriority?.groupNames || [];
+
+          if (groupId && groupOrder.length > 0) {
+            const idx = groupOrder.indexOf(groupId);
+            if (idx !== -1) return idx;
+          }
+          if (groupName && groupNames.length > 0) {
+            const idx = groupNames.findIndex(
+              (name) => name.toLowerCase() === groupName.toLowerCase()
+            );
+            if (idx !== -1) return idx;
+          }
+          return 9999;
+        };
+
+        const getItemPriority = (id, name) => {
+          const menuOrder = catalogPriority?.menuOrder || [];
+          const menuNames = catalogPriority?.menuNames || [];
+          if (id && menuOrder.length > 0) {
+            const idx = menuOrder.indexOf(id);
+            if (idx !== -1) return idx;
+          }
+          if (name && menuNames.length > 0) {
+            const idx = menuNames.findIndex(n => n.toLowerCase() === name.toLowerCase());
+            if (idx !== -1) return idx;
+          }
+          return 9999;
+        };
+
+        mapped.sort((a, b) => {
+          const prioGroupA = getGroupPriority(a.groupName, a.groupId);
+          const prioGroupB = getGroupPriority(b.groupName, b.groupId);
+          if (prioGroupA !== prioGroupB) return prioGroupA - prioGroupB;
+
+          const prioItemA = getItemPriority(a.id, a.name);
+          const prioItemB = getItemPriority(b.id, b.name);
+          if (prioItemA !== prioItemB) return prioItemA - prioItemB;
+
+          return (a.name || "").localeCompare(b.name || "");
+        });
+
         setProducts(mapped);
       } else {
         setProducts([]);
@@ -64,11 +135,28 @@ const SelectProductConsultationModal = ({
     }
   };
 
-  // Danh mục nhóm món
+  // Danh mục nhóm món sắp xếp theo cấu hình catalog priority
   const categories = useMemo(() => {
+    const getGroupPriority = (groupName) => {
+      const groupNames = catalogPriority?.groupNames || [];
+      if (groupName && groupNames.length > 0) {
+        const idx = groupNames.findIndex(
+          (name) => name.toLowerCase() === groupName.toLowerCase()
+        );
+        if (idx !== -1) return idx;
+      }
+      return 9999;
+    };
+
     const unique = Array.from(new Set(products.map((p) => p.groupName).filter(Boolean)));
+    unique.sort((a, b) => {
+      const prioA = getGroupPriority(a);
+      const prioB = getGroupPriority(b);
+      if (prioA !== prioB) return prioA - prioB;
+      return a.localeCompare(b);
+    });
     return ['all', ...unique];
-  }, [products]);
+  }, [products, catalogPriority]);
 
   // Lọc sản phẩm theo tìm kiếm và nhóm
   const filteredProducts = useMemo(() => {

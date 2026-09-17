@@ -32,6 +32,7 @@ import ProfitReportTable from "../components/reports/profit/ProfitReportTable";
 import ProfitCompareModal from "../components/reports/profit/ProfitCompareModal";
 
 import { getCashFlows } from "../api/cashFlowApi";
+import { getPaidInvoices } from "../api/orderApi";
 import { useBranch } from "../context/BranchContext";
 import "../styles/ReportProfitPage.css";
 
@@ -42,7 +43,7 @@ const formatVND = (val) =>
 
 /**
  * Page: ProfitReportPage
- * Báo cáo Lợi nhuận chuyên sâu — kết nối với dữ liệu thật từ Sổ quỹ /api/CashFlow
+ * Báo cáo Lợi nhuận chuyên sâu — kết nối với dữ liệu thật từ Hóa đơn & Sổ quỹ
  * Đường dẫn: /reports/profit
  */
 const ReportProfitPage = () => {
@@ -70,11 +71,22 @@ const ReportProfitPage = () => {
     setLoading(true);
     try {
       const [start, end] = dateRange;
-      const startStr = start.format("YYYY-MM-DD");
-      const endStr   = end.format("YYYY-MM-DD");
 
-      const res = await getCashFlows(currentBranchId);
-      const allCashFlows = res || [];
+      const [invoicesRes, cashFlowsRes] = await Promise.allSettled([
+        getPaidInvoices(currentBranchId),
+        getCashFlows(currentBranchId)
+      ]);
+
+      const allInvoices = invoicesRes.status === "fulfilled" ? (invoicesRes.value?.data || invoicesRes.value || []) : [];
+      const allCashFlows = cashFlowsRes.status === "fulfilled" ? (cashFlowsRes.value || []) : [];
+
+      // Filter invoices in date range
+      const filteredInvoices = allInvoices.filter((ord) => {
+        if (!ord.createdAt) return false;
+        const ordDate = dayjs(ord.createdAt);
+        return (ordDate.isSame(start, "day") || ordDate.isAfter(start, "day")) &&
+               (ordDate.isSame(end, "day") || ordDate.isBefore(end, "day"));
+      });
 
       // Filter cashflows in date range
       const filteredCashFlows = allCashFlows.filter((cf) => {
@@ -86,9 +98,17 @@ const ReportProfitPage = () => {
       });
 
       // Calculate totals
-      const rev = filteredCashFlows
-        .filter(cf => cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu")
+      const invoiceRev = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      const cashflowRev = filteredCashFlows
+        .filter(cf => (cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu") && !cf.orderId && cf.category !== "Bán hàng")
         .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
+
+      // Nếu có hóa đơn thì dùng invoiceRev + thu khác, nếu không có hóa đơn thì fallback toàn bộ cashflow thu
+      const rev = filteredInvoices.length > 0 
+        ? (invoiceRev + cashflowRev)
+        : filteredCashFlows
+            .filter(cf => cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu")
+            .reduce((sum, cf) => sum + (cf.totalAmount || cf.amount || 0), 0);
 
       const exp = filteredCashFlows
         .filter(cf => cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi")
@@ -109,13 +129,24 @@ const ReportProfitPage = () => {
         cur = cur.add(1, "day");
       }
 
+      if (filteredInvoices.length > 0) {
+        filteredInvoices.forEach((inv) => {
+          const key = dayjs(inv.createdAt).format("YYYY-MM-DD");
+          if (dailyMap[key]) {
+            dailyMap[key].revenue += (inv.totalAmount || 0);
+          }
+        });
+      }
+
       filteredCashFlows.forEach((cf) => {
         const dateVal = cf.businessDate || cf.createdAt;
         const key = dayjs(dateVal).format("YYYY-MM-DD");
         if (dailyMap[key]) {
           const amt = cf.totalAmount || cf.amount || 0;
           if (cf.directionValue === 1 || cf.type === "Thu" || cf.directionValue === "Thu") {
-            dailyMap[key].revenue += amt;
+            if (filteredInvoices.length === 0 || (!cf.orderId && cf.category !== "Bán hàng")) {
+              dailyMap[key].revenue += amt;
+            }
           } else if (cf.directionValue === 2 || cf.type === "Chi" || cf.directionValue === "Chi") {
             dailyMap[key].expense += amt;
           }

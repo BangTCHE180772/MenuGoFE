@@ -78,8 +78,19 @@ const ProductDetailModal = ({ product, open, onClose, onConsult }) => {
             </div>
           </div>
 
-          <div className="modal-actions" style={{ display: 'flex', gap: 10 }}>
-            <Button size="large" onClick={onClose} className="btn-close-modal" style={{ flex: 1 }}>
+          <div className="modal-actions" style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+            <Button
+              size="large"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                height: 42,
+                borderRadius: 8,
+                fontWeight: 600,
+                color: '#475569',
+                borderColor: '#cbd5e1'
+              }}
+            >
               Đóng
             </Button>
             {onConsult && (
@@ -92,6 +103,8 @@ const ProductDetailModal = ({ product, open, onClose, onConsult }) => {
                 }}
                 style={{
                   flex: 1,
+                  height: 42,
+                  borderRadius: 8,
                   background: '#ea580c',
                   borderColor: '#ea580c',
                   fontWeight: 600

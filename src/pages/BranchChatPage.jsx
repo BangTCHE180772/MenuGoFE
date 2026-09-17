@@ -185,7 +185,12 @@ const BranchChatPage = () => {
       const res = await axiosInstance.get(`/api/BranchChat/conversations`, {
         params: { branchId: currentBranchId },
       });
-      setConversations(res.data);
+      const currentActive = selectId || activeConvId;
+      setConversations(
+        (res.data || []).map((c) =>
+          c.id === currentActive ? { ...c, unreadCount: 0 } : c
+        )
+      );
       if (res.data.length > 0 && !activeConvId && !selectId) {
         handleSelectConversation(res.data[0].id);
       } else if (selectId) {
@@ -277,6 +282,9 @@ const BranchChatPage = () => {
 
   const handleSelectConversation = (id, targetMessageId = null) => {
     setActiveConvId(id);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+    );
     fetchMessages(id, targetMessageId);
   };
 
@@ -707,6 +715,13 @@ const BranchChatPage = () => {
                 {/* Message display pane (CHỈ CUỘN NỘI DUNG NÀY) */}
                 <Content
                   ref={messagesContainerRef}
+                  onClick={() => {
+                    if (activeConvId) {
+                      setConversations((prev) =>
+                        prev.map((c) => (c.id === activeConvId ? { ...c, unreadCount: 0 } : c))
+                      );
+                    }
+                  }}
                   style={{
                     padding: "20px 24px",
                     overflowY: "auto",
