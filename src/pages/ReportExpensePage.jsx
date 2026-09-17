@@ -271,8 +271,7 @@ const ReportExpensePage = () => {
           columnDefs={columnDefs}
           data={filteredData}
           summaryRow={[
-            "Tổng cộng", "-", "-", "-", "-", "-",
-            `-${formatVND(totalExpense)}`, "-",
+            "Tổng cộng", "-", "-", "-", "-", `-${formatVND(totalExpense)}`, "-",
           ]}
         />
       </div>

@@ -135,10 +135,6 @@ const CustomerBranchSection = ({ branches = [], loading, chainInfo }) => {
           <Title level={2} className="section-main-title">
             Ghé Thăm Chi Nhánh MenuGo Gần Bạn
           </Title>
-          <Paragraph className="section-desc">
-            Với không gian sang trọng, tinh tế cùng đội ngũ phục vụ chuyên
-            nghiệp, chúng tôi sẵn sàng đón tiếp quý khách tại mọi chi nhánh.
-          </Paragraph>
           <div style={{ marginTop: 16 }}>
             <Button
               type="primary"
