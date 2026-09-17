@@ -5,8 +5,7 @@ import {
   CloseOutlined,
   FullscreenOutlined,
   PrinterOutlined,
-  RightOutlined,
-  FileExcelOutlined
+  RightOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -708,72 +707,29 @@ const TransferDocumentModal = ({
               flexDirection: 'column'
             }}
           >
-            {items.length === 0 ? (
-              <div
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 40
-                }}
-              >
-                <div
-                  style={{
-                    border: '1px dashed #93c5fd',
-                    borderRadius: 12,
-                    padding: '30px 40px',
-                    textAlign: 'center',
-                    background: '#faf5ff',
-                    maxWidth: 500
-                  }}
-                >
-                  <div style={{ color: '#475569', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
-                    Nhấn chọn hoặc kéo thả file dữ liệu vào đây.
-                    <br />
-                    Chỉ nhận file Excel có đuôi .xlsx. Tải về File mẫu:{' '}
-                    <span style={{ color: '#0284c7', cursor: 'pointer', textDecoration: 'underline' }}>Excel 2003</span> |{' '}
-                    <span style={{ color: '#0284c7', cursor: 'pointer', textDecoration: 'underline' }}>bản cao hơn</span>
-                  </div>
-                  <button
-                    type="button"
-                    style={{
-                      background: '#0066ff',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: 16,
-                      padding: '6px 20px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      marginTop: 8
-                    }}
-                  >
-                    <FileExcelOutlined /> Chọn file
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
-                    <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
-                    <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐƠN VỊ TÍNH</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>SL CHUYỂN</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 130 }}>GIÁ CHUYỂN (Đ/ĐVT)</th>
-                    <th style={{ padding: '8px 8px', textAlign: 'right', width: 120 }}>THÀNH TIỀN</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, fontSize: 10, textTransform: 'uppercase' }}>
+                  <th style={{ padding: '8px 8px', width: 30, textAlign: 'center' }}></th>
+                  <th style={{ padding: '8px 8px', width: 35, textAlign: 'center' }}>STT</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left', width: 110 }}>MÃ HÀNG</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'left' }}>TÊN HÀNG</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>ĐƠN VỊ TÍNH</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 90 }}>TỒN KHO</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'center', width: 110 }}>SL CHUYỂN</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 130 }}>GIÁ CHUYỂN (Đ/ĐVT)</th>
+                  <th style={{ padding: '8px 8px', textAlign: 'right', width: 120 }}>THÀNH TIỀN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                      Chưa có sản phẩm nào được chọn. Hãy tìm kiếm để thêm sản phẩm chuyển kho.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {items.map((record, index) => {
+                ) : (
+                  items.map((record, index) => {
                     const conversionPoint = record.conversionPoint || 1;
                     const convertedStock = (record.baseStock ?? record.stock ?? 0) / conversionPoint;
                     const total = (Number(record.transferQuantity) || 0) * (Number(record.transferPrice) || 0);
@@ -872,10 +828,10 @@ const TransferDocumentModal = ({
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
-              </table>
-            )}
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
