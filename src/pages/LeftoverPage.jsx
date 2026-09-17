@@ -23,6 +23,7 @@ import { getCancelledHistory, getAllOrders } from '../api/orderApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getAllAccounts } from '../api/accountApi';
+import { getAllBranches } from '../api/branchApi';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 
@@ -42,19 +43,29 @@ const LeftoverPage = () => {
   const { currentBranchId } = useBranch();
   const branchId = currentBranchId || user?.branchId;
 
-  // Nhân viên (Cashier/Waiter/Chef...) mới cần điền form ghi nhận món thừa —
-  // Quản lý/Chủ sở hữu/Admin chỉ xem lịch sử để theo dõi, không tạo bản ghi.
-  const isManager =
-    ['Admin', 'Owner', 'Manager', 'Quản trị viên', 'Chủ sở hữu', 'Quản lý'].includes(role) ||
-    [1, 2, 3].includes(user?.roleId);
+  // useBranch().branches chỉ được nạp cho Admin/Owner (dùng cho bộ chọn chi
+  // nhánh) — các role còn lại (Waiter/Cashier/Chef/Manager) không có sẵn danh
+  // sách này, nên tự tải riêng ở đây để lấy tên chi nhánh hiển thị ở heading.
+  const [allBranches, setAllBranches] = useState([]);
+  useEffect(() => {
+    getAllBranches()
+      .then((res) => setAllBranches(res.data || []))
+      .catch(() => {});
+  }, []);
+  const branchName = allBranches.find((b) => b.id === branchId)?.name;
+
+  // Chỉ Phục vụ (Waiter) mới trực tiếp trả món cho khách nên chỉ role này được
+  // điền form ghi nhận — Thu ngân/Bếp/Quản lý/Chủ sở hữu/Admin chỉ xem lịch sử.
+  const canCreate = ['Waiter', 'Phục vụ'].includes(role) || user?.roleId === 6;
 
   const [form] = Form.useForm();
   const type = Form.useWatch('type', form);
+  const selectedTableId = Form.useWatch('tableId', form);
 
   const [products, setProducts] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [chefAccounts, setChefAccounts] = useState([]);
-  const [orderDetailOptions, setOrderDetailOptions] = useState([]);
+  const [tableOrderOptions, setTableOrderOptions] = useState([]);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -100,7 +111,7 @@ const LeftoverPage = () => {
   }, [fetchRecords]);
 
   useEffect(() => {
-    if (isManager) return;
+    if (!canCreate) return;
     (async () => {
       try {
         const [prodRes, shiftRes, accountRes] = await Promise.all([getAllProducts(), getAllShifts(), getAllAccounts(branchId)]);
@@ -111,19 +122,20 @@ const LeftoverPage = () => {
         message.error('Không thể tải danh mục sản phẩm/ca làm việc.');
       }
     })();
-  }, [isManager, branchId]);
+  }, [canCreate, branchId]);
 
   const fetchOrderDetailOptions = useCallback(async () => {
-    if (!branchId || isManager) return;
+    if (!branchId || !canCreate) return;
     try {
       const res = await getAllOrders(branchId);
       const orders = res.data || [];
       const now = dayjs();
-      const options = orders
+      const grouped = [];
+      orders
         .slice()
         .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
-        .flatMap((order) =>
-          (order.orderDetails || [])
+        .forEach((order) => {
+          const items = (order.orderDetails || [])
             .filter((d) => d.status !== 'Cancelled')
             // Chỉ hiện món đặt trong ngày và còn trong 1 tiếng gần nhất — tránh liệt kê
             // toàn bộ lịch sử đơn hàng cũ không còn liên quan đến việc trả món.
@@ -133,16 +145,23 @@ const LeftoverPage = () => {
             })
             .map((d) => ({
               value: d.id,
-              label: `HD${order.id} · Bàn ${order.tableName || '?'} · ${d.productName} x${d.quantity}`,
+              label: `${d.productName} x${d.quantity}`,
               productId: d.productId,
               quantity: d.quantity,
-            }))
-        );
-      setOrderDetailOptions(options);
+            }));
+          if (items.length === 0) return;
+          const existing = grouped.find((t) => t.tableId === order.tableId);
+          if (existing) {
+            existing.items.push(...items);
+          } else {
+            grouped.push({ tableId: order.tableId, tableName: order.tableName || `Đơn #${order.id}`, items });
+          }
+        });
+      setTableOrderOptions(grouped);
     } catch {
       message.error('Không thể tải danh sách chi tiết đơn hàng.');
     }
-  }, [branchId, isManager]);
+  }, [branchId, canCreate]);
 
   useEffect(() => {
     fetchOrderDetailOptions();
@@ -166,7 +185,6 @@ const LeftoverPage = () => {
         reason: values.reason,
         orderDetailId: values.type === 'Return' ? values.orderDetailId : null,
         handlingAction: values.type === 'Return' ? values.handlingAction : null,
-        compensationPoints: values.type === 'Return' ? values.compensationPoints ?? null : null,
         atFaultAccountId: values.type === 'Return' ? values.atFaultAccountId ?? null : null,
         shiftId: values.shiftId ?? null,
         recordDate: (values.recordDate || dayjs()).format('YYYY-MM-DD'),
@@ -210,9 +228,6 @@ const LeftoverPage = () => {
           <Space direction="vertical" size={0}>
             {r.tableName && <span>Bàn: {r.tableName}</span>}
             {r.handlingAction && <Tag>{HANDLING_ACTION_LABELS[r.handlingAction] || r.handlingAction}</Tag>}
-            {r.compensationPoints ? (
-              <span style={{ color: '#d48806', fontSize: 12 }}>Bù: {r.compensationPoints.toLocaleString('vi-VN')} điểm</span>
-            ) : null}
             {r.atFaultAccountName && (
               <span style={{ color: '#cf1322', fontSize: 12 }}>Bếp làm sai: {r.atFaultAccountName}</span>
             )}
@@ -265,9 +280,11 @@ const LeftoverPage = () => {
 
   const completedCancelCount = cancelledHistory.filter((r) => r.category === 'Completed').length;
 
+  const orderDetailOptionsForTable = tableOrderOptions.find((t) => t.tableId === selectedTableId)?.items || [];
+
   const leftoverTab = (
     <>
-      {!isManager && (
+      {canCreate && (
         <Card title="Ghi nhận món thừa" style={{ marginBottom: 20, borderRadius: 12 }}>
           <Form
             form={form}
@@ -283,7 +300,38 @@ const LeftoverPage = () => {
             </Form.Item>
 
             <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-              <Form.Item name="productId" label="Món" rules={[{ required: true, message: 'Chọn món' }]} style={{ width: 260 }}>
+              {type === 'Return' && (
+                <Form.Item name="tableId" label="Bàn" rules={[{ required: true, message: 'Chọn bàn' }]} style={{ width: 200 }}>
+                  <Select
+                    showSearch
+                    placeholder="Chọn bàn"
+                    optionFilterProp="label"
+                    options={tableOrderOptions.map((t) => ({ value: t.tableId, label: t.tableName }))}
+                    onChange={() => {
+                      form.setFieldsValue({ orderDetailId: undefined, productId: undefined, quantity: undefined });
+                    }}
+                  />
+                </Form.Item>
+              )}
+
+              {type === 'Return' && (
+                <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 260 }}>
+                  <Select
+                    showSearch
+                    disabled={!selectedTableId}
+                    placeholder={selectedTableId ? 'Chọn món' : 'Chọn bàn trước'}
+                    optionFilterProp="label"
+                    options={orderDetailOptionsForTable}
+                    onChange={(value, option) => {
+                      if (option) {
+                        form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
+                      }
+                    }}
+                  />
+                </Form.Item>
+              )}
+
+              <Form.Item name="productId" label="Món" hidden={type === 'Return'} rules={[{ required: true, message: 'Chọn món' }]} style={{ width: 260 }}>
                 <Select
                   showSearch
                   placeholder="Chọn món"
@@ -295,22 +343,6 @@ const LeftoverPage = () => {
               <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]} style={{ width: 120 }}>
                 <InputNumber min={1} style={{ width: '100%' }} />
               </Form.Item>
-
-              {type === 'Return' && (
-                <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 340 }}>
-                  <Select
-                    showSearch
-                    placeholder="Tìm theo bàn hoặc tên món..."
-                    optionFilterProp="label"
-                    options={orderDetailOptions}
-                    onChange={(value, option) => {
-                      if (option) {
-                        form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
-                      }
-                    }}
-                  />
-                </Form.Item>
-              )}
 
               {type === 'Extra' && (
                 <Form.Item name="shiftId" label="Ca làm việc" style={{ width: 200 }}>
@@ -334,9 +366,6 @@ const LeftoverPage = () => {
                       { value: 'Reuse', label: 'Tái sử dụng (nếu cho phép)' },
                     ]}
                   />
-                </Form.Item>
-                <Form.Item name="compensationPoints" label="Điểm tích lũy bù cho khách (nếu có)" style={{ width: 220 }}>
-                  <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="điểm" />
                 </Form.Item>
                 <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)" style={{ width: 220 }}>
                   <Select
@@ -429,7 +458,10 @@ const LeftoverPage = () => {
 
   return (
     <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-      <Title level={3}>Trả món &amp; Lịch sử huỷ món</Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <Title level={3} style={{ margin: 0 }}>Trả món &amp; Lịch sử huỷ món</Title>
+        {branchName && <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px' }}>Chi nhánh: {branchName}</Tag>}
+      </div>
 
       <Tabs
         defaultActiveKey="leftover"
