@@ -1,7 +1,9 @@
 import axiosInstance from './axiosInstance';
 
-export const getAllAccounts = () =>
-  axiosInstance.get('/api/Account/role-range');
+export const getAllAccounts = (branchId) =>
+  axiosInstance.get('/api/Account/role-range', {
+    params: branchId ? { branchId } : {},
+  });
 
 export const getAccountById = (id) =>
   axiosInstance.get(`/api/Account/${id}`);
