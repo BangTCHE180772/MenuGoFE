@@ -1,5 +1,4 @@
 import { message } from "antd";
-import * as XLSX from "xlsx";
 
 const getExportFormattedDate = () => {
   const now = new Date();
@@ -9,10 +8,57 @@ const getExportFormattedDate = () => {
   return `${day}-${month}-${year}`;
 };
 
+const escapeXml = (str) => {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+};
+
+const createExcelXML = (sheets) => {
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+`;
+  sheets.forEach((sheet) => {
+    const cleanSheetName = escapeXml(sheet.name.replace(/[:\\/?*\[\]]/g, "").trim().slice(0, 31) || "Sheet");
+    xml += ` <Worksheet ss:Name="${cleanSheetName}">\n  <Table>\n`;
+    (sheet.rows || []).forEach((row) => {
+      xml += "   <Row>\n";
+      (row || []).forEach((cell) => {
+        const val = escapeXml(cell);
+        const isNum = typeof cell === "number";
+        xml += `    <Cell><Data ss:Type="${isNum ? "Number" : "String"}">${val}</Data></Cell>\n`;
+      });
+      xml += "   </Row>\n";
+    });
+    xml += "  </Table>\n </Worksheet>\n";
+  });
+  xml += "</Workbook>";
+  return xml;
+};
+
+const triggerDownload = (content, filename, mimeType = "application/vnd.ms-excel;charset=utf-8;") => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 /**
- * Utility Xuất file Excel chuẩn .xlsx (SheetJS)
- * Mở trực tiếp bằng Microsoft Excel, hiển thị chuẩn từng cột A, B, C, D...
- * Tự động căn chỉnh độ rộng cột và định dạng dữ liệu
+ * Utility Xuất file Excel chuẩn (.xls/SpreadsheetML)
+ * Mở trực tiếp bằng Microsoft Excel, hiển thị chuẩn các cột
  */
 export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) => {
   try {
@@ -21,11 +67,11 @@ export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) 
     const finalFilename = `MenuGo_${cleanName}_${dateStr}`;
 
     const headers = columnDefs.map((col) => col.title || "");
-    const aoa = [headers];
+    const rows = [headers];
 
     if (summaryRow && Array.isArray(summaryRow)) {
       const summary = summaryRow.map((val) => (val === null || val === undefined ? "-" : val));
-      aoa.push(summary);
+      rows.push(summary);
     }
 
     (data || []).forEach((row) => {
@@ -34,33 +80,13 @@ export const exportToExcelCSV = (filename, columnDefs, data, summaryRow = null) 
         if (val === null || val === undefined) return "-";
         return val;
       });
-      aoa.push(rowData);
+      rows.push(rowData);
     });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const xmlContent = createExcelXML([{ name: "Báo cáo", rows }]);
+    triggerDownload(xmlContent, `${finalFilename}.xls`);
 
-    // Tính toán độ rộng cột tự động
-    const colWidths = columnDefs.map((col, idx) => {
-      let maxLen = (col.title || "").toString().length;
-      if (summaryRow && summaryRow[idx]) {
-        maxLen = Math.max(maxLen, String(summaryRow[idx]).length);
-      }
-      for (let r = 0; r < Math.min((data || []).length, 100); r++) {
-        const row = data[r];
-        let val = typeof col.field === "function" ? col.field(row) : row[col.field];
-        if (val !== null && val !== undefined) {
-          maxLen = Math.max(maxLen, String(val).length);
-        }
-      }
-      return { wch: Math.min(Math.max(maxLen + 4, 12), 50) };
-    });
-    ws["!cols"] = colWidths;
-
-    XLSX.utils.book_append_sheet(wb, ws, "Báo cáo");
-    XLSX.writeFile(wb, `${finalFilename}.xlsx`);
-
-    message.success(`Đã xuất file Excel: ${finalFilename}.xlsx`);
+    message.success(`Đã xuất file Excel: ${finalFilename}.xls`);
   } catch (err) {
     console.error("Lỗi xuất file Excel:", err);
     message.error("Không thể xuất file. Vui lòng thử lại!");
@@ -76,19 +102,17 @@ export const exportMultipleTablesToExcel = (filename, tablesArray) => {
     let cleanName = filename.replace(/^MenuGo_/i, "");
     const finalFilename = `MenuGo_${cleanName}_${dateStr}`;
 
-    const wb = XLSX.utils.book_new();
+    const sheets = [];
 
     // Sheet 1: Tổng hợp tất cả các bảng
-    const combinedAoa = [];
-    let maxColsCount = 0;
+    const combinedRows = [];
 
     tablesArray.forEach((tbl) => {
       if (tbl.title) {
-        combinedAoa.push([`=== ${tbl.title.toUpperCase()} ===`]);
+        combinedRows.push([`=== ${tbl.title.toUpperCase()} ===`]);
       }
       const headers = tbl.columnDefs.map((col) => col.title || "");
-      maxColsCount = Math.max(maxColsCount, headers.length);
-      combinedAoa.push(headers);
+      combinedRows.push(headers);
 
       (tbl.data || []).forEach((row) => {
         const rowData = tbl.columnDefs.map((col) => {
@@ -96,20 +120,18 @@ export const exportMultipleTablesToExcel = (filename, tablesArray) => {
           if (val === null || val === undefined) return "-";
           return val;
         });
-        combinedAoa.push(rowData);
+        combinedRows.push(rowData);
       });
 
-      combinedAoa.push([]);
+      combinedRows.push([]);
     });
 
-    const combinedWs = XLSX.utils.aoa_to_sheet(combinedAoa);
-    combinedWs["!cols"] = Array(maxColsCount).fill({ wch: 22 });
-    XLSX.utils.book_append_sheet(wb, combinedWs, "Tổng hợp");
+    sheets.push({ name: "Tổng hợp", rows: combinedRows });
 
     // Thêm từng Sheet riêng cho mỗi bảng để xem chi tiết
     tablesArray.forEach((tbl, idx) => {
       const headers = tbl.columnDefs.map((col) => col.title || "");
-      const sheetAoa = [headers];
+      const sheetRows = [headers];
 
       (tbl.data || []).forEach((row) => {
         const rowData = tbl.columnDefs.map((col) => {
@@ -117,39 +139,17 @@ export const exportMultipleTablesToExcel = (filename, tablesArray) => {
           if (val === null || val === undefined) return "-";
           return val;
         });
-        sheetAoa.push(rowData);
+        sheetRows.push(rowData);
       });
 
-      const ws = XLSX.utils.aoa_to_sheet(sheetAoa);
-      const colWidths = tbl.columnDefs.map((col) => {
-        let maxLen = (col.title || "").toString().length;
-        for (let r = 0; r < Math.min((tbl.data || []).length, 100); r++) {
-          const row = tbl.data[r];
-          let val = typeof col.field === "function" ? col.field(row) : row[col.field];
-          if (val !== null && val !== undefined) {
-            maxLen = Math.max(maxLen, String(val).length);
-          }
-        }
-        return { wch: Math.min(Math.max(maxLen + 4, 12), 45) };
-      });
-      ws["!cols"] = colWidths;
-
-      let sheetName = (tbl.title || `Bảng ${idx + 1}`)
-        .replace(/[:\\/?*\[\]]/g, "")
-        .trim()
-        .slice(0, 31);
-      if (!sheetName) sheetName = `Bảng ${idx + 1}`;
-
-      // Đảm bảo tên sheet không trùng lặp
-      if (wb.SheetNames.includes(sheetName)) {
-        sheetName = `${sheetName.slice(0, 28)}_${idx + 1}`;
-      }
-
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      let sheetName = (tbl.title || `Bảng ${idx + 1}`).trim();
+      sheets.push({ name: sheetName, rows: sheetRows });
     });
 
-    XLSX.writeFile(wb, `${finalFilename}.xlsx`);
-    message.success(`Đã xuất file Excel: ${finalFilename}.xlsx`);
+    const xmlContent = createExcelXML(sheets);
+    triggerDownload(xmlContent, `${finalFilename}.xls`);
+
+    message.success(`Đã xuất file Excel: ${finalFilename}.xls`);
   } catch (err) {
     console.error("Lỗi xuất Excel tổng hợp:", err);
     message.error("Không thể xuất file. Vui lòng thử lại!");
