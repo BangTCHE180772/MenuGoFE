@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Card,
   Form,
@@ -15,11 +15,12 @@ import {
   Popconfirm,
   Typography,
   Tabs,
+  Switch,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getCancelledHistory, getAllOrders, requestReturnItem } from '../api/orderApi';
-import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/inventoryApi';
+import { getCancelledHistory, getReturnableOrders, requestReturnItem } from '../api/orderApi';
+import { getLeftoverRecordsByBranch, createLeftoverRecord, deleteLeftoverRecord } from '../api/leftoverApi';
 import { getAllProducts } from '../api/productApi';
 import { getAllShifts } from '../api/shiftApi';
 import { getChefs } from '../api/accountApi';
@@ -56,10 +57,6 @@ const LeftoverPage = () => {
   // điền form ghi nhận — Thu ngân/Bếp/Quản lý/Chủ sở hữu/Admin chỉ xem lịch sử.
   const canCreate = ['Waiter', 'Phục vụ'].includes(role) || user?.roleId === 6;
 
-  const [form] = Form.useForm();
-  const type = Form.useWatch('type', form);
-  const selectedTableId = Form.useWatch('tableId', form);
-
   const [products, setProducts] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [chefAccounts, setChefAccounts] = useState([]);
@@ -68,6 +65,53 @@ const LeftoverPage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState(undefined);
+
+  const [form] = Form.useForm();
+  const type = Form.useWatch('type', form);
+  const selectedOrderId = Form.useWatch('orderId', form);
+  const selectedOrderDetailId = Form.useWatch('orderDetailId', form);
+  const selectedProductId = Form.useWatch('productId', form);
+  const isHandlingReuse = Form.useWatch('handlingAction', form) === true;
+  const returnReason = Form.useWatch('reason', form);
+  const productType = products.find((p) => p.id === selectedProductId)?.type;
+
+  const maxReturnable = useMemo(() => {
+    if (type !== 'Return' || !selectedOrderDetailId) return undefined;
+    for (const group of tableOrderOptions) {
+      const item = group.items.find((i) => i.value === selectedOrderDetailId);
+      if (item) return item.maxReturnable;
+    }
+    return undefined;
+  }, [type, selectedOrderDetailId, tableOrderOptions]);
+
+  const getReasonOptions = () => {
+    if (!productType) return [];
+    if ((productType === 'Regular' || productType === 'Manufactured') && isHandlingReuse) {
+      return [
+        { value: 'Khách gọi dư', label: 'Khách gọi dư' },
+        { value: 'Nhân viên bấm nhầm', label: 'Nhân viên bấm nhầm' },
+        { value: 'Bàn hủy món phút chót', label: 'Bàn hủy món phút chót' },
+        { value: 'Lý do khác', label: 'Lý do khác' }
+      ];
+    }
+    return [
+      { value: 'Ra món chậm', label: 'Ra món chậm' },
+      { value: 'Thức ăn nguội/kém chất lượng', label: 'Thức ăn nguội/kém chất lượng' },
+      { value: 'Có dị vật', label: 'Có dị vật' },
+      { value: 'Nhân viên làm đổ', label: 'Nhân viên làm đổ' },
+      { value: 'Lên sai món', label: 'Lên sai món' },
+      { value: 'Bao bì rách/hỏng', label: 'Bao bì rách/hỏng' },
+      { value: 'Lý do khác', label: 'Lý do khác' }
+    ];
+  };
+
+  const handleHandlingChange = (checked) => {
+    form.setFieldsValue({
+      handlingAction: checked,
+    });
+  };
+
+
 
   // ── Lịch sử hủy món (đơn đã hoàn thành vs đơn chờ xác nhận) ──────────
   const [cancelledHistory, setCancelledHistory] = useState([]);
@@ -125,36 +169,28 @@ const LeftoverPage = () => {
   const fetchOrderDetailOptions = useCallback(async () => {
     if (!branchId || !canCreate) return;
     try {
-      const res = await getAllOrders(branchId);
+      const res = await getReturnableOrders(branchId);
       const orders = res.data || [];
-      const now = dayjs();
       const grouped = [];
-      orders
-        .slice()
-        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
-        .forEach((order) => {
-          const items = (order.orderDetails || [])
-            .filter((d) => d.status !== 'Cancelled')
-            // Chỉ hiện món đặt trong ngày và còn trong 1 tiếng gần nhất — tránh liệt kê
-            // toàn bộ lịch sử đơn hàng cũ không còn liên quan đến việc trả món.
-            .filter((d) => {
-              const orderedAt = dayjs(d.createdAt);
-              return orderedAt.isSame(now, 'day') && now.diff(orderedAt, 'minute') <= 60;
-            })
-            .map((d) => ({
-              value: d.id,
-              label: `${d.productName} x${d.quantity}`,
-              productId: d.productId,
-              quantity: d.quantity,
-            }));
-          if (items.length === 0) return;
-          const existing = grouped.find((t) => t.tableId === order.tableId);
-          if (existing) {
-            existing.items.push(...items);
-          } else {
-            grouped.push({ tableId: order.tableId, tableName: order.tableName || `Đơn #${order.id}`, items });
-          }
+      orders.forEach((order) => {
+        const items = (order.orderDetails || []).map((d) => {
+          const maxReturnable = d.quantity - (d.returnedQuantity || 0);
+          return {
+            value: d.id,
+            label: `${d.productName} (gọi: ${d.quantity}, có thể trả: ${maxReturnable})`,
+            productId: d.productId,
+            quantity: d.quantity,
+            maxReturnable,
+          };
         });
+
+        if (items.length === 0) return;
+        grouped.push({ 
+          orderId: order.id, 
+          tableName: order.tableName ? `${order.tableName} (Đơn #${order.id})` : `Mang đi (Đơn #${order.id})`, 
+          items 
+        });
+      });
       setTableOrderOptions(grouped);
     } catch {
       message.error('Không thể tải danh sách chi tiết đơn hàng.');
@@ -181,10 +217,14 @@ const LeftoverPage = () => {
           setSaving(false);
           return;
         }
+        let finalReason = values.reason;
+        if (values.reason === 'Lý do khác') {
+          finalReason = values.otherReason;
+        }
         await requestReturnItem(values.orderDetailId, {
           returnQuantity: values.quantity,
-          returnReason: values.reason,
-          handlingAction: values.handlingAction,
+          returnReason: finalReason,
+          handlingAction: values.handlingAction ? 'Reuse' : 'Discard',
           atFaultAccountId: values.atFaultAccountId ?? null,
         });
         message.success('Đã xử lý trả món và ghi nhận thành công');
@@ -204,6 +244,9 @@ const LeftoverPage = () => {
       form.resetFields();
       form.setFieldsValue({ type: values.type, recordDate: dayjs() });
       fetchRecords();
+      if (values.type === 'Return') {
+        fetchOrderDetailOptions(); // Cập nhật lại dropdown Bàn/Món để ẩn món vừa trả
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Lỗi khi ghi nhận món thừa.');
     } finally {
@@ -238,7 +281,7 @@ const LeftoverPage = () => {
         r.type === 'Return' ? (
           <Space direction="vertical" size={0}>
             {r.tableName && <span>Bàn: {r.tableName}</span>}
-            {r.handlingAction && <Tag>{HANDLING_ACTION_LABELS[r.handlingAction] || r.handlingAction}</Tag>}
+            {r.handlingAction && <Tag>{HANDLING_ACTION_LABELS[r.handlingAction] || (r.handlingAction === 'Reuse' ? 'Tái sử dụng' : 'Huỷ')}</Tag>}
             {r.atFaultAccountName && (
               <span style={{ color: '#cf1322', fontSize: 12 }}>Bếp làm sai: {r.atFaultAccountName}</span>
             )}
@@ -291,7 +334,7 @@ const LeftoverPage = () => {
 
   const completedCancelCount = cancelledHistory.filter((r) => r.category === 'Completed').length;
 
-  const orderDetailOptionsForTable = tableOrderOptions.find((t) => t.tableId === selectedTableId)?.items || [];
+  const orderDetailOptionsForOrder = tableOrderOptions.find((t) => t.orderId === selectedOrderId)?.items || [];
 
   const leftoverTab = (
     <>
@@ -304,7 +347,13 @@ const LeftoverPage = () => {
             initialValues={{ type: 'Return', recordDate: dayjs() }}
           >
             <Form.Item name="type" label="Loại" rules={[{ required: true }]}>
-              <Radio.Group>
+              <Radio.Group onChange={(e) => {
+                if (e.target.value === 'Return') {
+                  form.setFieldsValue({ handlingAction: true, reason: undefined, otherReason: undefined });
+                } else {
+                  form.setFieldsValue({ handlingAction: undefined, reason: undefined, otherReason: undefined });
+                }
+              }}>
                 <Radio.Button value="Return">Khách trả món (Return)</Radio.Button>
                 <Radio.Button value="Extra">Bếp làm dư (Extra)</Radio.Button>
               </Radio.Group>
@@ -312,12 +361,26 @@ const LeftoverPage = () => {
 
             <Space style={{ display: 'flex' }} size="large" align="start" wrap>
               {type === 'Return' && (
-                <Form.Item name="tableId" label="Bàn" rules={[{ required: true, message: 'Chọn bàn' }]} style={{ width: 200 }}>
+                <Form.Item 
+                  name="orderId" 
+                  label={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 220 }}>
+                      <span>Đơn hàng / Bàn</span>
+                      <SyncOutlined 
+                        style={{ cursor: 'pointer', color: '#1890ff' }} 
+                        onClick={() => fetchOrderDetailOptions()} 
+                        title="Làm mới danh sách bàn"
+                      />
+                    </div>
+                  } 
+                  rules={[{ required: true, message: 'Chọn đơn hàng' }]} 
+                  style={{ width: 220 }}
+                >
                   <Select
                     showSearch
-                    placeholder="Chọn bàn"
+                    placeholder="Chọn bàn/đơn"
                     optionFilterProp="label"
-                    options={tableOrderOptions.map((t) => ({ value: t.tableId, label: t.tableName }))}
+                    options={tableOrderOptions.map((t) => ({ value: t.orderId, label: t.tableName }))}
                     onChange={() => {
                       form.setFieldsValue({ orderDetailId: undefined, productId: undefined, quantity: undefined });
                     }}
@@ -326,16 +389,16 @@ const LeftoverPage = () => {
               )}
 
               {type === 'Return' && (
-                <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 260 }}>
+                <Form.Item name="orderDetailId" label="Món trong đơn hàng" rules={[{ required: true, message: 'Chọn món khách trả trong đơn' }]} style={{ width: 320 }}>
                   <Select
                     showSearch
-                    disabled={!selectedTableId}
-                    placeholder={selectedTableId ? 'Chọn món' : 'Chọn bàn trước'}
+                    disabled={!selectedOrderId}
+                    placeholder={selectedOrderId ? 'Chọn món' : 'Chọn bàn/đơn trước'}
                     optionFilterProp="label"
-                    options={orderDetailOptionsForTable}
-                    onChange={(value, option) => {
+                    options={orderDetailOptionsForOrder}
+                  onChange={(value, option) => {
                       if (option) {
-                        form.setFieldsValue({ productId: option.productId, quantity: option.quantity });
+                        form.setFieldsValue({ productId: option.productId, quantity: 1 });
                       }
                     }}
                   />
@@ -351,8 +414,18 @@ const LeftoverPage = () => {
                 />
               </Form.Item>
 
-              <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]} style={{ width: 120 }}>
-                <InputNumber min={1} style={{ width: '100%' }} />
+              <Form.Item 
+                name="quantity" 
+                label="Số lượng" 
+                rules={[
+                  { required: true, message: 'Nhập số lượng' },
+                  type === 'Return' && maxReturnable !== undefined 
+                    ? { type: 'number', max: maxReturnable, message: `Tối đa ${maxReturnable}` } 
+                    : {}
+                ]} 
+                style={{ width: 120 }}
+              >
+                <InputNumber min={1} max={type === 'Return' ? maxReturnable : undefined} style={{ width: '100%' }} />
               </Form.Item>
 
               {type === 'Extra' && (
@@ -368,34 +441,53 @@ const LeftoverPage = () => {
 
             {type === 'Return' && (
               <Space style={{ display: 'flex' }} size="large" align="start" wrap>
-                <Form.Item name="handlingAction" label="Cách xử lý" rules={[{ required: true, message: 'Chọn cách xử lý' }]} style={{ width: 220 }}>
-                  <Select
-                    placeholder="Chọn cách xử lý"
-                    options={[
-                      { value: 'Discard', label: 'Huỷ' },
-                      { value: 'StaffUse', label: 'Nhân viên dùng' },
-                      { value: 'Reuse', label: 'Tái sử dụng (nếu cho phép)' },
-                    ]}
+                <Form.Item name="handlingAction" valuePropName="checked" label="Hướng xử lý" style={{ width: 220 }}>
+                  <Switch
+                    checkedChildren="Tái sử dụng"
+                    unCheckedChildren="Huỷ bỏ"
+                    onChange={handleHandlingChange}
                   />
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+                    Hàng tái sử dụng sẽ được cộng lại vào kho nếu là mặt hàng Thường.
+                  </div>
                 </Form.Item>
-                <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)" style={{ width: 220 }}>
-                  <Select
-                    allowClear
-                    showSearch
-                    placeholder="Chọn tài khoản bếp"
-                    optionFilterProp="label"
-                    options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
-                  />
-                </Form.Item>
+                {productType !== 'Regular' && productType !== 'Manufactured' && (
+                  <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)" style={{ width: 220 }}>
+                    <Select
+                      allowClear
+                      showSearch
+                      placeholder="Chọn tài khoản bếp"
+                      optionFilterProp="label"
+                      options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
+                    />
+                  </Form.Item>
+                )}
               </Space>
             )}
 
-            <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }]}>
-              <Input.TextArea
-                rows={2}
-                placeholder={type === 'Extra' ? 'VD: làm dư, ước tính sai...' : 'VD: món bị nguội, khách gọi nhầm...'}
-              />
-            </Form.Item>
+            {type === 'Return' ? (
+              <>
+                <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Chọn lý do' }]}>
+                  <Select 
+                    disabled={!selectedProductId}
+                    placeholder={selectedProductId ? "Chọn lý do trả món..." : "Vui lòng chọn món trước"} 
+                    options={getReasonOptions()} 
+                  />
+                </Form.Item>
+                {returnReason === 'Lý do khác' && (
+                  <Form.Item name="otherReason" rules={[{ required: true, message: 'Nhập chi tiết lý do' }]}>
+                    <Input.TextArea rows={2} placeholder="Vui lòng nhập chi tiết lý do..." />
+                  </Form.Item>
+                )}
+              </>
+            ) : (
+              <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }]}>
+                <Input.TextArea
+                  rows={2}
+                  placeholder="VD: làm dư, ước tính sai..."
+                />
+              </Form.Item>
+            )}
 
             <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
               <Button type="primary" icon={<PlusOutlined />} htmlType="submit" loading={saving}>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Modal, InputNumber, Input, Form, message, Select, Switch } from 'antd';
 import axiosInstance from '../../api/axiosInstance';
 import { useAuth } from '../../context/AuthContext';
+import { useBranch } from '../../context/BranchContext';
 import { getChefs } from '../../api/accountApi';
 import { requestReturnItem } from '../../api/orderApi';
 
@@ -11,7 +12,8 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
   const actionRef = useRef(false);
   const [chefAccounts, setChefAccounts] = useState([]);
   
-  const { user, currentBranchId } = useAuth();
+  const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const branchId = currentBranchId || user?.branchId;
   
   // handlingAction now represents the Switch (true = Reuse, false = Discard)
@@ -60,7 +62,6 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
   const handleHandlingChange = (checked) => {
     form.setFieldsValue({
       handlingAction: checked,
-      returnReason: undefined,
     });
   };
 
@@ -135,6 +136,29 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
           <InputNumber min={1} max={maxReturnable} style={{ width: '100%' }} />
         </Form.Item>
 
+        <Form.Item name="handlingAction" valuePropName="checked" label="Hướng xử lý">
+          <Switch
+            checkedChildren="Tái sử dụng"
+            unCheckedChildren="Huỷ bỏ"
+            onChange={handleHandlingChange}
+          />
+          <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+            Hàng tái sử dụng sẽ được cộng lại vào kho nếu là mặt hàng Thường.
+          </div>
+        </Form.Item>
+
+        {item.productType !== 'Regular' && item.productType !== 'Manufactured' && (
+          <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)">
+            <Select
+              allowClear
+              showSearch
+              placeholder="Chọn bếp làm sai..."
+              optionFilterProp="label"
+              options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          </Form.Item>
+        )}
+
         <Form.Item
           name="returnReason"
           label="Lý do trả"
@@ -154,29 +178,6 @@ const ReturnItemModal = ({ visible, item, onCancel, onSuccess, isCustomerMode = 
             style={{ marginBottom: 24 }}
           >
             <Input.TextArea rows={2} placeholder="Vui lòng nhập chi tiết lý do..." />
-          </Form.Item>
-        )}
-
-        <Form.Item name="handlingAction" valuePropName="checked" label="Hướng xử lý">
-          <Switch
-            checkedChildren="Tái sử dụng"
-            unCheckedChildren="Huỷ bỏ"
-            onChange={handleHandlingChange}
-          />
-          <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
-            Hàng tái sử dụng sẽ được cộng lại vào kho nếu là mặt hàng Thường.
-          </div>
-        </Form.Item>
-
-        {!isHandlingReuse && (
-          <Form.Item name="atFaultAccountId" label="Bếp làm sai (nếu có)">
-            <Select
-              allowClear
-              showSearch
-              placeholder="Chọn bếp làm sai..."
-              optionFilterProp="label"
-              options={chefAccounts.map((a) => ({ value: a.id, label: a.name }))}
-            />
           </Form.Item>
         )}
       </Form>
