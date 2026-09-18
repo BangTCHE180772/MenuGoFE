@@ -4,6 +4,9 @@ import axiosInstance from './axiosInstance';
 export const getAllOrders = (branchId) =>
   axiosInstance.get('/api/Order', { params: { branchId } });
 
+export const getReturnableOrders = (branchId) =>
+  axiosInstance.get('/api/Order/returnable', { params: { branchId } });
+
 export const getPaidInvoices = (branchId) =>
   axiosInstance.get('/api/Order/invoices', { params: { branchId } });
 
@@ -62,6 +65,9 @@ export const cancelOrder = (id) =>
 
 export const cancelOrderDetail = (id) =>
   axiosInstance.put(`/api/Order/details/${id}/cancel`);
+
+export const requestReturnItem = (orderDetailId, data) =>
+  axiosInstance.put(`/api/Order/details/${orderDetailId}/request-return`, data);
 
 export const getAvailableQuantities = (branchId, productIds) =>
   axiosInstance.post(`/api/Order/available-quantities/${branchId}`, productIds);
