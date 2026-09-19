@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Spin, message } from 'antd';
 import { getAllGroups, searchProductsOData } from '../../api/menuApi';
 import { getBInventories } from '../../api/binventoryApi';
-import { getAvailableQuantities } from '../../api/orderApi';
+import { getMenuAvailableQuantities } from '../../api/orderApi';
 import { getReusableLeftovers } from '../../api/leftoverApi';
 
 const formatPrice = (price) =>
@@ -36,7 +36,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
     const fetchReusable = () => {
       getReusableLeftovers(branchId)
         .then((res) => { if (!cancelled) setReusableLeftovers(res.data || []); })
-        .catch(() => {});
+        .catch(() => { });
     };
     fetchReusable();
     const poll = setInterval(fetchReusable, REUSE_POLL_MS);
@@ -94,7 +94,8 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
     try {
       if (branchId) {
         // Lấy theo BInventory chi nhánh, truyền mode = 0 để lấy TẤT CẢ (bao gồm cả Processed)
-        const rawBInventory = await getBInventories(branchId, '', '', 0);
+        const res = await getBInventories(branchId, '', '', 0);
+        const rawBInventory = Array.isArray(res) ? res : (res?.Items || []);
         if (Array.isArray(rawBInventory)) {
           const sellable = rawBInventory.filter(
             p => p.type === 'Processed' || p.type === 'Manufactured' || p.type === 'Regular'
@@ -130,14 +131,15 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
             }
           }
 
-          // Gán mặc định để hiển thị UI ngay lập tức không cần đợi API lấy số lượng
-          const initialProducts = mappedProducts.map(p => ({ ...p, availableQuantity: 999999 }));
+          // Gán mặc định null để không hiển thị 'Không giới hạn' giả trong lúc chờ API
+          const initialProducts = mappedProducts.map(p => ({ ...p, availableQuantity: null }));
           setProducts(initialProducts);
-          
+
           // Fetch Available Quantities chạy ngầm để không block UI (hiển thị UI ngay)
+          // Sử dụng hàm bulk để tính toán một lần, tránh N+1 queries
           const productIds = initialProducts.map(p => p.id);
           if (productIds.length > 0) {
-            getAvailableQuantities(branchId, productIds).then(qtyRes => {
+            getMenuAvailableQuantities(branchId).then(qtyRes => {
               const qtyMap = qtyRes.data || {};
               setProducts(currentProducts => currentProducts.map(p => ({
                 ...p,
@@ -241,7 +243,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
           margin: '0 12px 10px',
         }}>
           <div style={{ fontWeight: 600, fontSize: 12, color: '#b45309', marginBottom: 6 }}>
-            💡 Gợi ý dùng lại món thừa (còn trong 30 phút)
+            Gợi ý dùng lại món thừa (còn trong 30 phút)
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {reusableLeftovers.map((item) => {
@@ -298,23 +300,23 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
           {products.map((item) => (
             <button
               key={item.id}
-              className={`pos-menu-item ${canOrder && item.availableQuantity > 0 ? 'pos-menu-item--clickable' : ''}`}
-              onClick={() => canOrder && item.availableQuantity > 0 && onAddItem({
+              className={`pos-menu-item ${canOrder && item.availableQuantity !== 0 ? 'pos-menu-item--clickable' : ''}`}
+              onClick={() => canOrder && item.availableQuantity !== 0 && onAddItem({
                 id: item.id,
                 name: item.name,
                 price: Number(item.sellPrice),
                 desc: item.description,
                 category: item.groupName,
               })}
-              disabled={!canOrder || item.availableQuantity <= 0}
-              title={!canOrder ? 'Chọn bàn Có khách để gọi món' : (item.availableQuantity <= 0 ? 'Hết hàng' : `Thêm ${item.name}`)}
-              style={{ opacity: item.availableQuantity <= 0 ? 0.6 : 1, position: 'relative' }}
+              disabled={!canOrder || item.availableQuantity === 0}
+              title={!canOrder ? 'Chọn bàn Có khách để gọi món' : (item.availableQuantity === 0 ? 'Hết hàng' : `Thêm ${item.name}`)}
+              style={{ opacity: item.availableQuantity === 0 ? 0.6 : 1, position: 'relative' }}
             >
-              <div style={{ 
-                height: '70px', 
-                width: '70px', 
-                minWidth: '70px', 
-                borderRadius: '8px', 
+              <div style={{
+                height: '70px',
+                width: '70px',
+                minWidth: '70px',
+                borderRadius: '8px',
                 overflow: 'hidden',
                 border: '1px solid #f3f4f6',
                 background: '#f9fafb',
@@ -341,31 +343,31 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
                   </div>
                 )}
                 {item.imageLink ? (
-                  <img 
-                    src={item.imageLink} 
-                    alt={item.name} 
+                  <img
+                    src={item.imageLink}
+                    alt={item.name}
                     loading="lazy"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    onError={(e) => { 
-                      e.target.onerror = null; 
-                      e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80'; 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80';
                     }}
                   />
                 ) : (
-                  <img 
-                    src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80" 
-                    alt={item.name} 
+                  <img
+                    src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80"
+                    alt={item.name}
                     loading="lazy"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 )}
               </div>
               <div className="pos-menu-item-info">
                 <div className="pos-menu-item-name">{item.name}</div>
                 <div className="pos-menu-item-desc">{item.description}</div>
-                {item.availableQuantity < 999999 && (
+                {item.availableQuantity !== null && (
                   <div style={{ fontSize: '11px', color: item.availableQuantity > 0 ? '#10b981' : '#ef4444', fontWeight: '500', marginTop: '2px', marginBottom: '2px' }}>
-                    {item.availableQuantity > 0 ? `Còn lại: ${item.availableQuantity}` : 'Hết hàng'}
+                    {item.availableQuantity >= 999999 ? 'Không giới hạn' : (item.availableQuantity > 0 ? `Còn lại: ${item.availableQuantity}` : 'Hết hàng')}
                   </div>
                 )}
                 <div className="pos-menu-item-tag">{item.groupName}</div>
