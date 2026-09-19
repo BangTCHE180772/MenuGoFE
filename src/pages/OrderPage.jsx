@@ -38,6 +38,7 @@ const OrderPage = ({ isWaiterMode }) => {
   const [cartItems, setCartItems] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [refreshMenuTrigger, setRefreshMenuTrigger] = useState(0);
   const actionRef = useRef(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
@@ -317,6 +318,7 @@ const OrderPage = ({ isWaiterMode }) => {
 
       message.success(`Gọi thêm món thành công!`);
       setCartItems([]);
+      setRefreshMenuTrigger(prev => prev + 1);
 
       const newSummaryRes = await getTableOrderSummary(selectedTable.id);
       setOrderSummary(newSummaryRes.data);
@@ -528,6 +530,7 @@ const OrderPage = ({ isWaiterMode }) => {
           onAddItem={handleAddItem}
           branchId={deviceInfo?.branchId || localStorage.getItem('activeShiftBranchId') || (user?.branchIds && user.branchIds[0]) || 1}
           showReuseSuggestions={false}
+          refreshTrigger={refreshMenuTrigger}
         />
 
         <OrderPanel

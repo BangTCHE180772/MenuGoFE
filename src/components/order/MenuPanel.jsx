@@ -15,7 +15,7 @@ const formatPrice = (price) =>
 
 const REUSE_POLL_MS = 20000;
 
-const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true }) => {
+const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true, refreshTrigger = 0 }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả' }]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +188,7 @@ const MenuPanel = ({ onAddItem, canOrder, branchId, showReuseSuggestions = true 
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [search, activeGroup, branchId, categories]);
+  }, [search, activeGroup, branchId, categories, refreshTrigger]);
 
   /* ── Loading state ─────────────────────────────────────────────────────── */
   if (loading) {
