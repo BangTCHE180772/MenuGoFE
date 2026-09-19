@@ -42,4 +42,7 @@ export const checkInWithLocation = (data) =>
 export const autoAssignWorkSchedules = (data) =>
   axiosInstance.post('/api/WorkSchedule/auto-assign', data);
 
+export const getActivityLog = (id) =>
+  axiosInstance.get(`/api/WorkSchedule/${id}/activity-log`);
+
 
