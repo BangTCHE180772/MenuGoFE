@@ -12,7 +12,7 @@ const INVENTORY_OPTIONS = [
   { key: 'Partner', label: 'Đối tác' },
   { key: 'Customer', label: 'Khách hàng' },
   { key: 'Invoice', label: 'Hóa đơn' },
-  { key: 'Production', label: 'Sản xuất' },
+  { key: 'Production', label: 'Đồ chuẩn bị sẵn' },
   { key: 'Product', label: 'Danh sách nguyên liệu' },
   { key: 'BatchExpiry', label: 'Lô hàng & Hạn sử dụng' }
 ];
