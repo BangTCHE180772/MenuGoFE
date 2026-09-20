@@ -13,7 +13,9 @@ import {
   CalendarOutlined,
   FallOutlined,
   InfoCircleOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  PictureOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getExportDeleteById } from '../api/documentApi';
@@ -28,6 +30,8 @@ const ExportDelete_Detail = () => {
   const initialDoc = location.state?.document || null;
   const [doc, setDoc] = useState(initialDoc);
   const [loading, setLoading] = useState(!initialDoc);
+  const [activeTab, setActiveTab] = useState('details');
+  const [previewImage, setPreviewImage] = useState(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -78,6 +82,18 @@ const ExportDelete_Detail = () => {
     if (doc?.totalAmount && doc.totalAmount > 0) return Number(doc.totalAmount);
     return detailsList.reduce((sum, item) => sum + item.total, 0);
   }, [doc, detailsList]);
+
+  const imageUrlsList = useMemo(() => {
+    let imgs = doc?.imageUrls || [];
+    if (typeof imgs === 'string') {
+      try {
+        imgs = JSON.parse(imgs);
+      } catch (e) {
+        imgs = imgs ? [imgs] : [];
+      }
+    }
+    return Array.isArray(imgs) ? imgs : [];
+  }, [doc]);
 
   const isPending = doc?.status === 0 || doc?.status === 'Pending';
 
@@ -237,12 +253,52 @@ const ExportDelete_Detail = () => {
           </div>
         )}
 
-        {/* BẢNG MẶT HÀNG XUẤT HỦY */}
+        {/* BẢNG MẶT HÀNG XUẤT HỦY & HÌNH ẢNH */}
         <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AppstoreOutlined /> Chi tiết mặt hàng xuất hủy ({detailsList.length})
+          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 8px' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('details')}
+              style={{
+                padding: '12px 18px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: activeTab === 'details' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'details' ? '2px solid #e8442a' : '2px solid transparent',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <AppstoreOutlined /> Thông tin chi tiết phiếu xuất hủy ({detailsList.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('images')}
+              style={{
+                padding: '12px 18px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: activeTab === 'images' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'images' ? '2px solid #e8442a' : '2px solid transparent',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <PictureOutlined /> Hình ảnh {imageUrlsList.length > 0 ? `(${imageUrlsList.length})` : ''}
+            </button>
           </div>
-          <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
+
+          {activeTab === 'details' && (
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
@@ -306,6 +362,80 @@ const ExportDelete_Detail = () => {
               </tbody>
             </table>
           </div>
+          )}
+
+          {activeTab === 'images' && (
+            <div style={{ padding: '20px 24px' }}>
+              {imageUrlsList.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                  <PictureOutlined style={{ fontSize: 40, marginBottom: 10, color: '#cbd5e1' }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b' }}>Không có ảnh</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Chưa có hình ảnh biên bản hoặc bằng chứng hàng hỏng nào cho phiếu xuất hủy này.</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 16 }}>
+                    Danh sách hình ảnh chứng từ ({imageUrlsList.length}):
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 140px))',
+                      gap: 16
+                    }}
+                  >
+                    {imageUrlsList.map((url, imgIdx) => (
+                      <div
+                        key={imgIdx}
+                        onClick={() => setPreviewImage(url)}
+                        style={{
+                          width: 140,
+                          aspectRatio: '1 / 1',
+                          borderRadius: 8,
+                          border: '1px solid #e2e8f0',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          background: '#f1f5f9',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                          transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.12)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Hình ${imgIdx + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: 6,
+                            left: 6,
+                            background: 'rgba(15, 23, 42, 0.75)',
+                            color: '#ffffff',
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: 4
+                          }}
+                        >
+                          Ảnh {imgIdx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -377,6 +507,65 @@ const ExportDelete_Detail = () => {
           </tbody>
         </table>
       </InventoryPrintPortal>
+
+      {/* LIGHTBOX XEM ẢNH TOÀN MÀN HÌNH */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
+          >
+            <CloseOutlined />
+          </button>
+          <img
+            src={previewImage}
+            alt="Phóng to hình ảnh"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 6,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
