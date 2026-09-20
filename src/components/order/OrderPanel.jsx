@@ -9,7 +9,6 @@
 import { useState } from 'react';
 import { Spin, Tooltip, Modal, AutoComplete, message, Tag } from 'antd';
 import { getStatusConfig, TABLE_STATUS } from '../../data/tableConstants';
-import ReturnItemModal from './ReturnItemModal';
 import '../../styles/pos-order-panel.css';
 
 const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
@@ -81,20 +80,17 @@ const CartItem = ({ item, onUpdateQty, onRemove, onNoteChange }) => {
 };
 
 /* ── OrderedItem Row ────────────────────────────────────────────────────────── */
-const OrderedItem = ({ 
-  item, 
-  onMarkAsServed, 
-  onRequestReturn, 
-  onConfirmItem, 
-  onRejectClick, 
-  getDisplayQuantity, 
-  handleQuantityChange 
+const OrderedItem = ({
+  item,
+  onMarkAsServed,
+  onConfirmItem,
+  onRejectClick,
+  getDisplayQuantity,
+  handleQuantityChange
 }) => {
   const isReady = item.cookingStatus === 'Ready';
-  const isServed = item.cookingStatus === 'Served' || item.status === 'PartialReturned';
   const isPending = item.status === 'CustomerPending';
-  const returnableQty = item.quantity - (item.returnedQuantity || 0);
-  
+
   const getStatusColor = (item) => {
     if (item.returnedQuantity === item.quantity && item.quantity > 0) return '#ef4444'; // red for fully returned
     switch (item.cookingStatus || 'Waiting') {
@@ -144,7 +140,7 @@ const OrderedItem = ({
         <div className="pos-cart-item-total" style={{alignSelf: 'flex-start'}}>{formatPrice(item.price * item.quantity)}</div>
       </div>
 
-      {(isReady || item.note || (isServed && returnableQty > 0) || isPending) && (
+      {(isReady || item.note || isPending) && (
         <div className="pos-cart-item-bottom" style={{ marginTop: '8px', justifyContent: 'space-between' }}>
           <div className="pos-cart-item-note-display" style={{ fontStyle: 'italic', color: '#6b7280', fontSize: '12px' }}>
             {item.note && `Ghi chú: ${item.note}`}
@@ -176,15 +172,6 @@ const OrderedItem = ({
                 Đã phục vụ
               </button>
             )}
-            {isServed && returnableQty > 0 && (
-              <button 
-                className="pos-action-btn pos-action-btn--return"
-                style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5' }}
-                onClick={() => onRequestReturn(item)}
-              >
-                Trả món
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -207,7 +194,6 @@ const OrderPanel = ({
   onPayment,
   onMarkAsServed,
   onMerge,
-  onRefresh, // Thêm prop này để refresh order sau khi trả món thành công
   loading,
   isWaiterMode,
   onConfirmItem,
@@ -215,7 +201,6 @@ const OrderPanel = ({
   onCancelOrder,
 }) => {
   const [activeTab, setActiveTab] = useState('cart'); // 'cart' | 'ordered'
-  const [returnItem, setReturnItem] = useState(null);
 
   const [editedQuantities, setEditedQuantities] = useState({});
   const [rejectingItem, setRejectingItem] = useState(null);
@@ -437,7 +422,6 @@ const OrderPanel = ({
                       key={item.orderDetailId}
                       item={item}
                       onMarkAsServed={onMarkAsServed}
-                      onRequestReturn={(i) => setReturnItem(i)}
                       onConfirmItem={onConfirmItem}
                       onRejectClick={(i) => setRejectingItem(i)}
                       getDisplayQuantity={getDisplayQuantity}
@@ -468,17 +452,6 @@ const OrderPanel = ({
           )}
         </div>
       )}
-
-      {/* Return Item Modal */}
-      <ReturnItemModal
-        visible={!!returnItem}
-        item={returnItem}
-        onCancel={() => setReturnItem(null)}
-        onSuccess={() => {
-          setReturnItem(null);
-          if (onRefresh) onRefresh();
-        }}
-      />
 
       <Modal
         title={rejectingItem ? `Từ chối món: ${rejectingItem.productName}` : 'Từ chối món'}
