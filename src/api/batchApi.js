@@ -80,3 +80,30 @@ export const getBatchExpirySummary = async (branchId, nearExpiryDays = 7) => {
   });
   return response.data;
 };
+
+/**
+ * Lấy cấu hình ngưỡng cảnh báo hạn sử dụng của chi nhánh
+ */
+export const getBatchAlertSettings = async (branchId) => {
+  const response = await axiosInstance.get('/api/BInventory/batches/alert-settings', {
+    params: { branchId: branchId || undefined }
+  });
+  return response.data;
+};
+
+/**
+ * Cập nhật cấu hình ngưỡng cảnh báo hạn sử dụng của chi nhánh
+ */
+export const updateBatchAlertSettings = async (data) => {
+  const response = await axiosInstance.put('/api/BInventory/batches/alert-settings', data);
+  return response.data;
+};
+
+/**
+ * Bật/Tắt chuông thông báo hạn sử dụng cho một Lô hàng cụ thể
+ */
+export const toggleBatchNotificationMute = async (batchId) => {
+  const response = await axiosInstance.put(`/api/BInventory/batches/${batchId}/toggle-mute`);
+  return response.data;
+};
+

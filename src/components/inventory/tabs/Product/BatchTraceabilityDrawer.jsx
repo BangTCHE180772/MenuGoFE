@@ -10,10 +10,12 @@ import {
   InboxOutlined,
   ReloadOutlined,
   DeleteOutlined,
-  RollbackOutlined
+  RollbackOutlined,
+  BellOutlined,
+  BellFilled
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getBatchTraceability } from '../../../../api/batchApi';
+import { getBatchTraceability, toggleBatchNotificationMute } from '../../../../api/batchApi';
 import { getImportById } from '../../../../api/documentApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
 import DisposalDocumentModal from '../ExportDelete/DisposalDocumentModal';
@@ -62,6 +64,34 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) =>
       setTraceData(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [togglingMute, setTogglingMute] = useState(false);
+
+  const handleToggleMuteNotification = async () => {
+    if (!currentBatch?.id || togglingMute) return;
+    setTogglingMute(true);
+    try {
+      const res = await toggleBatchNotificationMute(currentBatch.id);
+      showToast(res?.message || (res?.isNotificationMuted ? 'Đã tắt nhận thông báo cho Lô này.' : 'Đã bật nhận thông báo cho Lô này.'), 'success');
+      // Cập nhật state nội bộ ngay lập tức
+      setTraceData(prev => {
+        if (!prev || !prev.currentBatch) return prev;
+        return {
+          ...prev,
+          currentBatch: {
+            ...prev.currentBatch,
+            isNotificationMuted: res?.isNotificationMuted ?? !prev.currentBatch.isNotificationMuted
+          }
+        };
+      });
+      if (onActionSuccess) onActionSuccess();
+    } catch (err) {
+      console.error('Lỗi khi bật/tắt thông báo Lô:', err);
+      showToast(err.response?.data?.message || 'Không thể thay đổi trạng thái nhận thông báo của Lô.', 'error');
+    } finally {
+      setTogglingMute(false);
     }
   };
 
@@ -338,6 +368,45 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) =>
             >
               <ReloadOutlined /> Làm mới
             </button>
+
+            {/* NÚT CHUÔNG BẬT / TẮT THÔNG BÁO CHO RIÊNG LÔ NÀY */}
+            <button
+              type="button"
+              onClick={handleToggleMuteNotification}
+              disabled={togglingMute || !currentBatch}
+              title={
+                currentBatch?.isNotificationMuted
+                  ? 'Đã tắt nhận thông báo - Bấm để bật nhận thông báo cho Lô này'
+                  : 'Đang nhận thông báo - Bấm để tắt thông báo cho Lô này'
+              }
+              style={{
+                background: currentBatch?.isNotificationMuted ? '#f1f5f9' : '#fffbeb',
+                border: currentBatch?.isNotificationMuted ? '1px solid #cbd5e1' : '1px solid #fde68a',
+                borderRadius: 6,
+                padding: '6px 10px',
+                fontSize: 12,
+                color: currentBatch?.isNotificationMuted ? '#64748b' : '#d97706',
+                cursor: togglingMute ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontWeight: 600,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {currentBatch?.isNotificationMuted ? (
+                <>
+                  <BellOutlined style={{ fontSize: 13, color: '#94a3b8' }} />
+                  <span>Đã tắt chuông</span>
+                </>
+              ) : (
+                <>
+                  <BellFilled style={{ fontSize: 13, color: '#f59e0b' }} />
+                  <span>Đang bật chuông</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={onClose}
