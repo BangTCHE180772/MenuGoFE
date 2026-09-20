@@ -482,6 +482,7 @@ const ProductCatalogView = () => {
         onCancel={() => setIsFormModalOpen(false)}
         editingProduct={editingProduct}
         groups={groups}
+        units={units}
         menus={menus}
         products={products}
         onSuccess={fetchData}

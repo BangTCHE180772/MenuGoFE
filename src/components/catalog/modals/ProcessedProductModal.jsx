@@ -15,6 +15,7 @@ const ProcessedProductModal = ({
   onCancel,
   editingProduct = null,
   groups = [],
+  units = [],
   menus = [],
   products = [],
   onSuccess,
@@ -496,7 +497,8 @@ const ProcessedProductModal = ({
               recipe={formData.recipe}
               setRecipe={rec => setFormData({ ...formData, recipe: rec })}
               products={products}
-              units={[]}
+              units={units}
+              groups={groups}
               currentProductId={editingProduct?.id}
               allowedProductTypes={['Processed', 'Manufactured', 'Regular', 'Ingredient']}
               notifyError={notifyError}
