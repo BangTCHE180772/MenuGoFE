@@ -187,7 +187,12 @@ const CustomerChatPage = () => {
     setLoadingList(true);
     try {
       const res = await getCustomerConversations();
-      setConversations(res.data);
+      const currentActive = selectId || activeConvId;
+      setConversations(
+        (res.data || []).map((c) =>
+          c.id === currentActive ? { ...c, unreadCount: 0 } : c
+        )
+      );
       if (res.data.length > 0 && !activeConvId && !selectId) {
         handleSelectConversation(res.data[0].id);
       } else if (selectId) {
@@ -279,6 +284,9 @@ const CustomerChatPage = () => {
 
   const handleSelectConversation = (id, targetMessageId = null) => {
     setActiveConvId(id);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+    );
     fetchMessages(id, targetMessageId);
   };
 
@@ -611,6 +619,13 @@ const CustomerChatPage = () => {
                   {/* Messages Display Area */}
                   <Content
                     ref={messagesContainerRef}
+                    onClick={() => {
+                      if (activeConvId) {
+                        setConversations((prev) =>
+                          prev.map((c) => (c.id === activeConvId ? { ...c, unreadCount: 0 } : c))
+                        );
+                      }
+                    }}
                     style={{
                       padding: '20px 24px',
                       overflowY: 'auto',

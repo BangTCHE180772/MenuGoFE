@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, Button, Space, Modal, Form, Input, Select, 
-  InputNumber, DatePicker, message, Tag, Switch 
+import {
+  Table, Button, Space, Modal, Form, Input, Select,
+  InputNumber, DatePicker, message, Tag, Switch
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -9,10 +9,14 @@ import { getAllVouchers, deleteVoucher } from '../api/voucherApi';
 import { getAllBranches } from '../api/branchApi';
 import VoucherCreateModal from '../components/voucher/VoucherCreateModal';
 import VoucherEditModal from '../components/voucher/VoucherEditModal';
+import { useAuth, ROLES } from '../context/AuthContext';
 
 const { Option } = Select;
 
 const VoucherPage = () => {
+  const { hasRole } = useAuth();
+  const isOwnerOrAdmin = hasRole(ROLES.OWNER, ROLES.ADMIN);
+
   const [vouchers, setVouchers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +39,7 @@ const VoucherPage = () => {
   };
 
   const fetchBranches = async () => {
+    if (!isOwnerOrAdmin) return;
     try {
       const res = await getAllBranches();
       setBranches(res.data || res);
@@ -107,52 +112,60 @@ const VoucherPage = () => {
       title: 'Mã Voucher',
       dataIndex: 'code',
       key: 'code',
-      render: (text) => <strong>{text}</strong>
+      render: (text) => <strong style={{ fontSize: 14 }}>{text}</strong>
     },
     {
       title: 'Tên CTKM',
       dataIndex: 'name',
       key: 'name',
+      render: (text) => <span style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{text}</span>
     },
     {
       title: 'Giá trị giảm',
       key: 'discount',
-      render: (_, record) => {
-        if (record.discountType === 'Fixed') {
-          return `${record.discountValue.toLocaleString()} đ`;
-        }
-        return `${record.discountValue}% (Tối đa ${record.maxDiscount.toLocaleString()} đ)`;
-      }
+      render: (_, record) => (
+        <span style={{ fontSize: 14, color: '#475569' }}>
+          {record.discountType === 'Fixed'
+            ? `${record.discountValue.toLocaleString()} đ`
+            : `${record.discountValue}% (Tối đa ${record.maxDiscount.toLocaleString()} đ)`}
+        </span>
+      )
     },
     {
       title: 'Đơn tối thiểu',
       dataIndex: 'minOrderValue',
-      render: (val) => `${val.toLocaleString()} đ`
-    },
-    {
-      title: 'Chi nhánh',
-      dataIndex: 'branchName',
-      render: (val) => val || 'Toàn hệ thống'
+      render: (val) => <span style={{ fontSize: 14, color: '#475569' }}>{val.toLocaleString()} đ</span>
     },
     {
       title: 'Thời gian',
       key: 'time',
       render: (_, record) => (
-        <span style={{fontSize: 12}}>
+        <span style={{ fontSize: 13, color: '#64748b' }}>
           {dayjs(record.startDate).format('DD/MM/YYYY')} - {dayjs(record.endDate).format('DD/MM/YYYY')}
         </span>
       )
     },
     {
-      title: 'SL',
-      key: 'quantity',
+      title: 'Giới hạn dùng',
+      key: 'usage',
       render: (_, record) => (
         <div>
-          <div>{record.usedCount} / {record.quantity}</div>
-          <div style={{ fontSize: 11, color: '#64748b' }}>
+          <div style={{ fontSize: 14, color: '#475569' }}>{record.usedCount} / {record.quantity}</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>
             {record.maxUsagePerCustomer ? `(Tối đa ${record.maxUsagePerCustomer}/khách)` : '(Không giới hạn/khách)'}
           </div>
         </div>
+      )
+    },
+    {
+      title: 'Áp dụng tại',
+      key: 'branch',
+      render: (_, record) => (
+        record.branchId ? (
+          <Tag color="blue" style={{ fontSize: 13 }}>{record.branchName}</Tag>
+        ) : (
+          <Tag color="blue" style={{ fontSize: 13 }}>Toàn hệ thống</Tag>
+        )
       )
     },
     {
@@ -171,7 +184,7 @@ const VoucherPage = () => {
           'Disabled': 'Đã khóa',
           'Expired': 'Đã kết thúc'
         };
-        return <Tag color={colors[record.status]}>{labels[record.status]}</Tag>;
+        return <Tag color={colors[record.status]} style={{ fontSize: 13 }}>{labels[record.status]}</Tag>;
       }
     },
     {
@@ -179,6 +192,9 @@ const VoucherPage = () => {
       key: 'action',
       render: (_, record) => {
         if (record.status === 'Expired') return <span style={{ fontSize: 12, color: '#94a3b8' }}>-</span>;
+        const canEditDelete = isOwnerOrAdmin || record.branchId != null;
+        if (!canEditDelete) return <span style={{ fontSize: 12, color: '#94a3b8' }}>-</span>;
+
         return (
           <Space size="middle">
             <Button icon={<EditOutlined />} onClick={() => showModal(record)} />
@@ -190,9 +206,8 @@ const VoucherPage = () => {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2>Quản lý Voucher</h2>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
           Tạo Voucher mới
         </Button>
@@ -208,24 +223,28 @@ const VoucherPage = () => {
           <Option value="Expired">Đã kết thúc</Option>
         </Select>
 
-        <span>Chi nhánh:</span>
-        <Select value={filterBranch} onChange={setFilterBranch} style={{ width: 200 }}>
-          <Option value="All">Tất cả chi nhánh</Option>
-          {branches.map(b => (
-            <Option key={b.id} value={b.id}>{b.name}</Option>
-          ))}
-        </Select>
+        {isOwnerOrAdmin && branches.length > 0 && (
+          <>
+            <span>Chi nhánh:</span>
+            <Select value={filterBranch} onChange={setFilterBranch} style={{ width: 200 }}>
+              <Option value="All">Tất cả chi nhánh</Option>
+              {branches.map(b => (
+                <Option key={b.id} value={b.id}>{b.name}</Option>
+              ))}
+            </Select>
+          </>
+        )}
       </Space>
 
-      <Table 
-        columns={columns} 
-        dataSource={processedVouchers} 
-        rowKey="id" 
+      <Table
+        columns={columns}
+        dataSource={processedVouchers}
+        rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
 
-      <VoucherCreateModal 
+      <VoucherCreateModal
         visible={isCreateModalVisible}
         onClose={() => setIsCreateModalVisible(false)}
         onSuccess={fetchVouchers}

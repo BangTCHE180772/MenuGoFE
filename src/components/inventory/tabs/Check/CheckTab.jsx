@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import CheckTable from './CheckTable';
 import CheckDocumentModal from './CheckDocumentModal';
 import { getCheckDocuments } from '../../../../api/documentApi';
+import { removeVietnameseTones } from '../../../../utils/stringHelper';
 
 const CheckTab = ({
   documents = [],
@@ -81,10 +82,22 @@ const CheckTab = ({
       }
       if (searchText) {
         const lower = searchText.toLowerCase().trim();
-        const matchCode = doc.code?.toLowerCase().includes(lower);
-        const matchCreator = (doc.createdByName || doc.creatorName || doc.creator || doc.snapshotCreatedByName || '').toLowerCase().includes(lower);
-        const matchNote = doc.note?.toLowerCase().includes(lower);
-        if (!matchCode && !matchCreator && !matchNote) return false;
+        const norm = removeVietnameseTones(searchText).trim();
+
+        const codeRaw = (doc.code || '').toLowerCase();
+        const creatorRaw = (doc.createdByName || doc.currentCreatedByName || doc.snapshotCreatedByName || doc.creatorName || doc.creator || '').toLowerCase();
+        const creatorNorm = removeVietnameseTones(doc.createdByName || doc.currentCreatedByName || doc.snapshotCreatedByName || doc.creatorName || doc.creator || '');
+        const noteRaw = (doc.note || '').toLowerCase();
+        const noteNorm = removeVietnameseTones(doc.note || '');
+        const branchRaw = (doc.branchName || doc.snapshotBranchName || '').toLowerCase();
+        const branchNorm = removeVietnameseTones(doc.branchName || doc.snapshotBranchName || '');
+
+        const matchCode = codeRaw.includes(lower);
+        const matchCreator = creatorRaw.includes(lower) || creatorNorm.includes(norm);
+        const matchNote = noteRaw.includes(lower) || noteNorm.includes(norm);
+        const matchBranch = branchRaw.includes(lower) || branchNorm.includes(norm);
+
+        if (!matchCode && !matchCreator && !matchNote && !matchBranch) return false;
       }
       return true;
     });

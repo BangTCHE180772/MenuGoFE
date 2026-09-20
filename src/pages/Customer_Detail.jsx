@@ -16,6 +16,7 @@ import {
 import { message } from 'antd';
 import { getCustomerById, getCustomerPurchases, getCustomerPoints } from '../api/customerManagementApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Customer_Detail = () => {
   const { id } = useParams();
@@ -69,8 +70,20 @@ const Customer_Detail = () => {
   const totalSpent = purchases.reduce((sum, o) => sum + Number(o.finalAmount ?? o.totalAmount ?? o.total ?? 0), 0);
   const points = Number(customer?.point ?? customer?.points ?? 0);
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const custClean = (customer?.name || 'KhachHang').replace(/[^a-zA-Z0-9À-ỹ]/g, '_');
+    document.title = `MenuGO_HoSoKhachHang_${customer?.phone || id}_${custClean}`;
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 2000);
+    }, 100);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -102,7 +115,7 @@ const Customer_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -119,7 +132,7 @@ const Customer_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: THÔNG TIN KHÁCH HÀNG */}
@@ -220,9 +233,9 @@ const Customer_Detail = () => {
           </div>
 
           {activeTab === 'orders' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '450px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã hóa đơn</th>
                     <th style={{ padding: '10px 12px' }}>Ngày giao dịch</th>
@@ -258,41 +271,58 @@ const Customer_Detail = () => {
                               {invoiceCode}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 12px', color: '#475569' }}>
-                            {p.createdAt || p.orderDate ? dayjs(p.createdAt || p.orderDate).format('DD/MM/YYYY HH:mm') : '---'}
+                          <td style={{ padding: '10px 12px', color: '#334155' }}>
+                            {p.orderDate || p.createdAt ? dayjs(p.orderDate || p.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
                           </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>
-                            {Number(p.totalAmount ?? p.total ?? 0).toLocaleString('vi-VN')} đ
+                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>
+                            {Math.round(Number(p.totalAmount ?? p.total ?? 0)).toLocaleString('vi-VN')} đ
                           </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>
-                            +{Number(p.pointsEarned ?? 0).toLocaleString('vi-VN')}
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
+                            +{Number(p.earnedPoints ?? p.pointsEarned ?? 0).toLocaleString('vi-VN')}
                           </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: (p.pointsUsed ?? 0) > 0 ? '#dc2626' : '#64748b', fontWeight: 700 }}>
-                            {(p.pointsUsed ?? 0) > 0 ? `-${Number(p.pointsUsed).toLocaleString('vi-VN')}` : '0'}
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
+                            {Number(p.usedPoints ?? p.pointsUsed ?? 0) > 0 ? `-${Number(p.usedPoints ?? p.pointsUsed ?? 0).toLocaleString('vi-VN')}` : '0'}
                           </td>
                           <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                            {Number(p.finalAmount ?? p.totalAmount ?? 0).toLocaleString('vi-VN')} đ
+                            {Math.round(Number(p.finalAmount ?? p.totalAmount ?? p.total ?? 0)).toLocaleString('vi-VN')} đ
                           </td>
                         </tr>
                       );
                     })
                   )}
+                  <tr style={{ background: '#f8fafc', fontWeight: 700, borderTop: '2px solid #cbd5e1' }}>
+                    <td colSpan={2} style={{ padding: '12px 14px', textAlign: 'right', color: '#1e293b', fontSize: 12 }}>
+                      TỔNG CỘNG ({purchases.length} ĐƠN HÀNG):
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#64748b' }}>
+                      {Math.round(purchases.reduce((s, o) => s + Number(o.totalAmount ?? o.total ?? 0), 0)).toLocaleString('vi-VN')} đ
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#059669' }}>
+                      +{purchases.reduce((s, o) => s + Number(o.earnedPoints ?? o.pointsEarned ?? 0), 0).toLocaleString('vi-VN')}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#dc2626' }}>
+                      -{purchases.reduce((s, o) => s + Number(o.usedPoints ?? o.pointsUsed ?? 0), 0).toLocaleString('vi-VN')}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: 13.5, fontWeight: 900, color: '#059669' }}>
+                      {Math.round(totalSpent).toLocaleString('vi-VN')} đ
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           )}
 
           {activeTab === 'points' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '450px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
-                    <th style={{ padding: '10px 12px' }}>Mã hóa đơn / Nguồn</th>
+                    <th style={{ padding: '10px 12px' }}>Mã tham chiếu</th>
                     <th style={{ padding: '10px 12px' }}>Thời gian</th>
-                    <th style={{ padding: '10px 12px' }}>Loại giao dịch</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Thay đổi điểm</th>
+                    <th style={{ padding: '10px 12px' }}>Loại biến động</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Biến động</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>Điểm sau GD</th>
-                    <th style={{ padding: '10px 12px' }}>Lý do</th>
+                    <th style={{ padding: '10px 12px' }}>Lý do / Nội dung</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
                   </tr>
                 </thead>
@@ -341,12 +371,14 @@ const Customer_Detail = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '10px 12px', color: '#475569' }}>
-                            {pt.time || pt.createdAt ? dayjs(pt.time || pt.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
+                          <td style={{ padding: '10px 12px', color: '#334155' }}>
+                            {pt.createdAt || pt.transactionDate ? dayjs(pt.createdAt || pt.transactionDate).format('DD/MM/YYYY HH:mm') : '---'}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
                             <span
                               style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
                                 padding: '2px 8px',
                                 borderRadius: 4,
                                 fontSize: 10.5,
@@ -408,6 +440,126 @@ const Customer_Detail = () => {
           )}
         </div>
       </div>
+
+      {/* KHUNG IN HỒ SƠ KHÁCH HÀNG CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="HỒ SƠ KHÁCH HÀNG & LỊCH SỬ GIAO DỊCH"
+        subTitle={`Khách hàng: ${customer?.name || '---'} | SĐT: ${customer?.phone || '---'} | In lúc: ${dayjs().format('DD/MM/YYYY HH:mm')}`}
+        docCode={customer?.phone || String(id)}
+        branchName={localStorage.getItem('currentBranchName')}
+        metaItems={[
+          { label: 'Họ và tên khách hàng', value: customer?.name || '---' },
+          { label: 'Số điện thoại liên hệ', value: customer?.phone || '---' },
+          { label: 'Email cá nhân', value: customer?.email || 'Chưa cập nhật' },
+          { label: 'Địa chỉ liên hệ', value: customer?.address || 'Chưa cập nhật' },
+          { label: 'Điểm thưởng tích lũy', value: `${points.toLocaleString('vi-VN')} điểm` },
+          { label: 'Giá trị quy đổi điểm', value: `${(points * 1000).toLocaleString('vi-VN')} đ` },
+          { label: 'Tổng số đơn đã mua', value: `${purchases.length} hóa đơn` },
+          { label: 'Tổng chi tiêu tích lũy', value: `${Math.round(totalSpent).toLocaleString('vi-VN')} đ` }
+        ]}
+        signatures={[
+          { title: 'Nhân viên tra cứu', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Kế toán đối soát', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Quản lý duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">I. LỊCH SỬ MUA HÀNG VÀ HÓA ĐƠN ({purchases.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '110px' }}>Mã hóa đơn</th>
+              <th style={{ width: '130px' }}>Ngày giao dịch</th>
+              <th style={{ width: '110px' }}>Tổng tiền (đ)</th>
+              <th style={{ width: '80px' }}>Điểm cộng</th>
+              <th style={{ width: '80px' }}>Điểm dùng</th>
+              <th style={{ width: '120px' }}>Thực thanh toán (đ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {purchases.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="print-text-center">Chưa có phát sinh đơn hàng nào</td>
+              </tr>
+            ) : (
+              purchases.map((p, idx) => {
+                const invoiceCode = formatInvoiceCode(p.invoiceCode, p.orderId) || (p.orderId ? `HD${p.orderId}` : `#${p.id}`);
+                const finalAmt = Math.round(Number(p.finalAmount ?? p.totalAmount ?? p.total ?? 0));
+                const totalAmt = Math.round(Number(p.totalAmount ?? p.total ?? 0));
+                const earned = Number(p.earnedPoints ?? p.pointsEarned ?? 0);
+                const used = Number(p.usedPoints ?? p.pointsUsed ?? 0);
+
+                return (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{invoiceCode}</td>
+                    <td className="print-text-center">{p.orderDate || p.createdAt ? dayjs(p.orderDate || p.createdAt).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                    <td className="print-text-right">{totalAmt.toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold" style={{ color: '#059669' }}>+{earned.toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold" style={{ color: '#dc2626' }}>{used > 0 ? `-${used.toLocaleString('vi-VN')}` : '0'}</td>
+                    <td className="print-text-right print-font-bold">{finalAmt.toLocaleString('vi-VN')}</td>
+                  </tr>
+                );
+              })
+            )}
+            <tr className="print-total-row">
+              <td colSpan={3} className="print-text-right print-font-bold">TỔNG CỘNG TÍCH LŨY:</td>
+              <td className="print-text-right print-font-bold">
+                {Math.round(purchases.reduce((s, o) => s + Number(o.totalAmount ?? o.total ?? 0), 0)).toLocaleString('vi-VN')}
+              </td>
+              <td className="print-text-right print-font-bold" style={{ color: '#059669' }}>
+                +{purchases.reduce((s, o) => s + Number(o.earnedPoints ?? o.pointsEarned ?? 0), 0).toLocaleString('vi-VN')}
+              </td>
+              <td className="print-text-right print-font-bold" style={{ color: '#dc2626' }}>
+                -{purchases.reduce((s, o) => s + Number(o.usedPoints ?? o.pointsUsed ?? 0), 0).toLocaleString('vi-VN')}
+              </td>
+              <td className="print-text-right print-font-bold">
+                {Math.round(totalSpent).toLocaleString('vi-VN')}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {pointsHistory.length > 0 && (
+          <>
+            <div className="print-section-heading">II. LỊCH SỬ BIẾN ĐỘNG ĐIỂM THÀNH VIÊN ({pointsHistory.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th style={{ width: '120px' }}>Mã tham chiếu</th>
+                  <th style={{ width: '130px' }}>Thời gian</th>
+                  <th style={{ width: '120px' }}>Loại biến động</th>
+                  <th style={{ width: '90px' }}>Biến động</th>
+                  <th style={{ width: '90px' }}>Điểm sau GD</th>
+                  <th>Nội dung / Lý do</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pointsHistory.map((pt, idx) => {
+                  const formattedCode = formatInvoiceCode(pt.relatedCode, pt.orderId) || pt.relatedCode || '---';
+                  const pChange = Number(pt.pointChange ?? pt.pointDelta ?? pt.points ?? 0);
+                  return (
+                    <tr key={idx}>
+                      <td className="print-text-center">{idx + 1}</td>
+                      <td className="print-font-bold">{formattedCode}</td>
+                      <td className="print-text-center">{pt.createdAt || pt.transactionDate ? dayjs(pt.createdAt || pt.transactionDate).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                      <td>{pt.type || (pChange > 0 ? 'Tích điểm' : 'Sử dụng điểm')}</td>
+                      <td className="print-text-right print-font-bold" style={{ color: pChange > 0 ? '#059669' : '#dc2626' }}>
+                        {pChange > 0 ? `+${pChange.toLocaleString('vi-VN')}` : pChange.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="print-text-right print-font-bold">
+                        {pt.pointAfter != null ? Number(pt.pointAfter).toLocaleString('vi-VN') : '---'}
+                      </td>
+                      <td>{pt.reason || pt.note || '---'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
     </div>
   );
 };

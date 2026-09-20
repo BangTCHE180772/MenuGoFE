@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Dropdown, Avatar, message, Select, Tooltip, Button } from "antd";
+import { Dropdown, Avatar, message, Select, Tooltip, Button, Badge } from "antd";
 import NotificationBell from './NotificationBell';
+import { useSignalR } from "../context/SignalRContext";
+import axiosInstance from "../api/axiosInstance";
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -83,8 +85,8 @@ const ROLE_MENUS = {
     { label: "Phục vụ", path: "/waiter-session", icon: <UserOutlined /> },
     { label: "Đặt bàn", path: "/reservations", icon: <BookOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
     { label: "Danh mục sản phẩm", path: "/product-catalog", icon: <AppstoreOutlined /> },
@@ -106,8 +108,8 @@ const ROLE_MENUS = {
   [ROLES.OWNER]: [
     { label: "Tổng quan", path: "/home", icon: <HomeOutlined /> },
     { label: "Báo cáo chuyên sâu", path: "/reports/revenue", icon: <BarChartOutlined />, children: REPORTS_SUB_MENU },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
     { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Chuỗi", path: "/chains", icon: <ShopOutlined /> },
     { label: "Chi nhánh", path: "/branches", icon: <ApartmentOutlined /> },
@@ -136,8 +138,8 @@ const ROLE_MENUS = {
     { label: "Phiên Phục vụ", path: "/waiter-session", icon: <RocketOutlined /> },
     { label: "Phiên Bếp", path: "/kitchen-session", icon: <FireOutlined /> },
     { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
-    { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
-    { label: "Khuyến mãi", path: "/vouchers", icon: <GiftOutlined /> },
+    // { label: "Thiết bị", path: "/device-management", icon: <DesktopOutlined /> },
+    { label: "Khuyến mãi", path: "/promotions", icon: <GiftOutlined /> },
     { label: "Quản lý kho", path: "/inventory-management", icon: <InboxOutlined />, children: INVENTORY_SUB_MENU },
     { label: "Sổ thu chi", path: "/cashflow", icon: <WalletOutlined /> },
     { label: "Thực đơn", path: "/menu-management", icon: <BookOutlined /> },
@@ -158,6 +160,7 @@ const ROLE_MENUS = {
   ],
   [ROLES.CASHIER]: [
     { label: "Phiên Thu Ngân", path: "/cashier-session", icon: <DollarOutlined /> },
+    { label: "Trò chuyện khách", path: "/chat", icon: <MessageOutlined /> },
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Hợp đồng của tôi", path: "/my-contract", icon: <FileProtectOutlined /> },
     { label: "Bảng lương của tôi", path: "/my-payroll", icon: <DollarOutlined /> },
@@ -204,6 +207,63 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
     "Quản lý kho": true,
     "Báo cáo chuyên sâu": true,
   });
+
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const connection = useSignalR();
+
+  const fetchChatUnreadCount = useCallback(async () => {
+    if (!currentBranchId) {
+      setChatUnreadCount(0);
+      return;
+    }
+    try {
+      const res = await axiosInstance.get('/api/BranchChat/conversations', {
+        params: { branchId: currentBranchId },
+      });
+      if (Array.isArray(res.data)) {
+        const total = res.data.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch (err) {
+      console.warn('Không thể tải số tin nhắn chưa đọc:', err);
+    }
+  }, [currentBranchId]);
+
+  useEffect(() => {
+    fetchChatUnreadCount();
+  }, [currentBranchId, fetchChatUnreadCount]);
+
+  useEffect(() => {
+    const handleCustomUpdate = (e) => {
+      if (typeof e.detail === "number") {
+        setChatUnreadCount(e.detail);
+      } else {
+        fetchChatUnreadCount();
+      }
+    };
+    window.addEventListener("chat-unread-updated", handleCustomUpdate);
+    return () => {
+      window.removeEventListener("chat-unread-updated", handleCustomUpdate);
+    };
+  }, [fetchChatUnreadCount]);
+
+  useEffect(() => {
+    if (connection && currentBranchId) {
+      connection.invoke("JoinBranchGroup", currentBranchId).catch(() => {});
+
+      const handleSignalRUpdate = () => {
+        fetchChatUnreadCount();
+      };
+
+      connection.on("ReceiveNewMessage", handleSignalRUpdate);
+      connection.on("ReceiveNewConversation", handleSignalRUpdate);
+
+      return () => {
+        connection.off("ReceiveNewMessage", handleSignalRUpdate);
+        connection.off("ReceiveNewConversation", handleSignalRUpdate);
+      };
+    }
+  }, [connection, currentBranchId, fetchChatUnreadCount]);
 
   const toggleSubMenu = (label) => {
     setOpenSubMenus((prev) => ({
@@ -325,14 +385,14 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
           const hasChildren = item.children && item.children.length > 0;
           const isParentActive = hasChildren
             ? item.children.some((child) => {
-                const childBasePath = child.path.split("?")[0];
-                if (child.tabKey) {
-                  return location.pathname === childBasePath && activeTabParam === child.tabKey;
-                }
-                return location.pathname === childBasePath;
-              })
+              const childBasePath = child.path.split("?")[0];
+              if (child.tabKey) {
+                return location.pathname === childBasePath && activeTabParam === child.tabKey;
+              }
+              return location.pathname === childBasePath;
+            })
             : location.pathname === item.path ||
-              (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
+            (item.path !== "/home" && location.pathname.startsWith(item.path + "/"));
 
           const isSubOpen = openSubMenus[item.label] ?? true;
 
@@ -408,6 +468,9 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
           }
 
           // ── Standard Single Menu Item ──────────────────────────────────────
+          const isChatItem = item.path === "/chat";
+          const showBadge = isChatItem && chatUnreadCount > 0;
+
           const navLinkContent = (
             <Link
               key={idx}
@@ -415,14 +478,50 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
               state={{ from: location }}
               className={`sidebar-nav-item ${isParentActive ? "active" : ""}`}
             >
-              <span className="sidebar-nav-icon">{item.icon}</span>
-              {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
+              <span className="sidebar-nav-icon">
+                {showBadge && collapsed ? (
+                  <Badge count={chatUnreadCount} overflowCount={99} size="small" offset={[2, -2]}>
+                    {item.icon}
+                  </Badge>
+                ) : (
+                  item.icon
+                )}
+              </span>
+              {!collapsed && (
+                <span
+                  className="sidebar-nav-label"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </span>
+                  {showBadge && (
+                    <Badge
+                      count={chatUnreadCount}
+                      overflowCount={99}
+                      style={{
+                        backgroundColor: "#ef4444",
+                        boxShadow: "0 0 0 1px #fff",
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    />
+                  )}
+                </span>
+              )}
             </Link>
           );
 
           if (collapsed) {
+            const tooltipTitle = showBadge ? `${item.label} (${chatUnreadCount} tin chưa đọc)` : item.label;
             return (
-              <Tooltip key={idx} title={item.label} placement="right">
+              <Tooltip key={idx} title={tooltipTitle} placement="right">
                 {navLinkContent}
               </Tooltip>
             );
@@ -449,7 +548,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
             </div>
           </Dropdown>
         )}
-        
+
         <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: '4px' }}>
           {!collapsed && (
             <Tooltip title="Đăng xuất" placement="top">
@@ -464,7 +563,7 @@ const SideBar = ({ collapsed, onToggleCollapse }) => {
             </Tooltip>
           )}
         </div>
-        
+
         {/* If collapsed, still show avatar that can click to dropdown */}
         {collapsed && (
           <div style={{ marginTop: '12px' }}>

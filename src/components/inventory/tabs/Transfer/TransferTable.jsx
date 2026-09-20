@@ -310,7 +310,7 @@ const TransferTable = ({
                             type="button"
                             onClick={() => {
                               if (window.confirm(`Bạn có chắc chắn muốn ${isDraft ? 'hủy phiếu nháp' : 'xóa chứng từ'} chuyển hàng này?`)) {
-                                handleDeleteDocument(doc.id, doc.type || 2);
+                                handleDeleteDocument(doc.id, doc.type || 5, doc.status);
                               }
                             }}
                             style={{ background: 'transparent', color: '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}
@@ -497,7 +497,7 @@ const TransferTable = ({
                                       type="button"
                                       onClick={() => {
                                         if (window.confirm('Bạn có chắc chắn muốn xóa phiếu chuyển hàng nháp này?')) {
-                                          handleDeleteDocument(doc.id, doc.type || 2);
+                                          handleDeleteDocument(doc.id, doc.type || 5, doc.status);
                                         }
                                       }}
                                       style={{

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Modal, Table, Typography, Button, message, Divider, Input, Checkbox, Row, Col, Radio, QRCode, Select } from 'antd';
 import { PrinterOutlined } from '@ant-design/icons';
-import { payOrder } from '../../api/orderApi';
+import { payOrder, getOrderById } from '../../api/orderApi';
 import { createPaymentLink, checkPaymentStatus } from '../../api/paymentApi';
 import { checkVoucher, getAllVouchers } from '../../api/voucherApi';
 import { configApi } from '../../api/configApi';
@@ -59,15 +59,38 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
         }
       };
 
+      const fetchOrderValidation = async () => {
+        if (!orderId) return;
+        try {
+          const res = await getOrderById(orderId);
+          if (res.data && res.data.status === 'Paid') {
+            message.success('Bàn này đã được thanh toán xong!');
+            if (onCancel) onCancel();
+            if (onSuccess) onSuccess();
+          }
+        } catch (error) {
+          if (error?.response?.status === 404) {
+            message.warning('Bàn này đã được thanh toán xong hoặc không còn đơn hàng! Hệ thống sẽ làm mới.');
+            if (onCancel) onCancel();
+            if (onSuccess) onSuccess();
+          }
+        }
+      };
+
       fetchVouchers();
       fetchConfig();
+      fetchOrderValidation();
     }
-  }, [visible]);
+  }, [visible, orderId]);
 
   useEffect(() => {
     if (connection && visible && paymentMethod === 'PayOS') {
       const handleNotification = (data) => {
-        if ((data && data.type === 'PaymentWebhook') || data?.Type === 'PaymentWebhook') {
+        if (!data) return;
+        const isWebhook = data.type === 'PaymentWebhook' || data.Type === 'PaymentWebhook';
+        const eventOrderId = data.orderId || data.OrderId;
+
+        if (isWebhook && Number(eventOrderId) === Number(orderId)) {
           message.success(data.message || data.Message || 'Thanh toán thành công qua PayOS!');
           if (onSuccess) onSuccess();
         }
@@ -75,7 +98,12 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
       connection.on('ReceiveNotification', handleNotification);
       return () => connection.off('ReceiveNotification', handleNotification);
     }
-  }, [connection, visible, paymentMethod, onSuccess]);
+  }, [connection, visible, paymentMethod, onSuccess, orderId]);
+
+  useEffect(() => {
+    // Xóa mã QR cũ nếu người dùng thay đổi giảm giá hoặc đổi phương thức thanh toán
+    setQrCodeData(null);
+  }, [appliedVoucher, usePoints, paymentMethod, customerData]);
 
   const handleSelectCustomer = (customer) => {
     setCustomerName(customer.name);
@@ -137,7 +165,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     }
     try {
       setLoading(true);
-      const res = await checkVoucher(code, branchId || 0, baseTotal);
+      const res = await checkVoucher(code, branchId || 0, baseTotal, customerData?.id);
       setAppliedVoucher({
         discountAmount: res.discountAmount,
         message: res.message,
@@ -155,7 +183,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     if (!voucherCode) return;
     try {
       setLoading(true);
-      const res = await checkVoucher(voucherCode, branchId || 0, baseTotal);
+      const res = await checkVoucher(voucherCode, branchId || 0, baseTotal, customerData?.id);
       setAppliedVoucher({
         discountAmount: res.discountAmount,
         message: res.message,
@@ -220,7 +248,7 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
         if (onSuccess) onSuccess();
       } else {
         // PayOS
-        const data = await createPaymentLink(orderId);
+        const data = await createPaymentLink(orderId, payload);
         if (data && data.qrCode) {
           setQrCodeData(data.qrCode);
           message.success('Đã tạo mã QR PayOS. Vui lòng đưa khách quét mã!');
@@ -229,7 +257,13 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
         }
       }
     } catch (error) {
-      message.error(error?.response?.data?.message || 'Có lỗi xảy ra khi thanh toán!');
+      if (error?.response?.status === 404) {
+        message.warning('Bàn này đã được thanh toán xong hoặc không còn đơn hàng! Hệ thống sẽ làm mới.');
+        if (onCancel) onCancel();
+        if (onSuccess) onSuccess();
+      } else {
+        message.error(error?.response?.data?.message || 'Có lỗi xảy ra khi thanh toán!');
+      }
     } finally {
       setLoading(false);
       isPayingRef.current = false;
@@ -303,6 +337,18 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
     printWindow.print();
   };
 
+  const handleCancel = () => {
+    Modal.confirm({
+      title: 'Xác nhận đóng',
+      content: 'Bạn có chắc chắn muốn thoát khỏi màn hình thanh toán không?',
+      okText: 'Có, thoát',
+      cancelText: 'Không',
+      onOk: () => {
+        if (onCancel) onCancel();
+      },
+    });
+  };
+
   const columns = [
     {
       title: 'Tên món',
@@ -340,12 +386,13 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
         </Title>
       }
       open={visible}
-      onCancel={onCancel}
+      onCancel={handleCancel}
+      maskClosable={false}
       footer={[
         <Button key="print" icon={<PrinterOutlined />} onClick={handlePrintPreBill} style={{ float: 'left' }}>
           In Phiếu Tạm Tính
         </Button>,
-        <Button key="back" onClick={onCancel} disabled={loading}>
+        <Button key="back" onClick={handleCancel} disabled={loading}>
           Hủy
         </Button>,
         <Button
@@ -497,8 +544,8 @@ const PaymentModal = ({ visible, orderId, tableName, items, branchId, onCancel, 
             </Text>
             {customerData.point > 0 && (
               <div style={{ marginTop: 4 }}>
-                <Checkbox 
-                  checked={usePoints} 
+                <Checkbox
+                  checked={usePoints}
                   onChange={(e) => setUsePoints(e.target.checked)}
                   disabled={customerData.point < pointConfig.minPointsToUse}
                 >

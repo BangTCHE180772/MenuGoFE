@@ -112,21 +112,23 @@ const CustomerMenuCard = ({ product, onViewDetail, onConsult }) => {
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <Button
-                type="text"
+                type="primary"
+                ghost
                 size="small"
                 icon={<MessageOutlined style={{ color: '#ea580c' }} />}
-                onClick={() => setConsultModalOpen(true)}
-                style={{ color: '#ea580c', fontWeight: 600, fontSize: 12 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConsultModalOpen(true);
+                }}
+                style={{
+                  color: '#ea580c',
+                  borderColor: '#ea580c',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  borderRadius: 6
+                }}
               >
                 Tư vấn
-              </Button>
-              <Button
-                type="link"
-                icon={<EyeOutlined />}
-                onClick={() => onViewDetail(product)}
-                className="btn-link-detail"
-              >
-                Xem
               </Button>
             </div>
           </div>

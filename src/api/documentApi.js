@@ -63,8 +63,10 @@ export const updateImportDocument = async (id, dto, branchId) => {
   return response.data;
 };
 
-export const deleteImportDocument = async (id) => {
-  const response = await axiosInstance.delete(`/api/Document/import/${id}`);
+export const deleteImportDocument = async (id, deleteNote = 'Hủy phiếu nhập kho') => {
+  const response = await axiosInstance.delete(`/api/ImportDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
   return response.data;
 };
 
@@ -121,8 +123,10 @@ export const deleteExportDeletePendingDocument = async (id, deleteNote = 'Hủy 
   return response.data;
 };
 
-export const deleteExportDeleteDocument = async (id) => {
-  const response = await axiosInstance.delete(`/api/Document/export-delete/${id}`);
+export const deleteExportDeleteDocument = async (id, deleteNote = 'Hủy phiếu xuất hủy') => {
+  const response = await axiosInstance.delete(`/api/ExportDeleteDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
   return response.data;
 };
 
@@ -295,8 +299,10 @@ export const deleteCheckPendingDocument = async (id, deleteNote = 'Hủy phiếu
   return response.data;
 };
 
-export const deleteCheckDocument = async (id) => {
-  const response = await axiosInstance.delete(`/api/Document/check/${id}`);
+export const deleteCheckDocument = async (id, deleteNote = 'Hủy phiếu kiểm kho') => {
+  const response = await axiosInstance.delete(`/api/CheckDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
   return response.data;
 };
 
@@ -347,8 +353,10 @@ export const deleteProductionPendingDocument = async (id, deleteNote = 'Hủy ph
   return response.data;
 };
 
-export const deleteProductionDocument = async (id) => {
-  const response = await axiosInstance.delete(`/api/Document/production/${id}`);
+export const deleteProductionDocument = async (id, deleteNote = 'Hủy phiếu sản xuất') => {
+  const response = await axiosInstance.delete(`/api/ProductionDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
   return response.data;
 };
 
@@ -388,6 +396,13 @@ export const completeCostAdjustmentDocument = async (id) => {
 };
 
 export const deleteCostAdjustmentPendingDocument = async (id, deleteNote = 'Hủy phiếu điều chỉnh giá vốn nháp') => {
+  const response = await axiosInstance.delete(`/api/CostAdjustmentDocument/${id}/soft-delete`, {
+    params: { deleteNote }
+  });
+  return response.data;
+};
+
+export const deleteCostAdjustmentDocument = async (id, deleteNote = 'Hủy phiếu điều chỉnh giá vốn') => {
   const response = await axiosInstance.delete(`/api/CostAdjustmentDocument/${id}/soft-delete`, {
     params: { deleteNote }
   });

@@ -132,9 +132,9 @@ const CashierPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <Title level={3} style={{ margin: 0 }}>Quầy Thu Ngân</Title>
         <Space size="middle">
-          <Tag icon={<SafetyCertificateOutlined />} color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
+          {/* <Tag icon={<SafetyCertificateOutlined />} color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
             Thiết bị đã xác thực
-          </Tag>
+          </Tag> */}
           <Button icon={<ReloadOutlined />} onClick={() => {
             fetchData(true);
             setRefreshKey(prev => prev + 1);

@@ -8,6 +8,7 @@ const { Text } = Typography;
 
 const InternalPickupModal = ({ visible, onClose, branchId }) => {
   const [loading, setLoading] = useState(false);
+  const [confirmingId, setConfirmingId] = useState(null);
   const [internalItems, setInternalItems] = useState([]);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ const InternalPickupModal = ({ visible, onClose, branchId }) => {
   };
 
   const handleConfirmPickup = async (orderDetailId) => {
+    setConfirmingId(orderDetailId);
     try {
       await updateCookingStatus(orderDetailId, 'Served');
       message.success('Đã xác nhận lấy đồ!');
@@ -50,6 +52,8 @@ const InternalPickupModal = ({ visible, onClose, branchId }) => {
     } catch (error) {
       console.error(error);
       message.error('Lỗi khi xác nhận lấy đồ');
+    } finally {
+      setConfirmingId(null);
     }
   };
 
@@ -67,6 +71,7 @@ const InternalPickupModal = ({ visible, onClose, branchId }) => {
       title="Nhận đồ nội bộ (Sốt, nước chấm, đồ dùng...)"
       open={visible}
       onCancel={onClose}
+      maskClosable={false}
       footer={[
         <Button key="close" onClick={onClose}>Đóng</Button>
       ]}
@@ -89,13 +94,21 @@ const InternalPickupModal = ({ visible, onClose, branchId }) => {
           renderItem={(item) => (
             <List.Item
               actions={[
-                <Button
-                  type="primary"
-                  style={{ backgroundColor: '#52c41a' }}
-                  onClick={() => handleConfirmPickup(item.orderDetailId)}
-                >
-                  Xác nhận lấy
-                </Button>
+                item.cookingStatus === 'Ready' ? (
+                  <Button
+                    type="primary"
+                    style={{ backgroundColor: '#52c41a' }}
+                    loading={confirmingId === item.orderDetailId}
+                    disabled={confirmingId !== null && confirmingId !== item.orderDetailId}
+                    onClick={() => handleConfirmPickup(item.orderDetailId)}
+                  >
+                    Xác nhận lấy
+                  </Button>
+                ) : (
+                  <Button disabled>
+                    Chờ bếp làm
+                  </Button>
+                )
               ]}
             >
               <List.Item.Meta

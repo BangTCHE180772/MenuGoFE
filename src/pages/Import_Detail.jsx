@@ -21,6 +21,7 @@ import {
 import { message } from 'antd';
 import { getImportById } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Import_Detail = () => {
   const { id } = useParams();
@@ -112,8 +113,19 @@ const Import_Detail = () => {
   const amountPaid = Number(doc?.amountPaid || 0);
   const amountDue = Number(doc?.amountDue ?? (totalAmount - amountPaid));
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.orderDate || doc?.createdAt).format('DDMMYYYY');
+    const partnerClean = (doc?.partnerName || doc?.snapshotPartnerName || 'NCC').replace(/[^a-zA-Z0-9À-ỹ]/g, '_');
+    document.title = `MenuGO_PhieuNhap_${doc?.code || id}_${docDate}_${partnerClean}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* THANH ĐIỀU HƯỚNG VÀ TIÊU ĐỀ */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -146,7 +158,7 @@ const Import_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -164,7 +176,7 @@ const Import_Detail = () => {
       </div>
 
       {/* NỘI DUNG CUỘN CHÍNH */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* TỔNG QUAN VÀ THỐNG KÊ */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: THÔNG TIN PHIẾU VÀ ĐỐI TÁC */}
@@ -339,9 +351,9 @@ const Import_Detail = () => {
 
           {/* TAB 1: DANH SÁCH MẶT HÀNG */}
           {activeTab === 'products' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã SP</th>
                     <th style={{ padding: '10px 12px' }}>Tên sản phẩm</th>
@@ -412,9 +424,9 @@ const Import_Detail = () => {
 
           {/* TAB 2: LỊCH SỬ THANH TOÁN */}
           {activeTab === 'cashflows' && doc?.cashFlows && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã phiếu chi</th>
                     <th style={{ padding: '10px 12px' }}>Thời gian</th>
@@ -446,9 +458,9 @@ const Import_Detail = () => {
 
           {/* TAB 3: LỊCH SỬ SỔ KHO */}
           {activeTab === 'ledgers' && doc?.inventoryLedgers && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Thời gian ghi sổ</th>
                     <th style={{ padding: '10px 12px' }}>Tên sản phẩm</th>
@@ -487,6 +499,131 @@ const Import_Detail = () => {
           )}
         </div>
       </div>
+
+      {/* KHUNG IN PHIẾU NHẬP KHO CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="PHIẾU NHẬP KHO NGUYÊN VẬT LIỆU"
+        subTitle={`Mã chứng từ: ${doc?.code || '---'} | Ngày lập: ${doc?.orderDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${doc?.status === 1 ? 'Hoàn thành' : 'Đã hủy'}`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Nhà cung cấp', value: doc?.partnerName || doc?.snapshotPartnerName },
+          { label: 'Chứng từ tham chiếu', value: doc?.parentDocumentCode || 'Không có' },
+          { label: 'Người lập phiếu', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Chi nhánh nhập', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Tổng tiền hàng', value: `${Math.round(totalAmount).toLocaleString('vi-VN')} đ` },
+          { label: 'Đã thanh toán', value: `${Math.round(amountPaid).toLocaleString('vi-VN')} đ` },
+          { label: 'Còn nợ NCC', value: `${Math.round(amountDue).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người lập phiếu', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Đại diện NCC / Giao hàng', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.partnerName || doc?.snapshotPartnerName || '' },
+          { title: 'Thủ kho nhận hàng', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.snapshotPostedByName || '' },
+          { title: 'Kế toán / Quản lý duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">I. DANH SÁCH NGUYÊN LIỆU NHẬP KHO ({detailsList.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '90px' }}>Mã nguyên liệu</th>
+              <th>Tên nguyên liệu</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '65px' }}>Số lượng</th>
+              <th style={{ width: '85px' }}>Đơn giá (đ)</th>
+              <th style={{ width: '95px' }}>Thành tiền (đ)</th>
+              <th style={{ width: '80px' }}>Lô hàng</th>
+              <th style={{ width: '85px' }}>Hạn dùng</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detailsList.map((item, idx) => (
+              <tr key={idx}>
+                <td className="print-text-center">{idx + 1}</td>
+                <td className="print-font-bold">{item.pCode}</td>
+                <td>{item.pName}</td>
+                <td className="print-text-center">{item.uName}</td>
+                <td className="print-text-right print-font-bold">{item.qty?.toLocaleString('vi-VN')}</td>
+                <td className="print-text-right">{Math.round(item.price || 0).toLocaleString('vi-VN')}</td>
+                <td className="print-text-right print-font-bold">{Math.round(item.total || 0).toLocaleString('vi-VN')}</td>
+                <td className="print-text-center">{item.batchCode || '---'}</td>
+                <td className="print-text-center">{item.expiryDate ? dayjs(item.expiryDate).format('DD/MM/YYYY') : '---'}</td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={6} className="print-text-right print-font-bold">TỔNG TIỀN HÀNG:</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalAmount).toLocaleString('vi-VN')} đ</td>
+              <td colSpan={2}></td>
+            </tr>
+          </tbody>
+        </table>
+
+        {doc?.inventoryLedgers && doc.inventoryLedgers.length > 0 && (
+          <>
+            <div className="print-section-heading">II. LỊCH SỬ BIẾN ĐỘNG SỔ KHO / CỘNG KHO TRUY VẾT ({doc.inventoryLedgers.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th>Tên nguyên liệu</th>
+                  <th style={{ width: '90px' }}>Mã lô</th>
+                  <th style={{ width: '50px' }}>ĐVT</th>
+                  <th style={{ width: '80px' }}>Biến động</th>
+                  <th style={{ width: '85px' }}>Tồn sau nhập</th>
+                  <th style={{ width: '110px' }}>Thời điểm chốt</th>
+                  <th style={{ width: '90px' }}>Người ghi sổ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.inventoryLedgers.map((lg, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{lg.snapshotProductName}</td>
+                    <td className="print-text-center">{lg.snapshotBatchCode || '---'}</td>
+                    <td className="print-text-center">{lg.snapshotUnitName || '---'}</td>
+                    <td className="print-text-right print-font-bold">+{Number(lg.quantityDelta || 0).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right">{Number(lg.runningQuantity || 0).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-center">{lg.postedAt ? dayjs(lg.postedAt).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                    <td>{lg.snapshotPostedByName || 'Quản lý'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {doc?.cashFlows && doc.cashFlows.length > 0 && (
+          <>
+            <div className="print-section-heading">III. LỊCH SỬ THANH TOÁN TIỀN CHO NHÀ CUNG CẤP ({doc.cashFlows.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th style={{ width: '110px' }}>Mã phiếu chi</th>
+                  <th style={{ width: '110px' }}>Thời gian</th>
+                  <th style={{ width: '100px' }}>Số tiền (đ)</th>
+                  <th style={{ width: '95px' }}>Phương thức</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.cashFlows.map((cf, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{cf.code}</td>
+                    <td className="print-text-center">{cf.businessDate ? dayjs(cf.businessDate).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                    <td className="print-text-right print-font-bold">{Math.round(Number(cf.totalAmount || 0)).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-center">{cf.paymentMethod === 'Cash' || cf.paymentMethod === 1 ? 'Tiền mặt' : 'Chuyển khoản'}</td>
+                    <td>{cf.note || '---'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
     </div>
   );
 };

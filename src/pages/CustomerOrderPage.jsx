@@ -40,6 +40,7 @@ const CustomerOrderPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [refreshMenuTrigger, setRefreshMenuTrigger] = useState(0);
   const [isCallingStaff, setIsCallingStaff] = useState(false);
   const [isRequestingBill, setIsRequestingBill] = useState(false);
   const [returnItem, setReturnItem] = useState(null);
@@ -242,6 +243,7 @@ const CustomerOrderPage = () => {
       setCartItems([]);
       setIsCartOpen(false);
       setActiveTab('ordered');
+      setRefreshMenuTrigger(prev => prev + 1);
       fetchTableSummary();
     } catch (err) {
       if (createdOrderId) {
@@ -373,7 +375,7 @@ const CustomerOrderPage = () => {
 
         {activeTab === 'menu' ? (
           <div className="co-menu-wrap">
-            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} branchId={summary?.branchId} showReuseSuggestions={false} />
+            <MenuPanel canOrder={isAvailableForOrder} onAddItem={handleAddItem} branchId={summary?.branchId} showReuseSuggestions={false} refreshTrigger={refreshMenuTrigger} />
           </div>
         ) : (
           <div className="co-ordered-list">

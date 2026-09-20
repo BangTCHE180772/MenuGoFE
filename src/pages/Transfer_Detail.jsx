@@ -19,6 +19,7 @@ import {
 import { message } from 'antd';
 import { getTransferById } from '../api/documentApi';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const Transfer_Detail = () => {
   const { id } = useParams();
@@ -112,8 +113,18 @@ const Transfer_Detail = () => {
     );
   };
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const docDate = dayjs(doc?.businessDate || doc?.createdAt).format('DDMMYYYY');
+    document.title = `MenuGO_ChuyenKho_${doc?.code || id}_${docDate}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -143,7 +154,7 @@ const Transfer_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -160,7 +171,7 @@ const Transfer_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: TUYẾN CHUYỂN KHO */}
@@ -254,9 +265,9 @@ const Transfer_Detail = () => {
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
             <AppstoreOutlined /> Chi tiết mặt hàng chuyển kho ({detailsList.length})
           </div>
-          <div style={{ overflowX: 'auto', width: '100%' }}>
+          <div style={{ maxHeight: '420px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                   <th style={{ padding: '10px 12px' }}>Mã SP</th>
                   <th style={{ padding: '10px 12px' }}>Tên sản phẩm</th>
@@ -321,6 +332,75 @@ const Transfer_Detail = () => {
           </div>
         </div>
       </div>
+
+      {/* KHUNG IN PHIẾU CHUYỂN KHO CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="PHIẾU CHUYỂN KHO NỘI BỘ"
+        subTitle={`Mã phiếu: ${doc?.code || '---'} | Ngày gửi: ${doc?.businessDate || doc?.createdAt ? dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${doc?.status === 1 ? 'Đã nhận đủ' : 'Đang chuyển hàng'}`}
+        docCode={doc?.code}
+        branchName={doc?.branchName || doc?.snapshotBranchName}
+        metaItems={[
+          { label: 'Từ chi nhánh xuất', value: doc?.branchName || doc?.snapshotBranchName },
+          { label: 'Đến chi nhánh nhận', value: doc?.toBranchName || doc?.snapshotToBranchName },
+          { label: 'Người tạo lệnh chuyển', value: doc?.creatorName || doc?.snapshotCreatedByName || doc?.creator },
+          { label: 'Người tiếp nhận', value: doc?.snapshotReceiverName || 'Chưa nhận' },
+          { label: 'Thời gian xuất gửi', value: doc?.businessDate || doc?.createdAt ? dayjs(doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---' },
+          { label: 'Thời gian thực nhận', value: doc?.responseDate ? dayjs(doc.responseDate).format('DD/MM/YYYY HH:mm') : '---' },
+          { label: 'Tổng số mặt hàng', value: `${detailsList.length} mặt hàng` },
+          { label: 'Tổng giá trị chuyển', value: `${Math.round(totalAmount).toLocaleString('vi-VN')} đ` },
+          { label: 'Ghi chú chuyển', value: doc?.note || 'Không có ghi chú' }
+        ]}
+        signatures={[
+          { title: 'Người lập phiếu', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.creatorName || doc?.snapshotCreatedByName || '' },
+          { title: 'Người giao hàng', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Thủ kho nhận hàng', subtitle: '(Ký, ghi rõ họ tên)', name: doc?.snapshotReceiverName || '' },
+          { title: 'Quản lý / Giám đốc duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">CHI TIẾT MẶT HÀNG CHUYỂN KHO TRUY VẾT ({detailsList.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '90px' }}>Mã nguyên liệu</th>
+              <th>Tên nguyên liệu</th>
+              <th style={{ width: '55px' }}>ĐVT</th>
+              <th style={{ width: '75px' }}>SL gửi</th>
+              <th style={{ width: '75px' }}>SL nhận</th>
+              <th style={{ width: '75px' }}>Lệch</th>
+              <th style={{ width: '90px' }}>Đơn giá (đ)</th>
+              <th style={{ width: '100px' }}>Thành tiền (đ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detailsList.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="print-text-center">Chưa có chi tiết sản phẩm chuyển kho</td>
+              </tr>
+            ) : (
+              detailsList.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="print-text-center">{idx + 1}</td>
+                  <td className="print-font-bold">{item.pCode}</td>
+                  <td>{item.pName}</td>
+                  <td className="print-text-center">{item.uName}</td>
+                  <td className="print-text-right">{item.sendQty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{item.receiveQty.toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold" style={{ color: item.diffQty < 0 ? '#b91c1c' : (item.diffQty > 0 ? '#15803d' : '#000') }}>
+                    {item.diffQty !== 0 ? (item.diffQty > 0 ? `+${item.diffQty}` : item.diffQty) : '0'}
+                  </td>
+                  <td className="print-text-right">{Math.round(item.price || 0).toLocaleString('vi-VN')}</td>
+                  <td className="print-text-right print-font-bold">{Math.round(item.total || 0).toLocaleString('vi-VN')}</td>
+                </tr>
+              ))
+            )}
+            <tr>
+              <td colSpan={8} className="print-text-right print-font-bold">TỔNG GIÁ TRỊ LÔ HÀNG CHUYỂN:</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalAmount).toLocaleString('vi-VN')} đ</td>
+            </tr>
+          </tbody>
+        </table>
+      </InventoryPrintPortal>
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -27,6 +29,7 @@ const Invoice_Detail = () => {
   const initialInvoice = location.state?.invoice || location.state?.document || null;
   const [invoice, setInvoice] = useState(initialInvoice);
   const [loading, setLoading] = useState(!initialInvoice);
+  const [printData, setPrintData] = useState(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -122,6 +125,61 @@ const Invoice_Detail = () => {
 
   const invoiceCode = invoice?.orderCode || invoice?.code || (invoice?.id ? `HD${invoice.id}` : (id ? (String(id).startsWith('HD') ? id : `HD${id}`) : ''));
 
+  const handlePrint = () => {
+    if (!invoice) return;
+    const dateVal = invoice.orderDate || invoice.createdAt || invoice.date || new Date();
+    const formattedDate = dayjs(dateVal).isValid() ? dayjs(dateVal).format('DD-MM-YYYY') : dayjs().format('DD-MM-YYYY');
+    const rawCustomer = invoice.customerName || invoice.customer?.name || invoice.customer || 'Khách lẻ';
+    const cleanCustomer = String(rawCustomer).trim().replace(/[\\/:*?"<>|]/g, '_');
+    const printFileName = `MenuGO_HoaDon_${formattedDate}_${cleanCustomer}`;
+
+    const originalTitle = document.title;
+    document.title = printFileName;
+
+    const handleAfterPrint = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    const docData = {
+      orderCode: invoice.orderCode || invoice.code || invoiceCode,
+      code: invoice.orderCode || invoice.code || invoiceCode,
+      date: dateVal,
+      createdAt: invoice.createdAt || invoice.orderDate,
+      tableName: invoice.tableName || invoice.table?.name || 'Mang về',
+      customer: rawCustomer,
+      customerPhone: invoice.customerPhone || invoice.customer?.phone || '',
+      createdByName: invoice.createdByName || invoice.cashierName || invoice.creatorName || 'Thu ngân',
+      branchName: invoice.branchName || invoice.branch?.name || invoice.snapshotBranchName || 'Chi nhánh MenuGo',
+      branchAddress: invoice.branchAddress || invoice.branch?.address || invoice.snapshotBranchAddress || ''
+    };
+
+    const items = itemsList.map((item, idx) => ({
+      id: item.id || idx,
+      productName: item.name || item.productName,
+      unitPrice: item.price || item.unitPrice || 0,
+      quantity: item.qty || item.quantity || 1,
+      totalPrice: item.total || item.totalPrice || 0
+    }));
+
+    setPrintData({
+      doc: docData,
+      items,
+      sub: subtotal,
+      disc: discountAmount,
+      pts: pointsDiscount,
+      total: totalAmount
+    });
+
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 2000);
+    }, 180);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
@@ -155,7 +213,7 @@ const Invoice_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In hóa đơn
@@ -343,6 +401,136 @@ const Invoice_Detail = () => {
           </div>
         </div>
       </div>
+
+      {/* FORM IN HÓA ĐƠN CHUẨN INVOICE TABLE (POS 80MM) */}
+      {printData && createPortal(
+        <div className="invoice-print-only">
+          <style dangerouslySetInnerHTML={{__html: `
+            @media screen {
+              .invoice-print-only {
+                display: none !important;
+              }
+            }
+            @media print {
+              #root {
+                display: none !important;
+              }
+              body {
+                background: #fff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .invoice-print-only {
+                display: block !important;
+                width: 80mm !important;
+                max-width: 80mm !important;
+                margin: 0 auto !important;
+                padding: 4mm 2mm !important;
+                color: #000 !important;
+                font-family: 'Courier New', Courier, monospace !important;
+                font-size: 11px !important;
+                line-height: 1.4 !important;
+              }
+              .text-center {
+                text-align: center !important;
+              }
+              .text-right {
+                text-align: right !important;
+              }
+              .text-left {
+                text-align: left !important;
+              }
+              .font-bold {
+                font-weight: bold !important;
+              }
+            }
+          `}} />
+          
+          <div className="text-center font-bold" style={{ fontSize: 13, textTransform: 'uppercase', marginBottom: 2 }}>
+            {printData.doc.branchName || 'Chi nhánh MenuGo'}
+          </div>
+          {printData.doc.branchAddress && (
+            <div className="text-center" style={{ fontSize: 10, marginBottom: 8, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+              {printData.doc.branchAddress}
+            </div>
+          )}
+          
+          <div className="text-center font-bold" style={{ fontSize: 14, margin: '10px 0 15px 0', letterSpacing: '0.5px' }}>
+            HÓA ĐƠN BÁN HÀNG
+          </div>
+
+          <div style={{ marginBottom: 10, fontSize: 10.5 }}>
+            <div>Mã HD: <span className="font-bold">{printData.doc.orderCode || printData.doc.code}</span></div>
+            <div>Thời gian: {dayjs(printData.doc.date || printData.doc.createdAt).format('DD/MM/YYYY HH:mm')}</div>
+            <div>Bàn: {printData.doc.tableName || 'Mang về'}</div>
+            <div style={{ height: 4 }} />
+            <div>Khách Hàng: {printData.doc.customer || 'Khách lẻ'}</div>
+            {printData.doc.customerPhone && <div>SDT: {printData.doc.customerPhone}</div>}
+            <div>NVBH: {printData.doc.createdByName || 'Thu ngân'}</div>
+          </div>
+
+          {/* ITEM TABLE */}
+          <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '5px 0', marginBottom: 10 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+              <thead>
+                <tr className="font-bold" style={{ borderBottom: '1px dashed #000' }}>
+                  <th className="text-left" style={{ width: '45%', paddingBottom: 4 }}>Tên món</th>
+                  <th className="text-right" style={{ width: '20%', paddingBottom: 4 }}>Giá</th>
+                  <th className="text-center" style={{ width: '15%', paddingBottom: 4 }}>SL</th>
+                  <th className="text-right" style={{ width: '20%', paddingBottom: 4 }}>T.Tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printData.items.map((item, idx) => (
+                  <tr key={item.id || idx}>
+                    <td className="text-left" style={{ padding: '4px 0', verticalAlign: 'top', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      {item.productName}
+                    </td>
+                    <td className="text-right" style={{ padding: '4px 0', verticalAlign: 'top' }}>
+                      {Math.round(item.unitPrice).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="text-center" style={{ padding: '4px 0', verticalAlign: 'top' }}>
+                      {item.quantity}
+                    </td>
+                    <td className="text-right" style={{ padding: '4px 0', verticalAlign: 'top', fontWeight: 'bold' }}>
+                      {Math.round(item.totalPrice).toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* FOOTER SECTION: QR & TOTALS */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', marginTop: 12 }}>
+            {/* Left: QR Code SVG */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: 8 }}>
+              <QRCodeSVG value={printData.doc.orderCode || printData.doc.code} size={85} />
+            </div>
+            
+            {/* Right: Totals list */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 10, paddingLeft: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Tổng tiền hàng</span>
+                <span className="font-bold">{Math.round(printData.sub > 0 ? printData.sub : printData.total).toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Trừ tiền</span>
+                <span>-{Math.round(printData.disc + printData.pts).toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #000', paddingTop: 4 }}>
+                <span className="font-bold">Tổng thanh toán</span>
+                <span className="font-bold" style={{ fontSize: 12 }}>{Math.round(printData.total).toLocaleString('vi-VN')} đ</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-center" style={{ marginTop: 25, fontSize: 9, fontStyle: 'italic', borderTop: '1px dashed #000', paddingTop: 8 }}>
+            Cảm ơn quý khách. Hẹn gặp lại!
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

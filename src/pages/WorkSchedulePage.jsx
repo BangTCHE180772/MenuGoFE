@@ -63,6 +63,7 @@ import {
   verifyPOSActivity,
   autoAssignWorkSchedules,
   rejectShiftSwap,
+  getActivityLog,
 } from '../api/workScheduleApi';
 import { getAllBranches } from '../api/branchApi';
 import { getRoleRange, getAllAccounts } from '../api/accountApi';
@@ -317,6 +318,27 @@ const WorkSchedulePage = () => {
   const [rejectShiftChangeTarget, setRejectShiftChangeTarget] = useState(null);
   const [rejectShiftChangeSubmitting, setRejectShiftChangeSubmitting] = useState(false);
   const [rejectShiftChangeForm] = Form.useForm();
+
+  // Activity Log Modal state
+  const [isActivityLogModalOpen, setIsActivityLogModalOpen] = useState(false);
+  const [activityLogData, setActivityLogData] = useState([]);
+  const [loadingActivityLog, setLoadingActivityLog] = useState(false);
+  const [selectedLogRecord, setSelectedLogRecord] = useState(null);
+
+  const handleOpenActivityLog = async (record) => {
+    setSelectedLogRecord(record);
+    setIsActivityLogModalOpen(true);
+    setLoadingActivityLog(true);
+    try {
+      const res = await getActivityLog(record.id);
+      setActivityLogData(res.data || []);
+    } catch (err) {
+      console.error(err);
+      message.error('Không thể tải nhật ký hoạt động!');
+    } finally {
+      setLoadingActivityLog(false);
+    }
+  };
 
   const handleOpenOTModal = async (record) => {
     setSelectedOTRecord(record);
@@ -1127,6 +1149,15 @@ const WorkSchedulePage = () => {
               />
             </Tooltip>
           )}
+          {record.checkInAt && accounts.some(a => a.id === record.accountId && (a.roleId === 6 || a.roleIds?.includes(6))) && (
+            <Tooltip title="Xem nhật ký hoạt động">
+              <Button
+                type="text"
+                icon={<SolutionOutlined style={{ color: '#13c2c2' }} />}
+                onClick={() => handleOpenActivityLog(record)}
+              />
+            </Tooltip>
+          )}
         <Tooltip title="Chỉnh sửa ca trực">
           <Button
             type="text"
@@ -1374,6 +1405,23 @@ const WorkSchedulePage = () => {
               }}
             >
               ⚠️ Duyệt OT (+{excessH.toFixed(1)}h)
+            </Tag>
+          </div>
+        )}
+
+        {/* Activity Log Button (Waiter + Checked In) */}
+        {item.checkInAt && accounts.some(a => a.id === item.accountId && (a.roleId === 6 || a.roleIds?.includes(6))) && (
+          <div style={{ marginTop: 2 }}>
+            <Tag
+              color="blue"
+              icon={<SolutionOutlined />}
+              style={{ margin: 0, padding: '0 4px', fontSize: '10px', lineHeight: '16px', cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenActivityLog(item);
+              }}
+            >
+              Xem nhật ký
             </Tag>
           </div>
         )}
@@ -2828,6 +2876,76 @@ const WorkSchedulePage = () => {
             <Input.TextArea rows={3} placeholder="VD: không đủ nhân sự thay thế, ca không phù hợp..." />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Activity Log Modal */}
+      <Modal
+        title={
+          <div>
+            <SolutionOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+            Nhật ký hoạt động (Timeline)
+          </div>
+        }
+        open={isActivityLogModalOpen}
+        onCancel={() => { setIsActivityLogModalOpen(false); setSelectedLogRecord(null); setActivityLogData([]); }}
+        footer={[
+          <Button key="close" onClick={() => setIsActivityLogModalOpen(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width={700}
+        destroyOnClose
+      >
+        {selectedLogRecord && (
+          <div style={{ marginBottom: 16, padding: '12px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91d5ff' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '15px' }}>Nhân viên: {getAccountName(selectedLogRecord.accountId)}</div>
+            <div>Ca: {getShiftDetails(selectedLogRecord.shiftId).name} ({getShiftDetails(selectedLogRecord.shiftId).time})</div>
+            <div>Giờ vào làm (Check-in): {selectedLogRecord.checkInAt ? dayjs(selectedLogRecord.checkInAt).format('HH:mm - DD/MM/YYYY') : '--'}</div>
+          </div>
+        )}
+        <Table
+          dataSource={activityLogData}
+          rowKey={(r, idx) => idx}
+          loading={loadingActivityLog}
+          pagination={{ pageSize: 10 }}
+          size="small"
+          columns={[
+            {
+              title: 'Thời gian',
+              dataIndex: 'timestamp',
+              key: 'timestamp',
+              width: 140,
+              render: (t) => dayjs(t).format('HH:mm - DD/MM'),
+            },
+            {
+              title: 'Hành động',
+              dataIndex: 'action',
+              key: 'action',
+              width: 150,
+              render: (act) => {
+                const isPrimary = act === 'Nhận bàn chính';
+                return <Tag color={isPrimary ? 'blue' : 'green'}>{act}</Tag>;
+              }
+            },
+            {
+              title: 'Mã đơn',
+              dataIndex: 'orderCode',
+              key: 'orderCode',
+              width: 100,
+            },
+            {
+              title: 'Bàn',
+              dataIndex: 'tableName',
+              key: 'tableName',
+              width: 120,
+            },
+            {
+              title: 'Chi tiết',
+              dataIndex: 'details',
+              key: 'details',
+            },
+          ]}
+        />
       </Modal>
     </div>
   );

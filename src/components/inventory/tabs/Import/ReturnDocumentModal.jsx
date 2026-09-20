@@ -218,6 +218,13 @@ const ReturnDocumentModal = ({
   const paidAmountExceedsTotal = paidAmount > netAmount && netAmount > 0;
   const hasPaidAmountError = paidAmountExceedsParentPaid || paidAmountExceedsTotal;
 
+  // Tự động giới hạn số tiền NCC đã trả không vượt quá Cần thu NCC (Đã làm tròn)
+  useEffect(() => {
+    if (formData.paidAmount > netAmount) {
+      setFormData((prev) => ({ ...prev, paidAmount: netAmount }));
+    }
+  }, [netAmount, formData.paidAmount]);
+
   const handleSubmit = async () => {
     if (!importDocument || !importDocument.id) {
       setErrorMsg('Không tìm thấy thông tin phiếu nhập kho gốc.');
@@ -710,12 +717,33 @@ const ReturnDocumentModal = ({
                       </div>
                     </div>
                     <input
-                      type="number"
-                      min={0}
-                      max={parentAmountPaid > 0 ? Math.min(netAmount, parentAmountPaid) : 0}
+                      type="text"
+                      inputMode="numeric"
                       disabled={parentAmountPaid <= 0}
-                      value={parentAmountPaid <= 0 ? 0 : formData.paidAmount}
-                      onChange={(e) => setFormData({ ...formData, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
+                      value={
+                        parentAmountPaid <= 0
+                          ? '0'
+                          : formData.paidAmount === '' || formData.paidAmount == null
+                          ? ''
+                          : Number(formData.paidAmount).toLocaleString('vi-VN')
+                      }
+                      onChange={(e) => {
+                        const rawDigits = e.target.value.replace(/\D/g, '');
+                        if (!rawDigits) {
+                          setFormData((prev) => ({ ...prev, paidAmount: 0 }));
+                          return;
+                        }
+                        let val = Number(rawDigits);
+                        if (val > netAmount) {
+                          val = netAmount;
+                        }
+                        setFormData((prev) => ({ ...prev, paidAmount: val }));
+                      }}
+                      onFocus={(e) => {
+                        if (formData.paidAmount === 0) {
+                          e.target.select();
+                        }
+                      }}
                       style={{
                         width: 120, textAlign: 'right', borderRadius: 6, padding: '4px 8px',
                         border: hasPaidAmountError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
@@ -725,7 +753,7 @@ const ReturnDocumentModal = ({
                         background: hasPaidAmountError ? '#fef2f2' : (parentAmountPaid <= 0 ? '#f1f5f9' : '#ffffff'),
                         cursor: parentAmountPaid <= 0 ? 'not-allowed' : 'text'
                       }}
-                      placeholder={parentAmountPaid <= 0 ? '0' : 'Nhập tiền...'}
+                      placeholder={parentAmountPaid <= 0 ? '0' : '0'}
                     />
                   </div>
                   {parentAmountPaid <= 0 && (

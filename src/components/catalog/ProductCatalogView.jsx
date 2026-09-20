@@ -6,7 +6,6 @@ import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
 import ProductPagination from './ProductPagination';
 import PriceManagementTab from './PriceManagementTab';
-import PromotionManagementTab from './PromotionManagementTab';
 
 // Modals
 import ProductTypeSelectModal from './modals/ProductTypeSelectModal';
@@ -455,20 +454,16 @@ const ProductCatalogView = () => {
 
         {activeTab === 'PricePromo' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <Collapse defaultActiveKey={['1', '2']} style={{ background: '#fff' }}>
-              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Quản lý giá sản phẩm</span>} key="1">
-                <PriceManagementTab
-                  products={products}
-                  groups={groups}
-                  onRefreshData={fetchData}
-                  notifySuccess={(msg) => showToast('success', msg)}
-                  notifyError={(msg) => showToast('error', msg)}
-                />
-              </Collapse.Panel>
-              <Collapse.Panel header={<span style={{ fontWeight: 600, fontSize: 16 }}>Chương trình khuyến mãi</span>} key="2">
-                <PromotionManagementTab />
-              </Collapse.Panel>
-            </Collapse>
+            <div style={{ background: '#fff', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Quản lý giá sản phẩm</div>
+              <PriceManagementTab
+                products={products}
+                groups={groups}
+                onRefreshData={fetchData}
+                notifySuccess={(msg) => showToast('success', msg)}
+                notifyError={(msg) => showToast('error', msg)}
+              />
+            </div>
           </div>
         )}
       </div>

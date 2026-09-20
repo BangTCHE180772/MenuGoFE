@@ -20,9 +20,27 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
   const pageSize = 20;
 
   const handlePrint = (doc, items, sub, disc, pts, total) => {
+    const dateVal = doc?.date || doc?.createdAt || doc?.orderDate || new Date();
+    const formattedDate = dayjs(dateVal).isValid() ? dayjs(dateVal).format('DD-MM-YYYY') : dayjs().format('DD-MM-YYYY');
+    const rawCustomer = doc?.customer || doc?.customerName || 'Khách lẻ';
+    const cleanCustomer = String(rawCustomer).trim().replace(/[\\/:*?"<>|]/g, '_');
+    const printFileName = `MenuGO_HoaDon_${formattedDate}_${cleanCustomer}`;
+
+    const originalTitle = document.title;
+    document.title = printFileName;
+
+    const handleAfterPrint = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+
     setPrintData({ doc, items, sub, disc, pts, total });
     setTimeout(() => {
       window.print();
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 2000);
     }, 180);
   };
 

@@ -137,6 +137,28 @@ const ReportInventoryPage = () => {
           console.error("[ReportInventoryPage] Consumption API error:", err);
           message.error("Không thể tải danh sách tiêu thụ thực tế.");
         }
+
+        // Nếu chưa có nhật ký tiêu thụ theo mốc ngày, chuyển đổi danh sách tồn kho hiện tại để đảm bảo luôn có dữ liệu
+        if (!rawConsumption || rawConsumption.length === 0) {
+          rawConsumption = (rawBInventory || []).map((bi) => ({
+            id: bi.ingredientId || bi.id || bi.code || "-",
+            name: bi.ingredientName || bi.productName || bi.name || "Nguyên liệu",
+            category: bi.categoryName || bi.category || "Chung",
+            unit: bi.unit || bi.unitName || "Đơn vị",
+            openingStock: bi.quantity || 0,
+            import: 0,
+            transferIn: 0,
+            transferOut: 0,
+            expectedConsumption: 0,
+            destruction: 0,
+            adjustment: 0,
+            closingStock: bi.quantity || 0,
+            variance: 0,
+            theoreticalStock: bi.quantity || 0,
+            variancePercent: 0,
+          }));
+        }
+
         setConsumptionItems(rawConsumption);
 
         // --- Gọi API Lấy nhật ký giao dịch kho chi tiết ---
@@ -236,7 +258,6 @@ const ReportInventoryPage = () => {
     { title: "Gửi",                         field: (r) => `${r.transferOut} ${r.unit}`, align: "right" },
     { title: "Tiêu hao định mức",           field: (r) => `${r.expectedConsumption} ${r.unit}`, align: "right" },
     { title: "Xuất hủy",                    field: (r) => `${(r.destruction || 0)} ${r.unit}`, align: "right" },
-    { title: "Điều chỉnh",                  field: (r) => `${(r.adjustment || 0) > 0 ? '+' : ''}${r.adjustment} ${r.unit}`, align: "right" },
     { title: "Tồn cuối",                    field: (r) => `${r.closingStock} ${r.unit}`, align: "right" },
     { title: "Chênh lệch",                  field: (r) => `${r.variance > 0 ? '+' : ''}${r.variance} ${r.unit}`, align: "right" },
     { title: "Tồn lý thuyết",               field: (r) => `${r.theoreticalStock} ${r.unit}`, align: "right" },
@@ -274,7 +295,7 @@ const ReportInventoryPage = () => {
           columnDefs={columnDefs}
           data={consumptionItems}
           summaryRow={[
-            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
+            "Tổng cộng", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-",
           ]}
         />
       </div>

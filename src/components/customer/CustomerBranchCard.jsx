@@ -86,13 +86,6 @@ const CustomerBranchCard = ({ branch, isMain, userCoords }) => {
           </div>
         </div>
 
-        <div className="info-row">
-          <PhoneOutlined className="info-icon icon-phone" />
-          <div className="info-content">
-            <span className="info-label">Hotline đặt bàn</span>
-            <span className="info-value">{phone}</span>
-          </div>
-        </div>
       </div>
 
       <div className="branch-maps-preview">

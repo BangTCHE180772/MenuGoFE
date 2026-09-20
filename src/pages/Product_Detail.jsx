@@ -19,6 +19,7 @@ import { getBatchesByBInventoryId } from '../api/batchApi';
 import BatchTraceabilityDrawer from '../components/inventory/tabs/Product/BatchTraceabilityDrawer';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../components/inventory/utils/batchHelper';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 const renderMethodBadge = (ldg) => {
   let method = ldg.methodName || ldg.method || ldg.type || '';
@@ -269,8 +270,18 @@ const Product_Detail = () => {
     );
   };
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const cleanName = pName.replace(/[^a-zA-Z0-9À-ỹ]/g, '_');
+    document.title = `MenuGO_TheKho_${pCode}_${cleanName}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -319,7 +330,7 @@ const Product_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In thẻ hàng
@@ -336,7 +347,7 @@ const Product_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARD TỔNG QUAN THÔNG TIN: ẢNH BÊN TRÁI - THÔNG TIN BÊN PHẢI */}
         <div
           style={{
@@ -525,9 +536,9 @@ const Product_Detail = () => {
 
           {/* TAB 1: THẺ KHO */}
           {activeTab === 'ledger' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '450px', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã chứng từ</th>
                     <th style={{ padding: '10px 12px' }}>Nghiệp vụ</th>
@@ -593,9 +604,9 @@ const Product_Detail = () => {
 
           {/* TAB 2: LÔ HÀNG & HSD */}
           {activeTab === 'batches' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '450px', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã Lô</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>SL ban đầu</th>
@@ -700,6 +711,114 @@ const Product_Detail = () => {
           )}
         </div>
       </div>
+
+      {/* KHUNG IN THẺ KHO NGUYÊN LIỆU CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="THẺ KHO NGUYÊN LIỆU & LỊCH SỬ BIẾN ĐỘNG TỒN"
+        subTitle={`Mã nguyên liệu: ${pCode} | Tên: ${pName} | Đơn vị: ${uName} | In lúc: ${dayjs().format('DD/MM/YYYY HH:mm')}`}
+        docCode={pCode}
+        branchName={product?.branchName || localStorage.getItem('currentBranchName')}
+        metaItems={[
+          { label: 'Mã nguyên liệu', value: pCode },
+          { label: 'Tên nguyên liệu', value: pName },
+          { label: 'Nhóm mặt hàng', value: groupName },
+          { label: 'Đơn vị tính cơ bản', value: uName },
+          { label: 'Tồn kho hiện tại', value: `${stockQty.toLocaleString('vi-VN')} ${uName}` },
+          { label: 'Giá vốn bình quân', value: `${Math.round(avgCost).toLocaleString('vi-VN')} đ` },
+          { label: 'Định mức tồn tối thiểu', value: minStock > 0 ? `${minStock} ${uName}` : 'Không cài đặt' },
+          { label: 'Tổng số bút toán thẻ kho', value: `${ledger.length} giao dịch` }
+        ]}
+        signatures={[
+          { title: 'Người lập thẻ kho', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Thủ kho phụ trách', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Kế toán kho', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Quản lý duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">I. LỊCH SỬ BIẾN ĐỘNG CỘNG TRỪ KHO (THẺ KHO TRUY VẾT) ({ledger.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '100px' }}>Mã chứng từ</th>
+              <th style={{ width: '100px' }}>Nghiệp vụ</th>
+              <th style={{ width: '120px' }}>Thời gian</th>
+              <th style={{ width: '95px' }}>Giá vốn BQ (đ)</th>
+              <th style={{ width: '90px' }}>Biến động tồn</th>
+              <th style={{ width: '90px' }}>Tồn tích lũy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ledger.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="print-text-center">Chưa có lịch sử giao dịch thẻ kho cho mặt hàng này</td>
+              </tr>
+            ) : (
+              ledger.map((lg, idx) => {
+                const qDelta = Number(lg.quantityDelta || lg.delta || 0);
+                const qBalance = Number(lg.runningQuantity || lg.balance || 0);
+                const unitCost = Number(lg.runningAverageCost || lg.unitCost || 0);
+                const timeStr = lg.businessDate || lg.postedAt || lg.createdAt;
+                let methodStr = lg.methodName || lg.method || lg.type || 'Giao dịch';
+                const docCode = lg.documentCode || lg.code || '';
+                if (docCode.startsWith('NH')) methodStr = 'Nhập hàng';
+                else if (docCode.startsWith('XH')) methodStr = 'Xuất hủy';
+                else if (docCode.startsWith('THN') || docCode.startsWith('TH')) methodStr = 'Trả hàng NCC';
+                else if (docCode.startsWith('CK')) methodStr = 'Chuyển hàng';
+                else if (docCode.startsWith('KK')) methodStr = 'Kiểm kê';
+                else if (docCode.startsWith('SX')) methodStr = 'Sản xuất';
+                else if (docCode.startsWith('HD') || docCode.startsWith('PXBH')) methodStr = 'Bán hàng';
+
+                return (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{lg.documentCode || lg.code || '---'}</td>
+                    <td className="print-text-center">{methodStr}</td>
+                    <td className="print-text-center">{timeStr ? dayjs(timeStr).format('DD/MM/YYYY HH:mm') : '---'}</td>
+                    <td className="print-text-right">{Math.round(unitCost).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold">
+                      {qDelta > 0 ? `+${qDelta.toLocaleString('vi-VN')}` : qDelta.toLocaleString('vi-VN')}
+                    </td>
+                    <td className="print-text-right print-font-bold">{qBalance.toLocaleString('vi-VN')}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+
+        {batches.length > 0 && (
+          <>
+            <div className="print-section-heading">II. DANH SÁCH LÔ HÀNG VÀ HẠN SỬ DỤNG ({batches.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th style={{ width: '110px' }}>Mã Lô</th>
+                  <th style={{ width: '110px' }}>Ngày nhập</th>
+                  <th style={{ width: '110px' }}>Hạn sử dụng</th>
+                  <th style={{ width: '110px' }}>Tồn hiện tại</th>
+                  <th>Ghi chú / Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((b, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{b.batchCode}</td>
+                    <td className="print-text-center">{b.createdAt ? dayjs(b.createdAt).format('DD/MM/YYYY') : '---'}</td>
+                    <td className="print-text-center">{b.expiryDate ? dayjs(b.expiryDate).format('DD/MM/YYYY') : '---'}</td>
+                    <td className="print-text-right print-font-bold">
+                      {Number(b.quantity || b.currentStock || 0).toLocaleString('vi-VN')} {uName}
+                    </td>
+                    <td>{b.statusText || 'Còn hạn'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
 
       {/* DRAWER TRUY VẾT LÔ HÀNG */}
       <BatchTraceabilityDrawer

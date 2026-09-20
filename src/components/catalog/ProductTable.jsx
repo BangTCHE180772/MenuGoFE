@@ -118,7 +118,7 @@ const ProductTable = ({
               </th>
               <th style={{ padding: '10px 12px', width: 100 }}>Mã hàng</th>
               <th style={{ padding: '10px 12px', width: 50, textAlign: 'center' }}>Ảnh</th>
-              <th style={{ padding: '10px 12px', minWidth: 180 }}>Tên sản phẩm</th>
+              <th style={{ padding: '10px 12px', minWidth: 260 }}>Tên sản phẩm</th>
               <th style={{ padding: '10px 12px', width: 130 }}>Nhóm hàng</th>
               <th style={{ padding: '10px 12px', width: 110, textAlign: 'right' }}>Giá bán</th>
               <th style={{ padding: '10px 12px', width: 100, textAlign: 'right' }}>Giá vốn</th>
@@ -210,8 +210,10 @@ const ProductTable = ({
 
                     {/* NAME */}
                     <td style={{ padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
+                          {item.name}
+                        </div>
                         {(() => {
                           const activePromo = promotions?.find(p => 
                             p.isActive && p.status === 'Active' && 
@@ -222,7 +224,8 @@ const ProductTable = ({
                               <span style={{ 
                                 display: 'inline-flex', alignItems: 'center', gap: 4, 
                                 fontSize: 10, fontWeight: 700, color: '#ffffff', 
-                                background: '#ea580c', padding: '2px 6px', borderRadius: 4 
+                                background: '#ea580c', padding: '2px 6px', borderRadius: 4,
+                                whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.2
                               }} title={activePromo.name}>
                                 <AppstoreOutlined style={{ fontSize: 10 }} /> Khuyến mãi
                               </span>
@@ -239,7 +242,8 @@ const ProductTable = ({
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            maxWidth: 240,
+                            maxWidth: 300,
+                            marginTop: 2,
                           }}
                         >
                           {item.description}

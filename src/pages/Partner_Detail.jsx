@@ -29,6 +29,7 @@ import {
 } from '../api/partnerApi';
 import { getDebtDisplayInfo } from '../utils/debtHelper';
 import { ReferenceLink } from '../utils/documentNavHelper';
+import InventoryPrintPortal from '../components/inventory/common/InventoryPrintPortal';
 
 // Phân loại nhãn hiển thị cho đối tác
 const getPartnerBadge = (t) => {
@@ -204,8 +205,18 @@ const Partner_Detail = () => {
   const remainingDebt = summary?.remainingDebt ?? partner?.remainingDebt ?? 0;
   const debtInfo = getDebtDisplayInfo(remainingDebt);
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const partnerClean = (partner?.name || summary?.partnerName || 'DoiTac').replace(/[^a-zA-Z0-9À-ỹ]/g, '_');
+    document.title = `MenuGO_SoGiaoDich_${partner?.code || id}_${partnerClean}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 2000);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh', background: '#f8fafc', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* HEADER */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -237,7 +248,7 @@ const Partner_Detail = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, color: '#334155', cursor: 'pointer' }}
           >
             <PrinterOutlined /> In phiếu
@@ -254,7 +265,7 @@ const Partner_Detail = () => {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* CARDS TỔNG QUAN HỒ SƠ & TÀI CHÍNH */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {/* THẺ 1: THÔNG TIN ĐỐI TÁC */}
@@ -399,9 +410,9 @@ const Partner_Detail = () => {
 
           {/* NỘI DUNG TAB PHIẾU NHẬP HÀNG */}
           {activeTab === 'docs' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '450px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã phiếu nhập</th>
                     <th style={{ padding: '10px 12px' }}>Ngày nhập</th>
@@ -690,9 +701,9 @@ const Partner_Detail = () => {
 
           {/* NỘI DUNG TAB LỊCH SỬ GIAO DỊCH */}
           {activeTab === 'cashflows' && (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ maxHeight: '450px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
                   <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', fontWeight: 700, textTransform: 'uppercase', fontSize: 10.5 }}>
                     <th style={{ padding: '10px 12px' }}>Mã nhập hàng</th>
                     <th style={{ padding: '10px 12px' }}>Ngày giao dịch</th>
@@ -983,6 +994,119 @@ const Partner_Detail = () => {
           </div>
         </div>
       )}
+
+      {/* KHUNG IN SỔ CHI TIẾT GIAO DỊCH ĐỐI TÁC CHUẨN A4 */}
+      <InventoryPrintPortal
+        title="SỔ CHI TIẾT GIAO DỊCH VÀ CÔNG NỢ ĐỐI TÁC"
+        subTitle={`Mã đối tác: ${partner?.code || id} | Tên: ${partner?.name || summary?.partnerName || 'Đối tác'} | In lúc: ${dayjs().format('DD/MM/YYYY HH:mm')}`}
+        docCode={partner?.code || id}
+        metaItems={[
+          { label: 'Tên đối tác', value: partner?.name || summary?.partnerName },
+          { label: 'Mã đối tác', value: partner?.code || `NCC#${id}` },
+          { label: 'Số điện thoại', value: partner?.phone || partner?.phoneNumber || '---' },
+          { label: 'Địa chỉ', value: partner?.address || '---' },
+          { label: 'Tổng tiền mua hàng', value: `${Math.round(totalImport).toLocaleString('vi-VN')} đ` },
+          { label: 'Tổng tiền trả hàng', value: `${Math.round(totalReturn).toLocaleString('vi-VN')} đ` },
+          { label: 'Đã thanh toán', value: `${Math.round(totalPaid).toLocaleString('vi-VN')} đ` },
+          { label: debtInfo.label, value: `${Math.round(Math.abs(remainingDebt)).toLocaleString('vi-VN')} đ` }
+        ]}
+        signatures={[
+          { title: 'Người lập sổ', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Kế toán công nợ', subtitle: '(Ký, ghi rõ họ tên)', name: '' },
+          { title: 'Đại diện Đối tác / NCC', subtitle: '(Ký, ghi rõ họ tên)', name: partner?.name || summary?.partnerName || '' },
+          { title: 'Quản lý / Giám đốc duyệt', subtitle: '(Ký, ghi rõ họ tên)', name: '' }
+        ]}
+      >
+        <div className="print-section-heading">I. LỊCH SỬ CHỨNG TỪ GIAO DỊCH (NHẬP HÀNG / TRẢ HÀNG) ({docs.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35px' }}>STT</th>
+              <th style={{ width: '100px' }}>Mã chứng từ</th>
+              <th style={{ width: '110px' }}>Ngày chứng từ</th>
+              <th style={{ width: '100px' }}>Nghiệp vụ</th>
+              <th style={{ width: '105px' }}>Tổng tiền (đ)</th>
+              <th style={{ width: '105px' }}>Đã trả (đ)</th>
+              <th style={{ width: '105px' }}>Còn nợ (đ)</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {docs.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="print-text-center">Chưa phát sinh chứng từ giao dịch nào với đối tác này</td>
+              </tr>
+            ) : (
+              docs.map((d, idx) => {
+                const total = Number(d.totalAmount || 0);
+                const paid = Number(d.paidAmount || 0);
+                const debt = Number(d.debtAmount || Math.max(0, total - paid));
+                const isReturn = d.type === 'Return' || String(d.code || '').startsWith('THN') || String(d.code || '').startsWith('TH');
+
+                return (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{d.code}</td>
+                    <td className="print-text-center">
+                      {d.orderDate || d.createdDate || d.createdAt ? dayjs(d.orderDate || d.createdDate || d.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
+                    </td>
+                    <td className="print-text-center">{isReturn ? 'Trả hàng NCC' : 'Nhập hàng'}</td>
+                    <td className="print-text-right print-font-bold">{Math.round(total).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right">{Math.round(paid).toLocaleString('vi-VN')}</td>
+                    <td className="print-text-right print-font-bold" style={{ color: debt > 0 ? '#b91c1c' : '#000' }}>
+                      {Math.round(debt).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="print-text-center">{d.status === 1 ? 'Hoàn thành' : (d.status === 0 ? 'Tạm' : 'Đã hủy')}</td>
+                  </tr>
+                );
+              })
+            )}
+            <tr>
+              <td colSpan={4} className="print-text-right print-font-bold">TỔNG CỘNG TIỀN MUA HÀNG:</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalImport).toLocaleString('vi-VN')} đ</td>
+              <td className="print-text-right print-font-bold">{Math.round(totalPaid).toLocaleString('vi-VN')} đ</td>
+              <td className="print-text-right print-font-bold">{Math.round(Math.max(0, remainingDebt)).toLocaleString('vi-VN')} đ</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        {cashFlows.length > 0 && (
+          <>
+            <div className="print-section-heading">II. LỊCH SỬ GIAO DỊCH TIỀN / THANH TOÁN ({cashFlows.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '35px' }}>STT</th>
+                  <th style={{ width: '110px' }}>Mã phiếu chi/thu</th>
+                  <th style={{ width: '120px' }}>Thời gian</th>
+                  <th style={{ width: '110px' }}>Số tiền (đ)</th>
+                  <th style={{ width: '100px' }}>Phương thức</th>
+                  <th>Ghi chú / Diễn giải</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cashFlows.map((cf, idx) => (
+                  <tr key={idx}>
+                    <td className="print-text-center">{idx + 1}</td>
+                    <td className="print-font-bold">{cf.code}</td>
+                    <td className="print-text-center">
+                      {cf.businessDate || cf.createdAt ? dayjs(cf.businessDate || cf.createdAt).format('DD/MM/YYYY HH:mm') : '---'}
+                    </td>
+                    <td className="print-text-right print-font-bold">
+                      {Math.round(Number(cf.totalAmount || cf.amount || 0)).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="print-text-center">
+                      {cf.paymentMethod === 'Cash' || cf.paymentMethod === 1 ? 'Tiền mặt' : 'Chuyển khoản'}
+                    </td>
+                    <td>{cf.note || 'Thanh toán tiền hàng'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </InventoryPrintPortal>
     </div>
   );
 };
