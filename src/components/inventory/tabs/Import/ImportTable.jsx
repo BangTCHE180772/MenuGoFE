@@ -13,7 +13,10 @@ import {
   SearchOutlined,
   PlusOutlined,
   ReloadOutlined,
-  EyeOutlined
+  EyeOutlined,
+  PictureOutlined,
+  CloseOutlined,
+  ZoomInOutlined
 } from '@ant-design/icons';
 import { deleteImportPendingDocument, getImportById } from '../../../../api/documentApi';
 
@@ -35,10 +38,11 @@ const ImportTable = ({
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedDocId, setExpandedDocId] = useState(null);
-  const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' }
+  const [activeTabMap, setActiveTabMap] = useState({}); // { [docId]: 'info' | 'payment' | 'image' }
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(null);
   const [loadedDocMap, setLoadedDocMap] = useState({}); // Cache full document details
   const [loadingDocId, setLoadingDocId] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const [pageSize, setPageSize] = useState(20);
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
@@ -464,6 +468,28 @@ const ImportTable = ({
                               >
                                 <CreditCardOutlined /> Lịch sử thanh toán
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => handleTabChange(doc.id, 'image')}
+                                style={{
+                                  padding: '10px 16px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  fontWeight: currentTab === 'image' ? 700 : 500,
+                                  color: currentTab === 'image' ? '#e8442a' : '#64748b',
+                                  borderBottom: currentTab === 'image' ? '2px solid #e8442a' : '2px solid transparent',
+                                  cursor: 'pointer',
+                                  fontSize: 12
+                                }}
+                              >
+                                <PictureOutlined /> Hình ảnh {(() => {
+                                  let imgs = loadedDoc.imageUrls || doc.imageUrls || [];
+                                  if (typeof imgs === 'string') {
+                                    try { imgs = JSON.parse(imgs); } catch (e) { imgs = imgs ? [imgs] : []; }
+                                  }
+                                  return Array.isArray(imgs) && imgs.length > 0 ? `(${imgs.length})` : '';
+                                })()}
+                              </button>
 
                               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <button
@@ -727,11 +753,122 @@ const ImportTable = ({
                                           )}
                                         </tbody>
                                       </table>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
+                                  )}
+
+                                  {/* TAB 3: HÌNH ẢNH */}
+                                  {currentTab === 'image' && (() => {
+                                    let imgs = loadedDoc.imageUrls || doc.imageUrls || [];
+                                    if (typeof imgs === 'string') {
+                                      try {
+                                        imgs = JSON.parse(imgs);
+                                      } catch (e) {
+                                        imgs = imgs ? [imgs] : [];
+                                      }
+                                    }
+                                    if (!Array.isArray(imgs)) imgs = [];
+
+                                    return (
+                                      <div style={{ padding: 16 }}>
+                                        {imgs.length === 0 ? (
+                                          <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                                            <PictureOutlined style={{ fontSize: 36, marginBottom: 8, color: '#cbd5e1' }} />
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Không có ảnh</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Chưa có hình ảnh biên lai hoặc bằng chứng chất lượng hàng nào cho phiếu nhập này.</div>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 12 }}>
+                                              Danh sách hình ảnh biên lai / nhận hàng ({imgs.length}):
+                                            </div>
+                                            <div
+                                              style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 130px))',
+                                                gap: 12
+                                              }}
+                                            >
+                                              {imgs.map((url, imgIdx) => (
+                                                <div
+                                                  key={imgIdx}
+                                                  onClick={() => setPreviewImage(url)}
+                                                  style={{
+                                                    width: 130,
+                                                    aspectRatio: '1 / 1',
+                                                    borderRadius: 8,
+                                                    border: '1px solid #e2e8f0',
+                                                    overflow: 'hidden',
+                                                    position: 'relative',
+                                                    background: '#f1f5f9',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                                                  }}
+                                                  onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.12)';
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'none';
+                                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                                                  }}
+                                                  title="Bấm để phóng to xem chi tiết"
+                                                >
+                                                  <img
+                                                    src={url}
+                                                    alt={`Ảnh ${imgIdx + 1}`}
+                                                    style={{
+                                                      width: '100%',
+                                                      height: '100%',
+                                                      objectFit: 'cover',
+                                                      display: 'block'
+                                                    }}
+                                                  />
+                                                  <div
+                                                    style={{
+                                                      position: 'absolute',
+                                                      inset: 0,
+                                                      background: 'rgba(0,0,0,0.25)',
+                                                      opacity: 0,
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      color: '#ffffff',
+                                                      fontSize: 18,
+                                                      transition: 'opacity 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
+                                                  >
+                                                    <ZoomInOutlined />
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      position: 'absolute',
+                                                      bottom: 4,
+                                                      left: 4,
+                                                      background: 'rgba(15, 23, 42, 0.75)',
+                                                      color: '#ffffff',
+                                                      fontSize: 10,
+                                                      fontWeight: 600,
+                                                      padding: '2px 6px',
+                                                      borderRadius: 4,
+                                                      pointerEvents: 'none'
+                                                    }}
+                                                  >
+                                                    Ảnh {imgIdx + 1}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </>
+                              )}
 
                           </div>
                         </td>
@@ -784,6 +921,66 @@ const ImportTable = ({
         onPageChange={setCurrentPage}
         onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
       />
+
+      {/* POPUP PHÓNG TO ẢNH (LIGHTBOX) */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            title="Đóng"
+            style={{
+              position: 'absolute',
+              top: 24,
+              right: 24,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
+          >
+            <CloseOutlined />
+          </button>
+          <img
+            src={previewImage}
+            alt="Phóng to hình ảnh"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 6,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
