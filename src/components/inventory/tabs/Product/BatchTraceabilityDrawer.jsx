@@ -82,10 +82,16 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
       bg = '#f5f3ff';
       color = '#6d28d9';
       border = '#ddd6fe';
-    } else if (label.toLowerCase().includes('sản xuất')) {
-      bg = '#ecfdf5';
-      color = '#047857';
-      border = '#a7f3d0';
+    } else if (label.toLowerCase().includes('chuẩn bị') || label === 'Sản xuất chuẩn bị sẵn') {
+      label = 'Sản xuất chuẩn bị sẵn';
+      bg = '#f0fdf4';
+      color = '#15803d';
+      border = '#bbf7d0';
+    } else if (label.toLowerCase().includes('tiêu hao') || label.toLowerCase().includes('sản xuất')) {
+      label = 'Tiêu hao sản xuất';
+      bg = '#fffbeb';
+      color = '#b45309';
+      border = '#fef3c7';
     } else if (label.toLowerCase().includes('trả') && !label.toLowerCase().includes('khách')) {
       label = 'Trả Hàng';
       bg = '#fff7ed';
@@ -373,7 +379,10 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                       </thead>
                       <tbody>
                         {allocations.map((a, idx) => {
-                          const isNegative = a.quantityAllocated > 0;
+                          const isReceipt = a.allocationType === 9 ||
+                            a.allocationType === 'ProductionReceipt' ||
+                            (a.allocationTypeName && (a.allocationTypeName.includes('chuẩn bị') || a.allocationTypeName.includes('Sản xuất chuẩn bị sẵn')));
+                          const isNegative = !isReceipt && a.quantityAllocated > 0;
                           return (
                             <tr key={a.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                               <td style={{ padding: '8px 10px', color: '#475569' }}>
@@ -390,10 +399,10 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                                   padding: '8px 10px',
                                   textAlign: 'right',
                                   fontWeight: 700,
-                                  color: isNegative ? '#dc2626' : '#059669'
+                                  color: isReceipt ? '#059669' : (isNegative ? '#dc2626' : '#059669')
                                 }}
                               >
-                                {isNegative ? `-${Number(a.quantityAllocated).toLocaleString('vi-VN')}` : `+${Number(a.quantityAllocated).toLocaleString('vi-VN')}`}
+                                {isReceipt ? `+${Number(a.quantityAllocated).toLocaleString('vi-VN')}` : (isNegative ? `-${Number(a.quantityAllocated).toLocaleString('vi-VN')}` : `+${Number(a.quantityAllocated).toLocaleString('vi-VN')}`)}
                               </td>
                               <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                                 {Number(a.unitCost).toLocaleString('vi-VN')} đ

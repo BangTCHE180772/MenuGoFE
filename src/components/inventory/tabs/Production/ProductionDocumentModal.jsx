@@ -67,6 +67,9 @@ const ProductionDocumentModal = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedManufactured, setSelectedManufactured] = useState(null);
   const [finishedQuantity, setFinishedQuantity] = useState(1);
+  const [expiryDate, setExpiryDate] = useState('');
+  const [showConfirmEmptyExpiry, setShowConfirmEmptyExpiry] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const [formData, setFormData] = useState({
     docCode: '',
@@ -123,6 +126,12 @@ const ProductionDocumentModal = ({
               });
               const finishedDetail = (res.details || []).find((d) => d.isFinishedProduct || d.fatherId == null) || res.details?.[0];
               if (finishedDetail) {
+                const exp = finishedDetail.expiryDateSnapshot || finishedDetail.expiryDate;
+                if (exp) {
+                  setExpiryDate(dayjs(exp).format('YYYY-MM-DD'));
+                } else {
+                  setExpiryDate('');
+                }
                 const pId = finishedDetail.productId || finishedDetail.bInventoryId;
                 // Fetch full product details for recipe if needed
                 getProductById(pId)
@@ -134,7 +143,8 @@ const ProductionDocumentModal = ({
                       name: finishedDetail.productName || finishedDetail.bInventoryName || pData?.name || 'Đồ chuẩn bị sẵn',
                       code: finishedDetail.code || pData?.skuCode || '',
                       unitName: finishedDetail.unitName || 'Đơn vị',
-                      ingredients: pData?.recipeItems || []
+                      ingredients: pData?.recipeItems || [],
+                      shelfLifeDays: pData?.shelfLifeDays || null
                     });
                   })
                   .catch(() => {
@@ -168,6 +178,9 @@ const ProductionDocumentModal = ({
         setShowDropdown(false);
         setSelectedManufactured(null);
         setFinishedQuantity(1);
+        setExpiryDate('');
+        setShowConfirmEmptyExpiry(false);
+        setPendingAction(null);
 
         setFormData({
           docCode: '',
@@ -183,6 +196,9 @@ const ProductionDocumentModal = ({
       setSelectedManufactured(null);
       setManufacturedQuery('');
       setFinishedQuantity(1);
+      setExpiryDate('');
+      setShowConfirmEmptyExpiry(false);
+      setPendingAction(null);
       setFormData({
         docCode: '',
         note: '',
@@ -229,7 +245,8 @@ const ProductionDocumentModal = ({
           code: b.code || b.skuCode || `SP${b.id}`,
           name: b.name || 'Đồ chuẩn bị sẵn',
           unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || '',
-          ingredients: b.recipeItems || b.recipeDetailes || b.ingredients || pMaster?.recipeItems || []
+          ingredients: b.recipeItems || b.recipeDetailes || b.ingredients || pMaster?.recipeItems || [],
+          shelfLifeDays: b.shelfLifeDays ?? b.product?.shelfLifeDays ?? pMaster?.shelfLifeDays ?? null
         };
       });
   }, [manufacturedList, products]);
@@ -257,24 +274,36 @@ const ProductionDocumentModal = ({
   const handleSelectManufactured = async (opt) => {
     setShowDropdown(false);
     setManufacturedQuery('');
-    
-    // Check if recipe items exist, if not fetch from API
-    if (!opt.ingredients || opt.ingredients.length === 0) {
-      try {
-        const res = await getProductById(opt.productId || opt.id);
-        const pData = res?.data || res;
-        const loadedRecipe = pData?.recipeItems || [];
-        setSelectedManufactured({
-          ...opt,
-          ingredients: loadedRecipe
-        });
-        return;
-      } catch (e) {
-        console.warn('Could not fetch product recipe:', e);
+
+    let loadedRecipe = opt.ingredients || [];
+    let shelfDays = opt.shelfLifeDays;
+
+    try {
+      const res = await getProductById(opt.productId || opt.id);
+      const pData = res?.data || res;
+      if (pData) {
+        if (!loadedRecipe || loadedRecipe.length === 0) {
+          loadedRecipe = pData.recipeItems || [];
+        }
+        if (pData.shelfLifeDays != null) {
+          shelfDays = pData.shelfLifeDays;
+        }
       }
+    } catch (e) {
+      console.warn('Could not fetch product details:', e);
     }
-    
-    setSelectedManufactured(opt);
+
+    setSelectedManufactured({
+      ...opt,
+      ingredients: loadedRecipe,
+      shelfLifeDays: shelfDays
+    });
+
+    if (shelfDays && Number(shelfDays) > 0) {
+      setExpiryDate(dayjs(selectedDateTime).add(Number(shelfDays), 'day').format('YYYY-MM-DD'));
+    } else {
+      setExpiryDate('');
+    }
   };
 
   // Preview ingredients list with branch inventory stock check
@@ -314,7 +343,7 @@ const ProductionDocumentModal = ({
     return ingredientsList.some((i) => i.isInsufficient);
   }, [ingredientsList]);
 
-  const handleSubmit = async (isDraft = false) => {
+  const handleTriggerSubmit = (isDraft = false) => {
     if (!selectedManufactured) {
       showToast('Vui lòng chọn 1 mặt hàng chuẩn bị sẵn.', 'error');
       return;
@@ -325,21 +354,36 @@ const ProductionDocumentModal = ({
       return;
     }
 
+    if (!expiryDate) {
+      setPendingAction(isDraft ? 'draft' : 'complete');
+      setShowConfirmEmptyExpiry(true);
+      return;
+    }
+
+    executeSubmit(isDraft ? 'draft' : 'complete');
+  };
+
+  const executeSubmit = async (actionType = 'complete') => {
+    const isDraft = actionType === 'draft';
     const qty = Math.min(10000000000, Math.max(0.001, Number(finishedQuantity) || 1));
+    const mDate = selectedDateTime ? selectedDateTime.toISOString() : new Date().toISOString();
+    const expDate = expiryDate ? dayjs(expiryDate).endOf('day').toISOString() : null;
 
     setLoading(true);
     try {
       const dto = {
         branchId: Number(branchId),
-      code: formData.docCode ? formData.docCode.trim() : undefined,
-        orderDate: new Date().toISOString(),
+        code: formData.docCode ? formData.docCode.trim() : undefined,
+        orderDate: mDate,
         note: formData.note || '',
         details: [
           {
             bInventoryId: Number(selectedManufactured.id),
             quantity: qty,
             fatherId: null,
-            unitConversionId: null
+            unitConversionId: null,
+            manufactureDate: mDate,
+            expiryDate: expDate
           }
         ]
       };
@@ -347,19 +391,19 @@ const ProductionDocumentModal = ({
       if (editDocumentId) {
         if (isDraft) {
           await updateProductionPending(editDocumentId, dto);
-          showToast('Cập nhật phiếu sản xuất nháp thành công!');
+          showToast('Cập nhật phiếu đồ chuẩn bị sẵn nháp thành công!');
         } else {
           await updateProductionPending(editDocumentId, dto);
           await completeProductionDocument(editDocumentId);
-          showToast('Hoàn thành phiếu sản xuất thành công!');
+          showToast('Hoàn thành phiếu đồ chuẩn bị sẵn thành công!');
         }
       } else {
         if (isDraft) {
           await createProductionPending(dto);
-          showToast('Lưu tạm phiếu sản xuất thành công!');
+          showToast('Lưu tạm phiếu đồ chuẩn bị sẵn thành công!');
         } else {
           await createProductionCompleted(dto);
-          showToast('Tạo và Hoàn thành phiếu sản xuất thành công!');
+          showToast('Tạo và Hoàn thành phiếu đồ chuẩn bị sẵn thành công!');
         }
       }
 
@@ -367,7 +411,7 @@ const ProductionDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu sản xuất.');
+      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu đồ chuẩn bị sẵn.');
       showToast(errMsg, 'error');
     } finally {
       setLoading(false);
@@ -574,6 +618,85 @@ const ProductionDocumentModal = ({
                 </div>
               </div>
 
+              {/* ROW: NGÀY SẢN XUẤT & HẠN SỬ DỤNG */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>Ngày sản xuất</span>
+                    <span style={{ fontSize: 10, color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      Tự động lấy ngày tạo
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#f8fafc',
+                      borderRadius: 18,
+                      padding: '6px 14px',
+                      border: '1px solid #cbd5e1',
+                      color: '#334155',
+                      fontWeight: 600,
+                      fontSize: 12
+                    }}
+                  >
+                    <CalendarOutlined style={{ color: '#64748b', marginRight: 8 }} />
+                    <span>{selectedDateTime ? dayjs(selectedDateTime).format('DD/MM/YYYY HH:mm') : dayjs().format('DD/MM/YYYY HH:mm')}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>Hạn sử dụng</span>
+                      {expiryDate && (
+                        <span style={{ fontSize: 10, color: '#2563eb', background: '#eff6ff', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                          Đã chọn
+                        </span>
+                      )}
+                    </div>
+                    {expiryDate && (
+                      <button
+                        type="button"
+                        onClick={() => setExpiryDate('')}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: 10.5, cursor: 'pointer', padding: 0 }}
+                      >
+                        Xóa hạn dùng
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#ffffff',
+                      borderRadius: 18,
+                      padding: '5px 14px',
+                      border: `1px solid ${!expiryDate ? '#cbd5e1' : '#2563eb'}`
+                    }}
+                  >
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      min={dayjs(selectedDateTime).format('YYYY-MM-DD')}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: 12,
+                        color: expiryDate ? '#0f172a' : '#64748b',
+                        fontWeight: expiryDate ? 600 : 400,
+                        background: 'transparent'
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>
+                    {expiryDate ? `Lô hết hạn vào ${dayjs(expiryDate).format('DD/MM/YYYY')}` : 'Để trống sẽ hỏi xác nhận khi bấm tạo'}
+                  </div>
+                </div>
+              </div>
+
               {/* DANH SÁCH NGUYÊN LIỆU THEO CÔNG THỨC */}
               {selectedManufactured && (
                 <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', padding: 12 }}>
@@ -736,7 +859,7 @@ const ProductionDocumentModal = ({
           <button
             type="button"
             disabled={loading || hasInsufficient}
-            onClick={() => handleSubmit(true)}
+            onClick={() => handleTriggerSubmit(true)}
             style={{
               background: '#ffffff',
               border: '1px solid #cbd5e1',
@@ -753,7 +876,7 @@ const ProductionDocumentModal = ({
           <button
             type="button"
             disabled={loading || hasInsufficient}
-            onClick={() => handleSubmit(false)}
+            onClick={() => handleTriggerSubmit(false)}
             style={{
               background: hasInsufficient ? '#cbd5e1' : '#e8442a',
               border: `1px solid ${hasInsufficient ? '#cbd5e1' : '#e8442a'}`,
@@ -770,6 +893,107 @@ const ProductionDocumentModal = ({
           </button>
         </div>
       </div>
+
+      {/* MODAL XÁC NHẬN HẠN DÙNG TRỐNG */}
+      {showConfirmEmptyExpiry && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2500,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowConfirmEmptyExpiry(false);
+          }}
+        >
+          <div
+            style={{
+              width: 440,
+              maxWidth: '100%',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: '#fef3c7',
+                  color: '#d97706',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  fontWeight: 700
+                }}
+              >
+                !
+              </div>
+              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                Xác nhận hạn sử dụng
+              </h4>
+            </div>
+
+            <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
+              Hạn sử dụng của đồ chuẩn bị sẵn đang để trống. Bạn có muốn để hạn dùng trống không?
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmEmptyExpiry(false)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  fontWeight: 600,
+                  padding: '7px 16px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12
+                }}
+              >
+                Quay lại nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmEmptyExpiry(false);
+                  executeSubmit(pendingAction || 'complete');
+                }}
+                style={{
+                  background: '#e8442a',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  padding: '7px 18px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
+                }}
+              >
+                Để trống & Tiếp tục
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
