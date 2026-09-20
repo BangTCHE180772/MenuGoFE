@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CloseOutlined,
   SearchOutlined,
@@ -272,6 +272,7 @@ const ProductionDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
+      code: formData.docCode ? formData.docCode.trim() : undefined,
         orderDate: new Date().toISOString(),
         note: formData.note || '',
         details: [

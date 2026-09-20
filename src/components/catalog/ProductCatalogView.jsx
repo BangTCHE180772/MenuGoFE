@@ -4,7 +4,7 @@ import { Collapse } from 'antd';
 import CatalogHeaderNav from './CatalogHeaderNav';
 import CatalogSidebar from './CatalogSidebar';
 import ProductTable from './ProductTable';
-import ProductPagination from './ProductPagination';
+import PaginationFooter from '../shared/PaginationFooter';
 import PriceManagementTab from './PriceManagementTab';
 
 // Modals
@@ -438,10 +438,11 @@ const ProductCatalogView = () => {
                 onEditProduct={handleEditProduct}
                 onDeleteProduct={handleDeleteProduct}
               />
-              <ProductPagination
+              <PaginationFooter
                 currentPage={currentPage}
                 pageSize={pageSize}
                 totalItems={filteredProducts.length}
+                totalPages={Math.ceil(filteredProducts.length / pageSize) || 1}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={(sz) => {
                   setPageSize(sz);

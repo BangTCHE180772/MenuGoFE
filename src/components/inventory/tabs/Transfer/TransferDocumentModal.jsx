@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -443,6 +443,7 @@ const TransferDocumentModal = ({
         // Create mode: TransferDocumentCreateDto
         const createDto = {
           branchId: Number(branchId),
+      code: formData.docCode ? formData.docCode.trim() : undefined,
           toBranchId: Number(targetBranchId),
           orderDate: openTimeISO || selectedDateTime.toISOString(),
           note: formData.note || '',

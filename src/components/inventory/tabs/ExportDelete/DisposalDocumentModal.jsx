@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -473,6 +473,7 @@ const DisposalDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
+      code: formData.docCode ? formData.docCode.trim() : undefined,
         orderDate: openTimeISO || new Date().toISOString(),
         note: formData.note || 'Xuất hủy hàng hóa',
         details: items.map((i) => ({

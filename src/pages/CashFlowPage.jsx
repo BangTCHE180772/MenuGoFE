@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 import { useBranch } from '../context/BranchContext';
 import { getCashFlows, deleteCashFlow } from '../api/cashFlowApi';
 import CreateCashFlowModal from '../components/cashflow/CreateCashFlowModal';
+import PaginationFooter from '../components/shared/PaginationFooter';
 import '../styles/CashFlowPage.css';
 
 /* ─── Helpers ─────────────────────────────── */
@@ -66,7 +67,7 @@ const CashFlowPage = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // Confirm delete
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -430,37 +431,14 @@ const CashFlowPage = () => {
         </div>
 
         {/* ─── PAGINATION ─── */}
-        {filtered.length > pageSize && (
-          <div className="pagination-wrapper">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="pg-btn"
-            >‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-              .reduce((acc, p, idx, arr) => {
-                if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, idx) =>
-                p === '...'
-                  ? <span key={idx} style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>
-                  : <button key={p} type="button" onClick={() => setCurrentPage(p)} className={`pg-btn ${p === currentPage ? 'active' : ''}`}>{p}</button>
-              )}
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="pg-btn"
-            >›</button>
-            <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 6 }}>
-              {filtered.length} phiếu
-            </span>
-          </div>
-        )}
+        <PaginationFooter
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+        />
       </div>
 
       {/* ─── MODAL ─── */}

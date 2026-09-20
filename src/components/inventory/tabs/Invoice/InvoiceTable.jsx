@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { SearchOutlined, PlusOutlined, ReloadOutlined, InfoCircleOutlined, UserOutlined, ShoppingCartOutlined, EyeOutlined } from '@ant-design/icons';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { getOrderById } from '../../../../api/orderApi';
 import { getDocumentById, getSaleById } from '../../../../api/documentApi';
 
@@ -17,7 +18,7 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
   const [loadedInvoiceMap, setLoadedInvoiceMap] = useState({});
   const [loadingInvoiceId, setLoadingInvoiceId] = useState(null);
   const [printData, setPrintData] = useState(null);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   const handlePrint = (doc, items, sub, disc, pts, total) => {
     const dateVal = doc?.date || doc?.createdAt || doc?.orderDate || new Date();
@@ -546,28 +547,14 @@ const InvoiceTable = ({ invoices = [], loading = false, onRefresh }) => {
       </div>
 
       {/* FOOTER PAGINATION */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 11, color: '#64748b' }}>
-        <div>Tổng số: <strong>{filtered.length}</strong> hóa đơn</div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-          >
-            Trở lại
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
-          >
-            Tiếp
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={filtered.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
 
       {printData && createPortal(
         <div className="invoice-print-only">

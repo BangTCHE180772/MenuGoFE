@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -79,6 +79,8 @@ const ImportDocumentModal = ({
   });
 
   const [items, setItems] = useState([]);
+  // Lưu string hiển thị SỐ LƯỢNG riêng để tránh bị lock khi đang gõ
+  const [qtyInputMap, setQtyInputMap] = useState({});
   const [supplierDebt, setSupplierDebt] = useState(null);
   const [loadingSupplierDebt, setLoadingSupplierDebt] = useState(false);
   const [deductDebt, setDeductDebt] = useState(false);
@@ -171,6 +173,7 @@ const ImportDocumentModal = ({
           };
         });
         setItems(mappedItems);
+        setQtyInputMap({});
       };
 
       // Populate immediately with initial editingDocument
@@ -198,6 +201,7 @@ const ImportDocumentModal = ({
         note: ''
       });
       setItems([]);
+      setQtyInputMap({});
     }
   }, [open, branchId, partners, editingDocument, products]);
 
@@ -394,6 +398,7 @@ const ImportDocumentModal = ({
 
     return {
       branchId: Number(branchId),
+      code: formData.docCode ? formData.docCode.trim() : undefined,
       partnerId: formData.supplierId ? Number(formData.supplierId) : null,
       orderDate: new Date().toISOString(),
       note: finalNote,
@@ -822,8 +827,18 @@ const ImportDocumentModal = ({
                             type="number"
                             min={0.001}
                             step="any"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(item.rowId, 'quantity', Math.max(0.001, Number(e.target.value)))}
+                            value={qtyInputMap[item.rowId] !== undefined ? qtyInputMap[item.rowId] : item.quantity}
+                            onChange={(e) => {
+                              // Cập nhật string hiển thị tự do, không clamp
+                              setQtyInputMap((prev) => ({ ...prev, [item.rowId]: e.target.value }));
+                            }}
+                            onBlur={(e) => {
+                              // Khi rời input mới validate & commit số thực
+                              const val = parseFloat(e.target.value);
+                              const committed = isNaN(val) || val < 0.001 ? 0.001 : val;
+                              handleItemChange(item.rowId, 'quantity', committed);
+                              setQtyInputMap((prev) => ({ ...prev, [item.rowId]: String(committed) }));
+                            }}
                             style={{
                               width: 60,
                               height: 26,

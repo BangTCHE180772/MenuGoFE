@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ReloadOutlined,
-  LeftOutlined,
-  RightOutlined,
   InfoCircleOutlined,
   HistoryOutlined,
   SwapOutlined,
@@ -19,6 +17,7 @@ import { getBInventories, getBInventoryLedger } from '../../../../api/binventory
 import { getBatchesByBInventoryId } from '../../../../api/batchApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
 import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
+import PaginationFooter from '../../../shared/PaginationFooter';
 
 const renderTruncatedText = (value, maxLength = 25, style = {}) => {
   const str = value !== null && value !== undefined ? String(value) : '';
@@ -217,7 +216,7 @@ const ProductTable = ({
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(15);
 
   // Row Expansion State: expandedId is the itemId currently expanded
   const [expandedId, setExpandedId] = useState(null);
@@ -1418,59 +1417,14 @@ const ProductTable = ({
       </div>
 
       {/* ─── FOOTER PAGINATION ─────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: '8px 16px',
-          borderTop: '1px solid #e2e8f0',
-          background: '#ffffff',
-          display: 'flex',
-          justify: 'space-between',
-          alignItems: 'center',
-          fontSize: 11,
-          color: '#64748b'
-        }}
-      >
-        <div>
-          Hiển thị từ {filteredData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
-          {Math.min(currentPage * pageSize, filteredData.length)} trên tổng {filteredData.length}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage === 1 ? '#cbd5e1' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <LeftOutlined style={{ fontSize: 10 }} />
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <RightOutlined style={{ fontSize: 10 }} />
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={filteredData.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
 
       {/* ─── BATCH TRACEABILITY DRAWER ─────────────────────────────────────── */}
       <BatchTraceabilityDrawer

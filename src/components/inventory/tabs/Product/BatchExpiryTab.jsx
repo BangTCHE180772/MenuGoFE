@@ -8,8 +8,6 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CompassOutlined,
-  LeftOutlined,
-  RightOutlined,
   InboxOutlined,
   FilterOutlined
 } from '@ant-design/icons';
@@ -17,6 +15,7 @@ import dayjs from 'dayjs';
 import { getBatches, getBatchExpirySummary } from '../../../../api/batchApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
 import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
+import PaginationFooter from '../../../shared/PaginationFooter';
 
 const BatchExpiryTab = ({ selectedBranchId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +25,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
   const [batches, setBatches] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // Summary Metrics State
   const [summary, setSummary] = useState({
@@ -107,7 +106,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId, searchText, expiryStatusFilter, batchStatusFilter, nearExpiryDays, currentPage]);
+  }, [selectedBranchId, searchText, expiryStatusFilter, batchStatusFilter, nearExpiryDays, currentPage, pageSize]);
 
   useEffect(() => {
     fetchSummary();
@@ -467,62 +466,15 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
         </table>
       </div>
 
-      {/* ─── 4. FOOTER PAGINATION ───────────────────────────────────────────── */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '0 0 8px 8px',
-          border: '1px solid #e2e8f0',
-          borderTop: 'none',
-          padding: '10px 16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 11.5,
-          color: '#64748b'
-        }}
-      >
-        <div>
-          Hiển thị từ {totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
-          {Math.min(currentPage * pageSize, totalCount)} trên tổng {totalCount} Lô hàng
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage === 1 ? '#cbd5e1' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <LeftOutlined style={{ fontSize: 10 }} />
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <RightOutlined style={{ fontSize: 10 }} />
-          </button>
-        </div>
-      </div>
+      {/* ─── 4. FOOTER PAGINATION ─────────────────────────────────────────── */}
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
 
       {/* ─── 5. BATCH TRACEABILITY DRAWER ───────────────────────────────────── */}
       <BatchTraceabilityDrawer
