@@ -21,7 +21,8 @@ const ReturnDocumentModal = ({
   onClose,
   onSuccess,
   branchId,
-  importDocument = null
+  importDocument = null,
+  presetBatch = null
 }) => {
   const auth = useAuth ? useAuth() : {};
   const user = auth?.user;
@@ -61,7 +62,9 @@ const ReturnDocumentModal = ({
       if (importDocument) {
         setFormData({
           paidAmount: 0,
-          note: `Trả hàng nhập theo phiếu ${importDocument.code}`
+          note: presetBatch?.batchCode
+            ? `Trả hàng Lô ${presetBatch.batchCode} - phiếu nhập ${importDocument.code}`
+            : `Trả hàng nhập theo phiếu ${importDocument.code}`
         });
 
         const loadReturnDetails = async () => {
@@ -77,11 +80,22 @@ const ReturnDocumentModal = ({
               const actualPaid = Number(apiRes?.amountPaid ?? importDocument?.amountPaid ?? 0);
               setParentAmountPaid(actualPaid);
 
-              const mappedItems = apiRes.details.map((it) => {
+              let mappedItems = apiRes.details.map((it) => {
                 const importQtyDisplay = Number(it.quantity ?? 0);
                 const alreadyReturnedBase = Number(it.alreadyReturnedBaseQuantity ?? 0);
                 const maxReturnInUnit = Number(it.maxReturnQuantity ?? 0);
                 const importPrice = Math.round(Number(it.unitPrice ?? 0));
+
+                let defaultQty = 0;
+                if (presetBatch) {
+                  if (Number(it.bInventoryId) === Number(presetBatch.bInventoryId)) {
+                    defaultQty = Math.min(maxReturnInUnit, Number(presetBatch.quantityRemaining));
+                  } else {
+                    defaultQty = 0;
+                  }
+                } else {
+                  defaultQty = maxReturnInUnit > 0 ? maxReturnInUnit : 0;
+                }
 
                 return {
                   // ID dòng chi tiết phiếu Nhập → dùng làm fatherId khi submit
@@ -96,11 +110,18 @@ const ReturnDocumentModal = ({
                   alreadyReturnedBase: alreadyReturnedBase,
                   maxQuantity: maxReturnInUnit,
                   // Nhập liệu
-                  quantity: maxReturnInUnit > 0 ? maxReturnInUnit : 0,
+                  quantity: defaultQty,
                   importPrice: importPrice,
-                  returnPrice: importPrice  // Mặc định = giá nhập, user có thể điều chỉnh
+                  returnPrice: importPrice // Mặc định = giá nhập, user có thể điều chỉnh
                 };
               });
+
+              if (presetBatch) {
+                const matched = mappedItems.filter((it) => Number(it.bInventoryId) === Number(presetBatch.bInventoryId));
+                if (matched.length > 0) {
+                  mappedItems = matched;
+                }
+              }
               setItems(mappedItems);
               return;
             }
@@ -122,9 +143,17 @@ const ReturnDocumentModal = ({
           const actualPaid = Number(importDocument?.amountPaid ?? 0);
           setParentAmountPaid(actualPaid);
 
-          const fallbackItems = (importDocument.details || []).map((d) => {
+          let fallbackItems = (importDocument.details || []).map((d) => {
             const qty = Number(d.quantity || 1);
             const price = Math.round(Number(d.unitPrice || 0));
+            let defaultQty = qty;
+            if (presetBatch) {
+              if (Number(d.bInventoryId) === Number(presetBatch.bInventoryId)) {
+                defaultQty = Math.min(qty, Number(presetBatch.quantityRemaining));
+              } else {
+                defaultQty = 0;
+              }
+            }
             return {
               fatherId: d.id,
               bInventoryId: d.bInventoryId,
@@ -135,11 +164,18 @@ const ReturnDocumentModal = ({
               importQuantity: qty,
               alreadyReturnedBase: 0,
               maxQuantity: qty,
-              quantity: qty,
+              quantity: defaultQty,
               importPrice: price,
               returnPrice: price
             };
           });
+
+          if (presetBatch) {
+            const matched = fallbackItems.filter((it) => Number(it.bInventoryId) === Number(presetBatch.bInventoryId));
+            if (matched.length > 0) {
+              fallbackItems = matched;
+            }
+          }
           setItems(fallbackItems);
         };
 

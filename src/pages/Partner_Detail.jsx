@@ -562,13 +562,12 @@ const Partner_Detail = () => {
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>Đã thanh toán (đ)</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>Còn nợ (đ)</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Trạng thái thanh toán</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {docs.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
                         Chưa có phiếu nhập hàng nào từ nhà cung cấp này
                       </td>
                     </tr>
@@ -692,27 +691,12 @@ const Partner_Detail = () => {
                                 </button>
                               )}
                             </td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                              <span
-                                onClick={() => navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`)}
-                                style={{
-                                  fontSize: 11,
-                                  color: '#2563eb',
-                                  cursor: 'pointer',
-                                  fontWeight: 600,
-                                  textDecoration: 'underline'
-                                }}
-                                title="Nhấp để chuyển tới Quản lý nhập hàng"
-                              >
-                                Xem chứng từ
-                              </span>
-                            </td>
                           </tr>
 
                           {/* VÙNG CHI TIẾT LỊCH SỬ GIAO DỊCH TƯƠNG ỨNG CỦA PHIẾU NHẬP */}
                           {isDocExpanded && (
                             <tr style={{ background: '#f8fafc' }}>
-                              <td colSpan={7} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
+                              <td colSpan={6} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
                                 <div
                                   style={{
                                     background: '#ffffff',

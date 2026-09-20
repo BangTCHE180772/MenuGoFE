@@ -675,13 +675,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Đã thanh toán</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Còn nợ</th>
                       <th style={{ padding: '7px 10px', textAlign: 'center' }}>Trạng thái thanh toán</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {docs.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                           Chưa có phiếu nhập hàng nào từ đối tác này
                         </td>
                       </tr>
@@ -715,7 +714,19 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                   ) : (
                                     <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
                                   )}
-                                  <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`);
+                                    }}
+                                    style={{
+                                      fontWeight: 700,
+                                      color: '#2563eb',
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline'
+                                    }}
+                                    title="Bấm để xem phiếu nhập kho tương ứng"
+                                  >
                                     {d.code}
                                   </span>
                                 </div>
@@ -802,27 +813,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                   </button>
                                 )}
                               </td>
-                              <td style={{ padding: '7px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                                <span
-                                  onClick={() => navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`)}
-                                  style={{
-                                    fontSize: 11,
-                                    color: '#2563eb',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                    textDecoration: 'underline'
-                                  }}
-                                  title="Nhấp để xem chi tiết chứng từ nhập kho"
-                                >
-                                  Xem chứng từ
-                                </span>
-                              </td>
                             </tr>
 
                             {/* VÙNG CHI TIẾT LỊCH SỬ GIAO DỊCH TƯƠNG ỨNG CỦA PHIẾU NHẬP */}
                             {isDocExpanded && (
                               <tr style={{ background: '#f8fafc' }}>
-                                <td colSpan={7} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
+                                <td colSpan={6} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
                                   <div
                                     style={{
                                       background: '#ffffff',

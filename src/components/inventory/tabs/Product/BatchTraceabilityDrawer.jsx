@@ -8,15 +8,48 @@ import {
   ArrowRightOutlined,
   InfoCircleOutlined,
   InboxOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DeleteOutlined,
+  RollbackOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getBatchTraceability } from '../../../../api/batchApi';
+import { getImportById } from '../../../../api/documentApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
+import DisposalDocumentModal from '../ExportDelete/DisposalDocumentModal';
+import ReturnDocumentModal from '../Import/ReturnDocumentModal';
 
-const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
+const showToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : type === 'info' ? '#3b82f6' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
+
+const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [traceData, setTraceData] = useState(null);
+
+  // States quản lý Modal Xuất hủy và Modal Trả hàng
+  const [disposalModalOpen, setDisposalModalOpen] = useState(false);
+  const [disposalInitialData, setDisposalInitialData] = useState(null);
+
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnImportDoc, setReturnImportDoc] = useState(null);
+  const [presetBatchForReturn, setPresetBatchForReturn] = useState(null);
 
   const fetchTraceability = async (id) => {
     if (!id) return;
@@ -45,6 +78,98 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
   const currentBatch = traceData?.currentBatch;
   const sourceBatch = traceData?.sourceBatch;
   const allocations = traceData?.allocations || [];
+
+  const handleOpenDisposal = () => {
+    if (!currentBatch || Number(currentBatch.quantityRemaining) <= 0) {
+      showToast('Lô hàng này đã hết tồn kho để xuất hủy.', 'warning');
+      return;
+    }
+
+    const itemToDispose = {
+      rowId: `batch-disposal-${currentBatch.id}-${Date.now()}`,
+      bInventoryId: currentBatch.bInventoryId,
+      code: currentBatch.productCode,
+      name: currentBatch.productName,
+      baseStock: currentBatch.quantityRemaining,
+      stock: currentBatch.quantityRemaining,
+      baseAvgCost: currentBatch.unitCost,
+      costPrice: currentBatch.unitCost,
+      unitConversionId: null,
+      unitName: currentBatch.unitName,
+      unitConversions: [],
+      conversionPoint: 1,
+      quantity: Number(currentBatch.quantityRemaining),
+      note: `Xuất hủy Lô: ${currentBatch.batchCode}`
+    };
+
+    setDisposalInitialData({
+      note: `Xuất hủy Lô ${currentBatch.batchCode} - ${currentBatch.productName}`,
+      items: [itemToDispose]
+    });
+    setDisposalModalOpen(true);
+  };
+
+  const handleOpenReturn = async () => {
+    if (!currentBatch || Number(currentBatch.quantityRemaining) <= 0) {
+      showToast('Lô hàng này đã hết tồn kho để trả hàng.', 'warning');
+      return;
+    }
+
+    const importDocId =
+      traceData?.initialImportDocumentId ||
+      allocations.find(
+        (a) =>
+          (a.documentType === 1 ||
+            a.documentType === 'Import' ||
+            a.allocationType === 0 ||
+            a.allocationType === 'ImportReceipt' ||
+            (a.documentCode && a.documentCode.startsWith('PNK'))) &&
+          a.documentId
+      )?.documentId;
+
+    if (!importDocId) {
+      const isProduction = allocations.some(
+        (a) =>
+          a.allocationType === 9 ||
+          a.allocationType === 'ProductionReceipt' ||
+          (a.documentCode && a.documentCode.startsWith('LSX'))
+      );
+      if (isProduction) {
+        showToast(
+          'Lô hàng này là thành phẩm sản xuất nội bộ, không có phiếu nhập Nhà cung cấp để trả hàng. Vui lòng sử dụng chức năng Xuất hủy.',
+          'warning'
+        );
+      } else {
+        showToast(
+          'Không tìm thấy phiếu nhập Nhà cung cấp liên kết với Lô hàng này để thực hiện trả hàng.',
+          'warning'
+        );
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const doc = await getImportById(importDocId);
+      if (!doc) {
+        showToast('Không thể tải thông tin phiếu nhập kho gốc.', 'error');
+        return;
+      }
+
+      setReturnImportDoc(doc);
+      setPresetBatchForReturn({
+        bInventoryId: currentBatch.bInventoryId,
+        quantityRemaining: currentBatch.quantityRemaining,
+        batchCode: currentBatch.batchCode
+      });
+      setReturnModalOpen(true);
+    } catch (err) {
+      console.error('Lỗi khi tải phiếu nhập để trả hàng:', err);
+      showToast('Lỗi khi tải thông tin phiếu nhập kho để trả hàng.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderAllocationTypeBadge = (a) => {
     let label = a.allocationTypeName || '';
@@ -106,6 +231,11 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
       bg = '#f8fafc';
       color = '#475569';
       border = '#cbd5e1';
+    } else if (label === 'Nhập hàng' || label.toLowerCase().includes('nhập kho') || a.allocationType === 0 || a.allocationType === 'ImportReceipt') {
+      label = 'Nhập hàng';
+      bg = '#ecfdf5';
+      color = '#059669';
+      border = '#a7f3d0';
     }
 
     return (
@@ -250,15 +380,90 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
-                      {currentBatch.productName} ({currentBatch.productCode})
-                    </span>
+                {/* Dòng 1: Tên sản phẩm (Mã sản phẩm) */}
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>
+                    {currentBatch.productName} ({currentBatch.productCode})
+                  </span>
+                </div>
+
+                {/* Dòng 2: [Đang hoạt động] [Khẩn cấp: Còn 1 ngày] phía đối diện sẽ có [xuất hủy] [trả hàng] */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 14,
+                    flexWrap: 'wrap',
+                    gap: 8
+                  }}
+                >
+                  {/* Bên trái dòng 2: Badge trạng thái hoạt động & Badge HSD */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     {renderBatchStatusBadge(currentBatch.status)}
+                    {renderExpiryStatusBadge(
+                      currentBatch.expiryDate,
+                      currentBatch.daysUntilExpiry,
+                      currentBatch.quantityRemaining,
+                      currentBatch.status
+                    )}
                   </div>
-                  <div>
-                    {renderExpiryStatusBadge(currentBatch.expiryDate, currentBatch.daysUntilExpiry, currentBatch.quantityRemaining, currentBatch.status)}
+
+                  {/* Phía đối diện dòng 2: Nút [Xuất hủy] và [Trả hàng] */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleOpenDisposal}
+                      disabled={Number(currentBatch.quantityRemaining) <= 0}
+                      title={
+                        Number(currentBatch.quantityRemaining) <= 0
+                          ? 'Lô hàng đã hết tồn kho để xuất hủy'
+                          : 'Xuất hủy toàn bộ số lượng còn lại của Lô này'
+                      }
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: Number(currentBatch.quantityRemaining) <= 0 ? '#94a3b8' : '#dc2626',
+                        background: Number(currentBatch.quantityRemaining) <= 0 ? '#f1f5f9' : '#fef2f2',
+                        border: `1px solid ${Number(currentBatch.quantityRemaining) <= 0 ? '#e2e8f0' : '#fca5a5'}`,
+                        borderRadius: 6,
+                        cursor: Number(currentBatch.quantityRemaining) <= 0 ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <DeleteOutlined /> Xuất hủy
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenReturn}
+                      disabled={Number(currentBatch.quantityRemaining) <= 0}
+                      title={
+                        Number(currentBatch.quantityRemaining) <= 0
+                          ? 'Lô hàng đã hết tồn kho để trả hàng'
+                          : 'Trả hàng Lô này lại cho Nhà cung cấp'
+                      }
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: Number(currentBatch.quantityRemaining) <= 0 ? '#94a3b8' : '#ea580c',
+                        background: Number(currentBatch.quantityRemaining) <= 0 ? '#f1f5f9' : '#fff7ed',
+                        border: `1px solid ${Number(currentBatch.quantityRemaining) <= 0 ? '#e2e8f0' : '#fed7aa'}`,
+                        borderRadius: 6,
+                        cursor: Number(currentBatch.quantityRemaining) <= 0 ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <RollbackOutlined /> Trả hàng
+                    </button>
                   </div>
                 </div>
 
@@ -379,9 +584,11 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
                       </thead>
                       <tbody>
                         {allocations.map((a, idx) => {
-                          const isReceipt = a.allocationType === 9 ||
+                          const isReceipt = a.allocationType === 0 ||
+                            a.allocationType === 'ImportReceipt' ||
+                            a.allocationType === 9 ||
                             a.allocationType === 'ProductionReceipt' ||
-                            (a.allocationTypeName && (a.allocationTypeName.includes('chuẩn bị') || a.allocationTypeName.includes('Sản xuất chuẩn bị sẵn')));
+                            (a.allocationTypeName && (a.allocationTypeName.includes('chuẩn bị') || a.allocationTypeName.includes('Sản xuất chuẩn bị sẵn') || a.allocationTypeName.includes('Nhập hàng')));
                           const isNegative = !isReceipt && a.quantityAllocated > 0;
                           return (
                             <tr key={a.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -422,6 +629,47 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose }) => {
           )}
         </div>
       </div>
+
+      {/* MODAL XUẤT HỦY LÔ HÀNG */}
+      {disposalModalOpen && (
+        <DisposalDocumentModal
+          open={disposalModalOpen}
+          branchId={currentBatch?.branchId}
+          initialData={disposalInitialData}
+          onClose={() => {
+            setDisposalModalOpen(false);
+            setDisposalInitialData(null);
+          }}
+          onSuccess={() => {
+            setDisposalModalOpen(false);
+            setDisposalInitialData(null);
+            fetchTraceability(batchId);
+            onActionSuccess?.();
+          }}
+        />
+      )}
+
+      {/* MODAL TRẢ HÀNG NHẬP LÔ HÀNG */}
+      {returnModalOpen && (
+        <ReturnDocumentModal
+          open={returnModalOpen}
+          branchId={currentBatch?.branchId}
+          importDocument={returnImportDoc}
+          presetBatch={presetBatchForReturn}
+          onClose={() => {
+            setReturnModalOpen(false);
+            setReturnImportDoc(null);
+            setPresetBatchForReturn(null);
+          }}
+          onSuccess={() => {
+            setReturnModalOpen(false);
+            setReturnImportDoc(null);
+            setPresetBatchForReturn(null);
+            fetchTraceability(batchId);
+            onActionSuccess?.();
+          }}
+        />
+      )}
     </div>
   );
 };

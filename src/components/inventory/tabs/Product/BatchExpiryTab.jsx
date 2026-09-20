@@ -484,6 +484,10 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
           setTraceDrawerOpen(false);
           setSelectedTraceBatchId(null);
         }}
+        onActionSuccess={() => {
+          fetchBatchesList();
+          fetchSummary();
+        }}
       />
     </div>
   );
