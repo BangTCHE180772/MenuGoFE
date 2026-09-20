@@ -549,13 +549,6 @@ const OrderPage = ({ isWaiterMode }) => {
           onRejectItem={handleRejectItem}
           onCancelOrder={handleCancelOrder}
           onMerge={() => setIsMergeModalVisible(true)}
-          onRefresh={() => {
-            if (selectedTable) {
-              getTableOrderSummary(selectedTable.id)
-                .then(res => setOrderSummary(res.data))
-                .catch(err => console.error(err));
-            }
-          }}
           loading={orderLoading}
           isWaiterMode={isWaiterMode}
         />

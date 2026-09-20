@@ -221,10 +221,13 @@ const LeftoverPage = () => {
         if (values.reason === 'Lý do khác') {
           finalReason = values.otherReason;
         }
+        const isReuse = values.handlingAction === true;
         await requestReturnItem(values.orderDetailId, {
           returnQuantity: values.quantity,
           returnReason: finalReason,
-          handlingAction: values.handlingAction ? 'Reuse' : 'Discard',
+          // Backend chỉ cộng lại kho khi IsIntact && Reuse — phải gửi cả hai.
+          isIntact: isReuse,
+          handlingAction: isReuse ? 'Reuse' : 'Discard',
           atFaultAccountId: values.atFaultAccountId ?? null,
         });
         message.success('Đã xử lý trả món và ghi nhận thành công');
