@@ -68,3 +68,8 @@ export const payPartnerImportDocument = async (partnerId, documentId, paymentDat
   return response.data;
 };
 
+export const updatePartnerImages = async (partnerId, imageUrls) => {
+  const response = await axiosInstance.put(`/api/Partner/${partnerId}/images`, { imageUrls });
+  return response.data;
+};
+
