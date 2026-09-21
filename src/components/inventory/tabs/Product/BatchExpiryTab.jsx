@@ -673,63 +673,55 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
               </div>
 
               {/* LINE 1: Cấp Bách */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', minWidth: 90 }}>
-                    Cấp Bách:
-                  </label>
-                  <input
-                    type="number"
-                    min="7"
-                    value={alertSettings.criticalDays}
-                    onChange={(e) => setAlertSettings(prev => ({ ...prev, criticalDays: e.target.value }))}
-                    style={{
-                      width: 85,
-                      height: 34,
-                      padding: '4px 10px',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid #cbd5e1',
-                      outline: 'none',
-                      textAlign: 'center'
-                    }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b', paddingLeft: 98, lineHeight: 1.4 }}>
-                  (thấp nhất là 7 ngày ) (mặc định là 7 ngày) mỗi ngày đều sẽ báo cảnh báo này khi hạn còn {alertSettings.criticalDays || 7} ngày hoặc theo thiết lập
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', minWidth: 90 }}>
+                  Cấp Bách:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="7"
+                  value={alertSettings.criticalDays}
+                  onChange={(e) => setAlertSettings(prev => ({ ...prev, criticalDays: e.target.value }))}
+                  style={{
+                    width: 85,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
               </div>
 
               {/* LINE 2: Cảnh báo */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: '#d97706', minWidth: 90 }}>
-                    Cảnh báo:
-                  </label>
-                  <input
-                    type="number"
-                    min="14"
-                    value={alertSettings.warningDays}
-                    onChange={(e) => setAlertSettings(prev => ({ ...prev, warningDays: e.target.value }))}
-                    style={{
-                      width: 85,
-                      height: 34,
-                      padding: '4px 10px',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderRadius: 6,
-                      border: '1px solid #cbd5e1',
-                      outline: 'none',
-                      textAlign: 'center'
-                    }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b', paddingLeft: 98, lineHeight: 1.4 }}>
-                  (thấp nhất là 14 ngày) (mặc định là 14 ngày) mỗi ngày đều sẽ báo cảnh báo này khi hạn còn {alertSettings.warningDays || 14} ngày hoặc theo thiết lập
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#d97706', minWidth: 90 }}>
+                  Cảnh báo:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="14"
+                  value={alertSettings.warningDays}
+                  onChange={(e) => setAlertSettings(prev => ({ ...prev, warningDays: e.target.value }))}
+                  style={{
+                    width: 85,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
               </div>
 
               {/* THÔNG BÁO LỖI NẾU CÓ */}

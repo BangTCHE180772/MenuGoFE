@@ -10,14 +10,44 @@ import {
   AppstoreOutlined,
   CompassOutlined,
   InboxOutlined,
-  EyeOutlined
+  EyeOutlined,
+  SettingOutlined,
+  BellOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getBInventories, getBInventoryLedger } from '../../../../api/binventoryApi';
+import {
+  getBInventories,
+  getBInventoryLedger,
+  getStockAlertSettings,
+  updateStockAlertSettings,
+  getItemStockAlertSettings,
+  updateItemStockAlertSettings
+} from '../../../../api/binventoryApi';
 import { getBatchesByBInventoryId } from '../../../../api/batchApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
 import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
 import PaginationFooter from '../../../shared/PaginationFooter';
+
+const showProductToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
 
 const renderTruncatedText = (value, maxLength = 25, style = {}) => {
   const str = value !== null && value !== undefined ? String(value) : '';
@@ -234,6 +264,151 @@ const ProductTable = ({
   // Traceability Drawer State
   const [traceDrawerOpen, setTraceDrawerOpen] = useState(false);
   const [selectedTraceBatchId, setSelectedTraceBatchId] = useState(null);
+
+  // Chi nhánh Stock Alert Settings Modal
+  const [branchAlertModalOpen, setBranchAlertModalOpen] = useState(false);
+  const [branchStockSettings, setBranchStockSettings] = useState({ criticalThreshold: 20, warningThreshold: 40 });
+  const [savingBranchSettings, setSavingBranchSettings] = useState(false);
+  const [branchSettingError, setBranchSettingError] = useState('');
+
+  const fetchBranchStockAlertSettings = async () => {
+    if (!selectedBranchId) return;
+    try {
+      const res = await getStockAlertSettings(selectedBranchId);
+      if (res) {
+        setBranchStockSettings({
+          criticalThreshold: res.criticalThreshold || 20,
+          warningThreshold: res.warningThreshold || 40
+        });
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải cấu hình cảnh báo tồn kho chi nhánh:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBranchStockAlertSettings();
+  }, [selectedBranchId]);
+
+  const handleSaveBranchStockSettings = async () => {
+    setBranchSettingError('');
+    const crit = Number(branchStockSettings.criticalThreshold);
+    const warn = Number(branchStockSettings.warningThreshold);
+
+    if (isNaN(crit) || crit <= 0) {
+      setBranchSettingError('Số lượng cảnh báo cấp bách phải lớn hơn 0.');
+      return;
+    }
+    if (isNaN(warn) || warn <= 0) {
+      setBranchSettingError('Số lượng cảnh báo phải lớn hơn 0.');
+      return;
+    }
+    if (warn < crit) {
+      setBranchSettingError('Số lượng cảnh báo phải lớn hơn hoặc bằng số lượng cấp bách.');
+      return;
+    }
+
+    setSavingBranchSettings(true);
+    try {
+      await updateStockAlertSettings({
+        branchId: selectedBranchId,
+        criticalThreshold: crit,
+        warningThreshold: warn
+      });
+      showProductToast('Lưu thiết lập thông báo thành công!', 'success');
+      setBranchAlertModalOpen(false);
+      fetchInventoryList();
+    } catch (err) {
+      console.error('Lỗi khi lưu thiết lập cảnh báo tồn kho:', err);
+      setBranchSettingError(err.response?.data?.message || 'Không thể lưu thiết lập thông báo.');
+    } finally {
+      setSavingBranchSettings(false);
+    }
+  };
+
+  // Item Stock Alert Settings Modal
+  const [itemAlertModalOpen, setItemAlertModalOpen] = useState(false);
+  const [selectedAlertItem, setSelectedAlertItem] = useState(null);
+  const [itemAlertLoading, setItemAlertLoading] = useState(false);
+  const [itemAlertForm, setItemAlertForm] = useState({
+    useCustom: false,
+    customCriticalThreshold: '',
+    customWarningThreshold: ''
+  });
+  const [savingItemAlert, setSavingItemAlert] = useState(false);
+  const [itemAlertError, setItemAlertError] = useState('');
+
+  const handleOpenItemAlertSettings = async (item) => {
+    const binvId = item.bInventoryId || item.id;
+    if (!binvId) return;
+    setItemAlertError('');
+    setItemAlertModalOpen(true);
+    setItemAlertLoading(true);
+    try {
+      const res = await getItemStockAlertSettings(binvId);
+      setSelectedAlertItem(res);
+      const hasCustom = res.customCriticalThreshold !== null && res.customCriticalThreshold !== undefined;
+      setItemAlertForm({
+        useCustom: hasCustom,
+        customCriticalThreshold: hasCustom ? res.customCriticalThreshold : (res.branchCriticalThreshold || branchStockSettings.criticalThreshold || 20),
+        customWarningThreshold: (hasCustom && res.customWarningThreshold !== null && res.customWarningThreshold !== undefined)
+          ? res.customWarningThreshold
+          : (res.branchWarningThreshold || branchStockSettings.warningThreshold || 40)
+      });
+    } catch (err) {
+      console.error('Lỗi khi tải cấu hình cảnh báo mặt hàng:', err);
+      showProductToast('Không thể tải cấu hình cảnh báo của mặt hàng.', 'error');
+      setItemAlertModalOpen(false);
+    } finally {
+      setItemAlertLoading(false);
+    }
+  };
+
+  const handleSaveItemAlertSettings = async () => {
+    if (!selectedAlertItem?.bInventoryId) return;
+    setItemAlertError('');
+
+    let payload = {
+      customCriticalThreshold: null,
+      customWarningThreshold: null
+    };
+
+    if (itemAlertForm.useCustom) {
+      const crit = Number(itemAlertForm.customCriticalThreshold);
+      const warn = Number(itemAlertForm.customWarningThreshold);
+
+      if (isNaN(crit) || crit <= 0) {
+        setItemAlertError('Số lượng cảnh báo cấp bách tùy chỉnh phải lớn hơn 0.');
+        return;
+      }
+      if (isNaN(warn) || warn <= 0) {
+        setItemAlertError('Số lượng cảnh báo tùy chỉnh phải lớn hơn 0.');
+        return;
+      }
+      if (warn < crit) {
+        setItemAlertError('Số lượng cảnh báo tùy chỉnh phải lớn hơn hoặc bằng số lượng cấp bách.');
+        return;
+      }
+
+      payload = {
+        customCriticalThreshold: crit,
+        customWarningThreshold: warn
+      };
+    }
+
+    setSavingItemAlert(true);
+    try {
+      await updateItemStockAlertSettings(selectedAlertItem.bInventoryId, payload);
+      showProductToast('Lưu thiết lập cảnh báo cho mặt hàng thành công!', 'success');
+      setItemAlertModalOpen(false);
+      fetchInventoryList();
+    } catch (err) {
+      console.error('Lỗi khi lưu thiết lập cảnh báo mặt hàng:', err);
+      setItemAlertError(err.response?.data?.message || 'Không thể lưu thiết lập cảnh báo.');
+    } finally {
+      setSavingItemAlert(false);
+    }
+  };
 
   // Fetch BInventories from API when selectedBranchId or subTab changes
   const fetchInventoryList = async () => {
@@ -624,26 +799,53 @@ const ProductTable = ({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={fetchInventoryList}
-          style={{
-            height: 32,
-            padding: '0 12px',
-            border: '1px solid #cbd5e1',
-            borderRadius: 6,
-            background: '#ffffff',
-            color: '#334155',
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4
-          }}
-        >
-          <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={fetchInventoryList}
+            style={{
+              height: 32,
+              padding: '0 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setBranchSettingError('');
+              fetchBranchStockAlertSettings();
+              setBranchAlertModalOpen(true);
+            }}
+            style={{
+              height: 32,
+              padding: '0 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <SettingOutlined style={{ fontSize: 12 }} /> Cài đặt
+          </button>
+        </div>
       </div>
 
       {/* ─── DATA TABLE AREA ─────────────────────────────────────────────────── */}
@@ -949,26 +1151,57 @@ const ProductTable = ({
                                 </button>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/product-detail/${itemId}`)}
-                                style={{
-                                  padding: '4px 12px',
-                                  fontSize: 11.5,
-                                  borderRadius: 5,
-                                  border: '1px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                }}
-                              >
-                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết mặt hàng
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenItemAlertSettings(item)}
+                                  style={{
+                                    padding: '4px 12px',
+                                    fontSize: 11.5,
+                                    borderRadius: 5,
+                                    border: (item.customCriticalThreshold !== null && item.customCriticalThreshold !== undefined)
+                                      ? '1px solid #bfdbfe'
+                                      : '1px solid #cbd5e1',
+                                    background: (item.customCriticalThreshold !== null && item.customCriticalThreshold !== undefined)
+                                      ? '#eff6ff'
+                                      : '#ffffff',
+                                    color: (item.customCriticalThreshold !== null && item.customCriticalThreshold !== undefined)
+                                      ? '#2563eb'
+                                      : '#0f172a',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                  }}
+                                  title="Cài đặt ngưỡng cảnh báo tồn kho riêng cho mặt hàng này"
+                                >
+                                  <BellOutlined style={{ fontSize: 12, color: (item.customCriticalThreshold !== null && item.customCriticalThreshold !== undefined) ? '#2563eb' : '#ea580c' }} />
+                                  <span>Cài đặt cảnh báo</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/product-detail/${itemId}`)}
+                                  style={{
+                                    padding: '4px 12px',
+                                    fontSize: 11.5,
+                                    borderRadius: 5,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#0f172a',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                  }}
+                                >
+                                  <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết mặt hàng
+                                </button>
+                              </div>
                             </div>
 
                             {/* TAB 1 CONTENT: THÔNG TIN */}
@@ -1435,6 +1668,445 @@ const ProductTable = ({
           setSelectedTraceBatchId(null);
         }}
       />
+
+      {/* ─── MODAL CÀI ĐẶT THÔNG BÁO TỒN KHO CHI NHÁNH ───────────────────────── */}
+      {branchAlertModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(2px)',
+            padding: 16
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 580,
+              background: '#ffffff',
+              borderRadius: 12,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* HEADER: Cài đặt */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SettingOutlined style={{ fontSize: 18, color: '#2563eb' }} />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                  Cài đặt
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBranchAlertModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* TEXT: Thông báo */}
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', borderBottom: '1px dashed #cbd5e1', paddingBottom: 8 }}>
+                Thông báo
+              </div>
+
+              {/* LINE 1: Cấp Bách */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', minWidth: 90 }}>
+                  Cấp Bách:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={branchStockSettings.criticalThreshold}
+                  onChange={(e) => setBranchStockSettings(prev => ({ ...prev, criticalThreshold: e.target.value }))}
+                  style={{
+                    width: 95,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>đơn vị</span>
+              </div>
+
+              {/* LINE 2: Cảnh báo */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#d97706', minWidth: 90 }}>
+                  Cảnh báo:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={branchStockSettings.warningThreshold}
+                  onChange={(e) => setBranchStockSettings(prev => ({ ...prev, warningThreshold: e.target.value }))}
+                  style={{
+                    width: 95,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>đơn vị</span>
+              </div>
+
+              {/* THÔNG BÁO LỖI NẾU CÓ */}
+              {branchSettingError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                  {branchSettingError}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setBranchAlertModalOpen(false)}
+                style={{
+                  height: 34,
+                  padding: '0 16px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  color: '#475569',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveBranchStockSettings}
+                disabled={savingBranchSettings}
+                style={{
+                  height: 34,
+                  padding: '0 18px',
+                  background: '#2563eb',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: savingBranchSettings ? 'not-allowed' : 'pointer',
+                  opacity: savingBranchSettings ? 0.7 : 1
+                }}
+              >
+                {savingBranchSettings ? 'Đang lưu...' : 'Lưu thiết lập'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL CÀI ĐẶT CẢNH BÁO RIÊNG MẶT HÀNG ───────────────────────────── */}
+      {itemAlertModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(2px)',
+            padding: 16
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 580,
+              background: '#ffffff',
+              borderRadius: 12,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* HEADER */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BellOutlined style={{ fontSize: 18, color: '#f59e0b' }} />
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                  Cài đặt cảnh báo tồn kho mặt hàng
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemAlertModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflowY: 'auto' }}>
+              {itemAlertLoading ? (
+                <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b', fontSize: 13 }}>
+                  Đang tải thông tin thiết lập...
+                </div>
+              ) : (
+                <>
+                  {/* SWITCH DÙNG THIẾT LẬP RIÊNG */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '12px 14px',
+                      background: itemAlertForm.useCustom ? '#eff6ff' : '#f8fafc',
+                      borderRadius: 8,
+                      border: `1px solid ${itemAlertForm.useCustom ? '#bfdbfe' : '#e2e8f0'}`
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="useCustomStockAlert"
+                      checked={itemAlertForm.useCustom}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setItemAlertForm(prev => ({
+                          ...prev,
+                          useCustom: checked,
+                          customCriticalThreshold: prev.customCriticalThreshold || selectedAlertItem?.branchCriticalThreshold || branchStockSettings.criticalThreshold || 20,
+                          customWarningThreshold: prev.customWarningThreshold || selectedAlertItem?.branchWarningThreshold || branchStockSettings.warningThreshold || 40
+                        }));
+                      }}
+                      style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#2563eb' }}
+                    />
+                    <label htmlFor="useCustomStockAlert" style={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>
+                      Thiết lập ngưỡng cảnh báo riêng cho vật phẩm này
+                    </label>
+                  </div>
+
+                  {/* VÙNG THIẾT LẬP NGƯỠNG */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 16,
+                      padding: '16px 18px',
+                      background: itemAlertForm.useCustom ? '#ffffff' : '#f8fafc',
+                      borderRadius: 8,
+                      border: `1px solid ${itemAlertForm.useCustom ? '#cbd5e1' : '#e2e8f0'}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* LINE 1: Cấp Bách */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 13, fontWeight: 700, color: itemAlertForm.useCustom ? '#dc2626' : '#94a3b8', minWidth: 90 }}>
+                        Cấp Bách:
+                      </label>
+                      <span style={{ fontSize: 13, color: itemAlertForm.useCustom ? '#475569' : '#94a3b8', fontWeight: 500 }}>dưới</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="any"
+                        disabled={!itemAlertForm.useCustom}
+                        value={itemAlertForm.useCustom ? itemAlertForm.customCriticalThreshold : (selectedAlertItem?.branchCriticalThreshold ?? branchStockSettings.criticalThreshold ?? 20)}
+                        onChange={(e) => setItemAlertForm(prev => ({ ...prev, customCriticalThreshold: e.target.value }))}
+                        style={{
+                          width: 95,
+                          height: 34,
+                          padding: '4px 10px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          borderRadius: 6,
+                          border: `1px solid ${itemAlertForm.useCustom ? '#cbd5e1' : '#e2e8f0'}`,
+                          background: itemAlertForm.useCustom ? '#ffffff' : '#f1f5f9',
+                          color: itemAlertForm.useCustom ? '#1e293b' : '#64748b',
+                          outline: 'none',
+                          textAlign: 'center',
+                          cursor: itemAlertForm.useCustom ? 'text' : 'not-allowed'
+                        }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: itemAlertForm.useCustom ? '#334155' : '#64748b' }}>
+                        {selectedAlertItem?.unitName || 'đơn vị'}
+                      </span>
+                      {!itemAlertForm.useCustom && (
+                        <span style={{ fontSize: 12.5, color: '#64748b', fontStyle: 'italic', fontWeight: 500 }}>
+                          (sử dụng theo thiết lập chung)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* LINE 2: Cảnh báo */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 13, fontWeight: 700, color: itemAlertForm.useCustom ? '#d97706' : '#94a3b8', minWidth: 90 }}>
+                        Cảnh báo:
+                      </label>
+                      <span style={{ fontSize: 13, color: itemAlertForm.useCustom ? '#475569' : '#94a3b8', fontWeight: 500 }}>dưới</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="any"
+                        disabled={!itemAlertForm.useCustom}
+                        value={itemAlertForm.useCustom ? itemAlertForm.customWarningThreshold : (selectedAlertItem?.branchWarningThreshold ?? branchStockSettings.warningThreshold ?? 40)}
+                        onChange={(e) => setItemAlertForm(prev => ({ ...prev, customWarningThreshold: e.target.value }))}
+                        style={{
+                          width: 95,
+                          height: 34,
+                          padding: '4px 10px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          borderRadius: 6,
+                          border: `1px solid ${itemAlertForm.useCustom ? '#cbd5e1' : '#e2e8f0'}`,
+                          background: itemAlertForm.useCustom ? '#ffffff' : '#f1f5f9',
+                          color: itemAlertForm.useCustom ? '#1e293b' : '#64748b',
+                          outline: 'none',
+                          textAlign: 'center',
+                          cursor: itemAlertForm.useCustom ? 'text' : 'not-allowed'
+                        }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: itemAlertForm.useCustom ? '#334155' : '#64748b' }}>
+                        {selectedAlertItem?.unitName || 'đơn vị'}
+                      </span>
+                      {!itemAlertForm.useCustom && (
+                        <span style={{ fontSize: 12.5, color: '#64748b', fontStyle: 'italic', fontWeight: 500 }}>
+                          (sử dụng theo thiết lập chung)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* THÔNG BÁO LỖI NẾU CÓ */}
+                  {itemAlertError && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                      {itemAlertError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setItemAlertModalOpen(false)}
+                style={{
+                  height: 34,
+                  padding: '0 16px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  color: '#475569',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveItemAlertSettings}
+                disabled={savingItemAlert || itemAlertLoading}
+                style={{
+                  height: 34,
+                  padding: '0 18px',
+                  background: '#2563eb',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: (savingItemAlert || itemAlertLoading) ? 'not-allowed' : 'pointer',
+                  opacity: (savingItemAlert || itemAlertLoading) ? 0.7 : 1
+                }}
+              >
+                {savingItemAlert ? 'Đang lưu...' : 'Lưu thiết lập'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

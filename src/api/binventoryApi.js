@@ -64,3 +64,38 @@ export const getTransactionLedger = async (branchId, startDate, endDate) => {
   });
   return response.data;
 };
+
+/**
+ * Lấy cấu hình ngưỡng cảnh báo tồn kho chung của chi nhánh
+ */
+export const getStockAlertSettings = async (branchId) => {
+  const response = await axiosInstance.get('/api/BInventory/stock-alert-settings', {
+    params: { branchId: branchId || undefined }
+  });
+  return response.data;
+};
+
+/**
+ * Cập nhật cấu hình ngưỡng cảnh báo tồn kho chung của chi nhánh
+ */
+export const updateStockAlertSettings = async (data) => {
+  const response = await axiosInstance.put('/api/BInventory/stock-alert-settings', data);
+  return response.data;
+};
+
+/**
+ * Lấy cấu hình ngưỡng cảnh báo tồn kho riêng của từng mặt hàng
+ */
+export const getItemStockAlertSettings = async (binventoryId) => {
+  const response = await axiosInstance.get(`/api/BInventory/${binventoryId}/alert-settings`);
+  return response.data;
+};
+
+/**
+ * Cập nhật cấu hình ngưỡng cảnh báo tồn kho riêng của từng mặt hàng
+ */
+export const updateItemStockAlertSettings = async (binventoryId, data) => {
+  const response = await axiosInstance.put(`/api/BInventory/${binventoryId}/alert-settings`, data);
+  return response.data;
+};
+
