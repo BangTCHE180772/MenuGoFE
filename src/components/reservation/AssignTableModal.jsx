@@ -78,10 +78,19 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
     <Modal
       title="Xếp Bàn Cho Khách"
       open={visible}
-      onCancel={onClose}
+      onCancel={() => {
+        Modal.confirm({
+          title: 'Xác nhận đóng',
+          content: 'Bạn có chắc chắn muốn đóng cửa sổ xếp bàn không?',
+          okText: 'Đóng',
+          cancelText: 'Huỷ',
+          onOk: onClose
+        });
+      }}
       onOk={handleOk}
       confirmLoading={submitting}
       destroyOnClose
+      maskClosable={false}
     >
       <Spin spinning={loading}>
         {reservation && (
