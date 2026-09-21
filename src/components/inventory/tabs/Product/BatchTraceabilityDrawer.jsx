@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Switch } from 'antd';
 import {
   CloseOutlined,
   HistoryOutlined,
@@ -370,42 +371,19 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) =>
             </button>
 
             {/* NÚT CHUÔNG BẬT / TẮT THÔNG BÁO CHO RIÊNG LÔ NÀY */}
-            <button
-              type="button"
-              onClick={handleToggleMuteNotification}
-              disabled={togglingMute || !currentBatch}
-              title={
-                currentBatch?.isNotificationMuted
-                  ? 'Đã tắt nhận thông báo - Bấm để bật nhận thông báo cho Lô này'
-                  : 'Đang nhận thông báo - Bấm để tắt thông báo cho Lô này'
-              }
-              style={{
-                background: currentBatch?.isNotificationMuted ? '#f1f5f9' : '#fffbeb',
-                border: currentBatch?.isNotificationMuted ? '1px solid #cbd5e1' : '1px solid #fde68a',
-                borderRadius: 6,
-                padding: '6px 10px',
-                fontSize: 12,
-                color: currentBatch?.isNotificationMuted ? '#64748b' : '#d97706',
-                cursor: togglingMute ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                fontWeight: 600,
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {currentBatch?.isNotificationMuted ? (
-                <>
-                  <BellOutlined style={{ fontSize: 13, color: '#94a3b8' }} />
-                  <span>Đã tắt chuông</span>
-                </>
-              ) : (
-                <>
-                  <BellFilled style={{ fontSize: 13, color: '#f59e0b' }} />
-                  <span>Đang bật chuông</span>
-                </>
-              )}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16, color: currentBatch?.isNotificationMuted ? '#94a3b8' : '#f59e0b', display: 'flex', transition: 'color 0.2s' }}>
+                {currentBatch?.isNotificationMuted ? <BellOutlined /> : <BellFilled />}
+              </span>
+              <Switch
+                checked={!currentBatch?.isNotificationMuted}
+                onChange={handleToggleMuteNotification}
+                disabled={togglingMute || !currentBatch}
+                checkedChildren="Bật"
+                unCheckedChildren="Tắt"
+                style={{ background: !currentBatch?.isNotificationMuted ? '#10b981' : undefined }}
+              />
+            </div>
 
             <button
               type="button"

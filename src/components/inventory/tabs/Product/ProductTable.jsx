@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Switch } from 'antd';
 import {
   ReloadOutlined,
   InfoCircleOutlined,
@@ -13,7 +14,8 @@ import {
   EyeOutlined,
   SettingOutlined,
   BellOutlined,
-  CloseOutlined
+  CloseOutlined,
+  BellFilled
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -353,7 +355,8 @@ const ProductTable = ({
         customCriticalThreshold: hasCustom ? res.customCriticalThreshold : (res.branchCriticalThreshold || branchStockSettings.criticalThreshold || 20),
         customWarningThreshold: (hasCustom && res.customWarningThreshold !== null && res.customWarningThreshold !== undefined)
           ? res.customWarningThreshold
-          : (res.branchWarningThreshold || branchStockSettings.warningThreshold || 40)
+          : (res.branchWarningThreshold || branchStockSettings.warningThreshold || 40),
+        isAlertEnabled: res.isAlertEnabled !== false
       });
     } catch (err) {
       console.error('Lỗi khi tải cấu hình cảnh báo mặt hàng:', err);
@@ -370,7 +373,8 @@ const ProductTable = ({
 
     let payload = {
       customCriticalThreshold: null,
-      customWarningThreshold: null
+      customWarningThreshold: null,
+      isAlertEnabled: itemAlertForm.isAlertEnabled
     };
 
     if (itemAlertForm.useCustom) {
@@ -392,7 +396,8 @@ const ProductTable = ({
 
       payload = {
         customCriticalThreshold: crit,
-        customWarningThreshold: warn
+        customWarningThreshold: warn,
+        isAlertEnabled: itemAlertForm.isAlertEnabled
       };
     }
 
@@ -1897,22 +1902,39 @@ const ProductTable = ({
                   Cài đặt cảnh báo tồn kho mặt hàng
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setItemAlertModalOpen(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  fontSize: 16,
-                  padding: 4,
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <CloseOutlined />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 18, color: itemAlertForm.isAlertEnabled ? '#10b981' : '#cbd5e1', display: 'flex', transition: 'color 0.2s' }}>
+                    {itemAlertForm.isAlertEnabled ? <BellFilled /> : <BellOutlined />}
+                  </span>
+                  <Switch
+                    checked={itemAlertForm.isAlertEnabled}
+                    onChange={(checked) => {
+                      setItemAlertForm(prev => ({ ...prev, isAlertEnabled: checked }));
+                      showProductToast(checked ? 'Đã bật nhận thông báo cho mặt hàng này.' : 'Đã tắt nhận thông báo cho mặt hàng này.', 'success');
+                    }}
+                    checkedChildren="Bật"
+                    unCheckedChildren="Tắt"
+                    style={{ background: itemAlertForm.isAlertEnabled ? '#10b981' : undefined }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setItemAlertModalOpen(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    padding: 4,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <CloseOutlined />
+                </button>
+              </div>
             </div>
 
             {/* BODY */}
