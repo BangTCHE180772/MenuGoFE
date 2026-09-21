@@ -72,6 +72,9 @@ export const requestReturnItem = (orderDetailId, data) =>
 export const getAvailableQuantities = (branchId, productIds) =>
   axiosInstance.post(`/api/Order/available-quantities/${branchId}`, productIds);
 
+export const getMenuAvailableQuantities = (branchId) =>
+  axiosInstance.get(`/api/Order/menu-available-quantities/${branchId}`);
+
 // ─── Order Assignment ─────────────────────────────────────────────────────
 export const getMyAssignments = () =>
   axiosInstance.get('/api/Order/my-assignments');

@@ -16,7 +16,10 @@ import {
   DollarCircleOutlined,
   ShopOutlined,
   InfoCircleOutlined,
-  TagOutlined
+  TagOutlined,
+  PictureOutlined,
+  ZoomInOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { message } from 'antd';
 import { getImportById } from '../api/documentApi';
@@ -32,7 +35,8 @@ const Import_Detail = () => {
   const initialDoc = location.state?.document || null;
   const [doc, setDoc] = useState(initialDoc);
   const [loading, setLoading] = useState(!initialDoc);
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'cashflows' | 'ledgers'
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'cashflows' | 'ledgers' | 'images'
+  const [previewImage, setPreviewImage] = useState(null);
 
   // Tải chi tiết phiếu nhập kho từ backend
   const fetchDetail = useCallback(async () => {
@@ -347,6 +351,32 @@ const Import_Detail = () => {
                 <FileTextOutlined /> Lịch sử sổ kho ({doc.inventoryLedgers.length})
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('images')}
+              style={{
+                padding: '12px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: activeTab === 'images' ? '#e8442a' : '#64748b',
+                borderBottom: activeTab === 'images' ? '2px solid #e8442a' : '2px solid transparent',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <PictureOutlined /> Hình ảnh {(() => {
+                let imgs = doc?.imageUrls || [];
+                if (typeof imgs === 'string') {
+                  try { imgs = JSON.parse(imgs); } catch(e) { imgs = imgs ? [imgs] : []; }
+                }
+                return Array.isArray(imgs) && imgs.length > 0 ? `(${imgs.length})` : '';
+              })()}
+            </button>
           </div>
 
           {/* TAB 1: DANH SÁCH MẶT HÀNG */}
@@ -497,6 +527,117 @@ const Import_Detail = () => {
               </table>
             </div>
           )}
+
+          {/* TAB 4: HÌNH ẢNH */}
+          {activeTab === 'images' && (() => {
+            let imgs = doc?.imageUrls || [];
+            if (typeof imgs === 'string') {
+              try {
+                imgs = JSON.parse(imgs);
+              } catch (e) {
+                imgs = imgs ? [imgs] : [];
+              }
+            }
+            if (!Array.isArray(imgs)) imgs = [];
+
+            return (
+              <div style={{ padding: '20px 24px' }}>
+                {imgs.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                    <PictureOutlined style={{ fontSize: 40, marginBottom: 10, color: '#cbd5e1' }} />
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b' }}>Không có ảnh</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Chưa có hình ảnh biên lai hoặc bằng chứng chất lượng hàng nào cho phiếu nhập này.</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 16 }}>
+                      Danh sách hình ảnh chứng từ ({imgs.length}):
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 140px))',
+                        gap: 16
+                      }}
+                    >
+                      {imgs.map((url, imgIdx) => (
+                        <div
+                          key={imgIdx}
+                          onClick={() => setPreviewImage(url)}
+                          style={{
+                            width: 140,
+                            aspectRatio: '1 / 1',
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            background: '#f1f5f9',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 12px -2px rgba(0,0,0,0.12)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                          }}
+                          title="Bấm để phóng to xem chi tiết"
+                        >
+                          <img
+                            src={url}
+                            alt={`Hình ảnh ${imgIdx + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              display: 'block'
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'rgba(0,0,0,0.25)',
+                              opacity: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              fontSize: 20,
+                              transition: 'opacity 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
+                          >
+                            <ZoomInOutlined />
+                          </div>
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 6,
+                              left: 6,
+                              background: 'rgba(15, 23, 42, 0.75)',
+                              color: '#ffffff',
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              pointerEvents: 'none'
+                            }}
+                          >
+                            Ảnh {imgIdx + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -624,6 +765,66 @@ const Import_Detail = () => {
           </>
         )}
       </InventoryPrintPortal>
+
+      {/* POPUP PHÓNG TO ẢNH (LIGHTBOX) */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            title="Đóng"
+            style={{
+              position: 'absolute',
+              top: 24,
+              right: 24,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
+          >
+            <CloseOutlined />
+          </button>
+          <img
+            src={previewImage}
+            alt="Phóng to hình ảnh"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 6,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

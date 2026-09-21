@@ -57,6 +57,7 @@ const NotificationPage = () => {
   const [datePreset, setDatePreset] = useState('today');
   const [dateRange, setDateRange] = useState([dayjs().startOf('day'), dayjs().endOf('day')]);
   const [selectedType, setSelectedType] = useState('All');
+  const [selectedPriority, setSelectedPriority] = useState('All');
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [searchText, setSearchText] = useState('');
   
@@ -102,6 +103,7 @@ const NotificationPage = () => {
         fromDate: dateRange[0]?.toISOString(),
         toDate: dateRange[1]?.toISOString(),
         type: selectedType === 'All' ? null : selectedType,
+        priority: selectedPriority === 'All' ? null : selectedPriority,
         search: searchText.trim() || null,
         page: currentPage,
         pageSize: pageSize
@@ -116,7 +118,7 @@ const NotificationPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentBranchId, selectedBranch, dateRange, selectedType, searchText, currentPage, pageSize]);
+  }, [currentBranchId, selectedBranch, dateRange, selectedType, selectedPriority, searchText, currentPage, pageSize]);
 
   useEffect(() => {
     fetchNotifications();
@@ -125,7 +127,7 @@ const NotificationPage = () => {
   // Reset page khi thay đổi bộ lọc
   useEffect(() => {
     setCurrentPage(1);
-  }, [currentBranchId, selectedBranch, datePreset, dateRange, selectedType, searchText]);
+  }, [currentBranchId, selectedBranch, datePreset, dateRange, selectedType, selectedPriority, searchText]);
 
   const handleItemClick = async (item) => {
     try {
@@ -291,6 +293,22 @@ const NotificationPage = () => {
               />
             </div>
           )}
+
+          {/* Priority Dropdown */}
+          <div className="notif-filter-item">
+            <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>Cấp cảnh báo</span>
+            <Select
+              value={selectedPriority}
+              onChange={setSelectedPriority}
+              style={{ width: '100%' }}
+              options={[
+                { value: 'All', label: 'Tất cả cấp độ' },
+                { value: 'Critical', label: '🔴 Cấp bách' },
+                { value: 'Warning', label: '🟠 Cảnh cáo' },
+                { value: 'Information', label: '🔵 Thông tin' }
+              ]}
+            />
+          </div>
 
           {/* Type Category Dropdown */}
           <div className="notif-filter-item">

@@ -237,10 +237,9 @@ const AppRouter = () => {
 
               {/* Admin only */}
               <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
-                <Route path="/admin" element={<div className="page-placeholder">⚙️ Quản trị hệ thống — Coming Soon</div>} />
                 <Route path="/orders" element={<OrderPage />} />
-              <Route path="/table-map" element={<TableMapPage />} />
-              <Route path="/cashier" element={<CashierPage />} />
+                <Route path="/table-map" element={<TableMapPage />} />
+                <Route path="/cashier" element={<CashierPage />} />
               </Route>
             </Route>
           </Route>

@@ -542,6 +542,7 @@ const ManufacturedProductModal = ({
               setRecipe={rec => setFormData({ ...formData, recipe: rec })}
               products={products}
               units={units}
+              groups={groups}
               currentProductId={editingProduct?.id}
               allowedProductTypes={['Manufactured', 'Regular', 'Ingredient']}
               notifyError={notifyError}

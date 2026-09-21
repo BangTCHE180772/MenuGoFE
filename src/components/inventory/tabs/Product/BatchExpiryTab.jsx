@@ -8,15 +8,36 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CompassOutlined,
-  LeftOutlined,
-  RightOutlined,
   InboxOutlined,
-  FilterOutlined
+  FilterOutlined,
+  SettingOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getBatches, getBatchExpirySummary } from '../../../../api/batchApi';
+import { getBatches, getBatchExpirySummary, getBatchAlertSettings, updateBatchAlertSettings } from '../../../../api/batchApi';
 import { renderBatchStatusBadge, renderExpiryStatusBadge } from '../../utils/batchHelper';
 import BatchTraceabilityDrawer from './BatchTraceabilityDrawer';
+import PaginationFooter from '../../../shared/PaginationFooter';
+
+const showNotificationToast = (text, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.innerText = text;
+  toast.style.cssText = `
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#10b981'};
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 99999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
 
 const BatchExpiryTab = ({ selectedBranchId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +47,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
   const [batches, setBatches] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // Summary Metrics State
   const [summary, setSummary] = useState({
@@ -70,6 +91,33 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
   const [traceDrawerOpen, setTraceDrawerOpen] = useState(false);
   const [selectedTraceBatchId, setSelectedTraceBatchId] = useState(null);
 
+  // Settings Modal State
+  const [settingModalOpen, setSettingModalOpen] = useState(false);
+  const [alertSettings, setAlertSettings] = useState({ criticalDays: 7, warningDays: 14 });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingError, setSettingError] = useState('');
+
+  // Fetch alert settings của chi nhánh
+  const fetchAlertSettings = useCallback(async () => {
+    if (!selectedBranchId) return;
+    try {
+      const res = await getBatchAlertSettings(selectedBranchId);
+      if (res) {
+        setAlertSettings({
+          criticalDays: res.criticalDays || 7,
+          warningDays: res.warningDays || 14
+        });
+        setNearExpiryDays(res.warningDays || 14);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải cấu hình cảnh báo hạn dùng:', err);
+    }
+  }, [selectedBranchId]);
+
+  useEffect(() => {
+    fetchAlertSettings();
+  }, [fetchAlertSettings]);
+
   // Fetch summary counts
   const fetchSummary = useCallback(async () => {
     if (!selectedBranchId) return;
@@ -107,7 +155,7 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedBranchId, searchText, expiryStatusFilter, batchStatusFilter, nearExpiryDays, currentPage]);
+  }, [selectedBranchId, searchText, expiryStatusFilter, batchStatusFilter, nearExpiryDays, currentPage, pageSize]);
 
   useEffect(() => {
     fetchSummary();
@@ -122,6 +170,43 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
   const handleRefresh = () => {
     fetchSummary();
     fetchBatchesList();
+  };
+
+  const handleSaveAlertSettings = async () => {
+    setSettingError('');
+    const crit = Number(alertSettings.criticalDays);
+    const warn = Number(alertSettings.warningDays);
+
+    if (isNaN(crit) || crit < 7) {
+      setSettingError('Số ngày cấp bách phải từ 7 ngày trở lên.');
+      return;
+    }
+    if (isNaN(warn) || warn < 14) {
+      setSettingError('Số ngày cảnh báo phải từ 14 ngày trở lên.');
+      return;
+    }
+    if (warn < crit) {
+      setSettingError('Số ngày cảnh báo phải lớn hơn hoặc bằng số ngày cấp bách.');
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      await updateBatchAlertSettings({
+        branchId: selectedBranchId,
+        criticalDays: crit,
+        warningDays: warn
+      });
+      showNotificationToast('Lưu thiết lập thông báo thành công!', 'success');
+      setNearExpiryDays(warn);
+      setSettingModalOpen(false);
+      handleRefresh();
+    } catch (err) {
+      console.error('Lỗi khi lưu thiết lập thông báo:', err);
+      setSettingError(err.response?.data?.message || 'Không thể lưu thiết lập thông báo.');
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   return (
@@ -329,26 +414,53 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefresh}
-          style={{
-            height: 32,
-            padding: '0 12px',
-            border: '1px solid #cbd5e1',
-            borderRadius: 6,
-            background: '#ffffff',
-            color: '#334155',
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4
-          }}
-        >
-          <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            style={{
+              height: 32,
+              padding: '0 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <ReloadOutlined style={{ fontSize: 12 }} /> Làm mới
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSettingError('');
+              fetchAlertSettings();
+              setSettingModalOpen(true);
+            }}
+            style={{
+              height: 32,
+              padding: '0 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: 6,
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <SettingOutlined style={{ fontSize: 12 }} /> Cài đặt
+          </button>
+        </div>
       </div>
 
       {/* ─── 3. MAIN BATCH TABLE ─────────────────────────────────────────────── */}
@@ -467,62 +579,15 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
         </table>
       </div>
 
-      {/* ─── 4. FOOTER PAGINATION ───────────────────────────────────────────── */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '0 0 8px 8px',
-          border: '1px solid #e2e8f0',
-          borderTop: 'none',
-          padding: '10px 16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 11.5,
-          color: '#64748b'
-        }}
-      >
-        <div>
-          Hiển thị từ {totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
-          {Math.min(currentPage * pageSize, totalCount)} trên tổng {totalCount} Lô hàng
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage === 1 ? '#cbd5e1' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <LeftOutlined style={{ fontSize: 10 }} />
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <RightOutlined style={{ fontSize: 10 }} />
-          </button>
-        </div>
-      </div>
+      {/* ─── 4. FOOTER PAGINATION ─────────────────────────────────────────── */}
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
 
       {/* ─── 5. BATCH TRACEABILITY DRAWER ───────────────────────────────────── */}
       <BatchTraceabilityDrawer
@@ -532,7 +597,193 @@ const BatchExpiryTab = ({ selectedBranchId }) => {
           setTraceDrawerOpen(false);
           setSelectedTraceBatchId(null);
         }}
+        onActionSuccess={() => {
+          fetchBatchesList();
+          fetchSummary();
+        }}
       />
+
+      {/* ─── 6. MODAL CÀI ĐẶT THÔNG BÁO ───────────────────────────────────────── */}
+      {settingModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(2px)',
+            padding: 16
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 580,
+              background: '#ffffff',
+              borderRadius: 12,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* HEADER: Cài đặt */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SettingOutlined style={{ fontSize: 18, color: '#2563eb' }} />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                  Cài đặt
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettingModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* TEXT: Thông báo */}
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', borderBottom: '1px dashed #cbd5e1', paddingBottom: 8 }}>
+                Thông báo
+              </div>
+
+              {/* LINE 1: Cấp Bách */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', minWidth: 90 }}>
+                  Cấp Bách:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="7"
+                  value={alertSettings.criticalDays}
+                  onChange={(e) => setAlertSettings(prev => ({ ...prev, criticalDays: e.target.value }))}
+                  style={{
+                    width: 85,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
+              </div>
+
+              {/* LINE 2: Cảnh báo */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#d97706', minWidth: 90 }}>
+                  Cảnh báo:
+                </label>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>dưới</span>
+                <input
+                  type="number"
+                  min="14"
+                  value={alertSettings.warningDays}
+                  onChange={(e) => setAlertSettings(prev => ({ ...prev, warningDays: e.target.value }))}
+                  style={{
+                    width: 85,
+                    height: 34,
+                    padding: '4px 10px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    textAlign: 'center'
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Ngày</span>
+              </div>
+
+              {/* THÔNG BÁO LỖI NẾU CÓ */}
+              {settingError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '8px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                  {settingError}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSettingModalOpen(false)}
+                style={{
+                  height: 34,
+                  padding: '0 16px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  color: '#475569',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAlertSettings}
+                disabled={savingSettings}
+                style={{
+                  height: 34,
+                  padding: '0 20px',
+                  background: savingSettings ? '#93c5fd' : '#2563eb',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: savingSettings ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                {savingSettings ? 'Đang lưu...' : 'Lưu thiết lập'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

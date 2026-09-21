@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -11,7 +12,8 @@ import {
   EnvironmentOutlined,
   WarningOutlined,
   CloseOutlined,
-  EyeOutlined
+  EyeOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import { getExportDeleteById } from '../../../../api/documentApi';
 
@@ -35,8 +37,10 @@ const ExportDeleteTable = ({
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [loadedDoc, setLoadedDoc] = useState(null);
   const [loadingDocId, setLoadingDocId] = useState(null);
+  const [expandedSubTab, setExpandedSubTab] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
 
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(15);
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -376,67 +380,176 @@ const ExportDeleteTable = ({
                               fontSize: 11
                             }}
                           >
-                            {/* SINGLE TAB HEADER */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
-                              <div
-                                style={{
-                                  padding: '10px 16px',
-                                  fontWeight: 700,
-                                  color: '#e8442a',
-                                  borderBottom: '2px solid #e8442a',
-                                  fontSize: 12,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 6
-                                }}
-                              >
-                                <InfoCircleOutlined /> Thông tin chi tiết phiếu xuất hủy
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/export-delete-detail/${doc.id}`, { state: { document: activeDoc } })}
-                                style={{
-                                  padding: '4px 12px',
-                                  fontSize: 11.5,
-                                  borderRadius: 5,
-                                  border: '1px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                }}
-                              >
-                                <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
-                              </button>
-                            </div>
+                            {/* TAB HEADERS */}
+                            {(() => {
+                              const currentTab = expandedSubTab[doc.id] || 'detail';
+                              let imgs = loadedDoc?.id === doc.id ? (loadedDoc?.imageUrls || doc.imageUrls || []) : (doc.imageUrls || []);
+                              if (typeof imgs === 'string') {
+                                try { imgs = JSON.parse(imgs); } catch (e) { imgs = imgs ? [imgs] : []; }
+                              }
+                              if (!Array.isArray(imgs)) imgs = [];
 
-                            {loadingDocId === doc.id ? (
-                              <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                                Đang nạp chi tiết phiếu xuất hủy...
-                              </div>
-                            ) : (
-                              <div style={{ padding: 16 }}>
-                                {/* HEADER INFO BOX */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                                  <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                      <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{activeDoc.code || doc.code}</span>
-                                      {getStatusBadge(activeDoc.status ?? doc.status)}
-                                    </div>
-                                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
-                                      Người tạo: <strong style={{ color: '#334155' }}>{activeDoc.creatorName || activeDoc.creator || doc.creatorName || 'Hệ thống'}</strong> &nbsp;|&nbsp; Thời gian: <strong style={{ color: '#334155' }}>{dayjs(activeDoc.businessDate || activeDoc.orderDate || activeDoc.createdAt || doc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 12px', alignItems: 'center' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedSubTab((prev) => ({ ...prev, [doc.id]: 'detail' }))}
+                                      style={{
+                                        padding: '10px 16px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        fontWeight: currentTab === 'detail' ? 700 : 500,
+                                        color: currentTab === 'detail' ? '#e8442a' : '#64748b',
+                                        borderBottom: currentTab === 'detail' ? '2px solid #e8442a' : '2px solid transparent',
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                      }}
+                                    >
+                                      <InfoCircleOutlined /> Thông tin chi tiết phiếu xuất hủy
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedSubTab((prev) => ({ ...prev, [doc.id]: 'image' }))}
+                                      style={{
+                                        padding: '10px 16px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        fontWeight: currentTab === 'image' ? 700 : 500,
+                                        color: currentTab === 'image' ? '#e8442a' : '#64748b',
+                                        borderBottom: currentTab === 'image' ? '2px solid #e8442a' : '2px solid transparent',
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                      }}
+                                    >
+                                      <PictureOutlined /> Hình ảnh {imgs.length > 0 ? `(${imgs.length})` : ''}
+                                    </button>
+
+                                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate(`/export-delete-detail/${doc.id}`, { state: { document: activeDoc } })}
+                                        style={{
+                                          padding: '4px 12px',
+                                          fontSize: 11.5,
+                                          borderRadius: 5,
+                                          border: '1px solid #cbd5e1',
+                                          background: '#ffffff',
+                                          color: '#0f172a',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 5,
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                        }}
+                                      >
+                                        <EyeOutlined style={{ fontSize: 12, color: '#e8442a' }} /> Chi tiết phiếu
+                                      </button>
                                     </div>
                                   </div>
 
-                                  <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <EnvironmentOutlined style={{ color: '#e8442a' }} />
-                                    <span>{activeDoc.branchName || doc.branchName || 'Chi nhánh trung tâm'}</span>
-                                  </div>
-                                </div>
+                                  {loadingDocId === doc.id ? (
+                                    <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                                      Đang nạp chi tiết phiếu xuất hủy...
+                                    </div>
+                                  ) : currentTab === 'image' ? (
+                                    <div style={{ padding: 16 }}>
+                                      {imgs.length === 0 ? (
+                                        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                                          <PictureOutlined style={{ fontSize: 36, marginBottom: 8, color: '#cbd5e1' }} />
+                                          <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Không có ảnh</div>
+                                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Chưa có hình ảnh biên bản hoặc bằng chứng hàng hỏng nào cho phiếu xuất hủy này.</div>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 12 }}>
+                                            Danh sách hình ảnh biên bản / hàng hỏng ({imgs.length}):
+                                          </div>
+                                          <div
+                                            style={{
+                                              display: 'grid',
+                                              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 130px))',
+                                              gap: 12
+                                            }}
+                                          >
+                                            {imgs.map((url, imgIdx) => (
+                                              <div
+                                                key={imgIdx}
+                                                onClick={() => setPreviewImage(url)}
+                                                style={{
+                                                  width: 130,
+                                                  aspectRatio: '1 / 1',
+                                                  borderRadius: 8,
+                                                  border: '1px solid #e2e8f0',
+                                                  overflow: 'hidden',
+                                                  position: 'relative',
+                                                  background: '#f1f5f9',
+                                                  cursor: 'pointer',
+                                                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.12)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(0)';
+                                                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                                                }}
+                                              >
+                                                <img
+                                                  src={url}
+                                                  alt={`Hình ${imgIdx + 1}`}
+                                                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                />
+                                                <div
+                                                  style={{
+                                                    position: 'absolute',
+                                                    bottom: 4,
+                                                    left: 4,
+                                                    background: 'rgba(15, 23, 42, 0.75)',
+                                                    color: '#ffffff',
+                                                    fontSize: 10,
+                                                    fontWeight: 600,
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4
+                                                  }}
+                                                >
+                                                  Ảnh {imgIdx + 1}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div style={{ padding: 16 }}>
+                                      {/* HEADER INFO BOX */}
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                                        <div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{activeDoc.code || doc.code}</span>
+                                            {getStatusBadge(activeDoc.status ?? doc.status)}
+                                          </div>
+                                          <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
+                                            Người tạo: <strong style={{ color: '#334155' }}>{activeDoc.creatorName || activeDoc.creator || doc.creatorName || 'Hệ thống'}</strong> &nbsp;|&nbsp; Thời gian: <strong style={{ color: '#334155' }}>{dayjs(activeDoc.businessDate || activeDoc.orderDate || activeDoc.createdAt || doc.createdAt).format('DD/MM/YYYY HH:mm')}</strong>
+                                          </div>
+                                        </div>
+
+                                        <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                          <EnvironmentOutlined style={{ color: '#e8442a' }} />
+                                          <span>{activeDoc.branchName || doc.branchName || 'Chi nhánh trung tâm'}</span>
+                                        </div>
+                                      </div>
 
                                 {activeDoc.note && (
                                   <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', fontSize: 11 }}>
@@ -491,57 +604,60 @@ const ExportDeleteTable = ({
                                   </table>
                                 </div>
 
-                                {/* BOTTOM ACTION BAR FOR PENDING DRAFT STATUS */}
-                                {isPending && (
-                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14, paddingTop: 12, borderTop: '1px border-dashed #cbd5e1' }}>
-                                    {onEditDocument && (
-                                      <button
-                                        type="button"
-                                        onClick={() => onEditDocument(doc.id)}
-                                        style={{
-                                          padding: '6px 14px',
-                                          fontSize: 11.5,
-                                          fontWeight: 700,
-                                          borderRadius: 6,
-                                          border: '1px solid #bfdbfe',
-                                          background: '#eff6ff',
-                                          color: '#2563eb',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: 4
-                                        }}
-                                      >
-                                        <EditOutlined /> Chỉnh sửa
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (window.confirm('Bạn có chắc chắn muốn xóa phiếu xuất hủy nháp này?')) {
-                                          handleDeleteDocument(doc.id, doc.type || 8, doc.status);
-                                        }
-                                      }}
-                                      style={{
-                                        padding: '6px 14px',
-                                        fontSize: 11.5,
-                                        fontWeight: 700,
-                                        borderRadius: 6,
-                                        border: '1px solid #fecaca',
-                                        background: '#fef2f2',
-                                        color: '#dc2626',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 4
-                                      }}
-                                    >
-                                      <DeleteOutlined /> Xóa
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                      {/* BOTTOM ACTION BAR FOR PENDING DRAFT STATUS */}
+                                      {isPending && (
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14, paddingTop: 12, borderTop: '1px border-dashed #cbd5e1' }}>
+                                          {onEditDocument && (
+                                            <button
+                                              type="button"
+                                              onClick={() => onEditDocument(doc.id)}
+                                              style={{
+                                                padding: '6px 14px',
+                                                fontSize: 11.5,
+                                                fontWeight: 700,
+                                                borderRadius: 6,
+                                                border: '1px solid #bfdbfe',
+                                                background: '#eff6ff',
+                                                color: '#2563eb',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 4
+                                              }}
+                                            >
+                                              <EditOutlined /> Chỉnh sửa
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (window.confirm('Bạn có chắc chắn muốn xóa phiếu xuất hủy nháp này?')) {
+                                                handleDeleteDocument(doc.id, doc.type || 8, doc.status);
+                                              }
+                                            }}
+                                            style={{
+                                              padding: '6px 14px',
+                                              fontSize: 11.5,
+                                              fontWeight: 700,
+                                              borderRadius: 6,
+                                              border: '1px solid #fecaca',
+                                              background: '#fef2f2',
+                                              color: '#dc2626',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: 4
+                                            }}
+                                          >
+                                            <DeleteOutlined /> Xóa
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </td>
                       </tr>
@@ -554,26 +670,73 @@ const ExportDeleteTable = ({
         </table>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 11, color: '#64748b' }}>
-        <div>Tổng số: <strong>{documents.length}</strong> phiếu</div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={documents.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
+
+      {/* LIGHTBOX XEM ẢNH TOÀN MÀN HÌNH */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out'
+          }}
+        >
           <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
           >
-            Trở lại
+            <CloseOutlined />
           </button>
-          <span>Trang {currentPage} / {totalPages}</span>
-          <button
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
-          >
-            Tiếp
-          </button>
+          <img
+            src={previewImage}
+            alt="Phóng to hình ảnh"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 6,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}
+          />
         </div>
-      </div>
+      )}
     </div>
   );
 };

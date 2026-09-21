@@ -6,7 +6,13 @@
  * 3. RemainingDebt == 0: "Hết nợ" (Màu xám/đen)
  */
 export const getDebtDisplayInfo = (remainingDebt) => {
-  const debt = Number(remainingDebt) || 0;
+  let debt = Number(remainingDebt) || 0;
+  // Sai số lẻ dưới 1 đồng được xem là hết nợ
+  if (Math.abs(debt) < 1) {
+    debt = 0;
+  } else {
+    debt = Math.round(debt);
+  }
 
   if (debt > 0) {
     return {

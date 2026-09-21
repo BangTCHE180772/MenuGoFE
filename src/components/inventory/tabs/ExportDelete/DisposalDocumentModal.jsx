@@ -7,7 +7,13 @@ import {
   PrinterOutlined,
   RightOutlined,
   EditOutlined,
-  WarningOutlined
+  WarningOutlined,
+  UploadOutlined,
+  PictureOutlined,
+  ZoomInOutlined,
+  LoadingOutlined,
+  CloudUploadOutlined,
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -21,6 +27,7 @@ import {
   deleteExportDeletePendingDocument,
   getExportDeleteById
 } from '../../../../api/documentApi';
+import { uploadImage } from '../../../../api/imageApi';
 import KiotDateTimePicker from '../Import/KiotDateTimePicker';
 import { useAuth } from '../../../../context/AuthContext';
 import { extractErrorMessage } from '../../utils/errorHelper';
@@ -77,6 +84,14 @@ const DisposalDocumentModal = ({
     note: ''
   });
   const [items, setItems] = useState([]);
+
+  // Quản lý ảnh chứng từ / bằng chứng hàng hủy
+  const [showImageOverlay, setShowImageOverlay] = useState(false);
+  const [imageUrls, setImageUrls] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Fetch BInventories by branch, date & searchQuery as user types (Mode 2: Exclude Processed)
   const fetchBInventories = useCallback((bId, date, query = '') => {
@@ -141,12 +156,26 @@ const DisposalDocumentModal = ({
               setSelectedDateTime(dt);
               setOpenTimeFormatted(dt.format('DD/MM/YYYY HH:mm'));
               setOpenTimeISO(dt.toISOString());
-              setFormData({
-                docCode: res.code || '',
-                note: res.note || ''
-              });
+                setFormData({
+                  docCode: res.code || '',
+                  note: res.note || ''
+                });
 
-              const fetchedInventories = Array.isArray(bInvRes?.data) ? bInvRes.data : (Array.isArray(bInvRes) ? bInvRes : []);
+                let imgs = [];
+                if (Array.isArray(res.imageUrls)) {
+                  imgs = res.imageUrls;
+                } else if (typeof res.imageUrls === 'string' && res.imageUrls.trim().length > 0) {
+                  try {
+                    imgs = JSON.parse(res.imageUrls);
+                  } catch (e) {
+                    imgs = [res.imageUrls];
+                  }
+                }
+                setImageUrls(imgs || []);
+                setShowImageOverlay(false);
+                setPreviewImage(null);
+
+                const fetchedInventories = Array.isArray(bInvRes?.data) ? bInvRes.data : (Array.isArray(bInvRes) ? bInvRes : []);
               if (fetchedInventories.length > 0) {
                 setBInventoryList(fetchedInventories);
               }
@@ -204,6 +233,20 @@ const DisposalDocumentModal = ({
           note: initialData?.note || ''
         });
         setItems(initialData?.items || []);
+
+        let initialImgs = [];
+        if (Array.isArray(initialData?.imageUrls)) {
+          initialImgs = initialData.imageUrls;
+        } else if (typeof initialData?.imageUrls === 'string' && initialData.imageUrls.trim().length > 0) {
+          try {
+            initialImgs = JSON.parse(initialData.imageUrls);
+          } catch (e) {
+            initialImgs = [initialData.imageUrls];
+          }
+        }
+        setImageUrls(initialImgs || []);
+        setShowImageOverlay(false);
+        setPreviewImage(null);
 
         if (branchId) {
           fetchBInventories(branchId, now.toISOString(), '');
@@ -455,6 +498,63 @@ const DisposalDocumentModal = ({
     }, 0);
   }, [items]);
 
+  // Xử lý tải ảnh chứng từ xuất hủy
+  const handleFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    const validImageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (validImageFiles.length === 0) {
+      showToast('Vui lòng chỉ chọn các tệp hình ảnh (.jpg, .jpeg, .png, .webp, ...).', 'warning');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const uploadPromises = validImageFiles.map((file) => uploadImage(file));
+      const results = await Promise.all(uploadPromises);
+      const newUrls = results
+        .map((res) => res.data?.imageLink || res.data?.url || res.data)
+        .filter(Boolean);
+      setImageUrls((prev) => [...newUrls, ...prev]);
+      showToast(`Đã tải lên ${newUrls.length} hình ảnh`, 'success');
+    } catch (error) {
+      console.error('Lỗi khi tải ảnh:', error);
+      showToast('Không thể tải ảnh lên máy chủ. Vui lòng kiểm tra lại kết nối và thử lại!', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer && e.dataTransfer.files) {
+      await handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    if (e.target.files) {
+      await handleFiles(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setImageUrls((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleSubmit = async (isDraft = false) => {
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 sản phẩm để xuất hủy.', 'error');
@@ -473,8 +573,10 @@ const DisposalDocumentModal = ({
     try {
       const dto = {
         branchId: Number(branchId),
+        code: formData.docCode ? formData.docCode.trim() : undefined,
         orderDate: openTimeISO || new Date().toISOString(),
         note: formData.note || 'Xuất hủy hàng hóa',
+        imageUrls: imageUrls || [],
         details: items.map((i) => ({
           bInventoryId: Number(i.bInventoryId),
           unitConversionId: i.unitConversionId ? Number(i.unitConversionId) : null,
@@ -1055,7 +1157,7 @@ const DisposalDocumentModal = ({
               <textarea
                 value={formData.note}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                rows={4}
+                rows={3}
                 placeholder="Ghi chú"
                 style={{
                   width: '100%',
@@ -1068,6 +1170,250 @@ const DisposalDocumentModal = ({
                 }}
               />
             </div>
+
+            {/* NÚT TẢI ẢNH (NGAY BÊN DƯỚI GHI CHÚ) */}
+            <button
+              type="button"
+              onClick={() => setShowImageOverlay(true)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                background: '#f8fafc',
+                border: '1px dashed #0284c7',
+                borderRadius: 6,
+                color: '#0369a1',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e0f2fe';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+              }}
+            >
+              <UploadOutlined style={{ fontSize: 14 }} />
+              <span>Tải Ảnh {imageUrls.length > 0 ? `(${imageUrls.length})` : ''}</span>
+            </button>
+
+            {/* OVERLAY TẢI VÀ QUẢN LÝ ẢNH */}
+            {showImageOverlay && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: '#ffffff',
+                  zIndex: 110,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  overflowY: 'auto'
+                }}
+              >
+                {/* NÚT QUAY LẠI */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageOverlay(false)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#334155',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#e2e8f0';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f1f5f9';
+                    }}
+                  >
+                    <ArrowLeftOutlined /> Quay lại
+                  </button>
+                  <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>
+                    {imageUrls.length > 0 ? `${imageUrls.length} ảnh đã chọn` : 'Chưa có ảnh'}
+                  </span>
+                </div>
+
+                {/* VÙNG KÉO THẢ TẢI ẢNH */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    borderRadius: 8,
+                    border: isDragging ? '2px dashed #0284c7' : '2px dashed #94a3b8',
+                    background: isDragging ? '#e0f2fe' : (uploadingImage ? '#f8fafc' : '#fafafa'),
+                    boxShadow: isDragging ? '0 0 15px rgba(2, 132, 199, 0.45)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: uploadingImage ? 'wait' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    userSelect: 'none',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDragging && !uploadingImage) {
+                      e.currentTarget.style.borderColor = '#0284c7';
+                      e.currentTarget.style.background = '#f0f9ff';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDragging && !uploadingImage) {
+                      e.currentTarget.style.borderColor = '#94a3b8';
+                      e.currentTarget.style.background = '#fafafa';
+                    }
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                  />
+
+                  {uploadingImage ? (
+                    <div style={{ textAlign: 'center', color: '#0284c7' }}>
+                      <LoadingOutlined style={{ fontSize: 32, marginBottom: 8 }} />
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>Đang tải ảnh lên...</div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: isDragging ? '#0284c7' : '#475569', padding: 16 }}>
+                      <CloudUploadOutlined style={{ fontSize: 38, color: isDragging ? '#0284c7' : '#64748b', marginBottom: 8 }} />
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isDragging ? '#0369a1' : '#1e293b' }}>
+                        Tải ảnh
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                        {isDragging ? 'Thả ảnh vào đây' : 'Bấm hoặc kéo thả ảnh vào đây'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* DANH SÁCH ẢNH ĐÃ TẢI LÊN */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {imageUrls.map((url, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1 / 1',
+                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        background: '#f8fafc',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={`Ảnh ${idx + 1}`}
+                        onClick={() => setPreviewImage(url)}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          cursor: 'pointer',
+                          display: 'block'
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 8,
+                          left: 8,
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          color: '#ffffff',
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        Ảnh {idx + 1}
+                      </div>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          display: 'flex',
+                          gap: 6
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImage(url)}
+                          title="Phóng to ảnh để xem"
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 4,
+                            background: 'rgba(15, 23, 42, 0.75)',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12
+                          }}
+                        >
+                          <ZoomInOutlined />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveImage(idx);
+                          }}
+                          title="Xóa ảnh này"
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 4,
+                            background: 'rgba(239, 68, 68, 0.85)',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12
+                          }}
+                        >
+                          <DeleteOutlined />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ACTION BUTTONS AT SIDEBAR FOOTER ([LƯU TẠM] & [HOÀN THÀNH]) */}
@@ -1113,6 +1459,65 @@ const DisposalDocumentModal = ({
           </div>
         </div>
       </div>
+
+      {/* LIGHTBOX XEM ẢNH TOÀN MÀN HÌNH */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: 20,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+            }}
+          >
+            <CloseOutlined />
+          </button>
+          <img
+            src={previewImage}
+            alt="Phóng to hình ảnh"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 6,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

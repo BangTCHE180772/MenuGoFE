@@ -9,7 +9,9 @@ import {
   ShoppingOutlined,
   DollarOutlined,
   WarningOutlined,
-  BellOutlined
+  BellOutlined,
+  CalendarOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
 
 /**
@@ -21,6 +23,26 @@ export const getNotificationVisualMeta = (item = {}) => {
   const title = (item.title || '').toLowerCase();
   const message = (item.message || '').toLowerCase();
   const isImportant = item.isImportant || item.priority === 'Critical';
+
+  // 0. ĐẶT BÀN & ĐẶT CHỖ (Reservation)
+  if (type === 'Reservation' || title.includes('đặt bàn') || message.includes('đặt bàn')) {
+    const isCancelled = title.includes('hủy') || message.includes('hủy');
+    return {
+      categoryKey: 'Reservation',
+      badgeText: isCancelled ? 'ĐẶT BÀN - ĐÃ HỦY' : 'ĐẶT BÀN - XÁC NHẬN',
+      badgeEmoji: '📅',
+      accentColor: isCancelled ? '#dc2626' : '#2563eb',
+      cardBg: isCancelled ? '#fef2f2' : '#eff6ff',
+      borderColor: isCancelled ? '#fecaca' : '#bfdbfe',
+      tagBg: isCancelled ? '#fee2e2' : '#dbeafe',
+      tagColor: isCancelled ? '#991b1b' : '#1e40af',
+      iconBg: isCancelled ? '#fee2e2' : '#dbeafe',
+      iconColor: isCancelled ? '#dc2626' : '#2563eb',
+      icon: <CalendarOutlined />,
+      actionText: 'Xem danh sách đặt bàn ➜',
+      defaultTitle: 'Thông báo đặt bàn',
+    };
+  }
 
   // 1. BẢNG LƯƠNG & CHỐT LƯƠNG CHI NHÁNH (Payroll)
   if (type === 'Payroll' || title.includes('chốt lương') || title.includes('trả lương') || title.includes('bảng lương') || message.includes('chốt lương')) {
@@ -172,7 +194,14 @@ export const getNotificationVisualMeta = (item = {}) => {
   }
 
   // 5. ĐƠN HÀNG & MÓN ĂN (Order & Kitchen)
-  if (type === 'Order' || title.includes('đơn hàng') || title.includes('món ăn') || title.includes('bàn') || message.includes('order')) {
+  if (
+    type === 'Order' ||
+    title.includes('đơn hàng') ||
+    title.includes('món ăn') ||
+    (title.includes('bàn') && !title.includes('đặt bàn')) ||
+    (message.includes('bàn') && !message.includes('đặt bàn')) ||
+    message.includes('order')
+  ) {
     return {
       categoryKey: 'Order',
       badgeText: 'ĐƠN HÀNG - PHỤC VỤ',
@@ -190,7 +219,26 @@ export const getNotificationVisualMeta = (item = {}) => {
     };
   }
 
-  // 6. TÀI CHÍNH & CHI PHÍ (Operational / Finance)
+  // 6. TIN NHẮN & TƯ VẤN (Chat)
+  if (type === 'Chat' || title.includes('tin nhắn') || message.includes('tin nhắn')) {
+    return {
+      categoryKey: 'Chat',
+      badgeText: 'TIN NHẮN - HỖ TRỢ',
+      badgeEmoji: '💬',
+      accentColor: '#0284c7',
+      cardBg: '#f0f9ff',
+      borderColor: '#bae6fd',
+      tagBg: '#e0f2fe',
+      tagColor: '#0369a1',
+      iconBg: '#e0f2fe',
+      iconColor: '#0284c7',
+      icon: <MessageOutlined />,
+      actionText: 'Mở cuộc trò chuyện ➜',
+      defaultTitle: 'Tin nhắn hỗ trợ',
+    };
+  }
+
+  // 7. TÀI CHÍNH & CHI PHÍ (Operational / Finance)
   if (type === 'Operational' && (title.includes('chi phí') || message.includes('chi phí') || title.includes('tiền') || message.includes('sổ quỹ'))) {
     return {
       categoryKey: 'Finance',
@@ -209,7 +257,7 @@ export const getNotificationVisualMeta = (item = {}) => {
     };
   }
 
-  // 7. VẬN HÀNH HỆ THỐNG (Operational / General)
+  // 8. VẬN HÀNH HỆ THỐNG (Operational / General)
   if (type === 'Operational') {
     return {
       categoryKey: 'Operational',
@@ -228,7 +276,7 @@ export const getNotificationVisualMeta = (item = {}) => {
     };
   }
 
-  // 8. KHÁC / THÔNG BÁO CHUNG
+  // 9. KHÁC / THÔNG BÁO CHUNG
   return {
     categoryKey: 'Other',
     badgeText: 'THÔNG BÁO HỆ THỐNG',
@@ -248,9 +296,14 @@ export const getNotificationVisualMeta = (item = {}) => {
 
 export const NOTIFICATION_CATEGORIES = [
   { value: 'All', label: 'Tất cả', emoji: '🔔' },
-  { value: 'Inventory', label: 'Hàng Hết', emoji: '📦' },
-  { value: 'ShelfLife', label: 'Hết hạn', emoji: '⏳' },
-  { value: 'Attendance', label: 'Chưa chấm công', emoji: '⏰' }
+  { value: 'Inventory', label: 'Tồn kho & Hàng hết', emoji: '📦' },
+  { value: 'Attendance', label: 'Chấm công', emoji: '⏰' },
+  { value: 'ShelfLife', label: 'Hạn sử dụng', emoji: '⏳' },
+  { value: 'Reservation', label: 'Đặt bàn', emoji: '📅' },
+  { value: 'Payroll', label: 'Lương thưởng', emoji: '💰' },
+  { value: 'Quality', label: 'Kiểm kê & Hao hụt', emoji: '🔍' },
+  { value: 'Order', label: 'Đơn hàng & Phục vụ', emoji: '🍽️' },
+  { value: 'Chat', label: 'Tin nhắn hỗ trợ', emoji: '💬' }
 ];
 
 /**
@@ -375,17 +428,27 @@ export const getNotificationSmartRedirectUrl = (item) => {
     return targetUrl;
   }
 
-  // 3. BẢNG LƯƠNG & CHỐT LƯƠNG CHI NHÁNH
+  // 3. ĐẶT BÀN & ĐẶT CHỖ
+  if (type === 'Reservation' || title.includes('đặt bàn') || message.includes('đặt bàn') || rawUrl.includes('/reservations')) {
+    return rawUrl || '/reservations';
+  }
+
+  // 4. BẢNG LƯƠNG & CHỐT LƯƠNG CHI NHÁNH
   if (type === 'Payroll' || rawUrl.includes('/payroll') || title.includes('lương')) {
     return '/payroll';
   }
 
-  // 4. ĐƠN HÀNG & PHỤC VỤ
+  // 5. ĐƠN HÀNG & PHỤC VỤ
   if (type === 'Order' || rawUrl.includes('/orders')) {
     return rawUrl || '/orders';
   }
 
-  // 5. SỔ QUỸ & CHI PHÍ
+  // 6. KIỂM KÊ & HAO HỤT
+  if (type === 'Quality' || title.includes('kiểm kê') || message.includes('kiểm kê') || title.includes('hao hụt')) {
+    return '/inventory-management?tab=Check';
+  }
+
+  // 7. SỔ QUỸ & CHI PHÍ
   if (type === 'Operational' && (title.includes('chi phí') || message.includes('chi phí') || rawUrl.includes('/cashflow'))) {
     return '/cashflow';
   }

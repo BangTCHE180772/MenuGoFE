@@ -114,11 +114,11 @@ const Production_Detail = () => {
 
           <div>
             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-              Quản lý kho / Sản xuất / Chi tiết lệnh sản xuất
+              Quản lý kho / Đồ chuẩn bị sẵn / Chi tiết phiếu đồ chuẩn bị sẵn
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-                {doc?.code || 'Lệnh sản xuất'}
+                {doc?.code || 'Phiếu đồ chuẩn bị sẵn'}
               </span>
               {isPending ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff', fontSize: 12, fontWeight: 700 }}>
@@ -159,7 +159,7 @@ const Production_Detail = () => {
           {/* THẺ 1: LỆNH SẢN XUẤT */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', padding: '16px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ToolOutlined style={{ color: '#9333ea' }} /> Thông tin sản xuất
+              <ToolOutlined style={{ color: '#9333ea' }} /> Thông tin đồ chuẩn bị sẵn
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -199,7 +199,7 @@ const Production_Detail = () => {
           {/* THẺ 3: TỔNG GIÁ TRỊ SẢN XUẤT */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', padding: '16px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AppstoreOutlined style={{ color: '#059669' }} /> Chi phí sản xuất
+              <AppstoreOutlined style={{ color: '#059669' }} /> Chi phí đồ chuẩn bị sẵn
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -218,14 +218,14 @@ const Production_Detail = () => {
         {doc?.note && (
           <div style={{ padding: '10px 16px', borderRadius: 6, background: '#faf5ff', border: '1px solid #e9d5ff', color: '#9333ea', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <InfoCircleOutlined />
-            <span><strong>Ghi chú lệnh sản xuất:</strong> {doc.note}</span>
+            <span><strong>Ghi chú phiếu chuẩn bị sẵn:</strong> {doc.note}</span>
           </div>
         )}
 
         {/* BẢNG 1: THÀNH PHẨM THU ĐƯỢC */}
         <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ShoppingOutlined /> Danh sách thành phẩm nhập kho ({finishedProducts.length})
+            <ShoppingOutlined /> Danh sách đồ chuẩn bị sẵn nhập kho ({finishedProducts.length})
           </div>
           <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
@@ -276,7 +276,7 @@ const Production_Detail = () => {
         {ingredients.length > 0 && (
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
             <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 12.5, color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <AppstoreOutlined /> Danh sách nguyên vật liệu tiêu hao ({ingredients.length})
+              <AppstoreOutlined /> Nguyên liệu tiêu hao theo công thức ({ingredients.length})
             </div>
             <div style={{ maxHeight: '350px', overflowY: 'auto', overflowX: 'auto', width: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, textAlign: 'left' }}>
@@ -327,7 +327,7 @@ const Production_Detail = () => {
 
       {/* KHUNG IN LỆNH SẢN XUẤT CHUẨN A4 */}
       <InventoryPrintPortal
-        title="LỆNH SẢN XUẤT VÀ TIÊU HAO NGUYÊN LIỆU"
+        title="PHIẾU ĐỒ CHUẨN BỊ SẴN VÀ TIÊU HAO NGUYÊN LIỆU"
         subTitle={`Mã lệnh: ${doc?.code || '---'} | Ngày thực hiện: ${doc?.orderDate || doc?.createdAt ? dayjs(doc.orderDate || doc.createdAt).format('DD/MM/YYYY HH:mm') : '---'} | Trạng thái: ${isPending ? 'Lưu tạm' : 'Đã hoàn thành'}`}
         docCode={doc?.code}
         branchName={doc?.branchName || doc?.snapshotBranchName}

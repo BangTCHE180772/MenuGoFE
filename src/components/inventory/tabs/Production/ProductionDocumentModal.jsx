@@ -6,7 +6,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import { getProductsByDate } from '../../../../api/binventoryApi';
+import { getBInventories, getProductsByDate } from '../../../../api/binventoryApi';
+import { getProductById } from '../../../../api/productApi';
 import {
   createProductionPending,
   createProductionCompleted,
@@ -61,10 +62,14 @@ const ProductionDocumentModal = ({
 
   // Search list for Manufactured products ONLY
   const [manufacturedList, setManufacturedList] = useState([]);
+  const [branchStocks, setBranchStocks] = useState([]);
   const [manufacturedQuery, setManufacturedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedManufactured, setSelectedManufactured] = useState(null);
   const [finishedQuantity, setFinishedQuantity] = useState(1);
+  const [expiryDate, setExpiryDate] = useState('');
+  const [showConfirmEmptyExpiry, setShowConfirmEmptyExpiry] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const [formData, setFormData] = useState({
     docCode: '',
@@ -87,8 +92,24 @@ const ProductionDocumentModal = ({
       });
   }, []);
 
+  // Fetch branch stock for all ingredients
+  const fetchBranchStocks = useCallback((bId) => {
+    if (!bId) return;
+    getBInventories(bId)
+      .then((res) => {
+        const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        setBranchStocks(data);
+      })
+      .catch((err) => {
+        console.error('Failed to load branch stocks:', err);
+      });
+  }, []);
+
   useEffect(() => {
     if (open) {
+      if (branchId) {
+        fetchBranchStocks(branchId);
+      }
       if (editDocumentId) {
         setLoading(true);
         getProductionById(editDocumentId)
@@ -105,19 +126,44 @@ const ProductionDocumentModal = ({
               });
               const finishedDetail = (res.details || []).find((d) => d.isFinishedProduct || d.fatherId == null) || res.details?.[0];
               if (finishedDetail) {
-                setSelectedManufactured({
-                  id: finishedDetail.bInventoryId,
-                  name: finishedDetail.productName || finishedDetail.bInventoryName || 'Thành phẩm',
-                  code: finishedDetail.code || '',
-                  unitName: finishedDetail.unitName || 'Đơn vị'
-                });
+                const exp = finishedDetail.expiryDateSnapshot || finishedDetail.expiryDate;
+                if (exp) {
+                  setExpiryDate(dayjs(exp).format('YYYY-MM-DD'));
+                } else {
+                  setExpiryDate('');
+                }
+                const pId = finishedDetail.productId || finishedDetail.bInventoryId;
+                // Fetch full product details for recipe if needed
+                getProductById(pId)
+                  .then((pRes) => {
+                    const pData = pRes?.data || pRes;
+                    setSelectedManufactured({
+                      id: finishedDetail.bInventoryId,
+                      productId: pId,
+                      name: finishedDetail.productName || finishedDetail.bInventoryName || pData?.name || 'Đồ chuẩn bị sẵn',
+                      code: finishedDetail.code || pData?.skuCode || '',
+                      unitName: finishedDetail.unitName || 'Đơn vị',
+                      ingredients: pData?.recipeItems || [],
+                      shelfLifeDays: pData?.shelfLifeDays || null
+                    });
+                  })
+                  .catch(() => {
+                    setSelectedManufactured({
+                      id: finishedDetail.bInventoryId,
+                      productId: pId,
+                      name: finishedDetail.productName || finishedDetail.bInventoryName || 'Đồ chuẩn bị sẵn',
+                      code: finishedDetail.code || '',
+                      unitName: finishedDetail.unitName || 'Đơn vị',
+                      ingredients: []
+                    });
+                  });
                 setFinishedQuantity(finishedDetail.quantity || 1);
               }
             }
           })
           .catch((err) => {
-            console.error('Lỗi khi tải chi tiết sản xuất:', err);
-            showToast('Không thể tải chi tiết phiếu sản xuất', 'error');
+            console.error('Lỗi khi tải chi tiết phiếu đồ chuẩn bị sẵn:', err);
+            showToast('Không thể tải chi tiết phiếu đồ chuẩn bị sẵn', 'error');
           })
           .finally(() => setLoading(false));
       } else {
@@ -132,6 +178,9 @@ const ProductionDocumentModal = ({
         setShowDropdown(false);
         setSelectedManufactured(null);
         setFinishedQuantity(1);
+        setExpiryDate('');
+        setShowConfirmEmptyExpiry(false);
+        setPendingAction(null);
 
         setFormData({
           docCode: '',
@@ -147,6 +196,9 @@ const ProductionDocumentModal = ({
       setSelectedManufactured(null);
       setManufacturedQuery('');
       setFinishedQuantity(1);
+      setExpiryDate('');
+      setShowConfirmEmptyExpiry(false);
+      setPendingAction(null);
       setFormData({
         docCode: '',
         note: '',
@@ -155,7 +207,7 @@ const ProductionDocumentModal = ({
       setShowDropdown(false);
       setLoading(false);
     }
-  }, [open, editDocumentId, branchId, fetchManufacturedProducts]);
+  }, [open, editDocumentId, branchId, fetchManufacturedProducts, fetchBranchStocks]);
 
   // Dynamic search on user typing for Manufactured products
   useEffect(() => {
@@ -185,13 +237,18 @@ const ProductionDocumentModal = ({
         const typeStr = String(rawType ?? '').toLowerCase();
         return typeStr === 'manufactured' || rawType === 2;
       })
-      .map((b) => ({
-        id: b.id ?? b.bInventoryId,
-        code: b.code || b.skuCode || `SP${b.id}`,
-        name: b.name || 'Thành phẩm sản xuất',
-        unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || '',
-        ingredients: b.recipeItems || b.ingredients || []
-      }));
+      .map((b) => {
+        const pMaster = products.find((p) => Number(p.id) === Number(b.productId || b.id));
+        return {
+          id: b.id ?? b.bInventoryId,
+          productId: b.productId || b.id,
+          code: b.code || b.skuCode || `SP${b.id}`,
+          name: b.name || 'Đồ chuẩn bị sẵn',
+          unitName: b.baseUnit?.unitName || b.unitConversions?.[0]?.unitName || '',
+          ingredients: b.recipeItems || b.recipeDetailes || b.ingredients || pMaster?.recipeItems || [],
+          shelfLifeDays: b.shelfLifeDays ?? b.product?.shelfLifeDays ?? pMaster?.shelfLifeDays ?? null
+        };
+      });
   }, [manufacturedList, products]);
 
   const filteredOptions = useMemo(() => {
@@ -214,22 +271,53 @@ const ProductionDocumentModal = ({
     });
   }, [manufacturedOptions, manufacturedQuery]);
 
-  const handleSelectManufactured = (opt) => {
-    setSelectedManufactured(opt);
-    setManufacturedQuery('');
+  const handleSelectManufactured = async (opt) => {
     setShowDropdown(false);
+    setManufacturedQuery('');
+
+    let loadedRecipe = opt.ingredients || [];
+    let shelfDays = opt.shelfLifeDays;
+
+    try {
+      const res = await getProductById(opt.productId || opt.id);
+      const pData = res?.data || res;
+      if (pData) {
+        if (!loadedRecipe || loadedRecipe.length === 0) {
+          loadedRecipe = pData.recipeItems || [];
+        }
+        if (pData.shelfLifeDays != null) {
+          shelfDays = pData.shelfLifeDays;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch product details:', e);
+    }
+
+    setSelectedManufactured({
+      ...opt,
+      ingredients: loadedRecipe,
+      shelfLifeDays: shelfDays
+    });
+
+    if (shelfDays && Number(shelfDays) > 0) {
+      setExpiryDate(dayjs(selectedDateTime).add(Number(shelfDays), 'day').format('YYYY-MM-DD'));
+    } else {
+      setExpiryDate('');
+    }
   };
 
   // Preview ingredients list with branch inventory stock check
   const ingredientsList = useMemo(() => {
     if (!selectedManufactured) return [];
-    const rawIngredients = selectedManufactured.ingredients || selectedManufactured.recipeDetailes || [];
+    const rawIngredients = selectedManufactured.ingredients || selectedManufactured.recipeDetailes || selectedManufactured.recipeItems || [];
     if (!Array.isArray(rawIngredients) || rawIngredients.length === 0) return [];
 
     const qty = Number(finishedQuantity) || 1;
     return rawIngredients.map((ing, idx) => {
       const ingProdId = ing.ingredientProductId || ing.productId || ing.ingredientId || ing.id;
-      const matched = products.find((p) => Number(p.productId || p.id) === Number(ingProdId) || (p.code && p.code === ing.code));
+      const matched = branchStocks.find((s) => Number(s.productId || s.id) === Number(ingProdId) || (s.code && (s.code === ing.ingredientCode || s.code === ing.code)))
+        || products.find((p) => Number(p.productId || p.id) === Number(ingProdId) || (p.code && (p.code === ing.ingredientCode || p.code === ing.code)));
+      
       const currentStock = Number(matched?.quantity ?? matched?.stockQuantity ?? 0);
       const norm = Number(ing.quantity || ing.normQty || 0);
       const required = norm * qty;
@@ -239,47 +327,63 @@ const ProductionDocumentModal = ({
       return {
         key: ingProdId || idx,
         id: ingProdId,
-        name: ing.name || ing.ingredientName || matched?.name || 'Nguyên liệu',
-        code: ing.code || ing.ingredientCode || matched?.code || `NL${ingProdId}`,
+        name: ing.ingredientProductName || ing.name || ing.ingredientName || matched?.name || 'Nguyên liệu',
+        code: ing.ingredientSKUCode || ing.code || ing.ingredientCode || matched?.code || `NL${ingProdId}`,
         norm,
         required,
         currentStock,
         unit,
         isInsufficient,
-        diff: required - currentStock
+        diff: Math.max(0, required - currentStock)
       };
     });
-  }, [selectedManufactured, finishedQuantity, products]);
+  }, [selectedManufactured, finishedQuantity, branchStocks, products]);
 
   const hasInsufficient = useMemo(() => {
     return ingredientsList.some((i) => i.isInsufficient);
   }, [ingredientsList]);
 
-  const handleSubmit = async (isDraft = false) => {
+  const handleTriggerSubmit = (isDraft = false) => {
     if (!selectedManufactured) {
-      showToast('Vui lòng chọn 1 mặt hàng sản xuất.', 'error');
+      showToast('Vui lòng chọn 1 mặt hàng chuẩn bị sẵn.', 'error');
       return;
     }
 
     if (hasInsufficient) {
-      showToast('Kho không đủ nguyên liệu để sản xuất. Vui lòng kiểm tra lại tồn kho.', 'error');
+      showToast('Kho không đủ nguyên liệu để chuẩn bị sẵn. Vui lòng kiểm tra lại tồn kho.', 'error');
       return;
     }
 
+    if (!expiryDate) {
+      setPendingAction(isDraft ? 'draft' : 'complete');
+      setShowConfirmEmptyExpiry(true);
+      return;
+    }
+
+    executeSubmit(isDraft ? 'draft' : 'complete');
+  };
+
+  const executeSubmit = async (actionType = 'complete') => {
+    const isDraft = actionType === 'draft';
     const qty = Math.min(10000000000, Math.max(0.001, Number(finishedQuantity) || 1));
+    const mDate = selectedDateTime ? selectedDateTime.toISOString() : new Date().toISOString();
+    const expDate = expiryDate ? dayjs(expiryDate).endOf('day').toISOString() : null;
 
     setLoading(true);
     try {
       const dto = {
         branchId: Number(branchId),
-        orderDate: new Date().toISOString(),
+        code: formData.docCode ? formData.docCode.trim() : undefined,
+        orderDate: mDate,
         note: formData.note || '',
         details: [
           {
             bInventoryId: Number(selectedManufactured.id),
             quantity: qty,
             fatherId: null,
-            unitConversionId: null
+            unitConversionId: null,
+            manufactureDate: mDate,
+            expiryDate: expDate
           }
         ]
       };
@@ -287,19 +391,19 @@ const ProductionDocumentModal = ({
       if (editDocumentId) {
         if (isDraft) {
           await updateProductionPending(editDocumentId, dto);
-          showToast('Cập nhật phiếu sản xuất nháp thành công!');
+          showToast('Cập nhật phiếu đồ chuẩn bị sẵn nháp thành công!');
         } else {
           await updateProductionPending(editDocumentId, dto);
           await completeProductionDocument(editDocumentId);
-          showToast('Hoàn thành phiếu sản xuất thành công!');
+          showToast('Hoàn thành phiếu đồ chuẩn bị sẵn thành công!');
         }
       } else {
         if (isDraft) {
           await createProductionPending(dto);
-          showToast('Lưu tạm phiếu sản xuất thành công!');
+          showToast('Lưu tạm phiếu đồ chuẩn bị sẵn thành công!');
         } else {
           await createProductionCompleted(dto);
-          showToast('Tạo và Hoàn thành phiếu sản xuất thành công!');
+          showToast('Tạo và Hoàn thành phiếu đồ chuẩn bị sẵn thành công!');
         }
       }
 
@@ -307,7 +411,7 @@ const ProductionDocumentModal = ({
       onClose();
     } catch (err) {
       console.error(err);
-      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu sản xuất.');
+      const errMsg = extractErrorMessage(err, 'Lỗi khi lưu phiếu đồ chuẩn bị sẵn.');
       showToast(errMsg, 'error');
     } finally {
       setLoading(false);
@@ -320,7 +424,7 @@ const ProductionDocumentModal = ({
     setLoading(true);
     try {
       await deleteProductionPendingDocument(editDocumentId, 'Hủy phiếu nháp từ giao diện');
-      showToast('Đã chuyển phiếu sản xuất sang trạng thái Canceled!');
+      showToast('Đã chuyển phiếu đồ chuẩn bị sẵn sang trạng thái Canceled!');
       onSuccess?.();
       onClose();
     } catch (err) {
@@ -370,7 +474,7 @@ const ProductionDocumentModal = ({
         <div style={{ padding: '16px 24px 0 24px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-              Tạo phiếu sản xuất
+              {editDocumentId ? 'Cập nhật phiếu đồ chuẩn bị sẵn' : 'Tạo phiếu đồ chuẩn bị sẵn'}
             </span>
             <button
               type="button"
@@ -390,7 +494,7 @@ const ProductionDocumentModal = ({
 
           {/* HEADER TITLE */}
           <div style={{ fontSize: 13, fontWeight: 700, color: '#e8442a', paddingBottom: 4 }}>
-            Thông tin sản xuất
+            Thông tin đồ chuẩn bị sẵn
           </div>
         </div>
 
@@ -402,7 +506,7 @@ const ProductionDocumentModal = ({
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>
-                    Sản xuất mặt hàng
+                    Mặt hàng chuẩn bị sẵn
                   </div>
                   <div
                     style={{
@@ -417,7 +521,7 @@ const ProductionDocumentModal = ({
                     <SearchOutlined style={{ color: '#94a3b8', marginRight: 8 }} />
                     <input
                       type="text"
-                      placeholder="Chọn mặt hàng sản xuất"
+                      placeholder="Chọn mặt hàng chuẩn bị sẵn"
                       value={selectedManufactured ? `${selectedManufactured.code} - ${selectedManufactured.name}` : manufacturedQuery}
                       onFocus={() => {
                         if (selectedManufactured) {
@@ -461,7 +565,7 @@ const ProductionDocumentModal = ({
                     >
                       {filteredOptions.length === 0 ? (
                         <div style={{ padding: 10, color: '#94a3b8', textAlign: 'center' }}>
-                          Không tìm thấy mặt hàng sản xuất
+                          Không tìm thấy mặt hàng chuẩn bị sẵn
                         </div>
                       ) : (
                         filteredOptions.map((opt) => (
@@ -514,6 +618,85 @@ const ProductionDocumentModal = ({
                 </div>
               </div>
 
+              {/* ROW: NGÀY SẢN XUẤT & HẠN SỬ DỤNG */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>Ngày sản xuất</span>
+                    <span style={{ fontSize: 10, color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      Tự động lấy ngày tạo
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#f8fafc',
+                      borderRadius: 18,
+                      padding: '6px 14px',
+                      border: '1px solid #cbd5e1',
+                      color: '#334155',
+                      fontWeight: 600,
+                      fontSize: 12
+                    }}
+                  >
+                    <CalendarOutlined style={{ color: '#64748b', marginRight: 8 }} />
+                    <span>{selectedDateTime ? dayjs(selectedDateTime).format('DD/MM/YYYY HH:mm') : dayjs().format('DD/MM/YYYY HH:mm')}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>Hạn sử dụng</span>
+                      {expiryDate && (
+                        <span style={{ fontSize: 10, color: '#2563eb', background: '#eff6ff', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                          Đã chọn
+                        </span>
+                      )}
+                    </div>
+                    {expiryDate && (
+                      <button
+                        type="button"
+                        onClick={() => setExpiryDate('')}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: 10.5, cursor: 'pointer', padding: 0 }}
+                      >
+                        Xóa hạn dùng
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#ffffff',
+                      borderRadius: 18,
+                      padding: '5px 14px',
+                      border: `1px solid ${!expiryDate ? '#cbd5e1' : '#2563eb'}`
+                    }}
+                  >
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      min={dayjs(selectedDateTime).format('YYYY-MM-DD')}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: 12,
+                        color: expiryDate ? '#0f172a' : '#64748b',
+                        fontWeight: expiryDate ? 600 : 400,
+                        background: 'transparent'
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>
+                    {expiryDate ? `Lô hết hạn vào ${dayjs(expiryDate).format('DD/MM/YYYY')}` : 'Để trống sẽ hỏi xác nhận khi bấm tạo'}
+                  </div>
+                </div>
+              </div>
+
               {/* DANH SÁCH NGUYÊN LIỆU THEO CÔNG THỨC */}
               {selectedManufactured && (
                 <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', padding: 12 }}>
@@ -530,7 +713,7 @@ const ProductionDocumentModal = ({
 
                   {ingredientsList.length === 0 ? (
                     <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>
-                      Mặt hàng này chưa được cấu hình danh sách nguyên liệu công thức (Recipe).
+                      Mặt hàng này chưa được cấu hình danh sách nguyên liệu công thức.
                     </div>
                   ) : (
                     <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>
@@ -580,15 +763,15 @@ const ProductionDocumentModal = ({
 
                   {hasInsufficient && (
                     <div style={{ marginTop: 8, padding: '6px 10px', background: '#fee2e2', borderRadius: 6, color: '#b91c1c', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      ⚠️ Không đủ nguyên liệu để sản xuất! Không thể hoàn thành hoặc lưu tạm khi kho thiếu nguyên liệu.
+                      ⚠️ Không đủ nguyên liệu để chuẩn bị sẵn! Không thể hoàn thành khi kho thiếu nguyên liệu.
                     </div>
                   )}
                 </div>
               )}
 
-              {/* ROW 2: MÃ SẢN XUẤT */}
+              {/* ROW 2: MÃ CHỨNG TỪ */}
               <div>
-                <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã sản xuất</div>
+                <div style={{ marginBottom: 6, fontWeight: 500, color: '#475569', fontSize: 11 }}>Mã chứng từ</div>
                 <input
                   type="text"
                   value={formData.docCode}
@@ -676,7 +859,7 @@ const ProductionDocumentModal = ({
           <button
             type="button"
             disabled={loading || hasInsufficient}
-            onClick={() => handleSubmit(true)}
+            onClick={() => handleTriggerSubmit(true)}
             style={{
               background: '#ffffff',
               border: '1px solid #cbd5e1',
@@ -693,7 +876,7 @@ const ProductionDocumentModal = ({
           <button
             type="button"
             disabled={loading || hasInsufficient}
-            onClick={() => handleSubmit(false)}
+            onClick={() => handleTriggerSubmit(false)}
             style={{
               background: hasInsufficient ? '#cbd5e1' : '#e8442a',
               border: `1px solid ${hasInsufficient ? '#cbd5e1' : '#e8442a'}`,
@@ -710,6 +893,107 @@ const ProductionDocumentModal = ({
           </button>
         </div>
       </div>
+
+      {/* MODAL XÁC NHẬN HẠN DÙNG TRỐNG */}
+      {showConfirmEmptyExpiry && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2500,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowConfirmEmptyExpiry(false);
+          }}
+        >
+          <div
+            style={{
+              width: 440,
+              maxWidth: '100%',
+              background: '#ffffff',
+              borderRadius: 14,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: '#fef3c7',
+                  color: '#d97706',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  fontWeight: 700
+                }}
+              >
+                !
+              </div>
+              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                Xác nhận hạn sử dụng
+              </h4>
+            </div>
+
+            <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
+              Hạn sử dụng của đồ chuẩn bị sẵn đang để trống. Bạn có muốn để hạn dùng trống không?
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmEmptyExpiry(false)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  fontWeight: 600,
+                  padding: '7px 16px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12
+                }}
+              >
+                Quay lại nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmEmptyExpiry(false);
+                  executeSubmit(pendingAction || 'complete');
+                }}
+                style={{
+                  background: '#e8442a',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  padding: '7px 18px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
+                }}
+              >
+                Để trống & Tiếp tục
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

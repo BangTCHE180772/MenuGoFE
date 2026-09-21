@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -13,9 +14,23 @@ import {
   UserOutlined,
   DownOutlined,
   RightOutlined,
-  EyeOutlined
+  EyeOutlined,
+  UploadOutlined,
+  PictureOutlined,
+  CloudUploadOutlined,
+  ZoomInOutlined,
+  LoadingOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
-import { getPartnerFinancialSummary, getPartnerImportDocuments, getPartnerCashFlows, payPartnerImportDocument } from '../../../../api/partnerApi';
+import {
+  getPartnerFinancialSummary,
+  getPartnerImportDocuments,
+  getPartnerCashFlows,
+  payPartnerImportDocument,
+  getPartnerById,
+  updatePartnerImages
+} from '../../../../api/partnerApi';
+import { uploadImage } from '../../../../api/imageApi';
 import { getDebtDisplayInfo } from '../../../../utils/debtHelper';
 import dayjs from 'dayjs';
 
@@ -57,14 +72,21 @@ const formatTransactionTypeBadge = (type) => {
   return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0' };
 };
 
-// Component chi tiết đối tác hiển thị 3 tab: Thông tin đối tác, Lịch sử giao dịch, Phiếu nhập hàng
+// Component chi tiết đối tác hiển thị các tab: Thông tin đối tác, Lịch sử giao dịch, Phiếu nhập hàng, Hình ảnh
 const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState('info'); // 'info' | 'transactions' | 'importDocs'
+  const [activeSubTab, setActiveSubTab] = useState('info'); // 'info' | 'transactions' | 'importDocs' | 'images'
   const [summary, setSummary] = useState(null);
   const [docs, setDocs] = useState([]);
   const [cashFlows, setCashFlows] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // States quản lý hình ảnh hợp đồng đối tác
+  const fileInputRef = useRef(null);
+  const [imageUrls, setImageUrls] = useState(Array.isArray(partner?.imageUrls) ? partner.imageUrls : []);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // States quản lý mở rộng phiếu nhập & thanh toán cho NCC
   const [expandedDocId, setExpandedDocId] = useState(null);
@@ -97,15 +119,22 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
     if (!partner?.id) return;
     setLoading(true);
     try {
-      const [sumRes, docsRes, cfRes] = await Promise.allSettled([
+      const [sumRes, docsRes, cfRes, partnerDetailRes] = await Promise.allSettled([
         getPartnerFinancialSummary(partner.id),
         getPartnerImportDocuments(partner.id),
-        getPartnerCashFlows(partner.id)
+        getPartnerCashFlows(partner.id),
+        getPartnerById(partner.id)
       ]);
 
       if (sumRes.status === 'fulfilled') setSummary(sumRes.value);
       if (docsRes.status === 'fulfilled') setDocs(docsRes.value || []);
       if (cfRes.status === 'fulfilled') setCashFlows(cfRes.value || []);
+      if (partnerDetailRes.status === 'fulfilled' && partnerDetailRes.value) {
+        const pData = partnerDetailRes.value;
+        if (pData.imageUrls && Array.isArray(pData.imageUrls)) {
+          setImageUrls(pData.imageUrls);
+        }
+      }
     } catch (err) {
       console.error('Lỗi khi tải chi tiết đối tác:', err);
     } finally {
@@ -116,6 +145,113 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Xử lý upload danh sách file ảnh hợp đồng
+  const handleUploadFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    const validFiles = Array.from(files).filter(
+      (f) => (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|svg)$/i.test(f.name)
+    );
+    if (validFiles.length === 0) {
+      message.warning('Vui lòng chọn tệp định dạng hình ảnh hợp lệ (PNG, JPG, JPEG, WEBP)!');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const uploadPromises = validFiles.map((file) => uploadImage(file));
+      const results = await Promise.allSettled(uploadPromises);
+      const uploadedList = [];
+      let failCount = 0;
+      let lastErrMsg = '';
+
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          const link = res.value?.data?.imageLink || res.value?.data?.url || res.value?.data;
+          if (link && typeof link === 'string') {
+            uploadedList.push(link);
+          }
+        } else {
+          failCount++;
+          lastErrMsg = res.reason?.response?.data?.message || res.reason?.message || '';
+          console.error('Lỗi khi tải ảnh:', validFiles[idx]?.name, res.reason);
+        }
+      });
+
+      if (uploadedList.length > 0) {
+        const updatedList = [...imageUrls, ...uploadedList];
+        await updatePartnerImages(partner.id, updatedList);
+        setImageUrls(updatedList);
+        if (failCount > 0) {
+          message.warning(`Đã tải lên ${uploadedList.length} ảnh, nhưng có ${failCount} ảnh bị lỗi!`);
+        } else {
+          message.success(`Đã tải lên thành công ${uploadedList.length} ảnh hợp đồng!`);
+        }
+        if (onRefresh) onRefresh();
+      } else {
+        message.error(lastErrMsg || 'Không thể tải ảnh lên máy chủ, vui lòng thử lại!');
+      }
+    } catch (err) {
+      console.error('Lỗi khi lưu ảnh hợp đồng đối tác:', err);
+      message.error(err.response?.data?.message || 'Đã xảy ra lỗi khi lưu ảnh hợp đồng!');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Xử lý xác nhận và xóa ảnh hợp đồng
+  const handleConfirmDeleteImage = (indexToDelete) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa ảnh',
+      content: 'Bạn có chắc chắn muốn xóa ảnh này không? Thao tác này không thể hoàn tác.',
+      okText: 'Xác nhận xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      centered: true,
+      onOk: async () => {
+        try {
+          const updatedList = imageUrls.filter((_, idx) => idx !== indexToDelete);
+          await updatePartnerImages(partner.id, updatedList);
+          setImageUrls(updatedList);
+          message.success('Đã xóa ảnh thành công!');
+          if (onRefresh) onRefresh();
+        } catch (err) {
+          console.error('Lỗi khi xóa ảnh:', err);
+          message.error('Không thể xóa ảnh, vui lòng thử lại!');
+        }
+      }
+    });
+  };
+
+  // Xử lý kéo thả tệp (Drag & Drop)
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleUploadFiles(e.dataTransfer.files);
+    }
+  };
 
   const handleConfirmPayment = async (e) => {
     e.preventDefault();
@@ -216,6 +352,26 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
             }}
           >
             Phiếu nhập hàng {docs.length > 0 ? `(${docs.length})` : ''}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('images')}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              background: 'transparent',
+              fontWeight: activeSubTab === 'images' ? 700 : 500,
+              color: activeSubTab === 'images' ? '#ea580c' : '#64748b',
+              borderBottom: activeSubTab === 'images' ? '2px solid #ea580c' : '2px solid transparent',
+              cursor: 'pointer',
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <PictureOutlined /> Hình ảnh {imageUrls.length > 0 ? `(${imageUrls.length})` : ''}
           </button>
         </div>
 
@@ -519,13 +675,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Đã thanh toán</th>
                       <th style={{ padding: '7px 10px', textAlign: 'right' }}>Còn nợ</th>
                       <th style={{ padding: '7px 10px', textAlign: 'center' }}>Trạng thái thanh toán</th>
-                      <th style={{ padding: '7px 10px', textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {docs.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                           Chưa có phiếu nhập hàng nào từ đối tác này
                         </td>
                       </tr>
@@ -559,7 +714,19 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                   ) : (
                                     <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
                                   )}
-                                  <span style={{ fontWeight: 700, color: '#2563eb' }}>
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`);
+                                    }}
+                                    style={{
+                                      fontWeight: 700,
+                                      color: '#2563eb',
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline'
+                                    }}
+                                    title="Bấm để xem phiếu nhập kho tương ứng"
+                                  >
                                     {d.code}
                                   </span>
                                 </div>
@@ -646,27 +813,12 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                                   </button>
                                 )}
                               </td>
-                              <td style={{ padding: '7px 10px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                                <span
-                                  onClick={() => navigate(`/inventory-management?tab=Import&search=${encodeURIComponent(d.code)}`)}
-                                  style={{
-                                    fontSize: 11,
-                                    color: '#2563eb',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                    textDecoration: 'underline'
-                                  }}
-                                  title="Nhấp để xem chi tiết chứng từ nhập kho"
-                                >
-                                  Xem chứng từ
-                                </span>
-                              </td>
                             </tr>
 
                             {/* VÙNG CHI TIẾT LỊCH SỬ GIAO DỊCH TƯƠNG ỨNG CỦA PHIẾU NHẬP */}
                             {isDocExpanded && (
                               <tr style={{ background: '#f8fafc' }}>
-                                <td colSpan={7} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
+                                <td colSpan={6} style={{ padding: '10px 14px 14px 14px', borderBottom: '1px solid #cbd5e1' }}>
                                   <div
                                     style={{
                                       background: '#ffffff',
@@ -773,6 +925,357 @@ const PartnerDetailSection = ({ partner, onEdit, onDelete, onRefresh }) => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: HÌNH ẢNH HỢP ĐỒNG ĐỐI TÁC */}
+          {activeSubTab === 'images' && (
+            <div>
+              {/* THANH TIÊU ĐỀ TAB */}
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  marginBottom: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <PictureOutlined style={{ color: '#ea580c', fontSize: 14 }} />
+                <span>Hình ảnh hợp đồng & chứng từ đối tác ({imageUrls.length})</span>
+              </div>
+
+              {/* INPUT FILE ẨN ĐỂ MỞ THƯ MỤC / CHỌN ẢNH */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                multiple
+                onChange={(e) => handleUploadFiles(e.target.files)}
+                style={{ display: 'none' }}
+              />
+
+              {/* KHU VỰC KÉO THẢ ẢNH (DROPZONE) */}
+              <div
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                style={{
+                  border: isDragging ? '2px dashed #ea580c' : '2px dashed #cbd5e1',
+                  background: isDragging ? '#fff7ed' : '#f8fafc',
+                  borderRadius: 8,
+                  padding: isDragging ? '24px 20px' : '16px 20px',
+                  textAlign: 'center',
+                  marginBottom: 14,
+                  transition: 'all 0.2s ease',
+                  boxShadow: isDragging ? '0 6px 18px rgba(234, 88, 12, 0.2)' : 'none',
+                  cursor: 'pointer'
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isDragging ? (
+                  <div style={{ pointerEvents: 'none' }}>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: '#ea580c',
+                        color: '#ffffff',
+                        padding: '6px 18px',
+                        borderRadius: 20,
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        marginBottom: 8,
+                        boxShadow: '0 2px 6px rgba(234, 88, 12, 0.35)'
+                      }}
+                    >
+                      <CloudUploadOutlined style={{ fontSize: 16 }} /> SẴN SÀNG TẢI ẢNH LÊN
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#c2410c' }}>
+                      Thả các ảnh hợp đồng vào đây ngay để tải lên!
+                    </div>
+                    <div style={{ fontSize: 11, color: '#ea580c', marginTop: 4 }}>
+                      Hệ thống sẽ tự động lưu ảnh vào hồ sơ của đối tác này
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <CloudUploadOutlined style={{ fontSize: 30, color: '#94a3b8', marginBottom: 6 }} />
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                      Kéo thả ảnh vào đây, hoặc nhấn để mở thư mục chọn ảnh từ máy tính
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                      Định dạng hỗ trợ: PNG, JPG, JPEG, WEBP. Có thể chọn và tải lên nhiều ảnh cùng một lúc.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      disabled={uploadingImage}
+                      style={{
+                        marginTop: 10,
+                        padding: '4px 14px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 5,
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <UploadOutlined style={{ color: '#ea580c' }} /> Mở thư mục chọn ảnh
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* TRẠNG THÁI ĐANG TẢI ẢNH LÊN */}
+              {uploadingImage && (
+                <div
+                  style={{
+                    background: '#fff7ed',
+                    border: '1px solid #fed7aa',
+                    borderRadius: 6,
+                    padding: '10px 14px',
+                    marginBottom: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    fontSize: 12,
+                    color: '#ea580c',
+                    fontWeight: 600
+                  }}
+                >
+                  <LoadingOutlined spin /> Đang xử lý tải ảnh lên máy chủ, vui lòng đợi trong giây lát...
+                </div>
+              )}
+
+              {/* DANH SÁCH ẢNH ĐÃ TẢI LÊN */}
+              {imageUrls.length === 0 ? (
+                <div
+                  style={{
+                    border: '1px dashed #e2e8f0',
+                    borderRadius: 6,
+                    padding: '30px 20px',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    fontSize: 11.5
+                  }}
+                >
+                  <PictureOutlined style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 8, display: 'block' }} />
+                  Chưa có hình ảnh hợp đồng nào được tải lên cho đối tác này.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    maxHeight: 380,
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 6,
+                    padding: 12,
+                    background: '#f8fafc'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                      gap: 12
+                    }}
+                  >
+                    {imageUrls.map((url, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          position: 'relative'
+                        }}
+                      >
+                        {/* HÌNH ẢNH PREVIEW */}
+                        <div
+                          style={{
+                            height: 130,
+                            overflow: 'hidden',
+                            background: '#0f172a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                          onClick={() => setPreviewImage(url)}
+                          title="Nhấp vào ảnh để phóng to"
+                        >
+                          <img
+                            src={url}
+                            alt="Ảnh hợp đồng"
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transition: 'transform 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                          />
+                        </div>
+
+                        {/* NÚT XÓA ẢNH */}
+                        <div
+                          style={{
+                            padding: '6px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#ffffff',
+                            borderTop: '1px solid #f1f5f9'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleConfirmDeleteImage(index);
+                            }}
+                            style={{
+                              width: '100%',
+                              background: '#fef2f2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: 4,
+                              padding: '5px 8px',
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#fee2e2';
+                              e.currentTarget.style.borderColor = '#ef4444';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#fef2f2';
+                              e.currentTarget.style.borderColor = '#fecaca';
+                            }}
+                            title="Xóa ảnh này"
+                          >
+                            <DeleteOutlined /> Xóa ảnh
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* MODAL XEM PHÓNG TO HÌNH ẢNH (LIGHTBOX) */}
+          {previewImage && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                padding: 20
+              }}
+              onClick={() => setPreviewImage(null)}
+            >
+              <div
+                style={{
+                  position: 'relative',
+                  maxWidth: '90vw',
+                  maxHeight: '90vh',
+                  background: '#0f172a',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* THANH ĐIỀU KHIỂN MODAL XEM ẢNH */}
+                <div
+                  style={{
+                    padding: '8px 14px',
+                    background: '#1e293b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    borderBottom: '1px solid #334155'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      fontSize: 16,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '2px 4px'
+                    }}
+                    title="Đóng"
+                  >
+                    <CloseOutlined />
+                  </button>
+                </div>
+
+                {/* KHU VỰC HIỂN THỊ ẢNH */}
+                <div
+                  style={{
+                    padding: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    maxHeight: 'calc(90vh - 60px)',
+                    overflow: 'auto'
+                  }}
+                >
+                  <img
+                    src={previewImage}
+                    alt="Xem ảnh hợp đồng"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: 'calc(85vh - 60px)',
+                      objectFit: 'contain',
+                      borderRadius: 4
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -997,7 +1500,7 @@ const PartnerTable = ({
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedPartnerId, setExpandedPartnerId] = useState(null);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   const toggleExpand = (partnerId) => {
     setExpandedPartnerId((prev) => (prev === partnerId ? null : partnerId));
@@ -1256,58 +1759,14 @@ const PartnerTable = ({
       </div>
 
       {/* PHÂN TRANG */}
-      <div
-        style={{
-          padding: '8px 4px',
-          background: '#ffffff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 11,
-          color: '#64748b',
-          marginTop: 6
-        }}
-      >
-        <div>
-          Hiển thị từ {partners.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
-          {Math.min(currentPage * pageSize, partners.length)} trên tổng {partners.length}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage === 1 ? '#cbd5e1' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Trở lại
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Tiếp
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={partners.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
     </div>
   );
 };

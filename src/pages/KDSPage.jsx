@@ -339,8 +339,9 @@ const KDSPage = () => {
       }
       grouped[key].totalQty += item.quantity;
     });
-    // Lọc ra những món có số lượng >= 2 để gộp mẻ
-    return Object.values(grouped).filter(g => g.totalQty >= 2);
+    // Đưa lên tất cả món đang chờ/đã nhận trong 30 phút gần nhất, kể cả món lẻ
+    // (chỉ 1 bàn đặt) — vẫn coi là 1 mẻ để bếp xử lý đồng bộ qua thanh này.
+    return Object.values(grouped);
   }, [waitingItems, acceptedItems]);
 
 

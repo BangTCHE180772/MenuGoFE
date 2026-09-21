@@ -52,7 +52,7 @@ const INVENTORY_SUB_MENU = [
   { label: "Đối tác", path: "/inventory-management?tab=Partner", tabKey: "Partner" },
   { label: "Khách hàng", path: "/inventory-management?tab=Customer", tabKey: "Customer" },
   { label: "Hóa đơn", path: "/inventory-management?tab=Invoice", tabKey: "Invoice" },
-  { label: "Sản xuất", path: "/inventory-management?tab=Production", tabKey: "Production" },
+  { label: "Đồ chuẩn bị sẵn", path: "/inventory-management?tab=Production", tabKey: "Production" },
   { label: "Danh sách nguyên liệu", path: "/inventory-management?tab=Product", tabKey: "Product" },
   { label: "Lô hàng & Hạn sử dụng", path: "/inventory-management?tab=BatchExpiry", tabKey: "BatchExpiry" },
 ];
@@ -102,7 +102,6 @@ const ROLE_MENUS = {
     { label: "Lịch làm việc", path: "/work-schedule", icon: <CalendarOutlined /> },
     { label: "Phản hồi ca làm", path: "/work-schedule-feedback", icon: <MessageOutlined /> },
     { label: "Quản lý bàn", path: "/tables", icon: <TableOutlined /> },
-    { label: "Quản trị", path: "/admin", icon: <SettingOutlined /> },
     { label: "Trang chào mừng", path: "/welcome", icon: <GlobalOutlined /> },
   ],
   [ROLES.OWNER]: [

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -32,7 +33,7 @@ const AdjustmentTable = ({
   const [loadedDoc, setLoadedDoc] = useState(null);
   const [loadingDocId, setLoadingDocId] = useState(null);
 
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(15);
 
   const totalPages = Math.ceil(documents.length / pageSize) || 1;
   const currentData = documents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -575,60 +576,14 @@ const AdjustmentTable = ({
       </div>
 
       {/* FOOTER PAGINATION */}
-      <div
-        style={{
-          padding: '8px 4px',
-          background: '#ffffff',
-          display: 'flex',
-          justify: 'space-between',
-          alignItems: 'center',
-          fontSize: 11,
-          color: '#64748b'
-        }}
-      >
-        <div>
-          Hiển thị <strong>{currentData.length}</strong> / <strong>{documents.length}</strong> phiếu
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            style={{
-              padding: '4px 8px',
-              fontSize: 11,
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: currentPage === 1 ? '#f8fafc' : '#ffffff',
-              color: currentPage === 1 ? '#94a3b8' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Trở lại
-          </button>
-
-          <span style={{ fontWeight: 600, color: '#334155' }}>
-            Trang {currentPage} / {totalPages}
-          </span>
-
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-            style={{
-              padding: '4px 8px',
-              fontSize: 11,
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: currentPage >= totalPages ? '#f8fafc' : '#ffffff',
-              color: currentPage >= totalPages ? '#94a3b8' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Tiếp
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={documents.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
     </div>
   );
 };

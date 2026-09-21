@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -31,7 +32,7 @@ const ProductionTable = ({
   const [loadedDoc, setLoadedDoc] = useState(null);
   const [loadingDocId, setLoadingDocId] = useState(null);
 
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -101,7 +102,7 @@ const ProductionTable = ({
             <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
             <input
               type="text"
-              placeholder="Theo mã phiếu sản xuất, người tạo..."
+              placeholder="Theo mã phiếu, người tạo..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               style={{
@@ -179,7 +180,7 @@ const ProductionTable = ({
               boxShadow: '0 2px 4px rgba(232, 68, 42, 0.25)'
             }}
           >
-            <PlusOutlined /> Sản xuất
+            <PlusOutlined /> Đồ chuẩn bị sẵn
           </button>
           <button
             type="button"
@@ -230,7 +231,7 @@ const ProductionTable = ({
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu sản xuất nào</td>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>Không tìm thấy phiếu đồ chuẩn bị sẵn nào</td>
               </tr>
             ) : (
               currentData.map((doc) => {
@@ -257,13 +258,13 @@ const ProductionTable = ({
                       <td style={{ padding: '8px 10px', fontWeight: 700, color: '#9333ea' }}>{doc.code}</td>
                       <td style={{ padding: '8px 10px' }}>
                         <span style={{ padding: '2px 6px', borderRadius: 4, background: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff', fontSize: 10, fontWeight: 600 }}>
-                          Sản xuất
+                          Đồ chuẩn bị sẵn
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{doc.branchName || doc.snapshotBranchName || doc.currentBranchName || 'Chi nhánh'}</td>
                       <td style={{ padding: '8px 10px', color: '#334155' }}>{dayjs(doc.orderDate || doc.businessDate || doc.createdAt).format('DD/MM/YYYY HH:mm')}</td>
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        {doc.totalAmount ? doc.totalAmount.toLocaleString('vi-VN') : 0} đ
+                        {doc.totalAmount ? Math.round(doc.totalAmount).toLocaleString('vi-VN') : 0} đ
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                         {getStatusBadge(doc.status)}
@@ -345,7 +346,7 @@ const ProductionTable = ({
                                   gap: 6
                                 }}
                               >
-                                <InfoCircleOutlined /> Thông tin chi tiết phiếu sản xuất
+                                <InfoCircleOutlined /> Thông tin chi tiết phiếu đồ chuẩn bị sẵn
                               </div>
                               <button
                                 type="button"
@@ -371,7 +372,7 @@ const ProductionTable = ({
 
                             {loadingDocId === doc.id ? (
                               <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                                Đang nạp chi tiết phiếu sản xuất...
+                                Đang nạp chi tiết phiếu đồ chuẩn bị sẵn...
                               </div>
                             ) : (
                               <div style={{ padding: 16 }}>
@@ -399,21 +400,21 @@ const ProductionTable = ({
                                   </div>
                                 )}
 
-                                {/* BẢNG 1: THÀNH PHẨM SẢN XUẤT */}
+                                {/* BẢNG 1: THÀNH PHẨM CHUẨN BỊ SẴN */}
                                 <div style={{ marginBottom: 16 }}>
                                   <div style={{ fontSize: 12, fontWeight: 700, color: '#7e22ce', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <span style={{ padding: '2px 8px', borderRadius: 4, background: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff', fontSize: 11, fontWeight: 700 }}>
-                                      Thành phẩm sản xuất (Tăng tồn kho)
+                                      Đồ chuẩn bị sẵn / Thành phẩm (Tăng tồn kho)
                                     </span>
                                   </div>
                                   <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                                       <thead>
                                         <tr style={{ background: '#faf5ff', borderBottom: '1px solid #e2e8f0', color: '#6b21a8', fontWeight: 700, textAlign: 'left' }}>
-                                          <th style={{ padding: '8px 10px' }}>Mã thành phẩm</th>
-                                          <th style={{ padding: '8px 10px' }}>Tên thành phẩm</th>
+                                          <th style={{ padding: '8px 10px' }}>Mã mặt hàng</th>
+                                          <th style={{ padding: '8px 10px' }}>Tên mặt hàng</th>
                                           <th style={{ padding: '8px 10px', textAlign: 'center' }}>Đơn vị tính</th>
-                                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số lượng sản xuất</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số lượng</th>
                                           <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn đơn vị (đ)</th>
                                           <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thành tiền (đ)</th>
                                         </tr>
@@ -422,13 +423,13 @@ const ProductionTable = ({
                                         {finishedProducts.length === 0 ? (
                                           <tr>
                                             <td colSpan={6} style={{ textAlign: 'center', padding: 12, color: '#94a3b8' }}>
-                                              Chưa có thông tin thành phẩm sản xuất
+                                              Chưa có thông tin đồ chuẩn bị sẵn
                                             </td>
                                           </tr>
                                         ) : (
                                           finishedProducts.map((dt, idx) => {
                                             const pCode = dt.snapshotProductCode || dt.currentProductCode || dt.code || `TP${idx + 1}`;
-                                            const pName = dt.snapshotProductName || dt.currentProductName || dt.productName || dt.name || 'Thành phẩm';
+                                            const pName = dt.snapshotProductName || dt.currentProductName || dt.productName || dt.name || 'Đồ chuẩn bị sẵn';
                                             const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
                                             const qty = Number(dt.quantity || 0);
                                             const price = Number(dt.unitPrice || dt.snapshotAvgCost || 0);
@@ -442,6 +443,60 @@ const ProductionTable = ({
                                                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{qty.toLocaleString('vi-VN')}</td>
                                                 <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>{Math.round(price).toLocaleString('vi-VN')} đ</td>
                                                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#9333ea' }}>{Math.round(total).toLocaleString('vi-VN')} đ</td>
+                                              </tr>
+                                            );
+                                          })
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                {/* BẢNG 2: NGUYÊN LIỆU TIÊU HAO THEO CÔNG THỨC */}
+                                <div style={{ marginBottom: 16 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: '#ea580c', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ padding: '2px 8px', borderRadius: 4, background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa', fontSize: 11, fontWeight: 700 }}>
+                                      Nguyên liệu tiêu hao theo công thức (Giảm tồn kho)
+                                    </span>
+                                  </div>
+                                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                      <thead>
+                                        <tr style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa', color: '#c2410c', fontWeight: 700, textAlign: 'left' }}>
+                                          <th style={{ padding: '8px 10px' }}>Mã nguyên liệu</th>
+                                          <th style={{ padding: '8px 10px' }}>Tên nguyên liệu</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'center' }}>Đơn vị tính</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Số lượng tiêu hao</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Giá vốn đơn vị (đ)</th>
+                                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thành tiền (đ)</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {ingredients.length === 0 ? (
+                                          <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: 12, color: '#94a3b8' }}>
+                                              {isPending ? 'Nguyên liệu tiêu hao sẽ tự động được trừ kho theo công thức khi hoàn thành phiếu.' : 'Không có nguyên liệu tiêu hao nào được ghi nhận cho phiếu này.'}
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          ingredients.map((dt, idx) => {
+                                            const pCode = dt.snapshotProductCode || dt.currentProductCode || dt.code || `NL${idx + 1}`;
+                                            const pName = dt.snapshotProductName || dt.currentProductName || dt.productName || dt.name || 'Nguyên liệu';
+                                            const uName = dt.unitName || dt.snapshotUnitName || dt.currentUnitName || 'Đơn vị';
+                                            const qty = Number(dt.quantity || 0);
+                                            const price = Number(dt.unitPrice || dt.snapshotAvgCost || 0);
+                                            const total = qty * price;
+
+                                            return (
+                                              <tr key={dt.id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
+                                                <td style={{ padding: '8px 10px', fontWeight: 700, color: '#ea580c' }}>{pCode}</td>
+                                                <td style={{ padding: '8px 10px', color: '#1e293b', fontWeight: 600 }}>{pName}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'center', color: '#475569' }}>{uName}</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
+                                                  -{qty.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}
+                                                </td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>{Math.round(price).toLocaleString('vi-VN')} đ</td>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>{Math.round(total).toLocaleString('vi-VN')} đ</td>
                                               </tr>
                                             );
                                           })
@@ -478,7 +533,7 @@ const ProductionTable = ({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (window.confirm('Bạn có chắc chắn muốn xóa phiếu sản xuất nháp này?')) {
+                                        if (window.confirm('Bạn có chắc chắn muốn xóa phiếu đồ chuẩn bị sẵn nháp này?')) {
                                           handleDeleteDocument(doc.id, doc.type || 9, doc.status);
                                         }
                                       }}
@@ -514,26 +569,14 @@ const ProductionTable = ({
         </table>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 11, color: '#64748b' }}>
-        <div>Tổng số: <strong>{documents.length}</strong> phiếu</div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-          >
-            Trở lại
-          </button>
-          <span>Trang {currentPage} / {totalPages}</span>
-          <button
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
-            style={{ padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
-          >
-            Tiếp
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={documents.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
     </div>
   );
 };

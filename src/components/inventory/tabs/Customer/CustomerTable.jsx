@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PaginationFooter from '../../../shared/PaginationFooter';
 import { useNavigate } from 'react-router-dom';
 import {
   PlusOutlined,
@@ -542,7 +543,7 @@ const CustomerTable = ({
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   const toggleExpand = (customerId) => {
     setExpandedCustomerId((prev) => (prev === customerId ? null : customerId));
@@ -733,58 +734,14 @@ const CustomerTable = ({
       </div>
 
       {/* FOOTER PAGINATION */}
-      <div
-        style={{
-          padding: '8px 4px',
-          background: '#ffffff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 11,
-          color: '#64748b',
-          marginTop: 6
-        }}
-      >
-        <div>
-          Hiển thị từ {customers.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} đến{' '}
-          {Math.min(currentPage * pageSize, customers.length)} trên tổng {customers.length} khách hàng
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage === 1 ? '#cbd5e1' : '#334155',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Trở lại
-          </button>
-          <span>
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              padding: '2px 6px',
-              borderRadius: 4,
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Tiếp
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={customers.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
     </div>
   );
 };
