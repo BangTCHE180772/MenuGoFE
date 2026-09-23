@@ -135,12 +135,12 @@ const CashierPage = () => {
           {/* <Tag icon={<SafetyCertificateOutlined />} color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
             Thiết bị đã xác thực
           </Tag> */}
-          <Button icon={<ReloadOutlined />} onClick={() => {
+          {/* <Button icon={<ReloadOutlined />} onClick={() => {
             fetchData(true);
             setRefreshKey(prev => prev + 1);
           }}>
             Làm mới
-          </Button>
+          </Button> */}
         </Space>
       </div>
 
