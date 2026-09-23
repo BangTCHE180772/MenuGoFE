@@ -167,14 +167,6 @@ const CashierPage = () => {
               </span>
             ),
           },
-          {
-            key: 'SHIFT_STATS',
-            label: (
-              <span>
-                <ThunderboltOutlined /> Thống Kê Ca Thu Ngân ({paidTodayOrders.length} HĐ đã thu)
-              </span>
-            ),
-          },
         ]}
       />
 
@@ -189,13 +181,6 @@ const CashierPage = () => {
       {activeTab === 'RESERVATION' && (
         <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
           <ReservationPage key={`reservation-${refreshKey}`} isPosHub={true} />
-        </Card>
-      )}
-
-      {/* ── TAB 3: THỐNG KÊ CA THU NGÂN ─────────────────────────────────────── */}
-      {activeTab === 'SHIFT_STATS' && (
-        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 24 }}>
-          <ShiftStatsPanel shifts={shifts} paidTodayOrders={paidTodayOrders} loading={loading} />
         </Card>
       )}
     </div>
