@@ -472,7 +472,7 @@ const KDSPage = () => {
       statusTag = <Tag color="orange">ĐANG NẤU</Tag>;
     } else if (status === COOKING_STATUS.READY) {
       cardBorderColor = '#52c41a';
-      statusTag = <Tag color="green">READY</Tag>;
+      statusTag = <Tag color="green">SẴN SÀNG</Tag>;
     }
 
     // Món thừa khớp đúng sản phẩm + số lượng, còn trong 30p — chỉ gợi ý khi món
@@ -748,7 +748,7 @@ const KDSPage = () => {
           </div>
           <div style={{ minWidth: 0 }}>
             <Title level={3} style={{ color: '#000000', margin: 0, whiteSpace: 'nowrap' }}>
-              Màn hình Bếp & Chế biến (KDS)
+              Màn hình Bếp & Chế biến
             </Title>
             <Text style={{ color: '#595959', whiteSpace: 'nowrap' }}>
               Điều phối & Điều khiển Thứ tự Chế biến Món ăn theo Thời gian Thực
@@ -773,7 +773,7 @@ const KDSPage = () => {
               onClick={() => setViewMode('GRID')}
               style={viewMode === 'GRID' ? { backgroundColor: '#1890ff', borderColor: '#1890ff', color: '#ffffff' } : { backgroundColor: '#ffffff', borderColor: '#d9d9d9', color: '#000000' }}
             >
-              Dạng Tabs
+              Dạng Thẻ
             </Button>
           </Button.Group>
 
@@ -828,7 +828,7 @@ const KDSPage = () => {
               message={
                 <Space>
                   <ExclamationCircleOutlined style={{ fontSize: 18, color: '#ff4d4f' }} />
-                  <span style={{ fontWeight: 700 }}>CẢNH BÁO BẾP (EX-1):</span>
+                  <span style={{ fontWeight: 700 }}>CẢNH BÁO BẾP:</span>
                   <span>{alert.message}</span>
                   <Tag color="default">{alert.timestamp}</Tag>
                 </Space>
@@ -890,7 +890,7 @@ const KDSPage = () => {
       <div style={{ marginBottom: 20, backgroundColor: KDS_STYLE.cardBg, padding: '16px 20px', borderRadius: KDS_STYLE.radius, border: KDS_STYLE.border, boxShadow: KDS_STYLE.shadow }}>
         <Title level={5} style={{ margin: '0 0 12px 0', color: KDS_STYLE.textPrimary, display: 'flex', alignItems: 'center' }}>
           <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8, fontSize: 18 }} />
-          Thanh Chế Biến Theo Lô / Mẻ (Batch Processing Bar)
+          Thanh Chế Biến Theo Lô / Mẻ
         </Title>
         {batchableItems.length === 0 ? (
           <Text style={{ color: KDS_STYLE.textSecondary }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
@@ -992,7 +992,7 @@ const KDSPage = () => {
                 borderBottom: '2px solid #52c41a'
               }}>
                 <Title level={4} style={{ color: '#000000', margin: 0, fontSize: 16 }}>
-                  ✅ Ready ({readyItems.length})
+                  ✅ Sẵn sàng ({readyItems.length})
                 </Title>
                 <Badge count={readyItems.length} style={{ backgroundColor: '#52c41a' }} />
               </div>
