@@ -181,7 +181,7 @@ const ROLE_MENUS = {
 
 // ─── Hiển thị role bằng tiếng Việt ───────────────────────────────────────
 const ROLE_LABELS = {
-  [ROLES.ADMIN]: "Quản trị viên",
+  [ROLES.ADMIN]: "Chủ sở hữu",
   [ROLES.OWNER]: "Chủ sở hữu",
   [ROLES.MANAGER]: "Quản lý",
   [ROLES.CASHIER]: "Thu ngân",
