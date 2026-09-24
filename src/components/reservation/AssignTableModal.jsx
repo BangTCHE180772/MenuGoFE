@@ -28,9 +28,10 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
   };
 
   const handleOk = async () => {
+    let tableIds;
     try {
       const values = await form.validateFields();
-      const { tableIds } = values;
+      tableIds = values.tableIds;
 
       if (!tableIds || tableIds.length === 0) {
         message.warning('Vui lòng chọn ít nhất 1 bàn!');
@@ -46,6 +47,8 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
       
       // Handle Reservation Warning
       if (error.response?.status === 422 && error.response.data?.isWarning) {
+        const currentTableIds = tableIds;
+        const currentReservationId = reservation.id;
         Modal.confirm({
           title: 'Cảnh báo xếp bàn',
           content: error.response.data.message,
@@ -53,15 +56,11 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
           cancelText: 'Huỷ',
           onOk: async () => {
             try {
-              setSubmitting(true);
-              // Retry with ignoreWarning = true
-              await assignTablesToReservation(reservation.id, tableIds, true);
+              await assignTablesToReservation(currentReservationId, currentTableIds, true);
               message.success('Xếp bàn thành công!');
               onSuccess();
             } catch (retryError) {
               message.error(retryError.response?.data?.message || 'Xếp bàn thất bại');
-            } finally {
-              setSubmitting(false);
             }
           }
         });
@@ -78,10 +77,19 @@ const AssignTableModal = ({ visible, onClose, onSuccess, reservation }) => {
     <Modal
       title="Xếp Bàn Cho Khách"
       open={visible}
-      onCancel={onClose}
+      onCancel={() => {
+        Modal.confirm({
+          title: 'Xác nhận đóng',
+          content: 'Bạn có chắc chắn muốn đóng cửa sổ xếp bàn không?',
+          okText: 'Đóng',
+          cancelText: 'Huỷ',
+          onOk: onClose
+        });
+      }}
       onOk={handleOk}
       confirmLoading={submitting}
       destroyOnClose
+      maskClosable={false}
     >
       <Spin spinning={loading}>
         {reservation && (

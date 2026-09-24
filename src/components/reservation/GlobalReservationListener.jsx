@@ -1,13 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { notification, Button, message } from 'antd';
 import { useSignalR } from '../../context/SignalRContext';
-import ChangeTableModal from './ChangeTableModal';
 import axiosInstance from '../../api/axiosInstance';
 
 const GlobalReservationListener = () => {
   const connection = useSignalR();
-  const [conflictData, setConflictData] = useState(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
     if (!connection) return;
@@ -26,20 +23,6 @@ const GlobalReservationListener = () => {
         description: data.Message,
         duration: 0, // Don't auto close
         placement: 'topRight',
-        btn: (
-          <Button
-            type="primary"
-            danger
-            size="small"
-            onClick={() => {
-              notification.destroy(key);
-              setConflictData(data);
-              setIsModalVisible(true);
-            }}
-          >
-            Xử lý ngay
-          </Button>
-        ),
       });
     };
 
@@ -93,19 +76,7 @@ const GlobalReservationListener = () => {
     };
   }, [connection]);
 
-  return (
-    <>
-      <ChangeTableModal
-        visible={isModalVisible}
-        conflictData={conflictData}
-        onClose={() => setIsModalVisible(false)}
-        onSuccess={() => {
-          // If you need to trigger a global refresh, you can do it here
-          // e.g., triggering a custom event or relying on SignalR updates
-        }}
-      />
-    </>
-  );
+  return null;
 };
 
 export default GlobalReservationListener;
