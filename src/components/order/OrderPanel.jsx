@@ -252,11 +252,12 @@ const OrderPanel = ({
   if (statusKey === TABLE_STATUS.OCCUPIED && summary?.activeOrderId) {
     const cleanIndex = transitions.findIndex(t => t.to === TABLE_STATUS.CLEANING);
     if (cleanIndex >= 0 && !isWaiterMode) {
-      if (orderedItems.length === 0) {
+      const effectiveItemsCount = orderedItems.filter(i => (i.quantity - (i.returnedQuantity || 0)) > 0).length;
+
+      if (effectiveItemsCount === 0) {
         transitions.splice(cleanIndex, 1, {
-          isCancelOrder: true,
-          orderId: summary.activeOrderId,
-          label: 'Hủy bàn (0đ)',
+          isPayment: true,
+          label: 'Hủy bàn (trống)',
           cls: 'btn-red'
         });
       } else {

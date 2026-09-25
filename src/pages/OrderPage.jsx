@@ -444,12 +444,30 @@ const OrderPage = ({ isWaiterMode }) => {
   const handlePaymentClick = () => {
     const activeItems = orderSummary?.items?.filter(i => i.status !== 'Cancelled') || [];
     const hasUnservedItems = activeItems.some(i => i.cookingStatus !== 'Served');
+    const effectiveItemsCount = activeItems.filter(i => (i.quantity - (i.returnedQuantity || 0)) > 0).length;
 
     if (hasUnservedItems) {
       Modal.warning({
         title: 'Cảnh báo: Bàn chưa lên hết món',
         content: 'Vẫn còn món chưa được phục vụ (đang chờ hoặc đang nấu). Vui lòng phục vụ hoặc huỷ món trước khi thanh toán.',
         okText: 'Đã hiểu',
+      });
+    } else if (effectiveItemsCount === 0) {
+      Modal.confirm({
+        title: 'Xác nhận hủy đơn & dọn bàn',
+        content: 'Đơn hàng trống (không có món nào hợp lệ). Bạn có chắc chắn muốn hủy đơn này và chuyển bàn về trạng thái dọn dẹp không?',
+        okText: 'Đồng ý',
+        cancelText: 'Huỷ',
+        onOk: async () => {
+          try {
+            await payOrder(orderSummary.activeOrderId, { paymentMethod: 'Cash' });
+            message.success('Đã hủy đơn hàng trống và chuyển bàn sang trạng thái dọn dẹp.');
+            handleRefreshData();
+          } catch (err) {
+            console.error(err);
+            message.error('Có lỗi xảy ra khi xử lý đơn hàng trống.');
+          }
+        }
       });
     } else {
       setIsPaymentModalVisible(true);
