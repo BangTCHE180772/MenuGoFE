@@ -95,6 +95,25 @@ body::-webkit-scrollbar:horizontal,
   background: transparent !important;
 }
 
+/* Custom visible vertical scrollbar for scrollable panels */
+.pretty-scrollbar::-webkit-scrollbar:vertical {
+  width: 6px !important;
+  display: block !important;
+}
+
+.pretty-scrollbar::-webkit-scrollbar-thumb:vertical {
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-radius: 4px !important;
+}
+
+.pretty-scrollbar::-webkit-scrollbar-thumb:vertical:hover {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+.pretty-scrollbar::-webkit-scrollbar-track:vertical {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+
 
 /* ─── Layouts ────────────────────────────────────────────────────────────── */
 .auth-layout {
