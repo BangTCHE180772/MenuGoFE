@@ -422,10 +422,12 @@ const LeftoverPage = () => {
                 label="Số lượng" 
                 rules={[
                   { required: true, message: 'Nhập số lượng' },
-                  type === 'Return' && maxReturnable !== undefined 
-                    ? { type: 'number', max: maxReturnable, message: `Tối đa ${maxReturnable}` } 
-                    : {}
-                ]} 
+                  // Không đưa luật rỗng {} vào đây: async-validator coi là kiểu chuỗi và báo
+                  // "không phải kiểu undefined hợp lệ" trên giá trị số.
+                  ...(type === 'Return' && maxReturnable !== undefined
+                    ? [{ type: 'number', max: maxReturnable, message: `Tối đa ${maxReturnable}` }]
+                    : []),
+                ]}
                 style={{ width: 120 }}
               >
                 <InputNumber min={1} max={type === 'Return' ? maxReturnable : undefined} style={{ width: '100%' }} />
