@@ -298,6 +298,45 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) =>
     );
   };
 
+  const getDocumentTab = (docCode = '', docType, allocType) => {
+    const code = (docCode || '').toUpperCase().trim();
+
+    // 1. Phân loại theo DocumentType
+    if (docType === 1 || docType === 'Import') return 'Import';
+    if (docType === 2 || docType === 'Return') return 'ImportReturn';
+    if (docType === 3 || docType === 'Sale') return 'Invoice';
+    if (docType === 4 || docType === 'CustomerReturn') return 'Invoice';
+    if (docType === 5 || docType === 'Transfer') return 'Transfer';
+    if (docType === 7 || docType === 8 || docType === 'Export' || docType === 'ExportDelete') return 'ExportDelete';
+    if (docType === 9 || docType === 'Production') return 'Production';
+    if (docType === 10 || docType === 'Check') return 'Check';
+    if (docType === 11 || docType === 'CostAdjustment') return 'Adjustment';
+
+    // 2. Phân loại theo AllocationType
+    if (allocType === 0 || allocType === 'ImportReceipt') return 'Import';
+    if (allocType === 1 || allocType === 'Sale') return 'Invoice';
+    if (allocType === 2 || allocType === 'TransferSend' || allocType === 3 || allocType === 'TransferReceive') return 'Transfer';
+    if (allocType === 4 || allocType === 'StockCheck') return 'Check';
+    if (allocType === 5 || allocType === 'Disposal') return 'ExportDelete';
+    if (allocType === 6 || allocType === 'SupplierReturn') return 'ImportReturn';
+    if (allocType === 7 || allocType === 'CustomerReturn') return 'Invoice';
+    if (allocType === 8 || allocType === 'CostAdjustment') return 'Adjustment';
+    if (allocType === 9 || allocType === 'ProductionReceipt' || allocType === 10 || allocType === 'ProductionConsumption') return 'Production';
+
+    // 3. Phân loại theo Tiền tố mã chứng từ (Code Prefix)
+    if (code.startsWith('NH') || code.startsWith('PNK')) return 'Import';
+    if (code.startsWith('THK')) return 'Invoice';
+    if (code.startsWith('TH') || code.startsWith('PTN')) return 'ImportReturn';
+    if (code.startsWith('BH') || code.startsWith('HD') || code.startsWith('DH') || code.startsWith('PXBH')) return 'Invoice';
+    if (code.startsWith('CK') || code.startsWith('PCH')) return 'Transfer';
+    if (code.startsWith('XH') || code.startsWith('PXH')) return 'ExportDelete';
+    if (code.startsWith('SX') || code.startsWith('LSX')) return 'Production';
+    if (code.startsWith('KK') || code.startsWith('PKK')) return 'Check';
+    if (code.startsWith('DC') || code.startsWith('DGV')) return 'Adjustment';
+
+    return 'Invoice';
+  };
+
   return (
     <div
       style={{
@@ -716,7 +755,21 @@ const BatchTraceabilityDrawer = ({ open, batchId, onClose, onActionSuccess }) =>
                                 {renderAllocationTypeBadge(a)}
                               </td>
                               <td style={{ padding: '8px 10px', fontWeight: 600, color: '#2563eb' }}>
-                                {a.documentCode ? <a href={`/inventory-management?tab=Invoice&search=${a.documentCode}`} target="_blank">{a.documentCode}</a> : '---'}
+                                {a.documentCode ? (
+                                  <a
+                                    href={`/inventory-management?tab=${getDocumentTab(a.documentCode, a.documentType, a.allocationType)}&search=${encodeURIComponent(a.documentCode)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={`Mở chi tiết chứng từ ${a.documentCode}`}
+                                    style={{ color: '#2563eb', textDecoration: 'none' }}
+                                    onMouseEnter={(e) => (e.target.style.textDecoration = 'underline')}
+                                    onMouseLeave={(e) => (e.target.style.textDecoration = 'none')}
+                                  >
+                                    {a.documentCode}
+                                  </a>
+                                ) : (
+                                  '---'
+                                )}
                               </td>
                               <td
                                 style={{
