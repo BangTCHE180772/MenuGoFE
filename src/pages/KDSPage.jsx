@@ -249,7 +249,7 @@ const KDSPage = () => {
 
   const handleBatchStatusChange = async (productId, nextStatus) => {
     try {
-      const res = await batchUpdateCookingStatus(productId, nextStatus);
+      const res = await batchUpdateCookingStatus(productId, nextStatus, currentBranchId);
       if (res.data?.failed > 0) {
         // Một số món trong mẻ không bắt đầu được (vd: thiếu nguyên liệu) — báo rõ lý do.
         message.warning(res.data.message, 8);
@@ -598,7 +598,7 @@ const KDSPage = () => {
               block
               size="large"
               icon={<FireOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING, 1)}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
               style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff', marginBottom: 8 }}
             >
               Xác nhận chế biến
