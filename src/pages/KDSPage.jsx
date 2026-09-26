@@ -247,9 +247,9 @@ const KDSPage = () => {
     }
   };
 
-  const handleBatchStatusChange = async (productId, nextStatus) => {
+  const handleBatchStatusChange = async (productId, nextStatus, quantity) => {
     try {
-      const res = await batchUpdateCookingStatus(productId, nextStatus, currentBranchId);
+      const res = await batchUpdateCookingStatus(productId, nextStatus, currentBranchId, quantity);
       if (res.data?.failed > 0) {
         // Một số món trong mẻ không bắt đầu được (vd: thiếu nguyên liệu) — báo rõ lý do.
         message.warning(res.data.message, 8);
@@ -323,7 +323,17 @@ const KDSPage = () => {
     });
     // Đưa lên tất cả món đang chờ/đã nhận trong 30 phút gần nhất, kể cả món lẻ
     // (chỉ 1 bàn đặt) — vẫn coi là 1 mẻ để bếp xử lý đồng bộ qua thanh này.
-    return Object.values(grouped);
+    // Tách thành các mẻ nhỏ, mỗi mẻ tối đa 10 phần
+    const finalBatches = [];
+    Object.values(grouped).forEach(batch => {
+      let remaining = batch.totalQty;
+      while (remaining > 0) {
+        const qty = Math.min(remaining, 10);
+        finalBatches.push({ ...batch, totalQty: qty });
+        remaining -= qty;
+      }
+    });
+    return finalBatches;
   }, [waitingItems, acceptedItems]);
 
 
@@ -856,9 +866,9 @@ const KDSPage = () => {
           <Text style={{ color: KDS_STYLE.textSecondary }}>Không có món cần gộp chế biến theo mẻ lúc này.</Text>
         ) : (
           <Space size="middle" wrap style={{ width: '100%' }}>
-            {batchableItems.map(batch => (
+            {batchableItems.map((batch, index) => (
               <Card
-                key={batch.productId}
+                key={`${batch.productId}-${index}`}
                 size="small"
                 style={{ borderColor: '#f0f0f0', backgroundColor: KDS_STYLE.cardBg, minWidth: 260, borderRadius: 10, overflow: 'hidden' }}
                 styles={{ body: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
@@ -872,7 +882,7 @@ const KDSPage = () => {
                 <Button 
                   type="primary" 
                   size="large"
-                  onClick={() => handleBatchStatusChange(batch.productId, COOKING_STATUS.COOKING)}
+                  onClick={() => handleBatchStatusChange(batch.productId, COOKING_STATUS.COOKING, batch.totalQty)}
                   style={{ marginLeft: 20, backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 700, height: 48, borderRadius: 8 }}
                   icon={<FireOutlined style={{ fontSize: 20 }} />}
                 >
