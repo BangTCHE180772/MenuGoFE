@@ -598,7 +598,7 @@ const KDSPage = () => {
               block
               size="large"
               icon={<FireOutlined />}
-              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING, 1)}
+              onClick={() => handleStatusChange(item.orderDetailId, COOKING_STATUS.COOKING)}
               style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, color: '#ffffff', marginBottom: 8 }}
             >
               Xác nhận chế biến
