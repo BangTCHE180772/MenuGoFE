@@ -249,7 +249,7 @@ const KDSPage = () => {
 
   const handleBatchStatusChange = async (productId, nextStatus) => {
     try {
-      const res = await batchUpdateCookingStatus(productId, nextStatus);
+      const res = await batchUpdateCookingStatus(productId, nextStatus, currentBranchId);
       if (res.data?.failed > 0) {
         // Một số món trong mẻ không bắt đầu được (vd: thiếu nguyên liệu) — báo rõ lý do.
         message.warning(res.data.message, 8);
