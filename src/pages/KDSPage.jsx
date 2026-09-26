@@ -627,37 +627,39 @@ const KDSPage = () => {
           {/* Cancellation Option ("Huỷ món") — món Ready vẫn huỷ được cho luồng
               "bếp làm chậm, khách đi về không nhận món nữa" (lỗi của bếp, được
               ghi nhận vào thống kê Món thừa). */}
-          <Popconfirm
-            title={
-              status === COOKING_STATUS.READY
-                ? 'Huỷ món ĐÃ HOÀN THÀNH này? (Sẽ được ghi nhận là bếp làm chậm trong thống kê)'
-                : 'Bạn có chắc chắn muốn hủy món này không?'
-            }
-            onConfirm={() => {
-                if (item.orderDetailIds) {
-                    item.orderDetailIds.forEach(id => handleCancelItem(id));
-                } else {
-                    handleCancelItem(item.orderDetailId);
-                }
-            }}
-            okText="Đồng ý"
-            cancelText="Hủy bỏ"
-            okButtonProps={{ danger: true }}
-          >
-            <Button
-              danger
-              block
-              type="text"
-              style={{
-                marginTop: 4,
-                borderColor: '#ff4d4f',
-                color: '#ff4d4f',
-                border: '1px dashed #ff4d4f',
+          {status !== COOKING_STATUS.COOKING && (
+            <Popconfirm
+              title={
+                status === COOKING_STATUS.READY
+                  ? 'Huỷ món ĐÃ HOÀN THÀNH này? (Sẽ được ghi nhận là bếp làm chậm trong thống kê)'
+                  : 'Bạn có chắc chắn muốn hủy món này không?'
+              }
+              onConfirm={() => {
+                  if (item.orderDetailIds) {
+                      item.orderDetailIds.forEach(id => handleCancelItem(id));
+                  } else {
+                      handleCancelItem(item.orderDetailId);
+                  }
               }}
+              okText="Đồng ý"
+              cancelText="Hủy bỏ"
+              okButtonProps={{ danger: true }}
             >
-              Hủy món
-            </Button>
-          </Popconfirm>
+              <Button
+                danger
+                block
+                type="text"
+                style={{
+                  marginTop: 4,
+                  borderColor: '#ff4d4f',
+                  color: '#ff4d4f',
+                  border: '1px dashed #ff4d4f',
+                }}
+              >
+                Hủy món
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       </Card>
     );
